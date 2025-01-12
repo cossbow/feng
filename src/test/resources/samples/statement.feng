@@ -1,0 +1,120 @@
+//
+// Statements
+//
+
+
+func commons() {
+    var a,b int;
+    var c,d = 1,1.2;
+    e,f = 3,4;
+}
+
+
+// if..else
+
+func checkIfStatement(code int) rom {
+    if (c < 0) throw new(OutBoundError, 0);
+
+    if (var c=code; c == 0) return "SUCCESS";
+    else if (c == 1) return "RUNNING";
+    else return "FAILED";
+}
+
+
+// for
+
+func checkForStatement(max int,
+         handle func(v int, v int) bool) {
+    // clause
+    for (var i = 0; i < max; i += 1) {
+        handle(i);
+    }
+    // simple
+    var i = 0;
+    for ( i < max ) {
+        handle(i);
+        i += 1;
+    }
+    // iterable
+    var src []int = {1,2,3,4,5,6,7,8,9};
+    for ( j : src ) {
+        handle(j);
+    }
+}
+
+
+// switch..case
+
+func checkSwitchStatement(c int) {
+    switch( var v = c % 4 ; c) {
+    case 0:
+    case 1:
+        return v;
+    case 2:
+        fallthrough;
+    case 3:
+        print(v);
+    default:
+    }
+}
+
+
+// try..catch..finally
+
+func throwStatement() {
+    throw error.simpleError("");
+}
+
+func tryStatement(run func()) {
+    // type 1
+    try {
+        run();
+        run();
+    } catch (e InnerError) {
+        checkError(e);
+    } catch (e ArgError) {
+    }
+    // type 2
+    try {
+        run();
+    } finally {
+        done();
+    }
+    // type 3
+    try {
+        run();
+        run();
+    } catch (e IoError|FmtError) {
+    } catch (e InnerError) {
+        checkError(e);
+    } finally {
+        done();
+    }
+}
+
+
+
+func multiIf(a, b int) int {
+    var a = if(a<b) true, "ok" else false, "not ok";
+    a = if(a<b) true, "ok" else false, "not ok";
+    return if(a<b) true, "ok" else false, "not ok";
+}
+
+func multiSwitch(a, b int) (int,int) {
+    var a = switch(a) {
+        case 1,2: 0,0;
+        case -1: 0;
+        default: 1,2;
+    };
+    a = switch(a) {
+        case 1,2: 0,0;
+        case -1: 0;
+        default: 1,2;
+    };
+    return switch(a) {
+        case 1,2: 0,0;
+        case -1: 0;
+        default: 1,2;
+    };
+}
+

@@ -1,0 +1,25 @@
+package org.cossbow.feng.ast.expr;
+
+import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.UnaryOperator;
+
+public class UnaryExpression extends Expression {
+    private final UnaryOperator operator;
+    private final Expression operand;
+
+    public UnaryExpression(Position pos,
+                           UnaryOperator operator,
+                           Expression operand) {
+        super(pos);
+        this.operator = operator;
+        this.operand = operand;
+    }
+
+    public UnaryOperator operator() {
+        return operator;
+    }
+
+    public Expression operand() {
+        return operand;
+    }
+}

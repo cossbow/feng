@@ -1,0 +1,16 @@
+export var rate int ;
+var count int = 100 *rate ;
+
+var r,s int ;
+var x,y int = 16<<2, 32>>3;
+
+
+func declare() {
+    var a int;
+    var c1 * Cat;
+    var c2 * ? Cat;
+    var c3 & ? Cat;
+    const b int = 0;
+}
+
+

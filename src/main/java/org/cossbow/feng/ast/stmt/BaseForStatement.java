@@ -1,0 +1,35 @@
+package org.cossbow.feng.ast.stmt;
+
+import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.expr.Expression;
+
+import java.util.Optional;
+
+public class BaseForStatement extends ForStatement {
+    private final Optional<Statement> initializer;
+    private final Expression condition;
+    private final Optional<Statement> updater;
+
+    public BaseForStatement(Position pos,
+                            Statement body,
+                            Optional<Statement> initializer,
+                            Expression condition,
+                            Optional<Statement> updater) {
+        super(pos, body);
+        this.initializer = initializer;
+        this.condition = condition;
+        this.updater = updater;
+    }
+
+    public Optional<Statement> initializer() {
+        return initializer;
+    }
+
+    public Expression condition() {
+        return condition;
+    }
+
+    public Optional<Statement> updater() {
+        return updater;
+    }
+}

@@ -1,0 +1,31 @@
+export
+class Vector {
+    var x float;
+    var y float;
+
+    macro OperatorAdd(left,right,sum) {
+        sum.x = left.x + right.x;
+        sum.y = left.y + right.y;
+    }
+}
+
+class Node`T` {
+    var next *Node`T`;
+    var value T;
+}
+export
+class List`T` {
+    var head *Node`T`;
+    macro Iterator {
+        cursor *Node`T`;
+        initializer() {
+            cursor = head;
+        }
+        condition() {
+            cursor != nil
+        }
+        updater() {
+            cursor = cursor.next;
+        }
+    }
+}

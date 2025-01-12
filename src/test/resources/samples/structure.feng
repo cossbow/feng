@@ -1,0 +1,72 @@
+struct A {
+    a1 int;
+    a2 : 8 int;
+    a3 : 2, a4 : 2, a5 int;
+    a6 Base;
+}
+union B {
+    b1 int;
+    b2 : 8 int;
+    b3 : 2, b4 : 2, b5 int;
+    b6 Base;
+}
+struct C {
+    c1 int;
+    a A;
+    b B;
+}
+union D {
+    d1 int;
+    a A;
+    b B;
+}
+struct E {
+    e1 int;
+    A;
+    B;
+}
+union F {
+    f1 int;
+    A;
+    B;
+}
+struct G {
+    g1 int;
+    st1 struct {
+        g2 int16;
+    };
+    st2 [2]struct {
+        g2 int16;
+    };
+    un1 [3]union {
+        g3 int32;
+    };
+    un2 union {
+        g3 int32;
+    };
+}
+union H {
+    g1 int;
+    st1 struct {
+        g2 int16;
+    };
+    st2 [2]struct {
+        g2 int16;
+    };
+    un1 [3]union {
+        g3 int32;
+    };
+    un2 union {
+        g3 int32;
+    };
+}
+export struct Out {
+    code int;
+    ids [16]int;
+    matrix [4][5]int;
+    bytes [][8]uint8;
+}
+
+func main() {
+    var o Out = {code= 12, ids= {1,11,111}};
+}

@@ -1,0 +1,8 @@
+export
+enum TaskStatus {
+    INIT,
+    WAIT =1001,
+    RUN =0x2f,
+    DONE = 0o7,
+    STOP =0b010,
+}

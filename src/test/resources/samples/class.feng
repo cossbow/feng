@@ -1,0 +1,71 @@
+
+interface Codec {
+    encode(*Object) ram;
+    decode(ram) *Object;
+}
+
+interface Storage {
+    read(ram) (ram, int);
+    write(ram, ram) int;
+}
+
+export
+class Redis : KvDb (Connection,Codec,Source) {
+    const keyCodec Codec;
+    const valueCodec Codec;
+    const storage Storage;
+    var count int;
+
+    export
+    func get(key *Object) (*Object, bool) {
+        var kd = keyCodec.encode(key);
+        var vd, er = storage.read(kd);
+        if (er == 1) return nil, false;
+        else if (er != nil) {
+            throw errorReadStorage(er);
+        }
+        return valueCodec.decode(vd), true;
+    }
+
+    export
+    func set(key *Object, value *Object) bool {
+        var kd = keyCodec.encode(key);
+        var vd = valueCodec.encode(value);
+        var er = storage.write(kd, vd);
+        if (er == 0) return true;
+        if (er == 1) return false;
+        throw errorWriteStorage(er);
+    }
+
+}
+
+
+func createRedis(storage Storage, keyCodec Codec, valueCodec Codec) {
+    var redis *Redis = new(Redis, {
+        storage: storage,
+        keyCodec: keyCodec,
+        valueCodec: valueCodec
+    });
+
+}
+
+class List {
+    // TODO
+    export
+    func map(mapping func(*Object) *Object) *List {
+        var ts = new(List);
+        for (t : this) {
+            ts.add(mapping(t));
+        }
+        return ts;
+    }
+
+}
+
+class complex {
+    var real, imag float64;
+    macro ADD(left, right, result) {
+        result.real = left.real + right.real;
+        result.imag = left.imag + right.imag;
+    }
+}

@@ -1,0 +1,41 @@
+package org.cossbow.feng.ast.stmt;
+
+import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.expr.Expression;
+
+import java.util.Optional;
+
+public class IfStatement extends Statement {
+    private final Optional<Statement> init;
+    private final Expression condition;
+    private final Statement yes;
+    private final Optional<Statement> not;
+
+    public IfStatement(Position pos,
+                       Optional<Statement> init,
+                       Expression condition,
+                       Statement yes,
+                       Optional<Statement> not) {
+        super(pos);
+        this.init = init;
+        this.condition = condition;
+        this.yes = yes;
+        this.not = not;
+    }
+
+    public Optional<Statement> init() {
+        return init;
+    }
+
+    public Expression condition() {
+        return condition;
+    }
+
+    public Statement yes() {
+        return yes;
+    }
+
+    public Optional<Statement> not() {
+        return not;
+    }
+}

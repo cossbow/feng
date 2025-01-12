@@ -1,0 +1,15 @@
+func define`T, R:String, S:Cat & Pet, D:Dota|Doom, E:Entry`Entry`Entry`T````() {
+    var a,b = r[0], t.set["id"];
+    var c [][1]Node`[]Entry`int``;
+}
+
+class Result`T:Object & primitive` {
+    var code int32;
+    var data T;
+}
+
+interface Call`R:Result`Object`` {
+    exec(r R);
+}
+
+

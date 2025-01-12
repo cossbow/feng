@@ -1,0 +1,62 @@
+attribute Document {}
+
+attribute Proxy {
+    name rom;
+    code rom = "feng";
+    tags []int;
+    props []Property = {Property.ID};
+}
+
+
+
+@Document
+var disk *Disk;
+@Document
+var r,s int;
+@Document
+var x,y int = 16<<2, 32>>3;
+
+
+
+@Document
+@Server({name= "proxy", type= Server.HTTP, config= {port= 90, users= {cookie=1}}, tags= {"user"}})
+func proxy(@Document o Object, @Proxy x,y Server) {
+    @Document
+    var a,b int;
+}
+
+
+@Document @Use
+enum Status {
+    INIT, RUNNING, SUCCESS, FAIL,
+}
+
+
+@Document
+@Use
+interface Source {
+    @Document
+    @API
+    url(@Param id int) String;
+}
+
+
+@Document
+class An {
+    @Document
+    @Id
+    var a String;
+
+    @Document
+    @API
+    func a(@Param id int) String {
+        return a;
+    }
+}
+
+
+@Serial
+struct Block {
+    sec, off int;
+}
+

@@ -1,0 +1,13 @@
+func main() {
+    var a User;
+    var a *User;
+    var a []User;
+    var a [2]User;
+    var a []*User;
+    var a [2]*User;
+    var a [][]User;
+    var a [][2]User;
+    var a [4][]User;
+    var a [][]*User;
+    var a [][2]*User;
+}

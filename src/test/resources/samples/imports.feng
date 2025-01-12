@@ -1,0 +1,3 @@
+import a\b {Alpha, Beta, Gamma: C, Delta :D};
+import a\b {*};
+func main() {}

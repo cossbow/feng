@@ -1,0 +1,27 @@
+
+
+func pi() float64 {
+    return 3.1415926;
+}
+
+func params(i,j int, u, v float) {
+}
+
+func doCalc(n uint32, c []int) {
+    if (n <= 1) {
+        return c[n];
+    } else if (c[n] > 0) {
+        return c[n];
+    }
+    c[n] = doCalc(n-1) + doCalc(n-2);
+    return c[n];
+}
+
+export
+func fibonacci(num uint32) int {
+    var cache = new([num]int, {1,2,3});
+    return doCalc(num, cache);
+}
+
+
+

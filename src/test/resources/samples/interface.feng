@@ -1,0 +1,9 @@
+interface Connection {
+    connect();
+    read(buf ram) int;
+}
+interface HttpConnection {
+    Connection;
+    url() String ;
+}
+
