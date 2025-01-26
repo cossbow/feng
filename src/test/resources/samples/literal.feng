@@ -1,20 +1,20 @@
 
-var commands [16]Command = {
+var commands [16]Command = [
     {name:"GET", desc:"获取"},
     {name:"SET", desc:"设置"},
     {name:"DEL", desc:"删除"}
-};
+];
 
-var states []State = new([16]State, {
+var states []State = new([16]State, [
     {name:"SUCCESS", code: 0},
     {name:"ErrorInner", code: 101},
     {name:"ErrorChannel", code: 201},
     {name:"ErrorRemoteFail", code: 1001},
     {name:"ErrorRemoteRetry", code: 1002}
-});
+]);
 
 func valuesOf(s *Map) []V {
-    var values []V = new([s.size()]V, {1});
+    var values []V = new([s.size()]V, [1,2]);
     // TODO
     return values;
 }

@@ -71,7 +71,7 @@ public class AssignmentParseTest extends BaseParseTest {
 
     @Test
     public void testAssignmentRight() {
-        var code = "a,b,c,d,e,f,g,h,i,j = 1,2+1,-2,PI,rate(3),foo.boo,arr[11],(2),{1},{id=1};";
+        var code = "a,b,c,d,e,f,g,h,i,j = 1,2+1,-2,PI,rate(3),foo.boo,arr[11],(2),[5],{id=1};";
         var stmt = (AssignmentsStatement) doParseLocal(code);
         var lhs = stmt.operands();
         var rhs = stmt.tuple();

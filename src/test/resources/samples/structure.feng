@@ -68,5 +68,5 @@ export struct Out {
 }
 
 func main() {
-    var o Out = {code= 12, ids= {1,11,111}};
+    var o Out = {code= 12, ids= [1,11,111]};
 }

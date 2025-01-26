@@ -613,14 +613,14 @@ expressionList
 
 // init class & struct & union
 objectExpr
-    : '{' objectEntry (COMMA objectEntry)* '}'
+    : '{' (objectEntry (COMMA objectEntry)*)? '}'
     ;
 objectEntry
     : name=Identifier ASSIGN value=expression
     ;
 // init array
 arrayExpr
-    : '{' elements=expressionList '}'
+    : '[' elements=expressionList? ']'
     ;
 // init with key-value pair
 pairsExpr

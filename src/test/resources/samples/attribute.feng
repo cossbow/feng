@@ -4,7 +4,7 @@ attribute Proxy {
     name rom;
     code rom = "feng";
     tags []int;
-    props []Property = {Property.ID};
+    props []Property = [Property.ID];
 }
 
 
@@ -19,7 +19,7 @@ var x,y int = 16<<2, 32>>3;
 
 
 @Document
-@Server({name= "proxy", type= Server.HTTP, config= {port= 90, users= {cookie=1}}, tags= {"user"}})
+@Server({name= "proxy", type= Server.HTTP, config= {port= 90, users= {cookie=1}}, tags= ["user"]})
 func proxy(@Document o Object, @Proxy x,y Server) {
     @Document
     var a,b int;

@@ -13,8 +13,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 
 import static org.cossbow.feng.ast.BinaryOperator.*;
 
@@ -80,7 +82,7 @@ public class ExpressionParseTest extends BaseParseTest {
     public void testNewArrayInit() {
         var typeName = randTypeName(32);
         var len = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
-        var code = "new([%d]%s, {1,2})".formatted(len, typeName);
+        var code = "new([%d]%s, [1,2])".formatted(len, typeName);
         var expr = this.<NewExpression>parseExpr(code);
         var arr = (NewArrayType) expr.type();
         Assertions.assertEquals(typeName, typeName(arr.element()));
@@ -129,6 +131,32 @@ public class ExpressionParseTest extends BaseParseTest {
 
     //
     // indexOf
+
+    @Test
+    public void testIndexOfArrayExpr() {
+        var rand = ThreadLocalRandom.current();
+        var values = rand.ints(10, 0, Integer.MAX_VALUE).boxed().toList();
+        var idx = randInt(0, values.size());
+        var litStr = values.stream().map(Objects::toString).collect(Collectors.joining(","));
+        var code = "[%s][%d]".formatted(litStr, idx);
+        var expr = (IndexOfExpression) parseExpr(code);
+        var arr = (ArrayExpression) expr.subject();
+        checkIds(values, arr.elements(), e -> integer(e).value().intValueExact());
+        Assertions.assertEquals(idx, integer(expr.index()).value());
+    }
+
+    @Test
+    public void testIndexOfPairsExpr() {
+        var pf = randVarFuncName(12);
+        var pv = randVarFuncName(12);
+        var idx = randInt(0, Integer.MAX_VALUE);
+        var code = "{%s:%s}[%d]".formatted(pf, pv, idx);
+        var expr = (IndexOfExpression) parseExpr(code);
+        var pair = ((PairsExpression) expr.subject()).pairs().getFirst();
+        Assertions.assertEquals(pf, varName(pair.key()));
+        Assertions.assertEquals(pv, varName(pair.value()));
+        Assertions.assertEquals(idx, integer(expr.index()).value());
+    }
 
     @Test
     public void testIndexOfByName() {
@@ -197,6 +225,18 @@ public class ExpressionParseTest extends BaseParseTest {
 
     //
     // memberOf
+
+    @Test
+    public void testMemberOfObjectExpr() {
+        var pf = randVarFuncName(12);
+        var pv = randVarFuncName(12);
+        var field = randVarFuncName(8);
+        var expr = (MemberOfExpression) parseExpr("{%s=%s}.%s".formatted(pf, pv, field));
+        var entry = ((ObjectExpression) expr.subject()).entries().getFirst();
+        Assertions.assertEquals(pf, entry.key());
+        Assertions.assertEquals(pv, varName(entry.value()));
+        Assertions.assertEquals(field, expr.member());
+    }
 
     @Test
     public void testMemberOfByName() {
@@ -618,10 +658,11 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testObject() {
-        var oe = (ObjectExpression) parseExpr("{id=5,fc=1.2,nm=\"gg\",ok=true,ex=nil,li={1},ch={sid=8},t={a1:b1}}");
+        var oe = (ObjectExpression) parseExpr("{id=5,fc=1.2,nm=\"gg\",ok=true,ex=nil,li=[1],ch={sid=8},t={a1:b1}}");
 
         Assertions.assertEquals(8, oe.entries().size());
-        var entries = Utils.toMap(oe.entries(), e -> e.key().value(), e -> e.value());
+        var entries = Utils.toMap(oe.entries(),
+                e -> e.key().value(), ObjectExpression.Entry::value);
 
         Assertions.assertInstanceOf(LiteralExpression.class, entries.get("id"));
         Assertions.assertInstanceOf(LiteralExpression.class, entries.get("fc"));
@@ -637,7 +678,7 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testArray() {
-        var ae = (ArrayExpression) parseExpr("{15,1.5,\"yy\",false,nil,{id=0},{1},{a2:b2},-9,2+5}");
+        var ae = (ArrayExpression) parseExpr("[15,1.5,\"yy\",false,nil,{id=0},[3],{a2:b2},-9,2+5]");
 
         Assertions.assertEquals(10, ae.elements().size());
         var els = ae.elements();

@@ -97,7 +97,7 @@ public class AttributeParseTest extends BaseParseTest {
     public void testArrayField2() {
         var fieldName = randVarFuncName(12);
         var fieldType = randTypeName(20);
-        var code = "export attribute Server { %s []%s = {10,20}; }".formatted(fieldName, fieldType);
+        var code = "export attribute Server { %s []%s = [10,20]; }".formatted(fieldName, fieldType);
         var def = (AttributeDefinition) doParseDefinition(code);
         Assertions.assertEquals(1, def.fields().size());
         var field = def.fields().getFirst();
@@ -234,7 +234,7 @@ public class AttributeParseTest extends BaseParseTest {
                     var init = anyNames(RandVarFuncName, 8, s);
                     inits.add(init);
                     code.append("@").append(names.get(s - 1)).append("({");
-                    appendList(code, init, "", "={1,2},");
+                    appendList(code, init, "", "=[1,2],");
                     code.setLength(code.length() - 1);
                     code.append("})");
                 }

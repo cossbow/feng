@@ -17,7 +17,7 @@ func assignDeclare(t *Object) {
     a = a.id;
     a.user.id = a.id;
     a.list[0] = {e:t};
-    list[0] = {a};
+    list[0] = [a];
 }
 
 func assignments()  {
@@ -27,7 +27,7 @@ func assignments()  {
 
 func newThings() {
     var a = new(Result, {code=0});
-    var b = new([4]int, {1,2});
+    var b = new([4]int, [1,2]);
     var c= new( [4]int, true);
 }
 
@@ -65,4 +65,8 @@ func lambda() {
     var sq func(int) int = func(v int) int {
         return v*v;
     };
+}
+
+func array() {
+    var a=[[[]]][0];
 }

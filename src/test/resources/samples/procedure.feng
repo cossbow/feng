@@ -19,7 +19,7 @@ func doCalc(n uint32, c []int) {
 
 export
 func fibonacci(num uint32) int {
-    var cache = new([num]int, {1,2,3});
+    var cache = new([num]int, [1,2,3]);
     return doCalc(num, cache);
 }
 

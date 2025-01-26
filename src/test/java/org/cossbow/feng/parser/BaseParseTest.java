@@ -108,10 +108,6 @@ public class BaseParseTest {
 
     //
 
-    public static TypeDefinition doParseType(String def) {
-        return (TypeDefinition) doParseDefinition(def);
-    }
-
     public static ProcDefinition doParseProc(String def) {
         return (ProcDefinition) doParseDefinition(def);
     }
@@ -166,20 +162,19 @@ public class BaseParseTest {
         return src.stream().map(Objects::toString).collect(Collectors.joining(","));
     }
 
-    public static String idList(Identifier[] src) {
-        return Arrays.stream(src).map(Objects::toString).collect(Collectors.joining(","));
-    }
-
     public static void appendList(StringBuilder sb, List<Identifier> li,
                                   String prefix, String suffix) {
         for (var f : li) sb.append(prefix).append(f).append(suffix);
     }
+
     //
 
     public static BigInteger randInt(int origin, int bound) {
         var v = ThreadLocalRandom.current().nextInt(origin, bound);
         return BigInteger.valueOf(v);
     }
+
+    //
 
     public static Literal lit(Expression expr) {
         return ((LiteralExpression) expr).literal();
@@ -210,19 +205,14 @@ public class BaseParseTest {
     }
 
 
-    public static <T> void checkIds(List<Identifier> names,
+    public static <T,R> void checkIds(List<R> names,
                                     List<T> list,
-                                    Function<T, Identifier> trans) {
+                                    Function<T, R> trans) {
         Assertions.assertEquals(names.size(), list.size());
         for (int i = 0; i < names.size(); i++) {
             Assertions.assertEquals(names.get(i), trans.apply(list.get(i)));
         }
     }
-
-    public static void checkIds(List<Identifier> names, List<Identifier> vars) {
-        checkIds(names, vars, Function.identity());
-    }
-
 
     public static Identifier typeName(TypeDeclarer td) {
         return ((DefinedTypeDeclarer) td).definedType().name();
