@@ -6,19 +6,18 @@ grammar Feng;
 //            Parser           //
 //*****************************//
 
-feng: sourceFile EOF ;
 
 
 
 //
 // headers
 //
-// file import
-sourceFile
-    : import_* global*
+// import
+source
+    : import_* global* EOF
     ;
 import_
-    : IMPORT package importSymbolSet SEMI
+    : IMPORT module importSymbolSet SEMI
     ;
 importSymbolSet
     : '{' all=MUL '}'
@@ -27,7 +26,7 @@ importSymbolSet
 importSymbol
     : name=Identifier (COLON alias=Identifier)?
     ;
-package
+module
     : Identifier (BACKSLASH Identifier)*
     ;
 
@@ -257,9 +256,10 @@ returnSet
 // macros
 //
 macro
-    : MACRO (macroClass | macroProcedure)
+    : HASH type=Identifier macroType        # MacroClass
+    | HASH type=Identifier macroProcedure   # MacroFunc
     ;
-macroClass
+macroType
     : name=Identifier '{' fields=macroVariables SEMI macroProcedure+ '}'
     ;
 macroProcedure
@@ -277,7 +277,7 @@ macroVariable
 
 // assignment
 assignments
-    : operands=assignableOperands ASSIGN tuple
+    : operands=assignableOperands op=(ASSIGN|COPY) tuple
     ;
 assignableOperands
     : assignableOperand (COMMA assignableOperand)*
@@ -750,7 +750,7 @@ NilLiteral                          : 'nil';
 //
 // Keywords
 //
-// Keywords: Package
+// Keywords: export & import
 EXPORT          : 'export' ;
 IMPORT          : 'import' ;
 // Keywords: Type & Declare
@@ -761,12 +761,10 @@ ATTRIBUTE       : 'attribute' ;
 INTERFACE       : 'interface' ;
 CLASS           : 'class' ;
 FUNC            : 'func' ;
-OPERATOR        : 'operator' ;
 CONST           : 'const' ;
 VAR             : 'var' ;
 LET             : 'let' ;
 NEW             : 'new' ;
-MACRO           : 'macro' ;
 // Keywords: Control
 RETURN          : 'return' ;
 IF              : 'if' ;
@@ -808,6 +806,7 @@ BACKSLASH       : '\\' ;
 // Operators
 //
 ASSIGN              : '=' ;
+COPY                : ':=' ;
 // combines
 ASSIGN_AND          : '&&=' ;
 ASSIGN_OR           : '||=' ;

@@ -14,10 +14,7 @@ import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
-import org.cossbow.feng.ast.micro.Macro;
-import org.cossbow.feng.ast.micro.MacroClass;
-import org.cossbow.feng.ast.micro.MacroProcedure;
-import org.cossbow.feng.ast.micro.MacroVariable;
+import org.cossbow.feng.ast.micro.*;
 import org.cossbow.feng.ast.mod.*;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
@@ -34,7 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class FileParseVisitor
+public class SourceParseVisitor
         extends FengBaseVisitor<Entity>
         implements FengVisitor<Entity> {
 
@@ -49,7 +46,7 @@ public class FileParseVisitor
     //
 
 
-    public FileParseVisitor() {
+    public SourceParseVisitor() {
 
     }
 
@@ -115,31 +112,26 @@ public class FileParseVisitor
     }
 
     //
-    // package: start
+    // module: start
     //
 
     @Override
-    public Entity visitFeng(FengParser.FengContext ctx) {
-        return visit(ctx.sourceFile());
-    }
-
-    @Override
-    public Entity visitSourceFile(FengParser.SourceFileContext ctx) {
+    public Entity visitSource(FengParser.SourceContext ctx) {
         var imports = this.<Import>visitList(ctx.import_());
         var globals = this.<Global>visitList(ctx.global());
-        return new SourceFile(posOf(ctx), imports, globals);
+        return new Source(posOf(ctx), imports, globals);
     }
 
     @Override
     public Entity visitImport_(FengParser.Import_Context ctx) {
-        var package_ = identifiers(ctx.package_().Identifier());
+        var pkg = identifiers(ctx.module().Identifier());
         var setCtx = ctx.importSymbolSet();
 
         if (setCtx.all != null) {
-            return new Import(posOf(ctx), package_, List.of());
+            return new Import(posOf(ctx), pkg, List.of());
         }
         var list = this.<ImportSymbol>visitList(setCtx.importSymbol());
-        return new Import(posOf(ctx), package_, list);
+        return new Import(posOf(ctx), pkg, list);
     }
 
     @Override
@@ -175,7 +167,7 @@ public class FileParseVisitor
     }
 
     //
-    // package: end
+    // module: end
     //
 
     //
@@ -446,7 +438,6 @@ public class FileParseVisitor
 
     private List<StructureMember> parseStructureMember(
             FengParser.StructureMemberFieldsContext ctx) {
-        var pos = posOf(ctx);
         var type = (StructureType) visit(ctx.type);
         var members = new ArrayList<StructureMember>();
         for (var fc : ctx.fields.structureField()) {
@@ -848,7 +839,8 @@ public class FileParseVisitor
     public Entity visitAssignments(FengParser.AssignmentsContext ctx) {
         var operands = this.<AssignableOperand>visitList(ctx.operands.assignableOperand());
         var values = (Tuple) visit(ctx.tuple());
-        return new AssignmentsStatement(posOf(ctx), operands, values);
+        var copy = ctx.op.getType() == FengParser.COPY;
+        return new AssignmentsStatement(posOf(ctx), operands, values, copy);
     }
 
     @Override
@@ -1121,18 +1113,35 @@ public class FileParseVisitor
     //
 
     @Override
-    public Entity visitMacro(FengParser.MacroContext ctx) {
-        var mcc = ctx.macroClass();
-        if (mcc != null) return visit(mcc);
-        return visit(ctx.macroProcedure());
+    public MacroClass visitMacroClass(FengParser.MacroClassContext ctx) {
+        var type = identifier(ctx.type);
+        var typeCtx = ctx.macroType();
+        var name = identifier(typeCtx.name);
+        var fields = parseMacroVariables(typeCtx.fields);
+        var methods = this.<MacroProcedure>visitList(typeCtx.macroProcedure());
+        return new MacroClass(posOf(ctx), type, name, fields, methods);
     }
 
     @Override
-    public Entity visitMacroClass(FengParser.MacroClassContext ctx) {
+    public Entity visitMacroProcedure(FengParser.MacroProcedureContext ctx) {
         var name = identifier(ctx.name);
-        var fields = this.<MacroVariable>visitList(ctx.fields.macroVariable());
-        var methods = this.<MacroProcedure>visitList(ctx.macroProcedure());
-        return new MacroClass(posOf(ctx), name, fields, methods);
+        var params = parseMacroVariables(ctx.params);
+        var body = parseStatements(ctx.statementList());
+        var result = this.<Expression>visitOptional(ctx.expression());
+        return new MacroProcedure(posOf(ctx), name, params, body, result);
+    }
+
+    @Override
+    public Entity visitMacroFunc(FengParser.MacroFuncContext ctx) {
+        var type = identifier(ctx.type);
+        var proc = (MacroProcedure) visit(ctx.macroProcedure());
+        return new MacroFunc(posOf(ctx), type, proc);
+    }
+
+    private List<MacroVariable> parseMacroVariables(
+            FengParser.MacroVariablesContext ctx) {
+        if (ctx == null) return List.of();
+        return visitList(ctx.macroVariable());
     }
 
     @Override
@@ -1140,17 +1149,6 @@ public class FileParseVisitor
         var name = identifier(ctx.name);
         var type = this.<TypeDeclarer>visitOptional(ctx.type);
         return new MacroVariable(posOf(ctx), name, Lazy.of(type));
-    }
-
-    @Override
-    public Entity visitMacroProcedure(FengParser.MacroProcedureContext ctx) {
-        var name = identifier(ctx.name);
-        List<MacroVariable> params = List.of();
-        if (ctx.params != null)
-            params = this.<MacroVariable>visitList(ctx.params.macroVariable());
-        var body = parseStatements(ctx.statementList());
-        var result = this.<Expression>visitOptional(ctx.expression());
-        return new MacroProcedure(posOf(ctx), name, params, body, result);
     }
 
 

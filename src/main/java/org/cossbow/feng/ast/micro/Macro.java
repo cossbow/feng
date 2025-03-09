@@ -6,15 +6,16 @@ import org.cossbow.feng.ast.Position;
 
 abstract
 public class Macro extends Entity {
-    private final Identifier name;
+    private final Identifier type;
 
     public Macro(Position pos,
-                 Identifier name) {
+                 Identifier type) {
         super(pos);
-        this.name = name;
+        this.type = type;
     }
 
-    public Identifier name() {
-        return name;
+    public Identifier type() {
+        return type;
     }
+
 }

@@ -5,13 +5,13 @@ import org.cossbow.feng.ast.mod.Import;
 
 import java.util.List;
 
-public class SourceFile extends Entity {
+public class Source extends Entity {
     private final List<Import> imports;
     private final List<Global> globals;
 
-    public SourceFile(Position pos,
-                      List<Import> imports,
-                      List<Global> globals) {
+    public Source(Position pos,
+                  List<Import> imports,
+                  List<Global> globals) {
         super(pos);
         this.imports = imports;
         this.globals = globals;

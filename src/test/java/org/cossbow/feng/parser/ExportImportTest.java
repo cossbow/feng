@@ -7,24 +7,24 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-public class PackageParseTest extends BaseParseTest {
+public class ExportImportTest extends BaseParseTest {
 
     @Test
     public void testImport1() {
         var code = "import a\\b {Alpha, Beta, Gamma: C, Delta :D};";
-        var p = doParse(code);
-        var imports = p.root().imports();
+        var file = doParseFile(code);
+        var imports = file.imports();
         Assertions.assertEquals(1, imports.size());
 
         var i = imports.getFirst();
-        Assertions.assertEquals(identifiers("a", "b"), i.package_());
+        Assertions.assertEquals(identifiers("a", "b"), i.module());
 
         Assertions.assertFalse(i.importAll());
 
         Assertions.assertEquals(4, i.symbols().size());
 
         {
-            var s = i.symbols().get(0);
+            var s = i.symbols().getFirst();
             Assertions.assertEquals(identifier("Alpha"), s.name());
             Assertions.assertFalse(s.alias().isPresent());
         }
@@ -36,24 +36,24 @@ public class PackageParseTest extends BaseParseTest {
         {
             var s = i.symbols().get(2);
             Assertions.assertEquals(identifier("Gamma"), s.name());
-            Assertions.assertEquals(identifier("C"), s.alias().get());
+            Assertions.assertEquals(identifier("C"), s.alias().orElseThrow());
         }
         {
             var s = i.symbols().get(3);
             Assertions.assertEquals(identifier("Delta"), s.name());
-            Assertions.assertEquals(identifier("D"), s.alias().get());
+            Assertions.assertEquals(identifier("D"), s.alias().orElseThrow());
         }
     }
 
     @Test
     public void testImport2() {
         var code = "import b\\c\\d {*};";
-        var p = doParse(code);
-        var imports = p.root().imports();
+        var file = doParseFile(code);
+        var imports = file.imports();
         Assertions.assertEquals(1, imports.size());
 
         var i = imports.getFirst();
-        Assertions.assertEquals(identifiers("b", "c", "d"), i.package_());
+        Assertions.assertEquals(identifiers("b", "c", "d"), i.module());
         Assertions.assertTrue(i.importAll());
     }
 

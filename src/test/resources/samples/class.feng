@@ -62,10 +62,3 @@ class List {
 
 }
 
-class complex {
-    var real, imag float64;
-    macro ADD(left, right, result) {
-        result.real = left.real + right.real;
-        result.imag = left.imag + right.imag;
-    }
-}

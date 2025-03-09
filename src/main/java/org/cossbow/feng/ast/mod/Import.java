@@ -7,19 +7,19 @@ import org.cossbow.feng.ast.Position;
 import java.util.List;
 
 public class Import extends Entity {
-    private final List<Identifier> package_;
+    private final List<Identifier> module;
     private final List<ImportSymbol> symbols;
 
     public Import(Position pos,
-                  List<Identifier> package_,
+                  List<Identifier> module,
                   List<ImportSymbol> symbols) {
         super(pos);
-        this.package_ = package_;
+        this.module = module;
         this.symbols = symbols;
     }
 
-    public List<Identifier> package_() {
-        return package_;
+    public List<Identifier> module() {
+        return module;
     }
 
     public List<ImportSymbol> symbols() {

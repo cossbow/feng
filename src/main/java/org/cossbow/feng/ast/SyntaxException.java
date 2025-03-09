@@ -1,14 +1,19 @@
 package org.cossbow.feng.ast;
 
+import org.cossbow.feng.parser.SyntaxErrorMsg;
+
+import java.util.List;
+
 public class SyntaxException extends RuntimeException {
-    private final Position pos;
+    private final List<SyntaxErrorMsg> errors;
 
-    public SyntaxException(String message, Position pos) {
-        super(message);
-        this.pos = pos;
+    public SyntaxException(List<SyntaxErrorMsg> errors) {
+        super(errors.toString());
+        this.errors = errors;
     }
 
-    public Position pos() {
-        return pos;
+    public List<SyntaxErrorMsg> errors() {
+        return errors;
     }
+
 }

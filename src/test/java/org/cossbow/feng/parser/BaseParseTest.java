@@ -21,6 +21,9 @@ import org.cossbow.feng.ast.stmt.Statement;
 import org.cossbow.feng.ast.stmt.Tuple;
 import org.junit.jupiter.api.Assertions;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -49,22 +52,37 @@ public class BaseParseTest {
     static final int EDGE_LOWERCASE = EDGE_UPPERCASE + 26;
     static final int EDGE_ALL = EDGE_LOWERCASE + 1;
 
-    static FileParser doParse(CharStream cs) {
-        var p = new FileParser();
-        p.parse(cs);
-        return p;
+    static ParseResult doParse(CharStream cs) {
+        var p = new SourceParser();
+        return p.parse(cs);
     }
 
-    static FileParser doParse(String code) {
-        var p = doParse(CharStreams.fromString(code));
-        Assertions.assertTrue(p.errors().isEmpty(), "parse error: " + code);
-        return p;
+    static Source doParseFile(String code, String name) {
+        var r = doParse(CharStreams.fromString(code, name));
+        Assertions.assertTrue(r.errors().isEmpty(),
+                "parse %s error: %s".formatted(name, code));
+        return r.root();
+    }
+
+    static Source doParseFile(String code) {
+        return doParseFile(code, "unknow");
+    }
+
+    static Source doParseFile(InputStream is, String name) {
+        try {
+            var r = doParse(CharStreams.fromStream(is));
+            Assertions.assertTrue(r.errors().isEmpty(),
+                    "parse %s error: %s".formatted(name, r.errors()));
+            return r.root();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     public static Global doParseGlobal(String def) {
-        var p = doParse(def);
-        Assertions.assertEquals(1, p.root().definitions().size());
-        return p.root().definitions().getFirst();
+        var sf = doParseFile(def, "global");
+        Assertions.assertEquals(1, sf.definitions().size());
+        return sf.definitions().getFirst();
     }
 
     public static Definition doParseDefinition(String def) {
@@ -205,9 +223,9 @@ public class BaseParseTest {
     }
 
 
-    public static <T,R> void checkIds(List<R> names,
-                                    List<T> list,
-                                    Function<T, R> trans) {
+    public static <T, R> void checkIds(List<R> names,
+                                       List<T> list,
+                                       Function<T, R> trans) {
         Assertions.assertEquals(names.size(), list.size());
         for (int i = 0; i < names.size(); i++) {
             Assertions.assertEquals(names.get(i), trans.apply(list.get(i)));
