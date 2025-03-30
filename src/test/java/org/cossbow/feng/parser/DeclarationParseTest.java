@@ -34,8 +34,8 @@ public class DeclarationParseTest extends BaseParseTest {
         var variables = def.statement().variables();
         for (var v : variables) {
             var attrs = v.modifier().attributes();
-            Assertions.assertEquals(identifier("Foo"), attrs.getFirst().type());
-            Assertions.assertEquals(identifier("Boo"), attrs.getLast().type());
+            Assertions.assertEquals(identifier("Foo"), attrs.getValue(0).type());
+            Assertions.assertEquals(identifier("Boo"), attrs.getValue(1).type());
         }
     }
 

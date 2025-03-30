@@ -2,7 +2,6 @@ package org.cossbow.feng.parser;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.cossbow.feng.ast.Source;
-import org.cossbow.feng.ast.SyntaxException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,7 +21,7 @@ public class ModuleParser {
             try (var is = Files.newInputStream(file)) {
                 var result = sourceParser.parse(CharStreams.fromStream(is));
                 if (!result.errors().isEmpty()) {
-                    throw new SyntaxException(result.errors());
+                    throw new ParseException(result.errors());
                 }
                 sources.put(name, result.root());
             }

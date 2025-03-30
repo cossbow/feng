@@ -20,16 +20,7 @@ union D {
     a A;
     b B;
 }
-struct E {
-    e1 int;
-    A;
-    B;
-}
-union F {
-    f1 int;
-    A;
-    B;
-}
+
 struct G {
     g1 int;
     st1 struct {

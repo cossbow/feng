@@ -206,6 +206,10 @@ public class BaseParseTest {
         return (IntegerLiteral) lit(expr);
     }
 
+    public static IntegerLiteral integer(Optional<Expression> expr) {
+        return integer(expr.orElseThrow());
+    }
+
     public static Identifier varName(Expression expr) {
         return ((ReferExpression) expr).name();
     }
@@ -224,8 +228,16 @@ public class BaseParseTest {
 
 
     public static <T, R> void checkIds(List<R> names,
+                                       UniqueTable<T> table) {
+        Assertions.assertEquals(names.size(), table.size());
+        for (int i = 0; i < names.size(); i++) {
+            Assertions.assertEquals(names.get(i), table.getId(i));
+        }
+    }
+
+    public static <T> void checkIds(List<Identifier> names,
                                        List<T> list,
-                                       Function<T, R> trans) {
+                                       Function<T, Identifier> trans) {
         Assertions.assertEquals(names.size(), list.size());
         for (int i = 0; i < names.size(); i++) {
             Assertions.assertEquals(names.get(i), trans.apply(list.get(i)));

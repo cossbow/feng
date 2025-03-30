@@ -109,19 +109,13 @@ modifier
 
 // structure: struct or union
 structureDefinition
-    : modifier domain=(STRUCT | UNION) name=Identifier typeParameters? '{' structureMember* '}'
+    : modifier domain=(STRUCT | UNION) name=Identifier typeParameters? '{' structureFieldsDef* '}'
     ;
 // structure unnamed
 unnamedStructureDefinition
-    : domain=(STRUCT | UNION) '{' structureMember* '}'
+    : domain=(STRUCT | UNION) '{' structureFieldsDef* '}'
     ;
-// structure member
-structureMember
-    : structureMemberFields
-    | structureMemberPart
-    ;
-// structure field
-structureMemberFields
+structureFieldsDef
     : fields=structureFields type=structureFieldType SEMI
     ;
 structureFieldType
@@ -146,10 +140,7 @@ definedStructureFieldType
 unnamedStructureFieldType
     : unnamedStructureDefinition
     ;
-// structure combine
-structureMemberPart
-    : definedType SEMI
-    ;
+
 
 
 
@@ -176,7 +167,7 @@ interfaceMemberPart
 // class
 //
 classDefinition
-    : modifier CLASS name=Identifier typeParameters? classInherit? classImpls? '{' classMember* '}'
+    : modifier CLASS name=Identifier typeParameters? classInherit? classImpl? '{' classMember* '}'
     ;
 classMember
     : modifier exportable classMemberImpl
@@ -195,7 +186,7 @@ classMemberMethod
 classInherit
     : COLON definedType
     ;
-classImpls
+classImpl
     : '(' definedType (COMMA definedType)* ')'
     ;
 

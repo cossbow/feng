@@ -23,7 +23,7 @@ public class EnumParseTest extends BaseParseTest {
                 }
                 """;
         var et = (EnumDefinition) doParseDefinition(code);
-        Assertions.assertEquals(identifier("TaskStatus"), et.name().orElseThrow());
+        Assertions.assertEquals(identifier("TaskStatus"), et.name());
 
         var expect = List.of(Pair.<String, Integer>of("INIT", null),
                 Pair.of("WAIT", 1001),
@@ -31,14 +31,14 @@ public class EnumParseTest extends BaseParseTest {
                 Pair.of("DONE", 7),
                 Pair.of("STOP", 2));
         Assertions.assertEquals(expect.size(), et.values().size());
-        for (int i = 0; i < expect.size(); i++) {
-            var p = expect.get(i);
-            var v = et.values().get(i);
-            Assertions.assertEquals(p.a(), v.name().value());
-            if (p.b() == null) {
+        for (var pair : expect) {
+            var v = et.values().get(identifier(pair.a()));
+            Assertions.assertEquals(pair.a(), v.name().value());
+            if (pair.b() == null) {
                 Assertions.assertTrue(v.init().isEmpty());
             } else {
-                Assertions.assertEquals(BigInteger.valueOf(p.b()), integer(v.init().get()).value());
+                Assertions.assertEquals(BigInteger.valueOf(pair.b()),
+                        integer(v.init().get()).value());
             }
         }
     }

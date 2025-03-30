@@ -7,29 +7,30 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.Macro;
+import org.cossbow.feng.ast.UniqueTable;
+import org.cossbow.feng.ast.MultiTable;
 
-import java.util.List;
 import java.util.Optional;
 
 public class ClassDefinition extends TypeDefinition {
     private final Optional<DefinedType> parent;
-    private final List<DefinedType> impls;
-    private final List<ClassField> fields;
-    private final List<ClassMethod> methods;
-    private final List<Macro> macros;
+    private final UniqueTable<DefinedType> impl;
+    private final UniqueTable<ClassField> fields;
+    private final UniqueTable<ClassMethod> methods;
+    private final MultiTable<Macro> macros;
 
     public ClassDefinition(Position pos,
                            Modifier modifier,
                            Optional<Identifier> name,
                            TypeParameters generic,
                            Optional<DefinedType> parent,
-                           List<DefinedType> impls,
-                           List<ClassField> fields,
-                           List<ClassMethod> methods,
-                           List<Macro> macros) {
+                           UniqueTable<DefinedType> impl,
+                           UniqueTable<ClassField> fields,
+                           UniqueTable<ClassMethod> methods,
+                           MultiTable<Macro> macros) {
         super(pos, modifier, name, generic);
         this.parent = parent;
-        this.impls = impls;
+        this.impl = impl;
         this.fields = fields;
         this.methods = methods;
         this.macros = macros;
@@ -39,19 +40,19 @@ public class ClassDefinition extends TypeDefinition {
         return parent;
     }
 
-    public List<DefinedType> impls() {
-        return impls;
+    public UniqueTable<DefinedType> impl() {
+        return impl;
     }
 
-    public List<ClassField> fields() {
+    public UniqueTable<ClassField> fields() {
         return fields;
     }
 
-    public List<ClassMethod> methods() {
+    public UniqueTable<ClassMethod> methods() {
         return methods;
     }
 
-    public List<Macro> macros() {
+    public MultiTable<Macro> macros() {
         return macros;
     }
 }

@@ -4,9 +4,7 @@ package org.cossbow.feng.parser;
 import org.cossbow.feng.Pair;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
-import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.ast.proc.Procedure;
-import org.cossbow.feng.ast.proc.Prototype;
+import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.BlockStatement;
 import org.cossbow.feng.ast.stmt.CallStatement;
 import org.junit.jupiter.api.Assertions;
@@ -38,31 +36,31 @@ public class ProcedureParseTest extends BaseParseTest {
         {
             var code = "()";
             var prototype = parsePrototype(code);
-            Assertions.assertTrue(prototype.parameters().isEmpty());
+            Assertions.assertTrue(prototype.parameterSet().isEmpty());
             Assertions.assertTrue(prototype.returnSet().isEmpty());
         }
         {
             var code = "(int)";
             var prototype = parsePrototype(code);
-            Assertions.assertEquals(1, prototype.parameters().size());
+            Assertions.assertEquals(1, prototype.parameterSet().size());
             Assertions.assertTrue(prototype.returnSet().isEmpty());
         }
         {
             var code = "(i,j int)";
             var prototype = parsePrototype(code);
-            Assertions.assertEquals(2, prototype.parameters().size());
+            Assertions.assertEquals(2, prototype.parameterSet().size());
             Assertions.assertTrue(prototype.returnSet().isEmpty());
         }
         {
             var code = "() int ";
             var prototype = parsePrototype(code);
-            Assertions.assertTrue(prototype.parameters().isEmpty());
+            Assertions.assertTrue(prototype.parameterSet().isEmpty());
             Assertions.assertEquals(1, prototype.returnSet().size());
         }
         {
             var code = "() (int,float) ";
             var prototype = parsePrototype(code);
-            Assertions.assertTrue(prototype.parameters().isEmpty());
+            Assertions.assertTrue(prototype.parameterSet().isEmpty());
             Assertions.assertEquals(2, prototype.returnSet().size());
         }
     }
@@ -80,14 +78,12 @@ public class ProcedureParseTest extends BaseParseTest {
             }
             var code = "(%s)".formatted(String.join(",", paramsSet));
             var prototype = parsePrototype(code);
-            var params = prototype.parameters();
+            var params = (VariableParameterSet) prototype.parameterSet();
             Assertions.assertEquals(expectParams.size(), params.size());
-            for (int i = 0; i < expectParams.size(); i++) {
-                var expect = expectParams.get(i);
-                var variable = params.get(i).variable();
-                Assertions.assertTrue(variable.isPresent());
-                Assertions.assertEquals(expect.a(), variable.get().name());
-                var vtd = (DefinedTypeDeclarer) params.get(i).type();
+            for (var expect:expectParams) {
+                var variable = params.get(expect.a());
+                Assertions.assertEquals(expect.a(), variable.name());
+                var vtd = (DefinedTypeDeclarer) variable.type().get();
                 Assertions.assertEquals(expect.b(), vtd.definedType().name());
                 Assertions.assertFalse(vtd.pointer());
                 Assertions.assertFalse(vtd.phantom());
@@ -102,10 +98,10 @@ public class ProcedureParseTest extends BaseParseTest {
         for (int size = 1; size <= 16; size++) {
             var expectTypes = anyNames(RandTypeName, 12, size);
             var prototype = parsePrototype("(%s)".formatted(idList(expectTypes)));
-            var params = prototype.parameters();
+            var params = (UnnamedParameterSet) prototype.parameterSet();
             Assertions.assertEquals(expectTypes.size(), params.size());
             for (int i = 0; i < size; i++) {
-                Assertions.assertEquals(expectTypes.get(i), typeName(params.get(i).type()));
+                Assertions.assertEquals(expectTypes.get(i), typeName(params.get(i)));
             }
         }
     }

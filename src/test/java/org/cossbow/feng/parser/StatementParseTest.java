@@ -2,7 +2,6 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.attr.Attribute;
 import org.cossbow.feng.ast.dcl.NewDefinedType;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.BinaryExpression;
@@ -76,7 +75,7 @@ public class StatementParseTest extends BaseParseTest {
                 var stmt = (DeclarationStatement) parseStmt(code.toString());
 
                 for (var v : stmt.variables()) {
-                    checkIds(attrs, v.modifier().attributes(), Attribute::type);
+                    checkIds(attrs, v.modifier().attributes());
                     Assertions.assertEquals(type, typeName(v.type().get()));
                 }
                 checkIds(names, stmt.variables(), Variable::name);

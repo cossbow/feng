@@ -141,7 +141,8 @@ public class ExpressionParseTest extends BaseParseTest {
         var code = "[%s][%d]".formatted(litStr, idx);
         var expr = (IndexOfExpression) parseExpr(code);
         var arr = (ArrayExpression) expr.subject();
-        checkIds(values, arr.elements(), e -> integer(e).value().intValueExact());
+        Assertions.assertEquals(values, arr.elements().stream()
+                .map(e -> integer(e).value().intValueExact()).toList());
         Assertions.assertEquals(idx, integer(expr.index()).value());
     }
 
@@ -152,7 +153,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var idx = randInt(0, Integer.MAX_VALUE);
         var code = "{%s:%s}[%d]".formatted(pf, pv, idx);
         var expr = (IndexOfExpression) parseExpr(code);
-        var pair = ((PairsExpression) expr.subject()).pairs().getFirst();
+        var pair = ((PairsExpression) expr.subject()).pairs().get(0);
         Assertions.assertEquals(pf, varName(pair.key()));
         Assertions.assertEquals(pv, varName(pair.value()));
         Assertions.assertEquals(idx, integer(expr.index()).value());
@@ -232,9 +233,8 @@ public class ExpressionParseTest extends BaseParseTest {
         var pv = randVarFuncName(12);
         var field = randVarFuncName(8);
         var expr = (MemberOfExpression) parseExpr("{%s=%s}.%s".formatted(pf, pv, field));
-        var entry = ((ObjectExpression) expr.subject()).entries().getFirst();
-        Assertions.assertEquals(pf, entry.key());
-        Assertions.assertEquals(pv, varName(entry.value()));
+        var entries = ((ObjectExpression) expr.subject()).entries();
+        Assertions.assertEquals(pv, varName(entries.get(pf)));
         Assertions.assertEquals(field, expr.member());
     }
 
@@ -342,7 +342,7 @@ public class ExpressionParseTest extends BaseParseTest {
     public void testArgSetLambda() {
         var expr = (CallExpression) parseExpr("func(){}()");
         var procedure = ((LambdaExpression) expr.callee()).procedure();
-        Assertions.assertTrue(procedure.prototype().parameters().isEmpty());
+        Assertions.assertTrue(procedure.prototype().parameterSet().isEmpty());
     }
 
     //
@@ -661,17 +661,16 @@ public class ExpressionParseTest extends BaseParseTest {
         var oe = (ObjectExpression) parseExpr("{id=5,fc=1.2,nm=\"gg\",ok=true,ex=nil,li=[1],ch={sid=8},t={a1:b1}}");
 
         Assertions.assertEquals(8, oe.entries().size());
-        var entries = Utils.toMap(oe.entries(),
-                e -> e.key().value(), ObjectExpression.Entry::value);
+        var entries = oe.entries();
 
-        Assertions.assertInstanceOf(LiteralExpression.class, entries.get("id"));
-        Assertions.assertInstanceOf(LiteralExpression.class, entries.get("fc"));
-        Assertions.assertInstanceOf(LiteralExpression.class, entries.get("nm"));
-        Assertions.assertInstanceOf(LiteralExpression.class, entries.get("ok"));
-        Assertions.assertInstanceOf(LiteralExpression.class, entries.get("ex"));
-        Assertions.assertInstanceOf(ArrayExpression.class, entries.get("li"));
-        Assertions.assertInstanceOf(ObjectExpression.class, entries.get("ch"));
-        Assertions.assertInstanceOf(PairsExpression.class, entries.get("t"));
+        Assertions.assertInstanceOf(LiteralExpression.class, entries.get(identifier("id")));
+        Assertions.assertInstanceOf(LiteralExpression.class, entries.get(identifier("fc")));
+        Assertions.assertInstanceOf(LiteralExpression.class, entries.get(identifier("nm")));
+        Assertions.assertInstanceOf(LiteralExpression.class, entries.get(identifier("ok")));
+        Assertions.assertInstanceOf(LiteralExpression.class, entries.get(identifier("ex")));
+        Assertions.assertInstanceOf(ArrayExpression.class, entries.get(identifier("li")));
+        Assertions.assertInstanceOf(ObjectExpression.class, entries.get(identifier("ch")));
+        Assertions.assertInstanceOf(PairsExpression.class, entries.get(identifier("t")));
     }
 
     // array

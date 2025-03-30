@@ -24,21 +24,21 @@ func checkIfStatement(code int) rom {
 // for
 
 func checkForStatement(max int,
-         handle func(v int, v int) bool) {
+         handle func(x int, y int) bool) {
     // clause
     for (var i = 0; i < max; i += 1) {
-        handle(i);
+        handle(i, max);
     }
     // simple
     var i = 0;
     for ( i < max ) {
-        handle(i);
+        handle(i, max);
         i += 1;
     }
     // iterable
     var src []int = [1,2,3,4,5,6,7,8,9];
     for ( j : src ) {
-        handle(j);
+        handle(j, max);
     }
 }
 

@@ -10,8 +10,6 @@ public class ModuleParseTest {
     public void testModuleParse() throws IOException {
         var mp = new ModuleParser();
         var mod = mp.parse(List.of(), List.of());
-        System.out.println(mod.path());
-        System.out.println(mod.sources());
     }
 
 }

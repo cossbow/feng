@@ -25,15 +25,19 @@ public class Definition extends Entity {
         return modifier;
     }
 
-    public Optional<Identifier> name() {
-        return name;
+    public Identifier name() {
+        return name.orElseThrow();
     }
 
-    public TypeParameters generic() {
-        return generic;
+    public boolean named() {
+        return name.isPresent();
     }
 
     public boolean unnamed() {
         return name.isEmpty();
+    }
+
+    public TypeParameters generic() {
+        return generic;
     }
 }

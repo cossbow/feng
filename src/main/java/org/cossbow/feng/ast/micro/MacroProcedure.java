@@ -5,19 +5,20 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.stmt.Statement;
+import org.cossbow.feng.ast.UniqueTable;
 
 import java.util.List;
 import java.util.Optional;
 
 public class MacroProcedure extends Entity {
     private final Identifier name;
-    private final List<MacroVariable> params;
+    private final UniqueTable<MacroVariable> params;
     private final List<Statement> body;
     private final Optional<Expression> result;
 
     public MacroProcedure(Position pos,
                           Identifier name,
-                          List<MacroVariable> params,
+                          UniqueTable<MacroVariable> params,
                           List<Statement> body,
                           Optional<Expression> result) {
         super(pos);
@@ -31,7 +32,7 @@ public class MacroProcedure extends Entity {
         return name;
     }
 
-    public List<MacroVariable> params() {
+    public UniqueTable<MacroVariable> params() {
         return params;
     }
 

@@ -70,3 +70,7 @@ func lambda() {
 func array() {
     var a=[[[]]][0];
 }
+
+func pairs() {
+    var kvs={1:2, rand():rand()};
+}

@@ -5,31 +5,31 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.ast.UniqueTable;
 
-import java.util.List;
 import java.util.Optional;
 
 public class StructureDefinition extends TypeDefinition {
     private final boolean union;
-    private final List<StructureMember> members;
+    private final UniqueTable<StructureField> fields;
 
     public StructureDefinition(Position pos,
                                Modifier modifier,
                                Optional<Identifier> name,
                                TypeParameters generic,
                                boolean union,
-                               List<StructureMember> members) {
+                               UniqueTable<StructureField> fields) {
         super(pos, modifier, name, generic);
         this.union = union;
-        this.members = members;
+        this.fields = fields;
     }
 
     public boolean union() {
         return union;
     }
 
-    public List<StructureMember> members() {
-        return members;
+    public UniqueTable<StructureField> fields() {
+        return fields;
     }
 
 }

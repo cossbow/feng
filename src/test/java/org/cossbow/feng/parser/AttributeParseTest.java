@@ -1,6 +1,7 @@
 package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.UniqueTable;
 import org.cossbow.feng.ast.attr.Attribute;
 import org.cossbow.feng.ast.attr.AttributeDefinition;
 import org.cossbow.feng.ast.expr.ArrayExpression;
@@ -8,6 +9,7 @@ import org.cossbow.feng.ast.expr.ObjectExpression;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.ast.proc.VariableParameterSet;
 import org.cossbow.feng.ast.stmt.DeclarationStatement;
 import org.cossbow.feng.ast.stmt.TryStatement;
 import org.junit.jupiter.api.Assertions;
@@ -21,7 +23,7 @@ import java.util.function.Function;
 
 public class AttributeParseTest extends BaseParseTest {
 
-    private final List<Function<CharSequence, List<Attribute>>> atXxx = List.of(
+    private final List<Function<CharSequence, UniqueTable<Attribute>>> atXxx = List.of(
             this::atDefineClass,
             this::atDefineInterface,
             this::atDefineEnum,
@@ -45,7 +47,7 @@ public class AttributeParseTest extends BaseParseTest {
         var name = randTypeName(16);
         var code = "attribute %s {}".formatted(name);
         var def = (AttributeDefinition) doParseDefinition(code);
-        Assertions.assertEquals(name, def.name().orElseThrow());
+        Assertions.assertEquals(name, def.name());
         Assertions.assertTrue(def.fields().isEmpty());
     }
 
@@ -56,7 +58,7 @@ public class AttributeParseTest extends BaseParseTest {
         var code = "export attribute Server { %s %s; }".formatted(name, type);
         var def = (AttributeDefinition) doParseDefinition(code);
         Assertions.assertEquals(1, def.fields().size());
-        var field = def.fields().getFirst();
+        var field = def.fields().getValue(0);
         Assertions.assertEquals(name, field.name());
         Assertions.assertEquals(type, field.type());
         Assertions.assertFalse(field.array());
@@ -71,7 +73,7 @@ public class AttributeParseTest extends BaseParseTest {
         var code = "export attribute Server { %s %s = %d; }".formatted(name, type, init);
         var def = (AttributeDefinition) doParseDefinition(code);
         Assertions.assertEquals(1, def.fields().size());
-        var field = def.fields().getFirst();
+        var field = def.fields().getValue(0);
         Assertions.assertEquals(name, field.name());
         Assertions.assertEquals(type, field.type());
         Assertions.assertFalse(field.array());
@@ -86,7 +88,7 @@ public class AttributeParseTest extends BaseParseTest {
         var code = "export attribute Server { %s []%s; }".formatted(fieldName, fieldType);
         var def = (AttributeDefinition) doParseDefinition(code);
         Assertions.assertEquals(1, def.fields().size());
-        var field = def.fields().getFirst();
+        var field = def.fields().getValue(0);
         Assertions.assertEquals(fieldName, field.name());
         Assertions.assertEquals(fieldType, field.type());
         Assertions.assertTrue(field.array());
@@ -100,7 +102,7 @@ public class AttributeParseTest extends BaseParseTest {
         var code = "export attribute Server { %s []%s = [10,20]; }".formatted(fieldName, fieldType);
         var def = (AttributeDefinition) doParseDefinition(code);
         Assertions.assertEquals(1, def.fields().size());
-        var field = def.fields().getFirst();
+        var field = def.fields().getValue(0);
         Assertions.assertEquals(fieldName, field.name());
         Assertions.assertEquals(fieldType, field.type());
         Assertions.assertTrue(field.array());
@@ -108,78 +110,78 @@ public class AttributeParseTest extends BaseParseTest {
         Assertions.assertEquals(2, arr.elements().size());
     }
 
-    private List<Attribute> atDefine(String code) {
+    private UniqueTable<Attribute> atDefine(String code) {
         var def = doParseDefinition(code);
         return def.modifier().attributes();
     }
 
-    private List<Attribute> atDefineClass(CharSequence attr) {
+    private UniqueTable<Attribute> atDefineClass(CharSequence attr) {
         return atDefine(attr + " class A{}");
     }
 
-    private List<Attribute> atDefineInterface(CharSequence attr) {
+    private UniqueTable<Attribute> atDefineInterface(CharSequence attr) {
         return atDefine(attr + " interface A{}");
     }
 
-    private List<Attribute> atDefineEnum(CharSequence attr) {
+    private UniqueTable<Attribute> atDefineEnum(CharSequence attr) {
         return atDefine(attr + " enum A{V,}");
     }
 
-    private List<Attribute> atDefineStruct(CharSequence attr) {
+    private UniqueTable<Attribute> atDefineStruct(CharSequence attr) {
         return atDefine(attr + " struct A{}");
     }
 
-    private List<Attribute> atDefineUnion(CharSequence attr) {
+    private UniqueTable<Attribute> atDefineUnion(CharSequence attr) {
         return atDefine(attr + " union A{}");
     }
 
-    private List<Attribute> atDefineAttribute(CharSequence attr) {
+    private UniqueTable<Attribute> atDefineAttribute(CharSequence attr) {
         return atDefine(attr + " attribute A{}");
     }
 
-    private List<Attribute> atDefineFunction(CharSequence attr) {
+    private UniqueTable<Attribute> atDefineFunction(CharSequence attr) {
         return atDefine(attr + " func all(){}");
     }
 
-    private List<Attribute> atDefinePrototype(CharSequence attr) {
+    private UniqueTable<Attribute> atDefinePrototype(CharSequence attr) {
         return atDefine(attr + " func all();");
     }
 
-    private List<Attribute> atClassField(CharSequence attr) {
+    private UniqueTable<Attribute> atClassField(CharSequence attr) {
         var code = "class A{%s var id int;}".formatted(attr);
         var def = (ClassDefinition) doParseDefinition(code);
-        return def.fields().getFirst().modifier().attributes();
+        return def.fields().get(identifier("id")).modifier().attributes();
     }
 
-    private List<Attribute> atClassMethod(CharSequence attr) {
+    private UniqueTable<Attribute> atClassMethod(CharSequence attr) {
         var code = "class A{%s func get(){}}".formatted(attr);
         var def = (ClassDefinition) doParseDefinition(code);
-        return def.methods().getFirst().modifier().attributes();
+        return def.methods().get(identifier("get")).modifier().attributes();
     }
 
-    private List<Attribute> atInterfaceMethod(CharSequence attr) {
+    private UniqueTable<Attribute> atInterfaceMethod(CharSequence attr) {
         var code = "interface A{%s get();}".formatted(attr);
         var def = (InterfaceDefinition) doParseDefinition(code);
-        return def.methods().getFirst().modifier().attributes();
+        return def.methods().get(identifier("get")).modifier().attributes();
     }
 
-    private List<Attribute> atParameter(CharSequence attr) {
+    private UniqueTable<Attribute> atParameter(CharSequence attr) {
         var code = "func test(%s a A){}".formatted(attr);
         var func = (FunctionDefinition) doParseDefinition(code);
-        return func.procedure().prototype().parameters().getFirst()
-                .variable().orElseThrow().modifier().attributes();
+        var ps = (VariableParameterSet) func.procedure().prototype().parameterSet();
+        return ps.variables().get(identifier("a")).modifier().attributes();
     }
 
-    private List<Attribute> atDeclaration(CharSequence attr) {
+    private UniqueTable<Attribute> atDeclaration(CharSequence attr) {
         var code = attr + " var a A;";
         var stmt = (DeclarationStatement) doParseLocal(code);
-        return stmt.variables().getFirst().modifier().attributes();
+        return stmt.variables().get(0).modifier().attributes();
     }
 
-    private List<Attribute> atTryCatch(CharSequence attr) {
+    private UniqueTable<Attribute> atTryCatch(CharSequence attr) {
         var code = "try{}catch(%s e Er){}".formatted(attr);
         var stmt = (TryStatement) doParseLocal(code);
-        return stmt.catchClauses().getFirst().argument().modifier().attributes();
+        return stmt.catchClauses().get(0).argument().modifier().attributes();
     }
 
     @Test
@@ -191,7 +193,7 @@ public class AttributeParseTest extends BaseParseTest {
                 appendList(code, names, "@", "\n");
                 var attrs = xxx.apply(code);
                 Assertions.assertEquals(size, attrs.size());
-                checkIds(names, attrs, Attribute::type);
+                checkIds(names, attrs);
             }
         }
     }
@@ -213,11 +215,11 @@ public class AttributeParseTest extends BaseParseTest {
                 }
                 var attrs = xxx.apply(code);
                 Assertions.assertEquals(size, attrs.size());
-                checkIds(names, attrs, Attribute::type);
+                checkIds(names, attrs);
                 for (int s = 0; s < size; s++) {
                     var init = inits.get(s);
-                    var obj = (ObjectExpression) attrs.get(s).init().orElseThrow();
-                    checkIds(init, obj.entries(), ObjectExpression.Entry::key);
+                    var obj = (ObjectExpression) attrs.getValue(s).init().orElseThrow();
+                    checkIds(init, obj.entries());
                 }
             }
         }
@@ -240,11 +242,11 @@ public class AttributeParseTest extends BaseParseTest {
                 }
                 var attrs = xxx.apply(code);
                 Assertions.assertEquals(size, attrs.size());
-                checkIds(names, attrs, Attribute::type);
+                checkIds(names, attrs);
                 for (int s = 0; s < size; s++) {
                     var init = inits.get(s);
-                    var obj = (ObjectExpression) attrs.get(s).init().orElseThrow();
-                    checkIds(init, obj.entries(), ObjectExpression.Entry::key);
+                    var obj = (ObjectExpression) attrs.getValue(s).init().orElseThrow();
+                    checkIds(init, obj.entries());
                 }
             }
         }

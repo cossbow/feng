@@ -1,21 +1,29 @@
 package org.cossbow.feng.ast.gen;
 
 import org.cossbow.feng.ast.Entity;
+import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
-
-import java.util.List;
+import org.cossbow.feng.ast.UniqueTable;
 
 public class TypeParameters extends Entity {
-    private final List<TypeParameter> params;
+    private final UniqueTable<TypeParameter> params;
 
     public TypeParameters(Position pos,
-                          List<TypeParameter> params) {
+                          UniqueTable<TypeParameter> params) {
         super(pos);
         this.params = params;
     }
 
-    public List<TypeParameter> params() {
+    public UniqueTable<TypeParameter> params() {
         return params;
+    }
+
+    public TypeParameter get(Identifier name) {
+        return params.get(name);
+    }
+
+    public boolean exists(Identifier name) {
+        return params.exists(name);
     }
 
     public boolean isEmpty() {
@@ -24,6 +32,8 @@ public class TypeParameters extends Entity {
 
     //
 
-    public static final TypeParameters EMPTY =
-            new TypeParameters(Position.ZERO, List.of());
+    public static TypeParameters empty() {
+        return new TypeParameters(Position.ZERO, new UniqueTable<>());
+    }
+
 }

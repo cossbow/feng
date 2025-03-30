@@ -13,6 +13,11 @@ public class MacroFunc extends Macro {
         this.procedure = procedure;
     }
 
+    @Override
+    public Identifier name() {
+        return procedure.name();
+    }
+
     public MacroProcedure procedure() {
         return procedure;
     }

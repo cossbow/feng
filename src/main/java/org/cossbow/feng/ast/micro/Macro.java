@@ -18,4 +18,6 @@ public class Macro extends Entity {
         return type;
     }
 
+    abstract
+    public Identifier name();
 }

@@ -43,9 +43,9 @@ public class SampleParseTest extends BaseParseTest {
     @Test
     public void testSamples() throws IOException {
         for (String name : list) {
-            System.out.printf("Test sample: [%s].\n", name);
+            System.out.println("name: "+name);
             var f = parseSample(name);
-            Assertions.assertNotNull(f);
+            Assertions.assertNotNull(f, "Test [%s] failed".formatted(name));
         }
     }
 

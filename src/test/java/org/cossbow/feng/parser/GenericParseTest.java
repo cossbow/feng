@@ -32,7 +32,7 @@ public class GenericParseTest extends BaseParseTest {
                 var params = anyNames(RandTypeName, 8, size);
                 var code = fmt.formatted(idList(params));
                 var def = doParseDefinition(code);
-                checkIds(params, def.generic().params(), TypeParameter::name);
+                checkIds(params, def.generic().params());
             }
         }
     }
@@ -43,8 +43,8 @@ public class GenericParseTest extends BaseParseTest {
             var params = anyNames(RandTypeName, 8, size);
             var code = "class A{func foo`%s`(){}}".formatted(idList(params));
             var def = (ClassDefinition) doParseDefinition(code);
-            var method = def.methods().getFirst();
-            checkIds(params, method.generic().params(), TypeParameter::name);
+            var method = def.methods().get(identifier("foo"));
+            checkIds(params, method.generic().params());
         }
     }
 
@@ -54,8 +54,8 @@ public class GenericParseTest extends BaseParseTest {
             var params = anyNames(RandTypeName, 8, size);
             var code = "interface A{foo`%s`();}".formatted(idList(params));
             var def = (InterfaceDefinition) doParseDefinition(code);
-            var method = def.methods().getFirst();
-            checkIds(params, method.generic().params(), TypeParameter::name);
+            var method = def.methods().get(identifier("foo"));
+            checkIds(params, method.generic().params());
         }
     }
 
@@ -65,7 +65,7 @@ public class GenericParseTest extends BaseParseTest {
             var type = randTypeName(2);
             var cov = randTypeName(8);
             var code = fmt.formatted(type + ":" + cov);
-            var param = doParseDefinition(code).generic().params().getFirst();
+            var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
             Assertions.assertEquals(cov, getSimpleTypeParam(param.constraint().orElseThrow()));
         }
@@ -79,7 +79,7 @@ public class GenericParseTest extends BaseParseTest {
                 var a = randTypeName(8);
                 var b = randTypeName(8);
                 var code = fmt.formatted(type + ":" + a + op.getValue() + b);
-                var param = doParseDefinition(code).generic().params().getFirst();
+                var param = doParseDefinition(code).generic().params().get(type);
                 Assertions.assertEquals(type, param.name());
                 var expr = (BinaryTypeExpression) param.constraint().orElseThrow();
                 Assertions.assertSame(op.getKey(), expr.operator());
@@ -97,7 +97,7 @@ public class GenericParseTest extends BaseParseTest {
             var b = randTypeName(8);
             var c = randTypeName(8);
             var code = fmt.formatted("%s: %s & %s | %s".formatted(type, a, b, c));
-            var param = doParseDefinition(code).generic().params().getFirst();
+            var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
             var expr = (BinaryTypeExpression) param.constraint().orElseThrow();
             Assertions.assertSame(TypeOperator.OR, expr.operator());
@@ -116,7 +116,7 @@ public class GenericParseTest extends BaseParseTest {
             var b = randTypeName(8);
             var c = randTypeName(8);
             var code = fmt.formatted("%s: %s | %s & %s".formatted(type, a, b, c));
-            var param = doParseDefinition(code).generic().params().getFirst();
+            var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
             var expr = (BinaryTypeExpression) param.constraint().orElseThrow();
             Assertions.assertSame(TypeOperator.OR, expr.operator());

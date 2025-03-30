@@ -2,23 +2,24 @@ package org.cossbow.feng.ast.attr;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.UniqueTable;
 
 import java.util.List;
 
 public class Modifier extends Entity {
-    private final List<Attribute> attributes;
+    private final UniqueTable<Attribute> attributes;
 
-    public static final Modifier EMPTY = new Modifier(Position.ZERO, List.of());
+    public Modifier(Position pos,
+                    UniqueTable<Attribute> attributes) {
+        super(pos);
+        this.attributes = attributes;
+    }
 
-    public List<Attribute> attributes() {
+    public UniqueTable<Attribute> attributes() {
         return attributes;
     }
 
-    //
-
-    public Modifier(Position pos,
-                    List<Attribute> attributes) {
-        super(pos);
-        this.attributes = attributes;
+    public static Modifier empty() {
+        return new Modifier(Position.ZERO, new UniqueTable<>());
     }
 }

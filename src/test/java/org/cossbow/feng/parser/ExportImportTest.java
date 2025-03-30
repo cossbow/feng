@@ -85,7 +85,7 @@ public class ExportImportTest extends BaseParseTest {
         for (int i = 0; i <= 1; i++) {
             var code = "class Cat{%s var price float;}".formatted(i > 0 ? "export" : "");
             var def = (ClassDefinition) doParseDefinition(code);
-            var field = def.fields().getFirst();
+            var field = def.fields().get(identifier("price"));
             Assertions.assertEquals(i > 0, field.export());
         }
     }
@@ -95,7 +95,7 @@ public class ExportImportTest extends BaseParseTest {
         for (int i = 0; i <= 1; i++) {
             var code = "class Cat{%s func run(){} }".formatted(i > 0 ? "export" : "");
             var def = (ClassDefinition) doParseDefinition(code);
-            var method = def.methods().getFirst();
+            var method = def.methods().get(identifier("run"));
             Assertions.assertEquals(i > 0, method.export());
         }
     }
