@@ -350,7 +350,7 @@ typeParameters
     : BACKTICK typeParameter (COMMA typeParameter)* BACKTICK
     ;
 typeParameter
-    : name=Identifier (COLON typeExpression)?
+    : name=Identifier typeExpression?
     ;
 typeExpression
     : definedType                                   # PrimaryTypeExpression

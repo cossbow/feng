@@ -64,7 +64,7 @@ public class GenericParseTest extends BaseParseTest {
         for (var fmt : simpleGlobalDefineFmt) {
             var type = randTypeName(2);
             var cov = randTypeName(8);
-            var code = fmt.formatted(type + ":" + cov);
+            var code = fmt.formatted(type + " " + cov);
             var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
             Assertions.assertEquals(cov, getSimpleTypeParam(param.constraint().orElseThrow()));
@@ -78,7 +78,7 @@ public class GenericParseTest extends BaseParseTest {
                 var type = randTypeName(2);
                 var a = randTypeName(8);
                 var b = randTypeName(8);
-                var code = fmt.formatted(type + ":" + a + op.getValue() + b);
+                var code = fmt.formatted(type + " " + a + op.getValue() + b);
                 var param = doParseDefinition(code).generic().params().get(type);
                 Assertions.assertEquals(type, param.name());
                 var expr = (BinaryTypeExpression) param.constraint().orElseThrow();
@@ -96,7 +96,7 @@ public class GenericParseTest extends BaseParseTest {
             var a = randTypeName(8);
             var b = randTypeName(8);
             var c = randTypeName(8);
-            var code = fmt.formatted("%s: %s & %s | %s".formatted(type, a, b, c));
+            var code = fmt.formatted("%s %s & %s | %s".formatted(type, a, b, c));
             var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
             var expr = (BinaryTypeExpression) param.constraint().orElseThrow();
@@ -115,7 +115,7 @@ public class GenericParseTest extends BaseParseTest {
             var a = randTypeName(8);
             var b = randTypeName(8);
             var c = randTypeName(8);
-            var code = fmt.formatted("%s: %s | %s & %s".formatted(type, a, b, c));
+            var code = fmt.formatted("%s %s | %s & %s".formatted(type, a, b, c));
             var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
             var expr = (BinaryTypeExpression) param.constraint().orElseThrow();
