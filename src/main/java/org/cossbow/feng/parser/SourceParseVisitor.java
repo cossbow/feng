@@ -828,7 +828,8 @@ final class SourceParseVisitor
     }
 
     private List<Variable> parseVariables(
-            FengParser.DeclaredNamesContext dnCtx) {
+            FengParser.DeclaredNamesContext dnCtx,
+            Lazy<TypeDeclarer> typeDcl) {
         var modifier = parseModifier(dnCtx.modifier());
         var dcl = parseDeclare(dnCtx.declare);
         var names = identifiers(dnCtx.identifierList());
@@ -836,16 +837,15 @@ final class SourceParseVisitor
         var unique = new UniqueTable<Identifier>(names.size());
         for (var name : names) {
             unique.add(name, name);
-            vars.add(new Variable(name.pos(), modifier, dcl, name));
+            vars.add(new Variable(name.pos(), modifier, dcl, name, typeDcl));
         }
         return vars;
     }
 
     @Override
     public Entity visitOnlyDeclaration(FengParser.OnlyDeclarationContext ctx) {
-        var variables = parseVariables(ctx.declaredNames());
         var typeDcl = (TypeDeclarer) visit(ctx.typeDeclarer());
-        for (var v : variables) v.type().set(typeDcl);
+        var variables = parseVariables(ctx.declaredNames(), Lazy.of(typeDcl));
         return new DeclarationStatement(posOf(ctx), variables,
                 Optional.empty());
     }
@@ -853,9 +853,8 @@ final class SourceParseVisitor
     @Override
     public Entity visitAssignedDeclaration(
             FengParser.AssignedDeclarationContext ctx) {
-        var variables = parseVariables(ctx.declaredNames());
         var typeDcl = this.<TypeDeclarer>visitOptional(ctx.typeDeclarer());
-        for (var v : variables) v.type().set(typeDcl.orElse(null));
+        var variables = parseVariables(ctx.declaredNames(), Lazy.of(typeDcl));
         var init = (Tuple) visit(ctx.tuple());
         return new DeclarationStatement(posOf(ctx), variables, Optional.of(init));
     }
@@ -1135,7 +1134,8 @@ final class SourceParseVisitor
             var type = (TypeDeclarer) visit(pc.typeDeclarer());
             var names = identifiers(pc.identifierList());
             for (var name : names) {
-                var v = new Variable(name.pos(), modifier, Declare.CONST, name, Lazy.of(type));
+                var v = new Variable(name.pos(), modifier,
+                        Declare.CONST, name, Lazy.of(type));
                 params.add(name, v);
             }
         }
