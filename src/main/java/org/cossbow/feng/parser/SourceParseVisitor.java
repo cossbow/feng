@@ -340,27 +340,33 @@ final class SourceParseVisitor
 
 
     @Override
-    public Entity visitPrimaryTypeExpression(FengParser.PrimaryTypeExpressionContext ctx) {
-        var definedType = (DefinedType) visit(ctx.definedType());
-        return new PrimaryTypeExpression(posOf(ctx), definedType);
+    public Entity visitDomainTypeConstraint(FengParser.DomainTypeConstraintContext ctx) {
+        var domain = TypeDomain.parse(ctx.typeDomains().getText());
+        return new DomainTypeConstraint(posOf(ctx), domain);
     }
 
     @Override
-    public Entity visitBinaryTypeExpression(FengParser.BinaryTypeExpressionContext ctx) {
+    public Entity visitDefinedTypeConstraint(FengParser.DefinedTypeConstraintContext ctx) {
+        var definedType = (DefinedType) visit(ctx.definedType());
+        return new DefinedTypeConstraint(posOf(ctx), definedType);
+    }
+
+    @Override
+    public Entity visitBinaryTypeConstraint(FengParser.BinaryTypeConstraintContext ctx) {
         var op = switch (ctx.op.getType()) {
             case FengParser.BITAND -> TypeOperator.AND;
             case FengParser.BITOR -> TypeOperator.OR;
             default -> throw new UnsupportedOperationException("unreachable branch");
         };
-        var left = (TypeExpression) visit(ctx.l);
-        var right = (TypeExpression) visit(ctx.r);
-        return new BinaryTypeExpression(posOf(ctx), op, left, right);
+        var left = (TypeConstraint) visit(ctx.l);
+        var right = (TypeConstraint) visit(ctx.r);
+        return new BinaryTypeConstraint(posOf(ctx), op, left, right);
     }
 
     @Override
     public Entity visitTypeParameter(FengParser.TypeParameterContext ctx) {
         var name = identifier(ctx.name);
-        var constraint = this.<TypeExpression>visitOptional(ctx.typeExpression());
+        var constraint = this.<TypeConstraint>visitOptional(ctx.typeConstraint());
         return new TypeParameter(posOf(ctx), name, constraint);
     }
 

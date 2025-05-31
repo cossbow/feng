@@ -2,10 +2,10 @@ package org.cossbow.feng.ast.gen;
 
 import org.cossbow.feng.ast.Position;
 
-public class PrimaryTypeExpression extends TypeExpression {
+public class DefinedTypeConstraint extends TypeConstraint {
     private final DefinedType definedType;
 
-    public PrimaryTypeExpression(Position pos,
+    public DefinedTypeConstraint(Position pos,
                                  DefinedType definedType) {
         super(pos);
         this.definedType = definedType;

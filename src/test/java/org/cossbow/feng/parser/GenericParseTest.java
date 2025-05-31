@@ -1,6 +1,7 @@
 package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.TypeDomain;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
@@ -26,7 +27,7 @@ public class GenericParseTest extends BaseParseTest {
     );
 
     @Test
-    public void testSimpleTypeParameter() {
+    public void testSimpleType() {
         for (var fmt : simpleGlobalDefineFmt) {
             for (int size = 1; size <= 8; size++) {
                 var params = anyNames(RandTypeName, 8, size);
@@ -38,7 +39,7 @@ public class GenericParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testSimpleClassMethodParameter() {
+    public void testSimpleClassMethod() {
         for (int size = 1; size <= 8; size++) {
             var params = anyNames(RandTypeName, 8, size);
             var code = "class A{func foo`%s`(){}}".formatted(idList(params));
@@ -49,7 +50,7 @@ public class GenericParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testSimpleInterfaceMethodParameter() {
+    public void testSimpleInterfaceMethod() {
         for (int size = 1; size <= 8; size++) {
             var params = anyNames(RandTypeName, 8, size);
             var code = "interface A{foo`%s`();}".formatted(idList(params));
@@ -60,7 +61,7 @@ public class GenericParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testSecondTypeParameter() {
+    public void testTypeConstraint1() {
         for (var fmt : simpleGlobalDefineFmt) {
             var type = randTypeName(2);
             var cov = randTypeName(8);
@@ -72,7 +73,23 @@ public class GenericParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testTypeParameterExpr() {
+    public void testTypeConstraint2() {
+        for (var fmt : simpleGlobalDefineFmt) {
+            for (var d : TypeDomain.values()) {
+                var type = randTypeName(2);
+                var code = fmt.formatted(type + " " + d.name);
+                var param = doParseDefinition(code)
+                        .generic().params().get(type);
+                Assertions.assertEquals(type, param.name());
+                var dtc = (DomainTypeConstraint) param
+                        .constraint().orElseThrow();
+                Assertions.assertEquals(d, dtc.domain());
+            }
+        }
+    }
+
+    @Test
+    public void testTypeConstraintExpr() {
         for (var op : typeOperatorSymbol.entrySet()) {
             for (var fmt : simpleGlobalDefineFmt) {
                 var type = randTypeName(2);
@@ -81,7 +98,7 @@ public class GenericParseTest extends BaseParseTest {
                 var code = fmt.formatted(type + " " + a + op.getValue() + b);
                 var param = doParseDefinition(code).generic().params().get(type);
                 Assertions.assertEquals(type, param.name());
-                var expr = (BinaryTypeExpression) param.constraint().orElseThrow();
+                var expr = (BinaryTypeConstraint) param.constraint().orElseThrow();
                 Assertions.assertSame(op.getKey(), expr.operator());
                 Assertions.assertEquals(a, getSimpleTypeParam(expr.left()));
                 Assertions.assertEquals(b, getSimpleTypeParam(expr.right()));
@@ -90,7 +107,7 @@ public class GenericParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testPriority1() {
+    public void testConstraintPriority1() {
         for (var fmt : simpleGlobalDefineFmt) {
             var type = randTypeName(2);
             var a = randTypeName(8);
@@ -99,9 +116,9 @@ public class GenericParseTest extends BaseParseTest {
             var code = fmt.formatted("%s %s & %s | %s".formatted(type, a, b, c));
             var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
-            var expr = (BinaryTypeExpression) param.constraint().orElseThrow();
+            var expr = (BinaryTypeConstraint) param.constraint().orElseThrow();
             Assertions.assertSame(TypeOperator.OR, expr.operator());
-            var left = (BinaryTypeExpression) expr.left();
+            var left = (BinaryTypeConstraint) expr.left();
             Assertions.assertEquals(a, getSimpleTypeParam(left.left()));
             Assertions.assertEquals(b, getSimpleTypeParam(left.right()));
             Assertions.assertEquals(c, getSimpleTypeParam(expr.right()));
@@ -109,7 +126,7 @@ public class GenericParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testPriority2() {
+    public void testConstraintPriority2() {
         for (var fmt : simpleGlobalDefineFmt) {
             var type = randTypeName(2);
             var a = randTypeName(8);
@@ -118,17 +135,17 @@ public class GenericParseTest extends BaseParseTest {
             var code = fmt.formatted("%s %s | %s & %s".formatted(type, a, b, c));
             var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
-            var expr = (BinaryTypeExpression) param.constraint().orElseThrow();
+            var expr = (BinaryTypeConstraint) param.constraint().orElseThrow();
             Assertions.assertSame(TypeOperator.OR, expr.operator());
             Assertions.assertEquals(a, getSimpleTypeParam(expr.left()));
-            var right = (BinaryTypeExpression) expr.right();
+            var right = (BinaryTypeConstraint) expr.right();
             Assertions.assertEquals(b, getSimpleTypeParam(right.left()));
             Assertions.assertEquals(c, getSimpleTypeParam(right.right()));
         }
     }
 
-    private Identifier getSimpleTypeParam(TypeExpression e) {
-        var dt = ((PrimaryTypeExpression) e).definedType();
+    private Identifier getSimpleTypeParam(TypeConstraint e) {
+        var dt = ((DefinedTypeConstraint) e).definedType();
         Assertions.assertTrue(dt.generic().isEmpty());
         return dt.name();
     }

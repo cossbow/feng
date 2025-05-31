@@ -8,11 +8,11 @@ import java.util.Optional;
 
 public class TypeParameter extends Entity {
     private final Identifier name;
-    private final Optional<TypeExpression> constraint;
+    private final Optional<TypeConstraint> constraint;
 
     public TypeParameter(Position pos,
                          Identifier name,
-                         Optional<TypeExpression> constraint) {
+                         Optional<TypeConstraint> constraint) {
         super(pos);
         this.name = name;
         this.constraint = constraint;
@@ -22,7 +22,7 @@ public class TypeParameter extends Entity {
         return name;
     }
 
-    public Optional<TypeExpression> constraint() {
+    public Optional<TypeConstraint> constraint() {
         return constraint;
     }
 }

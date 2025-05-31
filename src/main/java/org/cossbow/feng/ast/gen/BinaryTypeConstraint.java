@@ -2,14 +2,14 @@ package org.cossbow.feng.ast.gen;
 
 import org.cossbow.feng.ast.Position;
 
-public class BinaryTypeExpression extends TypeExpression {
+public class BinaryTypeConstraint extends TypeConstraint {
     private final TypeOperator operator;
-    private final TypeExpression left, right;
+    private final TypeConstraint left, right;
 
-    public BinaryTypeExpression(Position pos,
+    public BinaryTypeConstraint(Position pos,
                                 TypeOperator operator,
-                                TypeExpression left,
-                                TypeExpression right) {
+                                TypeConstraint left,
+                                TypeConstraint right) {
         super(pos);
         this.left = left;
         this.right = right;
@@ -20,11 +20,11 @@ public class BinaryTypeExpression extends TypeExpression {
         return operator;
     }
 
-    public TypeExpression left() {
+    public TypeConstraint left() {
         return left;
     }
 
-    public TypeExpression right() {
+    public TypeConstraint right() {
         return right;
     }
 }

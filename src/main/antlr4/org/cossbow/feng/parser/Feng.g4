@@ -350,15 +350,17 @@ typeParameters
     : BACKTICK typeParameter (COMMA typeParameter)* BACKTICK
     ;
 typeParameter
-    : name=Identifier typeExpression?
+    : name=Identifier typeConstraint?
     ;
-typeExpression
-    : definedType                                   # PrimaryTypeExpression
-    | l=typeExpression op=BITAND r=typeExpression   # BinaryTypeExpression
-    | l=typeExpression op=BITOR r=typeExpression    # BinaryTypeExpression
+typeConstraint
+    : typeDomains                                   # DomainTypeConstraint
+    | definedType                                   # DefinedTypeConstraint
+    | l=typeConstraint op=BITAND r=typeConstraint   # BinaryTypeConstraint
+    | l=typeConstraint op=BITOR r=typeConstraint    # BinaryTypeConstraint
     ;
-
-
+typeDomains
+    : CLASS | INTERFACE | ENUM | STRUCT | UNION | ATTRIBUTE | FUNC
+    ;
 
 
 
