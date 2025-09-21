@@ -1,16 +1,10 @@
 package org.cossbow.feng.ast.oop;
 
-import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.TypeDefinition;
+import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.Macro;
-import org.cossbow.feng.ast.UniqueTable;
-import org.cossbow.feng.ast.MultiTable;
-
-import java.util.Optional;
 
 public class InterfaceDefinition extends TypeDefinition {
     private final UniqueTable<InterfaceMethod> methods;

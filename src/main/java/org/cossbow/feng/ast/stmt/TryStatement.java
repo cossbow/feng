@@ -1,9 +1,9 @@
 package org.cossbow.feng.ast.stmt;
 
+import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 
 import java.util.List;
-import java.util.Optional;
 
 public class TryStatement extends Statement {
     private final BlockStatement body;

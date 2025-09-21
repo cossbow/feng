@@ -98,11 +98,11 @@ public class StatementParseTest extends BaseParseTest {
         var b = randVarFuncName(8);
         var code = "if(%s) %s();".formatted(a, b);
         var stmt = (IfStatement) parseStmt(code);
-        Assertions.assertTrue(stmt.init().isEmpty());
+        Assertions.assertTrue(stmt.init().none());
         Assertions.assertEquals(a, varName(stmt.condition()));
         var call = (CallStatement) stmt.yes();
         Assertions.assertEquals(b, varName(call.call().callee()));
-        Assertions.assertTrue(stmt.not().isEmpty());
+        Assertions.assertTrue(stmt.not().none());
     }
 
     @Test
@@ -112,11 +112,11 @@ public class StatementParseTest extends BaseParseTest {
         var c = randVarFuncName(8);
         var code = "if(%s) %s(); else %s();".formatted(a, b, c);
         var stmt = (IfStatement) parseStmt(code);
-        Assertions.assertTrue(stmt.init().isEmpty());
+        Assertions.assertTrue(stmt.init().none());
         Assertions.assertEquals(a, varName(stmt.condition()));
         var yes = (CallStatement) stmt.yes();
         Assertions.assertEquals(b, varName(yes.call().callee()));
-        var not = (CallStatement) stmt.not().orElseThrow();
+        var not = (CallStatement) stmt.not().must();
         Assertions.assertEquals(c, varName(not.call().callee()));
     }
 
@@ -128,11 +128,11 @@ public class StatementParseTest extends BaseParseTest {
         var d = randVarFuncName(8);
         var code = "if(%s) %s(); else if(%s) %s(); ".formatted(a, b, c, d);
         var stmt = (IfStatement) parseStmt(code);
-        Assertions.assertTrue(stmt.init().isEmpty());
+        Assertions.assertTrue(stmt.init().none());
         Assertions.assertEquals(a, varName(stmt.condition()));
         var yes = (CallStatement) stmt.yes();
         Assertions.assertEquals(b, varName(yes.call().callee()));
-        var stmt2 = (IfStatement) stmt.not().orElseThrow();
+        var stmt2 = (IfStatement) stmt.not().must();
         Assertions.assertEquals(c, varName(stmt2.condition()));
         var yes2 = (CallStatement) stmt2.yes();
         Assertions.assertEquals(d, varName(yes2.call().callee()));
@@ -164,9 +164,9 @@ public class StatementParseTest extends BaseParseTest {
                 """.formatted(a, a);
         var stmt = (SwitchStatement) parseStmt(code);
 
-        var dcl = (DeclarationStatement) stmt.init().orElseThrow();
+        var dcl = (DeclarationStatement) stmt.init().must();
         Assertions.assertEquals(a, dcl.variables().getFirst().name());
-        var init = (CallExpression) first(dcl.init().orElseThrow());
+        var init = (CallExpression) first(dcl.init().must());
         Assertions.assertEquals(identifier("goods"), varName(init.callee()));
         Assertions.assertTrue(init.arguments().isEmpty());
 
@@ -210,8 +210,8 @@ public class StatementParseTest extends BaseParseTest {
         var n = randVarFuncName(16);
         var code = "for(%s < %s) %s+=1;".formatted(i, n, i);
         var stmt = (BaseForStatement) parseStmt(code);
-        Assertions.assertTrue(stmt.initializer().isEmpty());
-        Assertions.assertTrue(stmt.updater().isEmpty());
+        Assertions.assertTrue(stmt.initializer().none());
+        Assertions.assertTrue(stmt.updater().none());
         var cond = (BinaryExpression) stmt.condition();
         Assertions.assertSame(BinaryOperator.LT, cond.operator());
         Assertions.assertEquals(i, varName(cond.left()));
@@ -229,7 +229,7 @@ public class StatementParseTest extends BaseParseTest {
         var code = "for(var %s=0; %s<%s; %s+=1) %s(%s);".formatted(i, i, n, i, c, i);
         var stmt = (BaseForStatement) parseStmt(code);
 
-        var dcl = (DeclarationStatement) stmt.initializer().orElseThrow();
+        var dcl = (DeclarationStatement) stmt.initializer().must();
         Assertions.assertEquals(i, dcl.variables().getFirst().name());
 
         var cond = (BinaryExpression) stmt.condition();
@@ -240,7 +240,7 @@ public class StatementParseTest extends BaseParseTest {
         Assertions.assertEquals(c, varName(call.callee()));
         Assertions.assertEquals(i, varName(call.arguments().getFirst()));
 
-        var aop = ((AssignmentOperateStatement) stmt.updater().orElseThrow());
+        var aop = ((AssignmentOperateStatement) stmt.updater().must());
         Assertions.assertEquals(i, ((VariableAssignableOperand) aop.operand()).name());
     }
 
@@ -264,7 +264,7 @@ public class StatementParseTest extends BaseParseTest {
         var code = "throw new(%s);".formatted(type);
         var stmt = (ThrowStatement) parseStmt(code);
         var newExpr = (NewExpression) stmt.exception();
-        Assertions.assertTrue(newExpr.init().isEmpty());
+        Assertions.assertTrue(newExpr.init().none());
         Assertions.assertEquals(type, ((NewDefinedType) newExpr.type()).type().name());
     }
 
@@ -315,7 +315,7 @@ public class StatementParseTest extends BaseParseTest {
                     checkCalls(catchLists.get(i), cc.body());
                 }
 
-                Assertions.assertEquals(hasFinal, tryStmt.finallyClause().isPresent());
+                Assertions.assertEquals(hasFinal, tryStmt.finallyClause().has());
                 if (hasFinal) {
                     checkCalls(finalBlk, tryStmt.finallyClause().get());
                 }
@@ -330,7 +330,7 @@ public class StatementParseTest extends BaseParseTest {
             var code = "return " + idList(names) + ";";
             var stmt = (ReturnStatement) parseStmt(code);
             if (i == 0) {
-                Assertions.assertTrue(stmt.result().isEmpty());
+                Assertions.assertTrue(stmt.result().none());
                 continue;
             }
             checkIds(names, ((ArrayTuple) stmt.result().get()).values(), BaseParseTest::varName);

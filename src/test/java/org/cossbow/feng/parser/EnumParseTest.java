@@ -35,7 +35,7 @@ public class EnumParseTest extends BaseParseTest {
             var v = et.values().get(identifier(pair.a()));
             Assertions.assertEquals(pair.a(), v.name().value());
             if (pair.b() == null) {
-                Assertions.assertTrue(v.init().isEmpty());
+                Assertions.assertTrue(v.init().none());
             } else {
                 Assertions.assertEquals(BigInteger.valueOf(pair.b()),
                         integer(v.init().get()).value());

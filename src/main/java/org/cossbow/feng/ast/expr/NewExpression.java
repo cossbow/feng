@@ -1,9 +1,8 @@
 package org.cossbow.feng.ast.expr;
 
+import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.NewType;
-
-import java.util.Optional;
 
 public class NewExpression extends PrimaryExpression {
     private final NewType type;

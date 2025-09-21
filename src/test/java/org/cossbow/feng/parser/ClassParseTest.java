@@ -20,7 +20,7 @@ public class ClassParseTest extends BaseParseTest {
         var name = randTypeName(32);
         var def = (ClassDefinition) doParseDefinition("class " + name + " {}");
         Assertions.assertEquals(name, def.name());
-        Assertions.assertTrue(def.parent().isEmpty());
+        Assertions.assertTrue(def.parent().none());
         Assertions.assertTrue(def.impl().isEmpty());
         Assertions.assertTrue(def.generic().isEmpty());
         Assertions.assertTrue(def.fields().isEmpty());
@@ -33,7 +33,7 @@ public class ClassParseTest extends BaseParseTest {
         var parent = randTypeName(32);
         var def = (ClassDefinition) doParseDefinition("class %s : %s {}".formatted(name, parent));
         Assertions.assertEquals(name, def.name());
-        var ref = def.parent().orElseThrow();
+        var ref = def.parent().must();
         Assertions.assertEquals(parent, ref.name());
     }
 

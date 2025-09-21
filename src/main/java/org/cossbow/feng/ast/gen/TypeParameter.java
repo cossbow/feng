@@ -2,9 +2,8 @@ package org.cossbow.feng.ast.gen;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
-
-import java.util.Optional;
 
 public class TypeParameter extends Entity {
     private final Identifier name;

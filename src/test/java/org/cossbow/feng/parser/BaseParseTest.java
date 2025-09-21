@@ -4,6 +4,7 @@ package org.cossbow.feng.parser;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.expr.Expression;
@@ -207,7 +208,7 @@ public class BaseParseTest {
     }
 
     public static IntegerLiteral integer(Optional<Expression> expr) {
-        return integer(expr.orElseThrow());
+        return integer(expr.must());
     }
 
     public static Identifier varName(Expression expr) {

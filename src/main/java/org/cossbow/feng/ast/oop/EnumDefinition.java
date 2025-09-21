@@ -1,14 +1,9 @@
 package org.cossbow.feng.ast.oop;
 
-import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.UniqueTable;
-import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.TypeDefinition;
+import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.gen.TypeParameters;
-
-import java.util.Optional;
 
 public class EnumDefinition extends TypeDefinition {
     private final UniqueTable<Value> values;

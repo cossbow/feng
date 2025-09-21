@@ -3,8 +3,6 @@ package org.cossbow.feng.ast;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
-import java.util.Optional;
-
 abstract
 public class Definition extends Entity {
     private final Modifier modifier;
@@ -26,15 +24,15 @@ public class Definition extends Entity {
     }
 
     public Identifier name() {
-        return name.orElseThrow();
+        return name.must();
     }
 
     public boolean named() {
-        return name.isPresent();
+        return name.has();
     }
 
     public boolean unnamed() {
-        return name.isEmpty();
+        return name.none();
     }
 
     public TypeParameters generic() {

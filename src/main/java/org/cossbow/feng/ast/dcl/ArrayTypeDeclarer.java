@@ -1,9 +1,8 @@
 package org.cossbow.feng.ast.dcl;
 
+import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
-
-import java.util.Optional;
 
 public class ArrayTypeDeclarer extends TypeDeclarer {
     private final TypeDeclarer elementType;

@@ -26,22 +26,22 @@ public class ExportImportTest extends BaseParseTest {
         {
             var s = i.symbols().getFirst();
             Assertions.assertEquals(identifier("Alpha"), s.name());
-            Assertions.assertFalse(s.alias().isPresent());
+            Assertions.assertFalse(s.alias().has());
         }
         {
             var s = i.symbols().get(1);
             Assertions.assertEquals(identifier("Beta"), s.name());
-            Assertions.assertFalse(s.alias().isPresent());
+            Assertions.assertFalse(s.alias().has());
         }
         {
             var s = i.symbols().get(2);
             Assertions.assertEquals(identifier("Gamma"), s.name());
-            Assertions.assertEquals(identifier("C"), s.alias().orElseThrow());
+            Assertions.assertEquals(identifier("C"), s.alias().must());
         }
         {
             var s = i.symbols().get(3);
             Assertions.assertEquals(identifier("Delta"), s.name());
-            Assertions.assertEquals(identifier("D"), s.alias().orElseThrow());
+            Assertions.assertEquals(identifier("D"), s.alias().must());
         }
     }
 

@@ -62,7 +62,7 @@ public class AttributeParseTest extends BaseParseTest {
         Assertions.assertEquals(name, field.name());
         Assertions.assertEquals(type, field.type());
         Assertions.assertFalse(field.array());
-        Assertions.assertTrue(field.init().isEmpty());
+        Assertions.assertTrue(field.init().none());
     }
 
     @Test
@@ -77,7 +77,7 @@ public class AttributeParseTest extends BaseParseTest {
         Assertions.assertEquals(name, field.name());
         Assertions.assertEquals(type, field.type());
         Assertions.assertFalse(field.array());
-        var i = integer(field.init().orElseThrow());
+        var i = integer(field.init().must());
         Assertions.assertEquals(BigInteger.valueOf(init), i.value());
     }
 
@@ -92,7 +92,7 @@ public class AttributeParseTest extends BaseParseTest {
         Assertions.assertEquals(fieldName, field.name());
         Assertions.assertEquals(fieldType, field.type());
         Assertions.assertTrue(field.array());
-        Assertions.assertTrue(field.init().isEmpty());
+        Assertions.assertTrue(field.init().none());
     }
 
     @Test
@@ -106,7 +106,7 @@ public class AttributeParseTest extends BaseParseTest {
         Assertions.assertEquals(fieldName, field.name());
         Assertions.assertEquals(fieldType, field.type());
         Assertions.assertTrue(field.array());
-        var arr = (ArrayExpression) field.init().orElseThrow();
+        var arr = (ArrayExpression) field.init().must();
         Assertions.assertEquals(2, arr.elements().size());
     }
 
@@ -175,13 +175,13 @@ public class AttributeParseTest extends BaseParseTest {
     private UniqueTable<Attribute> atDeclaration(CharSequence attr) {
         var code = attr + " var a A;";
         var stmt = (DeclarationStatement) doParseLocal(code);
-        return stmt.variables().get(0).modifier().attributes();
+        return stmt.variables().getFirst().modifier().attributes();
     }
 
     private UniqueTable<Attribute> atTryCatch(CharSequence attr) {
         var code = "try{}catch(%s e Er){}".formatted(attr);
         var stmt = (TryStatement) doParseLocal(code);
-        return stmt.catchClauses().get(0).argument().modifier().attributes();
+        return stmt.catchClauses().getFirst().argument().modifier().attributes();
     }
 
     @Test
@@ -218,7 +218,7 @@ public class AttributeParseTest extends BaseParseTest {
                 checkIds(names, attrs);
                 for (int s = 0; s < size; s++) {
                     var init = inits.get(s);
-                    var obj = (ObjectExpression) attrs.getValue(s).init().orElseThrow();
+                    var obj = (ObjectExpression) attrs.getValue(s).init().must();
                     checkIds(init, obj.entries());
                 }
             }
@@ -245,7 +245,7 @@ public class AttributeParseTest extends BaseParseTest {
                 checkIds(names, attrs);
                 for (int s = 0; s < size; s++) {
                     var init = inits.get(s);
-                    var obj = (ObjectExpression) attrs.getValue(s).init().orElseThrow();
+                    var obj = (ObjectExpression) attrs.getValue(s).init().must();
                     checkIds(init, obj.entries());
                 }
             }

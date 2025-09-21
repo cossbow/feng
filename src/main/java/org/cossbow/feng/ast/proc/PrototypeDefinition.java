@@ -1,12 +1,11 @@
 package org.cossbow.feng.ast.proc;
 
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
-
-import java.util.Optional;
 
 public class PrototypeDefinition extends TypeDefinition {
     private final Prototype prototype;

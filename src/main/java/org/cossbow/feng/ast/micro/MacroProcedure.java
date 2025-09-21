@@ -1,14 +1,10 @@
 package org.cossbow.feng.ast.micro;
 
-import org.cossbow.feng.ast.Entity;
-import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.stmt.Statement;
-import org.cossbow.feng.ast.UniqueTable;
 
 import java.util.List;
-import java.util.Optional;
 
 public class MacroProcedure extends Entity {
     private final Identifier name;

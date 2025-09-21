@@ -1,13 +1,7 @@
 package org.cossbow.feng.ast.attr;
 
-import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.TypeDefinition;
-import org.cossbow.feng.ast.UniqueTable;
+import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.gen.TypeParameters;
-
-import java.util.List;
-import java.util.Optional;
 
 public class AttributeDefinition extends TypeDefinition {
     private final UniqueTable<AttributeField> fields;

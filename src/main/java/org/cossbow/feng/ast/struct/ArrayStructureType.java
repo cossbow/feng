@@ -1,9 +1,8 @@
 package org.cossbow.feng.ast.struct;
 
+import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
-
-import java.util.Optional;
 
 public class ArrayStructureType extends StructureType {
     private final StructureType elementType;

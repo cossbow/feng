@@ -1,10 +1,10 @@
 package org.cossbow.feng.ast.stmt;
 
+import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Variable;
 
 import java.util.List;
-import java.util.Optional;
 
 public class DeclarationStatement extends Statement {
     private final List<Variable> variables;

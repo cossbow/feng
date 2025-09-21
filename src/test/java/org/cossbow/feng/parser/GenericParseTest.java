@@ -68,7 +68,7 @@ public class GenericParseTest extends BaseParseTest {
             var code = fmt.formatted(type + " " + cov);
             var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
-            Assertions.assertEquals(cov, getSimpleTypeParam(param.constraint().orElseThrow()));
+            Assertions.assertEquals(cov, getSimpleTypeParam(param.constraint().must()));
         }
     }
 
@@ -82,7 +82,7 @@ public class GenericParseTest extends BaseParseTest {
                         .generic().params().get(type);
                 Assertions.assertEquals(type, param.name());
                 var dtc = (DomainTypeConstraint) param
-                        .constraint().orElseThrow();
+                        .constraint().must();
                 Assertions.assertEquals(d, dtc.domain());
             }
         }
@@ -98,7 +98,7 @@ public class GenericParseTest extends BaseParseTest {
                 var code = fmt.formatted(type + " " + a + op.getValue() + b);
                 var param = doParseDefinition(code).generic().params().get(type);
                 Assertions.assertEquals(type, param.name());
-                var expr = (BinaryTypeConstraint) param.constraint().orElseThrow();
+                var expr = (BinaryTypeConstraint) param.constraint().must();
                 Assertions.assertSame(op.getKey(), expr.operator());
                 Assertions.assertEquals(a, getSimpleTypeParam(expr.left()));
                 Assertions.assertEquals(b, getSimpleTypeParam(expr.right()));
@@ -116,7 +116,7 @@ public class GenericParseTest extends BaseParseTest {
             var code = fmt.formatted("%s %s & %s | %s".formatted(type, a, b, c));
             var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
-            var expr = (BinaryTypeConstraint) param.constraint().orElseThrow();
+            var expr = (BinaryTypeConstraint) param.constraint().must();
             Assertions.assertSame(TypeOperator.OR, expr.operator());
             var left = (BinaryTypeConstraint) expr.left();
             Assertions.assertEquals(a, getSimpleTypeParam(left.left()));
@@ -135,7 +135,7 @@ public class GenericParseTest extends BaseParseTest {
             var code = fmt.formatted("%s %s | %s & %s".formatted(type, a, b, c));
             var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
-            var expr = (BinaryTypeConstraint) param.constraint().orElseThrow();
+            var expr = (BinaryTypeConstraint) param.constraint().must();
             Assertions.assertSame(TypeOperator.OR, expr.operator());
             Assertions.assertEquals(a, getSimpleTypeParam(expr.left()));
             var right = (BinaryTypeConstraint) expr.right();

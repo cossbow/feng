@@ -1,10 +1,10 @@
 package org.cossbow.feng.ast.stmt;
 
+import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
 import java.util.List;
-import java.util.Optional;
 
 public class SwitchStatement extends Statement {
     private final Optional<Statement> init;

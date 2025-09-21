@@ -1,7 +1,6 @@
 package org.cossbow.feng.ast;
 
 import java.util.Objects;
-import java.util.Optional;
 
 public class Lazy<T> {
     private T value;
@@ -15,7 +14,7 @@ public class Lazy<T> {
     }
 
     public static <T> Lazy<T> of(Optional<T> o) {
-        return new Lazy<>(o.orElse(null));
+        return new Lazy<>(o.get());
     }
 
     public static <T> Lazy<T> nil() {

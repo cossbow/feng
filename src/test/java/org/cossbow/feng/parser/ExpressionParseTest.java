@@ -1,6 +1,5 @@
 package org.cossbow.feng.parser;
 
-import org.cossbow.feng.Utils;
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.UnaryOperator;
 import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
@@ -75,7 +74,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var expr = this.<NewExpression>parseExpr(code);
         var defType = ((NewDefinedType) expr.type()).type();
         Assertions.assertEquals(typeName, defType.name());
-        Assertions.assertInstanceOf(ObjectExpression.class, expr.init().orElseThrow());
+        Assertions.assertInstanceOf(ObjectExpression.class, expr.init().must());
     }
 
     @Test
@@ -87,7 +86,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var arr = (NewArrayType) expr.type();
         Assertions.assertEquals(typeName, typeName(arr.element()));
         Assertions.assertEquals(BigInteger.valueOf(len), integer(arr.length()).value());
-        Assertions.assertInstanceOf(ArrayExpression.class, expr.init().orElseThrow());
+        Assertions.assertInstanceOf(ArrayExpression.class, expr.init().must());
     }
 
     @Test
@@ -153,7 +152,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var idx = randInt(0, Integer.MAX_VALUE);
         var code = "{%s:%s}[%d]".formatted(pf, pv, idx);
         var expr = (IndexOfExpression) parseExpr(code);
-        var pair = ((PairsExpression) expr.subject()).pairs().get(0);
+        var pair = ((PairsExpression) expr.subject()).pairs().getFirst();
         Assertions.assertEquals(pf, varName(pair.key()));
         Assertions.assertEquals(pv, varName(pair.value()));
         Assertions.assertEquals(idx, integer(expr.index()).value());

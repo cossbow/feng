@@ -29,7 +29,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Function;
 
 final class SourceParseVisitor
@@ -77,7 +76,7 @@ final class SourceParseVisitor
     @SuppressWarnings("unchecked")
     private <N extends Entity> Optional<N> visitOptional(ParseTree tree) {
         if (tree == null) return Optional.empty();
-        return Optional.ofNullable((N) visit(tree));
+        return Optional.of((N) visit(tree));
     }
 
     @SuppressWarnings("unchecked")
@@ -168,7 +167,7 @@ final class SourceParseVisitor
     public Entity visitImportSymbol(FengParser.ImportSymbolContext ctx) {
         var name = identifier(ctx.name);
         var alias = ctx.alias != null ? identifier(ctx.alias) : null;
-        return new ImportSymbol(posOf(ctx.name), name, Optional.ofNullable(alias));
+        return new ImportSymbol(posOf(ctx.name), name, Optional.of(alias));
     }
 
     @Override
