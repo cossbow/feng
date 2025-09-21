@@ -1033,14 +1033,12 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitSwitchStatement(FengParser.SwitchStatementContext ctx) {
-        var assignmentCtx = ctx.embedAssignment();
-        var assign = this.<Statement>visitOptional(assignmentCtx);
+        var assign = this.<Statement>visitOptional(ctx.init);
         var value = (Expression) visit(ctx.expression());
         var branches = this.<SwitchBranch>visitList(ctx.switchBranch());
         var defBr = List.<Statement>of();
-        var defCtx = ctx.switchBranchDefault();
-        if (defCtx != null) {
-            defBr = parseStatements(defCtx.statementList());
+        if (ctx.def != null) {
+            defBr = parseStatements(ctx.def.statementList());
         }
         return new SwitchStatement(posOf(ctx), assign, value, branches, defBr);
     }

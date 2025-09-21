@@ -413,12 +413,14 @@ forStatement
 forIterator
     : init=embedAssignment SEMI expression SEMI next=embedAssignment
     ;
+// statement: for: this's a sugar
 forEach
     : identifierList COLON expression
     ;
 // statement: switch
 switchStatement
-    : SWITCH '(' (embedAssignment SEMI)? expression ')' '{' switchBranch* switchBranchDefault? '}'
+    : SWITCH '(' (init=embedAssignment SEMI)? expression ')'
+                '{' switchBranch* def=switchBranchDefault? '}'
     ;
 switchBranch
     : CASE expressionList COLON statementList (FALLTHROUGH SEMI)?
