@@ -297,7 +297,7 @@ assignedDeclaration
     : declaredNames typeDeclarer? ASSIGN tuple
     ;
 declaredNames
-    : modifier declare=(VAR|LET|CONST) identifierList
+    : modifier declare=(VAR|CONST) identifierList
     ;
 
 
@@ -758,7 +758,6 @@ CLASS           : 'class' ;
 FUNC            : 'func' ;
 CONST           : 'const' ;
 VAR             : 'var' ;
-LET             : 'let' ;
 NEW             : 'new' ;
 // Keywords: Control
 RETURN          : 'return' ;

@@ -14,7 +14,7 @@ import java.util.Map;
 public class DeclarationParseTest extends BaseParseTest {
 
     private static final Map<Declare, String> DECLARES =
-            Map.of(Declare.VAR, "var", Declare.LET, "let", Declare.CONST, "const");
+            Map.of(Declare.VAR, "var", Declare.CONST, "const");
 
     @Test
     public void testGlobalVar() {
