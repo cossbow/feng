@@ -7,8 +7,8 @@
 
 # 特性
 
-引入了面向对象之后，对象之间互相引用会形成一个复杂的图结构，对何时释放对象是个复杂的问题。
-同时对象的字段可能是指针，就需要考虑类型安全。
+引入了面向对象之后，对象之间互相引用很可能会形成复杂的对象图，对于什么时候在哪儿释放对象是个复杂的问题。
+而且对象的字段可能是指针，类型转换时需考虑类型的兼容性。所以主要设计是在内存安全基础上引入面向对象特性。
 
 主要的特性如下：
 
@@ -35,23 +35,23 @@
 
 ## module定义和导入
 
-module名称与目录名称一致，无声明，且目录名称的组成与变量命名要求一致，要是目录名不合规就不管吧。
+module名称即代码文件所在目录名，目录名的规则与变量命名要求一致。
 
-让一个符号在外部可见，需要使用`export`关键字修饰。比如在module`calc`里面有代码：
+让一个符号在外部可见，需要使用`export`关键字修饰。比如在`calc`里面有函数：
 
 ```feng
 export
-func sin(a, b int) int {
+func add(a, b int) int {
     return a + b;
 }
 ```
 
-在另一个module里使用关键字`import`导入`calc`，就能使用`calc`里的函数：
+在其他module里使用关键字`import`导入`calc`，就能使用`calc`里的函数：
 
 ```feng
-import calc {sin};
-func test() float64 {
-   return sin(1);
+import calc {add};
+func test() int {
+   return add(1, 2);
 }
 ```
 
@@ -60,21 +60,21 @@ func test() float64 {
 ```feng
 import calc {*};
 func test() float64 {
-   return sin(1);
+   return add(1);
 }
 ```
 
 ## 程序入口
 
-像大多数语言那样，有一个入口函数名称为`main`，无参数无返回值，作为可自行程序的入口：
+有一个入口函数名称为`main`，无参数无返回值，作为可自行程序的入口：
 
 ```feng
 func main() {
-    println("Hello Fèng!");
+    printf("Hello Fèng!");
 }
 ```
 
-如果程序将编译成一个独立的可自行文件，则需要`main`函数，如果编译成library那就不需要。
+如果程序将编译成一个独立的可自行文件才需要`main`函数，因此这不是必须的。
 
 ## 输入输出
 
@@ -106,7 +106,7 @@ func main() {
 ```feng
 import fmt;
 func print(a, b int) {
-    println(a + b);
+    printf("%d\n", a + b);
 }
 ```
 
@@ -134,11 +134,9 @@ module是代码的基本管理单元。
 2. module名称与路径一一对应，在文件中不声明module名称。要求目录名称的规则和变量名称一样。
    例如在Linux下，module`com\jjj\base\util`对应的相对路径为`com/jjj/base/util`。
 
-### module间引用
+### 导出符号
 
-使用`import`显示导入某个module内的符号，可以显式使用这个module里`export`标识的内容。
-
-`xxx\util`有代码：
+比如当前module为`xxx\util`，其中的符号`Node.value`字段、`List`类及`List.size`方法导出给外部使用：
 
 ```feng
 class Node {
@@ -148,43 +146,23 @@ class Node {
 export class List {
    var head *Node;
    var size int;
+   const tag int; // 类的成员需要单独导出才能被外面使用
    export func size() {
       return size;
    }
 }
 ```
 
-`test`里使用的示例代码：
+另外接口、结构类型及属性的成员不需要单独导出。
+
+### 导入符号
+
+声明导入`com\cossbow\log`中的全部符号：
 
 ```feng
-import xxx\util {List};
-func testList() {
-   // var node *Node = new(Node);  // 错误，不能显式使用
-   var li *List = new(List);
-   // var s int = li.size; // 还是错误， 不能显式使用
-   var s int = li.size();
-}
-```
-
-类的成员需要单独导出才能被外面使用：
-
-```feng
-export class User { // User类可以被外部使用
-   export var id int;   // id字段能在外部访问
-   var name rom;        // name字段不能在外部访问
-}
-```
-
-接口、结构类型及属性的成员不需要单独导出。
-
-### 导入格式
-
-声明导入module，在使用的符号名称前面需要加module名称前缀：
-
-```feng
-import com\cossbow\log;
+import com\cossbow\log {*};
 func main() {
-   log.println("Hello Feng!");
+   println(string("Hello Feng!"));
 }
 ```
 
@@ -193,16 +171,17 @@ func main() {
 ```feng
 import com\cossbow\log {println};
 func main() {
-   println("Hello Feng!");
+   println(string("Hello Feng!"));
 }
 ```
 
-符号列表可以用通配符`*`占用（不能和上面方式同时使用），表示全部导入：
+符号列表同时导入多个，用`,`隔开：
 
 ```feng
-import com\cossbow\log {*};
+import com\cossbow\log {println, sprintf};
 func main() {
-   println("Hello Feng!");
+    var m Sring = sprintf("Hello Feng!");
+   println(m);
 }
 ```
 
