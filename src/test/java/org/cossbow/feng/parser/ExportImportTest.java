@@ -11,7 +11,7 @@ public class ExportImportTest extends BaseParseTest {
 
     @Test
     public void testImport1() {
-        var code = "import a\\b {Alpha, Beta, Gamma: C, Delta :D};";
+        var code = "import a.b.{Alpha, Beta, Gamma: C, Delta :D};";
         var file = doParseFile(code);
         var imports = file.imports();
         Assertions.assertEquals(1, imports.size());
@@ -47,7 +47,7 @@ public class ExportImportTest extends BaseParseTest {
 
     @Test
     public void testImport2() {
-        var code = "import b\\c\\d {*};";
+        var code = "import b.c.d.*;";
         var file = doParseFile(code);
         var imports = file.imports();
         Assertions.assertEquals(1, imports.size());

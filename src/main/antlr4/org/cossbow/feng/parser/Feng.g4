@@ -20,14 +20,14 @@ import_
     : IMPORT module importSymbolSet SEMI
     ;
 importSymbolSet
-    : '{' all=MUL '}'
+    : all=MUL
     | '{' importSymbol (COMMA importSymbol)* '}'
     ;
 importSymbol
     : name=Identifier (COLON alias=Identifier)?
     ;
 module
-    : Identifier (BACKSLASH Identifier)*
+    : (Identifier DOT)+
     ;
 
 

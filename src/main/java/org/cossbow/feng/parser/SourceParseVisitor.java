@@ -157,10 +157,10 @@ final class SourceParseVisitor
         var setCtx = ctx.importSymbolSet();
 
         if (setCtx.all != null) {
-            return new Import(posOf(ctx), pkg, List.of());
+            return new Import(posOf(ctx), pkg, true, List.of());
         }
         var list = this.<ImportSymbol>visitList(setCtx.importSymbol());
-        return new Import(posOf(ctx), pkg, list);
+        return new Import(posOf(ctx), pkg, false, list);
     }
 
     @Override
