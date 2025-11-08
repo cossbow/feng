@@ -61,10 +61,10 @@ func sum(a, b int) int {
 }
 ```
 
-假设函数调用`printf`是`fmt`提供的打印到终端的函数：
+假设函数调用`printf`是module`fmt`提供的打印到终端的函数：
 
 ```feng
-import fmt;
+import fmt.{printf};
 func main() {
     printf("%d + %d = %d \n", 1, 3, sum(1, 3));
 }
@@ -73,7 +73,7 @@ func main() {
 可以没有返回值的函数：
 
 ```feng
-import fmt;
+import fmt.{printf};
 func print(a, b int) {
     printf("%d\n", a + b);
 }
@@ -82,7 +82,7 @@ func print(a, b int) {
 可以有一个或多个返回值：
 
 ```feng
-import fmt;
+import fmt.{printf};
 func divAndMod(a, b int) (int, int) {
     return a / b, a % b;
 }
@@ -116,11 +116,11 @@ module是代码的基本管理单元。
 
 1. 在module内部所有的内容都可见，跨module只能访问导出的符号。
 2. module名称与路径一一对应，在文件中不声明module名称。要求目录名称的规则和变量名称一样。
-   例如在Linux下，module`com\jjj\base\util`对应的相对路径为`com/jjj/base/util`。
+   例如在Linux下，module`com.jjj.base.util`对应的相对路径为`com/jjj/base/util`。
 
 ### 导出符号
 
-比如当前module为`xxx\util`，其中的符号`Node.value`字段、`List`类及`List.size`方法导出给外部使用：
+比如当前module为`xxx.util`，其中的符号`Node.value`字段、`List`类及`List.size`方法导出给外部使用：
 
 ```feng
 class Node {
@@ -141,10 +141,10 @@ export class List {
 
 ### 导入符号
 
-声明导入`com\cossbow\log`中的全部符号：
+声明导入`com.cossbow.log`中的全部符号：
 
 ```feng
-import com\cossbow\log {*};
+import com.cossbow.log.*;
 func main() {
    println(string("Hello Feng!"));
 }
@@ -153,7 +153,7 @@ func main() {
 可以在module路径后加上具体的符号列表，就能直接使用符号列表中的：
 
 ```feng
-import com\cossbow\log {println};
+import com.cossbow.log.{println};
 func main() {
    println(string("Hello Feng!"));
 }
@@ -162,7 +162,7 @@ func main() {
 符号列表同时导入多个，用`,`隔开：
 
 ```feng
-import com\cossbow\log {println, sprintf};
+import com.cossbow.log.{println, sprintf};
 func main() {
     var m Sring = sprintf("Hello Feng!");
    println(m);
