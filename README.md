@@ -319,17 +319,31 @@ func test(v int) bool {
 
 #### 索引运算符
 
-仅数组默认支持这种运算符。索引运算符是由中括号组成，括号中是获取索引值的表达式：
+仅数组默认支持这种运算符。索引运算符是由中括号组成，括号中是获取索引值的表达式。
+其用法有两种：
 
-```feng
-func test(arr [16]int) {
-   var a int = arr[2]; // 读取索引为2的元素值并赋值给新变量a
-   printf("%d\n", arr[5]); // 读取数组的索引为5的元素值并传给printf函数
-   arr[9] = a + 10; // 赋值：修改索引为9的元素值
-}
-```
-
-上面例子中展示了两种使用方式，在赋值的左边为写操作，否则为读操作。
+1. 索引表达式在右边是读操作，即获取索引对应元素的值作为运算结果。在语句中可以有两种方式接收取值：
+   1. 左边用两个变量接收：第一个接收的是值；第二个接收的是布尔值，表示索引对应元素是否存在。
+      ```feng
+      func test(arr [16]int) {
+          if (var v, exists = arr[16]; exists) {
+              // 索引16越界了，也就是不存在，所以exists=false，无法进入这个分支
+          }
+      }
+      ```
+   2. 左边一个变量或者在表达式中使用时，仅返回元素值，如果元素不存在则终止运行并抛出[错误](#错误)。
+      ```feng
+      func test(arr [16]int) int {
+          return arr[16]; // 索引越界，终止运行并抛出错误
+      }
+      ```
+2. 放左边为写操作，即修改索引对应元素的值。
+   ```feng
+   func test(arr [16]int) {
+       arr[15] = 0; // 修改索引为15的元素值为0
+   }
+   ```
+   数组的容量是创建之后就不能变了，所以索引越界自然也要终止运行并抛出[错误](#错误)。
 
 #### new运算符
 
@@ -445,34 +459,36 @@ func testMul(a,b *Complex) *Complex {
 
 ##### 自定义索引
 
-默认的索引只有数组支持，分有读和写两种操作，放在右边既是读，左边既是写。
+默认只有数组支持的[索引运算符](#索引运算符)也可以自定义。
+由于索引运算符分有读和写两种操作，因此分成`indexGet`和`indexSet`两个过程宏。
 
 比如自定义一个字典类`Map`，功能是提供自定义类型的Key和Value的索引。用法示例：
 
 ```feng
 class Map {
-   // 索引读，运行时不存在则报错
-   #operator indexGet(key int, lhs String) {
+   // 索引读
+   #operator indexGet(key, operand, exists) {
       var n = getNode(key);
-      lhs = n.value;
-   }
-   // 索引读，带检查功能
-   #operator indexTryGet(key int, lhs String, exists bool) {
-      var n = getNode(key);
-      lhs, exists = if (n != nil) n.value, true else nil, nil;
+      operand, exists = if (n != nil) n.value, true else nil, nil;
    }
    // 索引写
-   #operator indexSet(key int, rhs String) {
-      set(id, rhs);
+   #operator indexSet(key int, value String) {
+      set(key, value);
    }
 }
 func main() {
    var m Map;
    m[100] = 159;
-   var v int64 = m[100]; // 对应使用的是indexGet
+   // 带检查读：运行时如果key不存在则exists为false
+   var v, exists = m[100];
+   // 直接读：运行时如果key不存在（exists为false）则终止执行并抛出错误
+   var v int64 = m[100];
    printf("m[100] = %s\n", v);
 }
 ```
+
+在写操作时索引不存在是否终止执行取决于内部实现：
+比如一般情况的Map是可以新增key的，而数组是不能自动扩容的。
 
 ##### 自定义遍历
 
@@ -1834,3 +1850,7 @@ class Vector {
 
 包含名称、字段表和过程宏组成，能保存中间状态。
 比如自定义类型的[foreach遍历](#foreach遍历)的实现。
+
+## 错误
+
+## 属性
