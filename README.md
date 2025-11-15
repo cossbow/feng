@@ -455,9 +455,9 @@ func testMul(a,b *Complex) *Complex {
 }
 ```
 
-#### 自定义控制运算符
+#### 自定义特殊运算符
 
-##### 自定义索引
+##### 自定义索引运算符
 
 默认只有数组支持的[索引运算符](#索引运算符)也可以自定义。
 由于索引运算符分有读和写两种操作，因此分成`indexGet`和`indexSet`两个过程宏。
@@ -489,51 +489,6 @@ func main() {
 
 在写操作时索引不存在是否终止执行取决于内部实现：
 比如一般情况的Map是可以新增key的，而数组是不能自动扩容的。
-
-##### 自定义遍历
-
-实现迭代是通过名为`Iterator`的helper宏实现的，但考虑循环是很常用的语法，所以利用宏直接由编译器展开。
-宏的字段不限制，包含4个方法`initializer`、`condition`、`updater`、`get`
-
-| 方法          | 作用     | 参数                   |
-|-------------|--------|----------------------|
-| initializer | 初始化迭代器 | 无                    |
-| condition   | 循环条件   | 无                    |
-| updater     | 更新迭代器  | 无                    |
-| get         | 获取值    | 不限制，但设置多少个，使用时就接收多少个 |
-
-示例：
-
-```feng
-class Node`T` {
-    var next *Node`T`;
-    var value T;
-}
-export
-class List`T` {
-    var head *Node`T`;
-    #helper Iterator {
-        cursor *Node`T`;
-        initializer() {
-            cursor = head;
-        }
-        condition() {
-            cursor != nil
-        }
-        updater() {
-            cursor = cursor.next;
-        }
-        get(value) {
-            value = cursor.value;
-        }
-    }
-}
-func test(src List`Team`) {
-   for (i, t : src) {
-      // t is const int
-   }
-}
-```
 
 ## 类
 
@@ -756,7 +711,7 @@ func main() {
 }
 ```
 
-支持[foreach遍历](#foreach遍历)所有枚举值：
+支持[迭代循环](#迭代循环)所有枚举值：
 
 ```feng
 func main() {
@@ -1322,14 +1277,17 @@ func test(n Node) {
 
 ### 循环语句
 
+
+#### 条件循环语句
+
+`for`后面的括号内是控制体，控制体可以且必须有一个控制条件表达式，也可以包括初始化和更新子语句；
+之后是需要执行的语句或语句序列，称循环体。
 当控制条件满足时重复执行循环体：
 
 1. 控制条件是一个`bool`类型的条件表达式，当结果为`true`时才会执行循环体。
 2. 循环体是一个语句，如果需要多个语句操作则需使用[块语句](#块语句)包起来。
 
-#### 条件遍历
-
-`for`后面的括号内只有条件表达式
+简单的循环语句为括号内只有条件表达式：
 
 ```feng
 func main() {
@@ -1341,11 +1299,14 @@ func main() {
 }
 ```
 
-#### 迭代遍历
+完整的控制体格式为：【初始化】;【表达式】;【更新】
+1. 【初始化】在循环前执行一次，然后再进入循环过程。
+2. 循环过程的每一轮：先判断【表达式】，`false`则结束循环，`true`则执行循环体，最后执行【更新】。
+3. 循环体中可以有控制循环的操作：
+   1. 遇到`continue`语句则直接进入下一轮循环，也就是2中描述的。
+   2. 遇到`break`则直接跳出当前循环或指定循环。
 
-`for`关键字后面的括号里面的控制器，有初始化、条件和更新三个部分，条件是一个结果为`bool`值的表达式，初始化与更新都是赋值语句。
-
-示例：
+例如循环100次，并每次打印变量`i`的值：
 
 ```feng
 func main() {
@@ -1355,9 +1316,9 @@ func main() {
 }
 ```
 
-#### foreach遍历
+#### 迭代循环
 
-变量数组
+对于变量数组，可以用更简单的方式遍历所有元素：
 
 ```feng
 func main() {
@@ -1369,7 +1330,63 @@ func main() {
 }
 ```
 
-循环语句遍历形式默认只对数组使用，自定义类可以实现为名为`for`的宏：
+当然`continue`和`break`语句对迭代循环依然有效。
+
+循环语句遍历形式默认只对数组使用，对自定义类可以实现自定义迭代器，然后就可以用迭代循环来遍历了。
+实现迭代是通过名为`Iterator`的helper宏实现的，但考虑循环是很常用的语法，所以利用宏直接由编译器展开。
+宏的字段不限制，包含4个方法`initializer`、`condition`、`updater`、`get`
+
+| 方法          | 作用     | 参数      |
+|-------------|--------|---------|
+| initializer | 初始化迭代器 | 无       |
+| condition   | 循环条件   | 无       |
+| updater     | 更新迭代器  | 无       |
+| get         | 获取值    | 不限制     |
+
+其中`get`可以写多个，但参数个数不能相同。
+
+示例：
+
+```feng
+class Node`T` {
+    var next *Node`T`;
+    var value T;
+}
+export
+class List`T` {
+    var head *Node`T`;
+    #helper Iterator {
+        cursor *Node`T`;
+        index int;
+        initializer() {
+            cursor = head;
+            index = 0;
+        }
+        condition() {
+            cursor != nil
+        }
+        updater() {
+            cursor = cursor.next;
+            index += 1;
+        }
+        get(v) {
+            v = cursor.value;
+        }
+        get(i, v) {
+            i = index;
+            v = cursor.value;
+        }
+    }
+}
+func test(src List`*Team`) {
+   for ( t : src) { // 匹配第一个get
+      // TODO
+   }
+   for (i, t : src) { // 匹配第二个get
+      // TODO
+   }
+}
+```
 
 ### 赋值运算语句
 
@@ -1849,7 +1866,7 @@ class Vector {
 ### 类宏
 
 包含名称、字段表和过程宏组成，能保存中间状态。
-比如自定义类型的[foreach遍历](#foreach遍历)的实现。
+比如自定义类型的[迭代循环](#迭代循环)的实现。
 
 ## 错误
 
