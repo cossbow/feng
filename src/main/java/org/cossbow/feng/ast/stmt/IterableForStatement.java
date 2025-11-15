@@ -6,13 +6,13 @@ import org.cossbow.feng.ast.expr.Expression;
 
 import java.util.List;
 
-public class EachForStatement extends ForStatement {
+public class IterableForStatement extends ForStatement {
     private final List<Identifier> arguments;
     private final Expression iterable;
 
-    public EachForStatement(Position pos, Statement body,
-                            List<Identifier> arguments,
-                            Expression iterable) {
+    public IterableForStatement(Position pos, Statement body,
+                                List<Identifier> arguments,
+                                Expression iterable) {
         super(pos, body);
         this.arguments = arguments;
         this.iterable = iterable;

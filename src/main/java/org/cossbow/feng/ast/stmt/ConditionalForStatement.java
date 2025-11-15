@@ -4,16 +4,16 @@ import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
-public class BaseForStatement extends ForStatement {
+public class ConditionalForStatement extends ForStatement {
     private final Optional<Statement> initializer;
     private final Expression condition;
     private final Optional<Statement> updater;
 
-    public BaseForStatement(Position pos,
-                            Statement body,
-                            Optional<Statement> initializer,
-                            Expression condition,
-                            Optional<Statement> updater) {
+    public ConditionalForStatement(Position pos,
+                                   Statement body,
+                                   Optional<Statement> initializer,
+                                   Expression condition,
+                                   Optional<Statement> updater) {
         super(pos, body);
         this.initializer = initializer;
         this.condition = condition;

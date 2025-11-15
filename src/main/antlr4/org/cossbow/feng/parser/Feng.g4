@@ -406,15 +406,15 @@ ifTuple
     ;
 // statement: for
 forStatement
-    : FOR '(' expression ')' statement      # PredicateForStatement
+    : FOR '(' expression ')' statement      # UnaryForStatement
+    | FOR '(' forClause ')' statement       # TernaryForStatement
     | FOR '(' forIterator ')' statement     # IterableForStatement
-    | FOR '(' forEach ')' statement         # ForEachStatement
     ;
-forIterator
+forClause
     : init=embedAssignment SEMI expression SEMI next=embedAssignment
     ;
 // statement: for: this's a sugar
-forEach
+forIterator
     : identifierList COLON expression
     ;
 // statement: switch

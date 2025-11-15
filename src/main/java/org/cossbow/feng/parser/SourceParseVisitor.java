@@ -994,32 +994,35 @@ final class SourceParseVisitor
     // for statement
 
     @Override
-    public Entity visitPredicateForStatement(
-            FengParser.PredicateForStatementContext ctx) {
+    public Entity visitUnaryForStatement(
+            FengParser.UnaryForStatementContext ctx) {
         var condition = (Expression) visit(ctx.expression());
         var body = (Statement) visit(ctx.statement());
-        return new BaseForStatement(posOf(ctx), body, Optional.empty(), condition, Optional.empty());
+        return new ConditionalForStatement(posOf(ctx), body,
+                Optional.empty(), condition, Optional.empty());
+    }
+
+    @Override
+    public Entity visitTernaryForStatement(
+            FengParser.TernaryForStatementContext ctx) {
+        var clause = ctx.forClause();
+        var initializer = (Statement) visit(clause.init);
+        var condition = (Expression) visit(clause.expression());
+        var updater = (Statement) visit(clause.next);
+        var body = (Statement) visit(ctx.statement());
+        return new ConditionalForStatement(posOf(ctx), body,
+                Optional.of(initializer), condition,
+                Optional.of(updater));
     }
 
     @Override
     public Entity visitIterableForStatement(
             FengParser.IterableForStatementContext ctx) {
-        var forIterator = ctx.forIterator();
-        var initializer = (Statement) visit(forIterator.init);
-        var condition = (Expression) visit(forIterator.expression());
-        var updater = (Statement) visit(forIterator.next);
+        var iterator = ctx.forIterator();
+        var arguments = identifiers(iterator.identifierList());
+        var source = (Expression) visit(iterator.expression());
         var body = (Statement) visit(ctx.statement());
-        return new BaseForStatement(posOf(ctx), body,
-                Optional.of(initializer), condition, Optional.of(updater));
-    }
-
-    @Override
-    public Entity visitForEachStatement(FengParser.ForEachStatementContext ctx) {
-        var forEach = ctx.forEach();
-        var arguments = identifiers(forEach.identifierList());
-        var source = (Expression) visit(forEach.expression());
-        var body = (Statement) visit(ctx.statement());
-        return new EachForStatement(posOf(ctx), body, arguments, source);
+        return new IterableForStatement(posOf(ctx), body, arguments, source);
     }
 
     @Override

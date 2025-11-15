@@ -205,11 +205,11 @@ public class StatementParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testForCondition() {
+    public void testUnaryFor() {
         var i = randVarFuncName(8);
         var n = randVarFuncName(16);
         var code = "for(%s < %s) %s+=1;".formatted(i, n, i);
-        var stmt = (BaseForStatement) parseStmt(code);
+        var stmt = (ConditionalForStatement) parseStmt(code);
         Assertions.assertTrue(stmt.initializer().none());
         Assertions.assertTrue(stmt.updater().none());
         var cond = (BinaryExpression) stmt.condition();
@@ -222,12 +222,12 @@ public class StatementParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testForIteration() {
+    public void testTernaryFor() {
         var i = randVarFuncName(8);
         var n = randVarFuncName(16);
         var c = randVarFuncName(32);
         var code = "for(var %s=0; %s<%s; %s+=1) %s(%s);".formatted(i, i, n, i, c, i);
-        var stmt = (BaseForStatement) parseStmt(code);
+        var stmt = (ConditionalForStatement) parseStmt(code);
 
         var dcl = (DeclarationStatement) stmt.initializer().must();
         Assertions.assertEquals(i, dcl.variables().getFirst().name());
@@ -245,13 +245,13 @@ public class StatementParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testForEach() {
+    public void testIterableFor() {
         var size = ThreadLocalRandom.current().nextInt(1, 10);
         var names = anyNames(RandVarFuncName, 8, size);
         var src = randVarFuncName(16);
         var body = randVarFuncName(32);
         var code = "for(%s : %s) %s();".formatted(idList(names), src, body);
-        var forStmt = (EachForStatement) parseStmt(code);
+        var forStmt = (IterableForStatement) parseStmt(code);
         Assertions.assertEquals(names, forStmt.arguments());
         Assertions.assertEquals(src, varName(forStmt.iterable()));
         var call = (CallStatement) forStmt.body();
@@ -398,7 +398,7 @@ public class StatementParseTest extends BaseParseTest {
         var name = randVarFuncName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":for(a>0)a-=1;");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(BaseForStatement.class, stmt.statement());
+        Assertions.assertInstanceOf(ConditionalForStatement.class, stmt.statement());
     }
 
     @Test
