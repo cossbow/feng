@@ -32,6 +32,7 @@
 7. 运算操作符自定义：简化了C++运算符重载（Overloading），不能覆盖内置的实现。
 8. 虚引用：被引用的对象可以是值类型变量和引用类型的变量，限定为本地变量，包括参数。
 9. 泛型：泛型参数可以加约束条件，类成员方法也可以带参数。
+10. 异常机制：异常机制可以方便的处理设计之外的错误，避免使用goto处理。
 
 # 语法
 
@@ -331,10 +332,10 @@ func test(v int) bool {
           }
       }
       ```
-   2. 左边一个变量或者在表达式中使用时，仅返回元素值，如果元素不存在则终止运行并抛出[错误](#错误)。
+   2. 左边一个变量或者在表达式中使用时，仅返回元素值，如果元素不存在则终止运行并抛出[异常](#异常)。
       ```feng
       func test(arr [16]int) int {
-          return arr[16]; // 索引越界，终止运行并抛出错误
+          return arr[16]; // 索引越界，终止运行并抛出异常
       }
       ```
 2. 放左边为写操作，即修改索引对应元素的值。
@@ -343,7 +344,7 @@ func test(v int) bool {
        arr[15] = 0; // 修改索引为15的元素值为0
    }
    ```
-   数组的容量是创建之后就不能变了，所以索引越界自然也要终止运行并抛出[错误](#错误)。
+   数组的容量是创建之后就不能变了，所以索引越界自然也要终止运行并抛出[异常](#异常)。
 
 #### new运算符
 
@@ -358,7 +359,7 @@ func test(v int) bool {
 用于判断是否能类的引用是否能进行转换的语法，比如类的实例的引用传递可以给接口或父类指针，反过来则需要判断其类型。
 有两种用法：
 
-1. 用一个变量去接收结果，运算表达式返回的是对应类型的引用，这种情况下如果不能转换则抛出[错误](#错误)。同时可以参与表达式计算。
+1. 用一个变量去接收结果，运算表达式返回的是对应类型的引用，这种情况下如果不能转换则抛出[异常](#异常)。同时可以参与表达式计算。
    ```feng
    func test(o Object) {
       var f = o?(*File);   // 转换成File类的引用
@@ -367,7 +368,7 @@ func test(v int) bool {
    }
    ```
 2. 用两个变量去接收的话，就会返回[元组](#元组)，不能参与表达式计算。
-   第一个值是类型引用参考第1条；第二个为`bool`值，表示是否能进行转换。这时不会抛出错误。
+   第一个值是类型引用参考第1条；第二个为`bool`值，表示是否能进行转换。这时不会抛出[异常](#异常)。
    ```feng
    func valid(w Writer) {
       var f, ok = w?(*File);
@@ -481,7 +482,7 @@ func main() {
    m[100] = 159;
    // 带检查读：运行时如果key不存在则exists为false
    var v, exists = m[100];
-   // 直接读：运行时如果key不存在（exists为false）则终止执行并抛出错误
+   // 直接读：运行时如果key不存在（exists为false）则终止执行并抛出异常
    var v int64 = m[100];
    printf("m[100] = %s\n", v);
 }
@@ -1471,57 +1472,110 @@ func test() {
 
 ### 异常语句
 
-异常控制在许多语言都有，在有些场合使用很方便，比如资源打开和关闭。虽然有资源类，但这主要和内存管理一起的，如果在关闭资源操作中有耗时的，
-比如等待IO，会对性能影响难预测，因为`release`是在计数为`0`时或者GC释放前调用的。因此还是有必要加异常机制。
+分为抛出和处理[异常](#异常)两种语句。
 
-异常语句分为抛出和捕捉：
+#### 抛出异常
 
-1. 抛出一个对象，当前程序将会从此处中止，并从向异常机制提交一个异常实例，如果是有返回值的过程则忽略返回值。如果过程调用者没有捕捉到，则继续中止并将此异常实例提交给异常机制。
-2. 捕捉是由`try`/`catch`组成的结构，机制将`try`中的块语句抛出的异常实例，然后匹配到`catch`
-   语句中指定的类型，匹配到则捕捉成功，否则继续向下匹配。如果没有都未匹配成功则继续抛出。
-3. 不论前面的`try`和`catch`中的执行情况如何，最终结束后一定会执行`finally`。
+抛出异常是为了处理返回值没有处理的错误。抛出异常后：
 
-这里抛出的对象是任意一个类的实例：
+1. 会终止当前过程的执行，不执行返回语句，而是抛出一个包含错误信息的实例。
+2. 如果调用的过程抛出了一个异常A，会从调用处终止当前过程的执行，继续抛出异常A。
 
 ```feng
-func step1() {
-   throw new(Object);
-}
-class Exception {}
-func step2() {
+func example1() {
    throw new(Exception);
 }
-class Error {}
-func step2() {
-   throw new(Error);
+func example2() {
+    example1();
+    println("example1()必然抛出异常，所以这一行不会执行！");
 }
-func main() {
+func example3() {
+    example2();
+    println("example2()也会抛出异常，所以这一行也不会执行！");
+}
+```
+
+如果发生了抛出异常，那这个会一直按调用链往外抛，直到被`catch`匹配到为止。
+
+抛出的异常的类型需要自己定义，在[异常](#异常)中详细说明。
+
+#### 处理异常
+
+异常处理语句分三个部分：
+
+1. `try`部分：必须的部分，将需要处理的代码块包裹起来。
+2. `catch`部分：可以有多个，分配匹配不同的异常类型。匹配到就执行对应的代码块，否则继续往后匹配。
+   如果没有都未匹配成功则继续往外抛出。
+3. `finally`部分：上面两部分无论什么情况，都必须执行这部分。
+   如果第1部分有`return`语句，先执行`return`后的表达式，再执行`finally`部分，最后再正式返回。
+   如果第2部分没有或者未捕获到异常，则先执行`finally`部分后继续抛出。
+
+第2和3部分至少必须有一个。
+
+完整的例子：
+
+```feng
+func calc() {
    try {
       step1();
       step2();
    } catch(e *NilPointerError) {
-      // TODO
-   } catch(e *IllegalStateError | *IllegalArgumentError) { // 同时catch两种错误
-      // TODO something else
+      println("捕获到了空指针");
+   } catch(e *IllegalStateError | *IllegalArgumentError) {
+      println("捕获到了状态错误或者参数错误");
    } finally {
-      // TODO 清理一下
+      println("最终经过这里再往下执行");
    }
+   return getResult();
 }
 ```
 
-TODO：未想好的：抛出机制怎么收集栈信息呢？就是怎么自定义实现可以收集栈信息的异常类呢？
+没有`finally`部分，只有`catch`部分：
 
 ```feng
-class Error {
-   // 提供一个方法
-   func tracestack() {
-      var as *List`*A` = new(List`*B`);
+func calc() {
+   try {
+      step1();
+   } catch(e *IllegalStateError) {
+      println("捕获到了状态错误或者参数错误");
    }
-   // 采用宏方式
-   # tracestack() {
+   return getResult();
+}
+```
+
+没有`catch`部分，只有`finally`部分：
+
+```feng
+func calc() {
+   try {
+      step1();
+      step2();
+      return getResult();
+   } finally {
+      println("最终经过这里再往下执行");
    }
 }
 ```
+
+`finally`可以用来释放外部资源，避免资源泄露。比如文件关闭：
+
+```feng
+func readTxt() String {
+   var f, er = open("tmp.txt");
+   if er != nil {
+      return string("");
+   }
+   try {
+      step1(f);
+      step2(f);
+      return getTxt(f);
+   } finally {
+      f.close();
+   }
+}
+```
+
+注意：`catch`匹配括号里的参数`e`是常量参数。
 
 ## 元组
 
@@ -1868,6 +1922,26 @@ class Vector {
 包含名称、字段表和过程宏组成，能保存中间状态。
 比如自定义类型的[迭代循环](#迭代循环)的实现。
 
-## 错误
+## 异常
+
+一个能被抛出的异常类需要定义`#error`宏`tracestack`，在这个宏里追踪并收集栈信息：
+
+```feng
+class Stack {
+    var fn uint64;
+    var line uint32;
+}
+export
+class Error {
+   var stacks List`Stack`;
+   func tracestack(fn uint64, line uint32) {
+      var s Stack = {fn=fn,line=line};
+      stacks.add(s);
+   }
+   #error tracestack(fn uint64, line uint32) {
+      tracestack(fn, line);
+   }
+}
+```
 
 ## 属性
