@@ -87,7 +87,6 @@ public class ProcedureParseTest extends BaseParseTest {
                 Assertions.assertEquals(expect.b(), vtd.definedType().name());
                 Assertions.assertFalse(vtd.pointer());
                 Assertions.assertFalse(vtd.phantom());
-                Assertions.assertFalse(vtd.optional());
             }
             Assertions.assertTrue(prototype.returnSet().isEmpty());
         }

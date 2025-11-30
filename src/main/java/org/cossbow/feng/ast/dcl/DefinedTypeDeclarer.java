@@ -7,23 +7,20 @@ public class DefinedTypeDeclarer extends TypeDeclarer {
     private final DefinedType definedType;
     private final boolean reference;
     private final boolean phantom;
-    private final boolean optional;
 
     public DefinedTypeDeclarer(Position pos,
                                DefinedType definedType,
                                boolean reference,
-                               boolean phantom,
-                               boolean optional) {
+                               boolean phantom) {
         super(pos);
         this.definedType = definedType;
         this.reference = reference;
         this.phantom = phantom;
-        this.optional = optional;
     }
 
     public DefinedTypeDeclarer(Position pos,
                                DefinedType definedType) {
-        this(pos, definedType, false, false, false);
+        this(pos, definedType, false, false);
     }
 
     public DefinedType definedType() {
@@ -38,7 +35,4 @@ public class DefinedTypeDeclarer extends TypeDeclarer {
         return phantom;
     }
 
-    public boolean optional() {
-        return optional;
-    }
 }

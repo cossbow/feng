@@ -322,7 +322,7 @@ definedTypeDeclarer
     : pointerType? definedType
     ;
 pointerType
-    : kind=(MUL|BITAND) optional=QUESTION?
+    : kind=(MUL|BITAND)
     ;
 funcTypeDeclarer
     : FUNC prototype

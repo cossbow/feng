@@ -80,7 +80,6 @@ public class DeclarationParseTest extends BaseParseTest {
             var td = (DefinedTypeDeclarer) v.type().get();
             Assertions.assertTrue(td.pointer());
             Assertions.assertFalse(td.phantom());
-            Assertions.assertFalse(td.optional());
         }
         {
             var dcl = parseLocalDecl("var u &User");
@@ -88,23 +87,6 @@ public class DeclarationParseTest extends BaseParseTest {
             var td = (DefinedTypeDeclarer) v.type().get();
             Assertions.assertTrue(td.pointer());
             Assertions.assertTrue(td.phantom());
-            Assertions.assertFalse(td.optional());
-        }
-        {
-            var dcl = parseLocalDecl("var u *?User");
-            var v = dcl.variables().getFirst();
-            var td = (DefinedTypeDeclarer) v.type().get();
-            Assertions.assertTrue(td.pointer());
-            Assertions.assertFalse(td.phantom());
-            Assertions.assertTrue(td.optional());
-        }
-        {
-            var dcl = parseLocalDecl("var u &?User");
-            var v = dcl.variables().getFirst();
-            var td = (DefinedTypeDeclarer) v.type().get();
-            Assertions.assertTrue(td.pointer());
-            Assertions.assertTrue(td.phantom());
-            Assertions.assertTrue(td.optional());
         }
     }
 
@@ -115,8 +97,6 @@ public class DeclarationParseTest extends BaseParseTest {
                 "var i %s",
                 "var i *%s",
                 "var i &%s",
-                "var i *?%s",
-                "var i &?%s",
         };
         for (var fmt : fmtList) {
             for (int i = 0; i < 10; i++) {

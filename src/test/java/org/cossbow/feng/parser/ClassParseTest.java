@@ -83,7 +83,6 @@ public class ClassParseTest extends BaseParseTest {
                     Assertions.assertTrue(t.definedType().generic().isEmpty());
                     Assertions.assertFalse(t.pointer());
                     Assertions.assertFalse(t.phantom());
-                    Assertions.assertFalse(t.optional());
                 }
             }
         }
@@ -106,30 +105,6 @@ public class ClassParseTest extends BaseParseTest {
                     Assertions.assertTrue(t.definedType().generic().isEmpty());
                     Assertions.assertTrue(t.pointer());
                     Assertions.assertFalse(t.phantom());
-                    Assertions.assertFalse(t.optional());
-                }
-            }
-        }
-    }
-
-    @Test
-    public void testFieldOptional() {
-        for (var dcl : DECLARES.entrySet()) {
-            for (int size = 1; size <= 8; size++) {
-                var names = anyNames(RandVarFuncName, 10, size);
-                var type = randTypeName(16);
-                var fields = parseFields("%s %s *?%s;".formatted(dcl.getValue(), idList(names), type));
-                Assertions.assertEquals(size, fields.size());
-                for (var name : names) {
-                    var f = fields.get(name);
-                    Assertions.assertSame(dcl.getKey(), f.declare());
-                    Assertions.assertEquals(name, f.name());
-                    var t = (DefinedTypeDeclarer) f.type();
-                    Assertions.assertEquals(type, t.definedType().name());
-                    Assertions.assertTrue(t.definedType().generic().isEmpty());
-                    Assertions.assertTrue(t.pointer());
-                    Assertions.assertFalse(t.phantom());
-                    Assertions.assertTrue(t.optional());
                 }
             }
         }

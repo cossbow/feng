@@ -100,7 +100,6 @@ public class ExpressionParseTest extends BaseParseTest {
         Assertions.assertTrue(type.definedType().generic().isEmpty());
         Assertions.assertTrue(type.pointer());
         Assertions.assertFalse(type.phantom());
-        Assertions.assertFalse(type.optional());
     }
 
     //

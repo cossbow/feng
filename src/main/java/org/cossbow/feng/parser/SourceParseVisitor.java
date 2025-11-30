@@ -282,13 +282,11 @@ final class SourceParseVisitor
         var ptr = ctx.pointerType();
         var isPointer = ptr != null;
         var isPhantom = false;
-        var isOptional = false;
         if (isPointer) {
             isPhantom = ptr.kind.getType() == FengParser.BITAND;
-            isOptional = ptr.optional != null;
         }
         var dt = (DefinedType) visit(ctx.definedType());
-        return new DefinedTypeDeclarer(posOf(ctx), dt, isPointer, isPhantom, isOptional);
+        return new DefinedTypeDeclarer(posOf(ctx), dt, isPointer, isPhantom);
     }
 
     @Override
