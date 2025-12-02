@@ -142,31 +142,31 @@ export class List {
 
 ### 导入符号
 
-声明导入`com.cossbow.log`中的全部符号：
+声明导入`com.cossbow.fmt`模块：
 
 ```feng
-import com.cossbow.log.*;
+import com.cossbow.fmt;
 func main() {
-   println(string("Hello Feng!"));
+   fmt$println(string("Hello Fèng!"));
 }
 ```
 
-可以在module路径后加上具体的符号列表，就能直接使用符号列表中的：
+可以导入全部可见的符号，就不需要加module前缀了：
 
 ```feng
-import com.cossbow.log.{println};
+import com.cossbow.fmt *;
 func main() {
-   println(string("Hello Feng!"));
+   println(string("Hello Fèng!"));
 }
 ```
 
-符号列表同时导入多个，用`,`隔开：
+可以设置module别名：
 
 ```feng
-import com.cossbow.log.{println, sprintf};
+import com.cossbow.fmt ccfmt;
 func main() {
-    var m Sring = sprintf("Hello Feng!");
-   println(m);
+    var m Sring = ccfmt$sprintf("Hello Fèng!");
+    ccfmt$println(m);
 }
 ```
 
