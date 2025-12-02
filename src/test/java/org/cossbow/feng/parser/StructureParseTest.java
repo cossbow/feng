@@ -1,6 +1,6 @@
 package org.cossbow.feng.parser;
 
-import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.UniqueTable;
 import org.cossbow.feng.ast.struct.*;
 import org.junit.jupiter.api.Assertions;
@@ -31,9 +31,9 @@ public class StructureParseTest extends BaseParseTest {
         return def.fields();
     }
 
-    public static void checkTypeName(StructureType type, Identifier name) {
+    public static void checkTypeName(StructureType type, Symbol name) {
         var dst = (DefinedStructureType) type;
-        Assertions.assertEquals(name, dst.type().name());
+        Assertions.assertEquals(name, dst.type().symbol());
     }
 
     @Test
@@ -44,7 +44,7 @@ public class StructureParseTest extends BaseParseTest {
         for (var name : names) {
             var field = fields.get(name);
             Assertions.assertEquals(name, field.name());
-            checkTypeName(field.type(), identifier("int"));
+            checkTypeName(field.type(), symbol("int"));
         }
     }
 
@@ -61,9 +61,9 @@ public class StructureParseTest extends BaseParseTest {
 
     @Test
     public void testFieldBitMix() {
-        var a = randVarFuncName(8);
+        var a = randVarName(8);
         var bit = ThreadLocalRandom.current().nextInt(0, 64) + 1;
-        var b = randVarFuncName(8);
+        var b = randVarName(8);
         var fields = parseFields("%s:%d, %s int64;".formatted(a, bit, b));
         var af = fields.get(a);
         Assertions.assertEquals(a, af.name());
@@ -78,7 +78,7 @@ public class StructureParseTest extends BaseParseTest {
     public void testFieldReferenceType() {
         final int n = 8;
         var names = anyNames(RandVarFuncName, 6, n);
-        var types = anyNames(RandTypeName, 10, n);
+        var types = anyNames(RandTypeSymbol, 10, n);
         var code = new StringBuilder();
         for (int i = 0; i < n; i++) {
             code.append(names.get(i)).append(" ").append(types.get(i)).append(";");
@@ -94,9 +94,9 @@ public class StructureParseTest extends BaseParseTest {
 
     @Test
     public void testFieldLocalType() {
-        var a = randVarFuncName(6);
-        var b = randVarFuncName(6);
-        var bt = randTypeName(12);
+        var a = randVarName(6);
+        var b = randVarName(6);
+        var bt = randTypeSymbol(12);
         var code = "%s struct{%s %s;};".formatted(a, b, bt);
         var fields = parseFields(code);
         Assertions.assertEquals(1, fields.size());
@@ -118,7 +118,7 @@ public class StructureParseTest extends BaseParseTest {
             var fields = parseFields("a []int;");
             var field = fields.get(identifier("a"));
             var type = (ArrayStructureType) field.type();
-            checkTypeName(type.elementType(), identifier("int"));
+            checkTypeName(type.elementType(), symbol("int"));
             Assertions.assertTrue(type.length().none());
         }
         {
@@ -126,7 +126,7 @@ public class StructureParseTest extends BaseParseTest {
             var fields = parseFields("a [%d]int;".formatted(length));
             var field = fields.get(identifier("a"));
             var type = (ArrayStructureType) field.type();
-            checkTypeName(type.elementType(), identifier("int"));
+            checkTypeName(type.elementType(), symbol("int"));
             Assertions.assertEquals(length, integer(type.length()).value());
         }
     }
@@ -140,7 +140,7 @@ public class StructureParseTest extends BaseParseTest {
             Assertions.assertTrue(at.length().none());
             var eat = (ArrayStructureType) at.elementType();
             Assertions.assertEquals(length, integer(eat.length()).value());
-            checkTypeName(eat.elementType(), identifier("int"));
+            checkTypeName(eat.elementType(), symbol("int"));
         }
         {
             var len1 = randInt(10, 100);
@@ -150,7 +150,7 @@ public class StructureParseTest extends BaseParseTest {
             Assertions.assertEquals(len1, integer(at.length()).value());
             var eat = (ArrayStructureType) at.elementType();
             Assertions.assertEquals(len2, integer(eat.length()).value());
-            checkTypeName(eat.elementType(), identifier("int"));
+            checkTypeName(eat.elementType(), symbol("int"));
         }
     }
 

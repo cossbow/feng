@@ -2,35 +2,35 @@ package org.cossbow.feng.ast.mod;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 
 import java.util.List;
 
 public class Import extends Entity {
     private final List<Identifier> module;
-    private final boolean all;
-    private final List<ImportSymbol> symbols;
+    private final Optional<Identifier> alias;
+    private final boolean flat;
 
     public Import(Position pos,
                   List<Identifier> module,
-                  boolean all,
-                  List<ImportSymbol> symbols) {
+                  Optional<Identifier> alias,
+                  boolean flat) {
         super(pos);
         this.module = module;
-        this.all = all;
-        this.symbols = symbols;
+        this.alias = alias;
+        this.flat = flat;
     }
 
     public List<Identifier> module() {
         return module;
     }
 
-    public List<ImportSymbol> symbols() {
-        assert !symbols.isEmpty();
-        return symbols;
+    public Optional<Identifier> alias() {
+        return alias;
     }
 
-    public boolean importAll() {
-        return symbols.isEmpty();
+    public boolean flat() {
+        return flat;
     }
 }

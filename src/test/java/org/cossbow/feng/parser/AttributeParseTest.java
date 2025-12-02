@@ -53,7 +53,7 @@ public class AttributeParseTest extends BaseParseTest {
 
     @Test
     public void testField1() {
-        var name = randVarFuncName(12);
+        var name = randVarName(12);
         var type = randTypeName(20);
         var code = "export attribute Server { %s %s; }".formatted(name, type);
         var def = (AttributeDefinition) doParseDefinition(code);
@@ -67,7 +67,7 @@ public class AttributeParseTest extends BaseParseTest {
 
     @Test
     public void testField2() {
-        var name = randVarFuncName(12);
+        var name = randVarName(12);
         var type = randTypeName(20);
         var init = ThreadLocalRandom.current().nextInt(0, Integer.MAX_VALUE);
         var code = "export attribute Server { %s %s = %d; }".formatted(name, type, init);
@@ -83,7 +83,7 @@ public class AttributeParseTest extends BaseParseTest {
 
     @Test
     public void testArrayField1() {
-        var fieldName = randVarFuncName(12);
+        var fieldName = randVarName(12);
         var fieldType = randTypeName(20);
         var code = "export attribute Server { %s []%s; }".formatted(fieldName, fieldType);
         var def = (AttributeDefinition) doParseDefinition(code);
@@ -97,7 +97,7 @@ public class AttributeParseTest extends BaseParseTest {
 
     @Test
     public void testArrayField2() {
-        var fieldName = randVarFuncName(12);
+        var fieldName = randVarName(12);
         var fieldType = randTypeName(20);
         var code = "export attribute Server { %s []%s = [10,20]; }".formatted(fieldName, fieldType);
         var def = (AttributeDefinition) doParseDefinition(code);

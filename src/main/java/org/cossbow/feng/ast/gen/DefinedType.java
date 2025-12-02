@@ -1,23 +1,23 @@
 package org.cossbow.feng.ast.gen;
 
 import org.cossbow.feng.ast.Entity;
-import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.Symbol;
 
 public class DefinedType extends Entity {
-    private final Identifier name;
+    private final Symbol symbol;
     private final TypeArguments generic;
 
     public DefinedType(Position pos,
-                       Identifier name,
+                       Symbol symbol,
                        TypeArguments generic) {
         super(pos);
-        this.name = name;
+        this.symbol = symbol;
         this.generic = generic;
     }
 
-    public Identifier name() {
-        return name;
+    public Symbol symbol() {
+        return symbol;
     }
 
     public TypeArguments generic() {

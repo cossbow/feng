@@ -3,6 +3,7 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.Pair;
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.BlockStatement;
@@ -68,11 +69,11 @@ public class ProcedureParseTest extends BaseParseTest {
     @Test
     public void testPrototypeNamedParameter() {
         for (int n = 1; n <= 8; n++) {
-            var expectParams = new ArrayList<Pair<Identifier, Identifier>>();
+            var expectParams = new ArrayList<Pair<Identifier, Symbol>>();
             var paramsSet = new ArrayList<String>();
             for (int s = 1; s <= n; s++) {
                 var names = anyNames(RandVarFuncName, 12, s);
-                var type = randTypeName(8);
+                var type = randTypeSymbol(8);
                 paramsSet.add(idList(names) + " " + type);
                 for (var name : names) expectParams.add(Pair.of(name, type));
             }
@@ -80,11 +81,11 @@ public class ProcedureParseTest extends BaseParseTest {
             var prototype = parsePrototype(code);
             var params = (VariableParameterSet) prototype.parameterSet();
             Assertions.assertEquals(expectParams.size(), params.size());
-            for (var expect:expectParams) {
+            for (var expect : expectParams) {
                 var variable = params.get(expect.a());
                 Assertions.assertEquals(expect.a(), variable.name());
-                var vtd = (DefinedTypeDeclarer) variable.type().get();
-                Assertions.assertEquals(expect.b(), vtd.definedType().name());
+                var vtd = (DefinedTypeDeclarer) variable.type().must();
+                Assertions.assertEquals(expect.b(), vtd.definedType().symbol());
                 Assertions.assertFalse(vtd.pointer());
                 Assertions.assertFalse(vtd.phantom());
             }
@@ -95,7 +96,7 @@ public class ProcedureParseTest extends BaseParseTest {
     @Test
     public void testPrototypeUnnamedParameter() {
         for (int size = 1; size <= 16; size++) {
-            var expectTypes = anyNames(RandTypeName, 12, size);
+            var expectTypes = anyNames(RandTypeSymbol, 12, size);
             var prototype = parsePrototype("(%s)".formatted(idList(expectTypes)));
             var params = (UnnamedParameterSet) prototype.parameterSet();
             Assertions.assertEquals(expectTypes.size(), params.size());
@@ -113,7 +114,7 @@ public class ProcedureParseTest extends BaseParseTest {
             Assertions.assertTrue(types.isEmpty());
         }
         for (int n = 1; n <= 10; n++) {
-            var defTypes = anyNames(RandTypeName, 12, n);
+            var defTypes = anyNames(RandTypeSymbol, 12, n);
             var prototype = parsePrototype("()(%s)".formatted(idList(defTypes)));
             var types = prototype.returnSet();
             Assertions.assertEquals(n, types.size());
@@ -130,7 +131,7 @@ public class ProcedureParseTest extends BaseParseTest {
             Assertions.assertEquals(0, body.list().size());
         }
         for (int size = 1; size <= 100; size++) {
-            var callees = anyNames(RandVarFuncName, 10, size);
+            var callees = anyNames(RandVarSymbol, 10, size);
             var code = callees.stream().map(c -> c + "();").collect(Collectors.joining());
             var body = parseBody("{" + code + "}");
             var list = body.list();

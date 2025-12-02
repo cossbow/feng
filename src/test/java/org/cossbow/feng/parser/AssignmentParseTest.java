@@ -35,8 +35,8 @@ public class AssignmentParseTest extends BaseParseTest {
     static <H extends AssignableOperand>
     void assignmentOperationTester(String lhs, Consumer<H> lhsTest) {
         for (var op : assignableOperators) {
-            var b = randVarFuncName(8);
-            var code = "%s%s=%s;".formatted(lhs, symbol(op), b);
+            var b = randVarSymbol(8);
+            var code = "%s%s=%s;".formatted(lhs, operator(op), b);
             var operation = (AssignmentOperateStatement) doParseLocal(code);
             lhsTest.accept((H) operation.operand());
             Assertions.assertEquals(b, varName(operation.value()));
@@ -46,11 +46,11 @@ public class AssignmentParseTest extends BaseParseTest {
 
     @Test
     public void testAssignmentLeft() {
-        var a = randVarFuncName(8);
-        var b = randVarFuncName(8);
-        var i = randVarFuncName(6);
-        var c = randVarFuncName(8);
-        var m = randVarFuncName(12);
+        var a = randVarSymbol(8);
+        var b = randVarSymbol(8);
+        var i = randVarSymbol(6);
+        var c = randVarSymbol(8);
+        var m = randVarName(12);
         var code = "%s, %s[%s], %s.%s= 1,2,3;".formatted(a, b, i, c, m);
         var stmt = (AssignmentsStatement) doParseLocal(code);
         var list = stmt.operands();
@@ -58,7 +58,7 @@ public class AssignmentParseTest extends BaseParseTest {
         Assertions.assertEquals(3, list.size());
 
         var vhls = (VariableAssignableOperand) list.get(0);
-        Assertions.assertEquals(a, vhls.name());
+        Assertions.assertEquals(a, vhls.symbol());
 
         var ihls = (IndexAssignableOperand) list.get(1);
         Assertions.assertEquals(b, varName(ihls.subject()));
@@ -95,20 +95,20 @@ public class AssignmentParseTest extends BaseParseTest {
 
     @Test
     public void testAssignmentOperation() {
-        var v = randVarFuncName(8);
+        var v = randVarSymbol(8);
         assignmentOperationTester("" + v, lhs -> {
             var refLeft = (VariableAssignableOperand) lhs;
-            Assertions.assertEquals(v, refLeft.name());
+            Assertions.assertEquals(v, refLeft.symbol());
         });
 
-        var f = randVarFuncName(5);
+        var f = randVarName(5);
         assignmentOperationTester(v + "." + f, lhs -> {
             var fieldLeft = (MemberAssignableOperand) lhs;
             Assertions.assertEquals(v, varName(fieldLeft.subject()));
             Assertions.assertEquals(f, fieldLeft.member());
         });
 
-        var i = randVarFuncName(4);
+        var i = randVarSymbol(4);
         assignmentOperationTester(v + "[" + i + "]", lhs -> {
             var indexLeft = (IndexAssignableOperand) lhs;
             Assertions.assertEquals(v, varName(indexLeft.subject()));

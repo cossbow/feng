@@ -1,23 +1,23 @@
 package org.cossbow.feng.ast.expr;
 
-import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.gen.TypeArguments;
 
 public class ReferExpression extends PrimaryExpression {
-    private final Identifier name;
+    private final Symbol symbol;
     private final TypeArguments generic;
 
     public ReferExpression(Position pos,
-                           Identifier name,
+                           Symbol symbol,
                            TypeArguments generic) {
         super(pos);
-        this.name = name;
+        this.symbol = symbol;
         this.generic = generic;
     }
 
-    public Identifier name() {
-        return name;
+    public Symbol symbol() {
+        return symbol;
     }
 
     public TypeArguments generic() {

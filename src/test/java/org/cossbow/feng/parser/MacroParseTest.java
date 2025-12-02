@@ -36,11 +36,11 @@ public class MacroParseTest extends BaseParseTest {
     @Test
     public void testFunc() {
         for (var f : macroMap) {
-            var type = randVarFuncName(8);
-            var name = randVarFuncName(12);
-            var left = randVarFuncName(8);
-            var right = randVarFuncName(8);
-            var result = randVarFuncName(8);
+            var type = randVarName(8);
+            var name = randVarName(12);
+            var left = randVarName(8);
+            var right = randVarName(8);
+            var result = randVarName(8);
             var code = "%s %s(%s,%s,%s){%s.x=%s.x+%s.x;}"
                     .formatted(type, name, left, right, result, result, left, right);
             var macros = f.apply(code);
@@ -50,10 +50,12 @@ public class MacroParseTest extends BaseParseTest {
             checkIds(List.of(left, right, result), proc.params());
             var stmt = (AssignmentsStatement) proc.body().getFirst();
             var operand = (MemberAssignableOperand) stmt.operands().getFirst();
-            Assertions.assertEquals(result, varName(operand.subject()));
+            Assertions.assertEquals(symbol(result), varName(operand.subject()));
             var bin = (BinaryExpression) first(stmt.tuple());
-            Assertions.assertEquals(left, varName(((MemberOfExpression) bin.left()).subject()));
-            Assertions.assertEquals(right, varName(((MemberOfExpression) bin.right()).subject()));
+            Assertions.assertEquals(symbol(left),
+                    varName(((MemberOfExpression) bin.left()).subject()));
+            Assertions.assertEquals(symbol(right),
+                    varName(((MemberOfExpression) bin.right()).subject()));
         }
     }
 
@@ -62,10 +64,10 @@ public class MacroParseTest extends BaseParseTest {
         for (var f : macroMap) {
             var type = randTypeName(8);
             var name = randTypeName(12);
-            var idx = randVarFuncName(8);
-            var m1 = randVarFuncName(8);
-            var m2 = randVarFuncName(8);
-            var m3 = randVarFuncName(8);
+            var idx = randVarName(8);
+            var m1 = randVarName(8);
+            var m2 = randVarName(8);
+            var m3 = randVarName(8);
             var code = "%s %s{%s int;%s(){%s=0;}%s(){%s<size}%s(){%s+=1;}}"
                     .formatted(type, name, idx, m1, idx, m2, idx, m3, idx);
             var mc = (MacroClass) f.apply(code).get(type, name);

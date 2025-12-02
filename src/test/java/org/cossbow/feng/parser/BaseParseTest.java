@@ -35,8 +35,10 @@ import java.util.stream.Collectors;
 abstract
 public class BaseParseTest {
 
-    public static final IntFunction<Identifier> RandVarFuncName = BaseParseTest::randVarFuncName;
+    public static final IntFunction<Identifier> RandVarFuncName = BaseParseTest::randVarName;
     public static final IntFunction<Identifier> RandTypeName = BaseParseTest::randTypeName;
+    public static final IntFunction<Symbol> RandVarSymbol = BaseParseTest::randVarSymbol;
+    public static final IntFunction<Symbol> RandTypeSymbol = BaseParseTest::randTypeSymbol;
 
     static final String ALL = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_";
     static final int EDGE_DIGITS = 10;
@@ -117,11 +119,11 @@ public class BaseParseTest {
             Map.entry(UnaryOperator.INVERT, "!")
     );
 
-    public static String symbol(BinaryOperator op) {
+    public static String operator(BinaryOperator op) {
         return Objects.requireNonNull(operatorSymbols.get(op));
     }
 
-    public static String symbol(UnaryOperator op) {
+    public static String operator(UnaryOperator op) {
         return Objects.requireNonNull(operatorSymbols.get(op));
     }
 
@@ -149,7 +151,7 @@ public class BaseParseTest {
         return values.stream().map(BaseParseTest::identifier).toList();
     }
 
-    public static Identifier randVarFuncName(int len) {
+    public static Identifier randVarName(int len) {
         var random = ThreadLocalRandom.current();
         var sb = new StringBuilder(len);
         sb.append(ALL.charAt(random.nextInt(EDGE_UPPERCASE, EDGE_LOWERCASE)));
@@ -169,20 +171,37 @@ public class BaseParseTest {
         return identifier(sb.toString());
     }
 
-    public static List<Identifier> anyNames(IntFunction<Identifier> gen, int len, int size) {
-        var names = new LinkedHashSet<Identifier>(size);
+    public static Symbol symbol(Identifier name) {
+        return new Symbol(name.pos(), name);
+    }
+
+    public static Symbol symbol(String name) {
+        return symbol(identifier(name));
+    }
+
+    public static Symbol randTypeSymbol(int len) {
+        return symbol(randTypeName(len));
+    }
+
+    public static Symbol randVarSymbol(int len) {
+        return symbol(randVarName(len));
+    }
+
+    public static <I> List<I> anyNames(IntFunction<I> gen, int len, int size) {
+        var names = new LinkedHashSet<I>(size);
         for (int i = 0; i < size; i++) {
             names.add(gen.apply(len));
         }
         return new ArrayList<>(names);
     }
 
-    public static String idList(Collection<Identifier> src) {
-        return src.stream().map(Objects::toString).collect(Collectors.joining(","));
+    public static <I> String idList(Collection<I> src) {
+        return src.stream().map(Objects::toString)
+                .collect(Collectors.joining(","));
     }
 
-    public static void appendList(StringBuilder sb, List<Identifier> li,
-                                  String prefix, String suffix) {
+    public static <I> void appendList(StringBuilder sb, List<I> li,
+                                      String prefix, String suffix) {
         for (var f : li) sb.append(prefix).append(f).append(suffix);
     }
 
@@ -211,11 +230,11 @@ public class BaseParseTest {
         return integer(expr.must());
     }
 
-    public static Identifier varName(Expression expr) {
-        return ((ReferExpression) expr).name();
+    public static Symbol varName(Expression expr) {
+        return ((ReferExpression) expr).symbol();
     }
 
-    public static Identifier calleeName(Statement stmt) {
+    public static Symbol calleeName(Statement stmt) {
         return varName(((CallStatement) stmt).call().callee());
     }
 
@@ -236,17 +255,17 @@ public class BaseParseTest {
         }
     }
 
-    public static <T> void checkIds(List<Identifier> names,
+    public static <I, T> void checkIds(List<I> names,
                                        List<T> list,
-                                       Function<T, Identifier> trans) {
+                                       Function<T, I> trans) {
         Assertions.assertEquals(names.size(), list.size());
         for (int i = 0; i < names.size(); i++) {
             Assertions.assertEquals(names.get(i), trans.apply(list.get(i)));
         }
     }
 
-    public static Identifier typeName(TypeDeclarer td) {
-        return ((DefinedTypeDeclarer) td).definedType().name();
+    public static Symbol typeName(TypeDeclarer td) {
+        return ((DefinedTypeDeclarer) td).definedType().symbol();
     }
 
 }

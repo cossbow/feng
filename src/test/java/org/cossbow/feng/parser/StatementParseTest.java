@@ -2,6 +2,7 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.dcl.NewDefinedType;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.BinaryExpression;
@@ -20,13 +21,13 @@ import java.util.stream.Collectors;
 
 public class StatementParseTest extends BaseParseTest {
 
-    static void appendCalls(StringBuilder sb, List<Identifier> li) {
+    static <I> void appendCalls(StringBuilder sb, List<I> li) {
         sb.append("{");
         appendList(sb, li, "", "();");
         sb.append("}");
     }
 
-    static void checkCalls(List<Identifier> names, BlockStatement block) {
+    static void checkCalls(List<Symbol> names, BlockStatement block) {
         checkIds(names, block.list(), BaseParseTest::calleeName);
     }
 
@@ -40,7 +41,7 @@ public class StatementParseTest extends BaseParseTest {
         for (int i = 0; i < 10; i++) {
             var list = new ArrayList<String>(i);
             for (int j = 0; j < i; j++) {
-                list.add("var %s = %d;".formatted(randVarFuncName(6), i + j));
+                list.add("var %s = %d;".formatted(randVarName(6), i + j));
             }
             var code = list.stream().collect(Collectors.joining("", "{", "}"));
             var block = (BlockStatement) parseStmt(code);
@@ -51,12 +52,12 @@ public class StatementParseTest extends BaseParseTest {
     @Test
     public void testAssignmentOperation() {
         for (var op : AssignmentParseTest.assignableOperators) {
-            var a = randVarFuncName(8);
-            var b = randVarFuncName(8);
-            var code = a + symbol(op) + "=" + b + ";";
+            var a = symbol(randVarName(8));
+            var b = symbol(randVarName(8));
+            var code = a + operator(op) + "=" + b + ";";
             var stmt = (AssignmentOperateStatement) parseStmt(code);
             var lhs = (VariableAssignableOperand) stmt.operand();
-            Assertions.assertEquals(a, lhs.name());
+            Assertions.assertEquals(a, lhs.symbol());
             Assertions.assertEquals(b, varName(stmt.value()));
             Assertions.assertSame(op, stmt.operator());
         }
@@ -66,7 +67,7 @@ public class StatementParseTest extends BaseParseTest {
     public void testDeclaration() {
         for (int an = 1; an <= 5; an++) {
             for (int vn = 1; vn <= 10; vn++) {
-                var type = randTypeName(16);
+                var type = symbol(randTypeName(16));
                 var code = new StringBuilder();
                 var attrs = anyNames(RandTypeName, 16, an);
                 appendList(code, attrs, "@", "");
@@ -76,7 +77,7 @@ public class StatementParseTest extends BaseParseTest {
 
                 for (var v : stmt.variables()) {
                     checkIds(attrs, v.modifier().attributes());
-                    Assertions.assertEquals(type, typeName(v.type().get()));
+                    Assertions.assertEquals(type, typeName(v.type().must()));
                 }
                 checkIds(names, stmt.variables(), Variable::name);
             }
@@ -85,7 +86,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testCall() {
-        var fn = randVarFuncName(16);
+        var fn = symbol(randVarName(16));
         var stmt = (CallStatement) parseStmt(fn + "();");
         var call = stmt.call();
         Assertions.assertEquals(fn, varName(call.callee()));
@@ -94,8 +95,8 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testIf() {
-        var a = randVarFuncName(8);
-        var b = randVarFuncName(8);
+        var a = symbol(randVarName(8));
+        var b = symbol(randVarName(8));
         var code = "if(%s) %s();".formatted(a, b);
         var stmt = (IfStatement) parseStmt(code);
         Assertions.assertTrue(stmt.init().none());
@@ -107,9 +108,9 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testIfElse() {
-        var a = randVarFuncName(8);
-        var b = randVarFuncName(8);
-        var c = randVarFuncName(8);
+        var a = symbol(randVarName(8));
+        var b = symbol(randVarName(8));
+        var c = symbol(randVarName(8));
         var code = "if(%s) %s(); else %s();".formatted(a, b, c);
         var stmt = (IfStatement) parseStmt(code);
         Assertions.assertTrue(stmt.init().none());
@@ -122,10 +123,10 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testIfElseIf() {
-        var a = randVarFuncName(8);
-        var b = randVarFuncName(8);
-        var c = randVarFuncName(8);
-        var d = randVarFuncName(8);
+        var a = symbol(randVarName(8));
+        var b = symbol(randVarName(8));
+        var c = symbol(randVarName(8));
+        var d = symbol(randVarName(8));
         var code = "if(%s) %s(); else if(%s) %s(); ".formatted(a, b, c, d);
         var stmt = (IfStatement) parseStmt(code);
         Assertions.assertTrue(stmt.init().none());
@@ -140,14 +141,14 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testSwitchBranchEmpty() {
-        var x = randVarFuncName(12);
+        var x = symbol(randVarName(12));
         var stmt = (SwitchStatement) parseStmt("switch(%s) {}".formatted(x));
         Assertions.assertEquals(x, varName(stmt.value()));
     }
 
     @Test
     public void testSwitchBranchFull() {
-        var a = randVarFuncName(6);
+        var a = randVarName(6);
         var code = """
                 switch(var %s = goods(); %s) {
                 case "0":
@@ -167,10 +168,10 @@ public class StatementParseTest extends BaseParseTest {
         var dcl = (DeclarationStatement) stmt.init().must();
         Assertions.assertEquals(a, dcl.variables().getFirst().name());
         var init = (CallExpression) first(dcl.init().must());
-        Assertions.assertEquals(identifier("goods"), varName(init.callee()));
+        Assertions.assertEquals(symbol("goods"), varName(init.callee()));
         Assertions.assertTrue(init.arguments().isEmpty());
 
-        Assertions.assertEquals(a, varName(stmt.value()));
+        Assertions.assertEquals(symbol(a), varName(stmt.value()));
         {
             var br = stmt.branches().getFirst();
             Assertions.assertEquals("0", string(br.constants().getFirst()));
@@ -182,7 +183,7 @@ public class StatementParseTest extends BaseParseTest {
             Assertions.assertEquals("1", string(br.constants().getFirst()));
             Assertions.assertEquals(1, br.statements().size());
             var c1 = (CallStatement) br.statements().getFirst();
-            Assertions.assertEquals(identifier("call1"), varName(c1.call().callee()));
+            Assertions.assertEquals(symbol("call1"), varName(c1.call().callee()));
             Assertions.assertFalse(br.fallthrough());
         }
         {
@@ -190,7 +191,7 @@ public class StatementParseTest extends BaseParseTest {
             Assertions.assertEquals("2", string(br.constants().getFirst()));
             Assertions.assertEquals(1, br.statements().size());
             var c1 = (CallStatement) br.statements().getFirst();
-            Assertions.assertEquals(identifier("call2"), varName(c1.call().callee()));
+            Assertions.assertEquals(symbol("call2"), varName(c1.call().callee()));
             Assertions.assertTrue(br.fallthrough());
         }
         {
@@ -199,15 +200,15 @@ public class StatementParseTest extends BaseParseTest {
             Assertions.assertEquals("4", string(br.constants().get(1)));
             Assertions.assertEquals(1, br.statements().size());
             var c1 = (CallStatement) br.statements().getFirst();
-            Assertions.assertEquals(identifier("call3"), varName(c1.call().callee()));
+            Assertions.assertEquals(symbol("call3"), varName(c1.call().callee()));
             Assertions.assertFalse(br.fallthrough());
         }
     }
 
     @Test
     public void testUnaryFor() {
-        var i = randVarFuncName(8);
-        var n = randVarFuncName(16);
+        var i = symbol(randVarName(8));
+        var n = symbol(randVarName(16));
         var code = "for(%s < %s) %s+=1;".formatted(i, n, i);
         var stmt = (ConditionalForStatement) parseStmt(code);
         Assertions.assertTrue(stmt.initializer().none());
@@ -218,14 +219,14 @@ public class StatementParseTest extends BaseParseTest {
         Assertions.assertEquals(n, varName(cond.right()));
         var assign = (AssignmentOperateStatement) stmt.body();
         var lhs = (VariableAssignableOperand) assign.operand();
-        Assertions.assertEquals(i, lhs.name());
+        Assertions.assertEquals(i, lhs.symbol());
     }
 
     @Test
     public void testTernaryFor() {
-        var i = randVarFuncName(8);
-        var n = randVarFuncName(16);
-        var c = randVarFuncName(32);
+        var i = randVarName(10);
+        var n = symbol(randVarName(16));
+        var c = symbol(randVarName(32));
         var code = "for(var %s=0; %s<%s; %s+=1) %s(%s);".formatted(i, i, n, i, c, i);
         var stmt = (ConditionalForStatement) parseStmt(code);
 
@@ -234,22 +235,22 @@ public class StatementParseTest extends BaseParseTest {
 
         var cond = (BinaryExpression) stmt.condition();
         Assertions.assertSame(BinaryOperator.LT, cond.operator());
-        Assertions.assertEquals(i, varName(cond.left()));
+        Assertions.assertEquals(symbol(i), varName(cond.left()));
         Assertions.assertEquals(n, varName(cond.right()));
         var call = ((CallStatement) stmt.body()).call();
         Assertions.assertEquals(c, varName(call.callee()));
-        Assertions.assertEquals(i, varName(call.arguments().getFirst()));
+        Assertions.assertEquals(symbol(i), varName(call.arguments().getFirst()));
 
         var aop = ((AssignmentOperateStatement) stmt.updater().must());
-        Assertions.assertEquals(i, ((VariableAssignableOperand) aop.operand()).name());
+        Assertions.assertEquals(symbol(i), ((VariableAssignableOperand) aop.operand()).symbol());
     }
 
     @Test
     public void testIterableFor() {
         var size = ThreadLocalRandom.current().nextInt(1, 10);
         var names = anyNames(RandVarFuncName, 8, size);
-        var src = randVarFuncName(16);
-        var body = randVarFuncName(32);
+        var src = symbol(randVarName(16));
+        var body = symbol(randVarName(32));
         var code = "for(%s : %s) %s();".formatted(idList(names), src, body);
         var forStmt = (IterableForStatement) parseStmt(code);
         Assertions.assertEquals(names, forStmt.arguments());
@@ -260,12 +261,12 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testThrow() {
-        var type = randTypeName(32);
+        var type = symbol(randTypeName(32));
         var code = "throw new(%s);".formatted(type);
         var stmt = (ThrowStatement) parseStmt(code);
         var newExpr = (NewExpression) stmt.exception();
         Assertions.assertTrue(newExpr.init().none());
-        Assertions.assertEquals(type, ((NewDefinedType) newExpr.type()).type().name());
+        Assertions.assertEquals(type, ((NewDefinedType) newExpr.type()).type().symbol());
     }
 
     @Test
@@ -276,28 +277,28 @@ public class StatementParseTest extends BaseParseTest {
                 var hasFinal = f > 0;
 
                 var code = new StringBuilder("try{");
-                var body = anyNames(RandVarFuncName, 8, rand.nextInt(1, 6));
+                var body = anyNames(RandVarSymbol, 8, rand.nextInt(1, 6));
                 for (var c : body) code.append(c).append("();");
                 code.append("}");
 
                 var excepts = new ArrayList<Identifier>();
-                var typeSets = new ArrayList<List<Identifier>>();
-                var catchLists = new ArrayList<List<Identifier>>();
+                var typeSets = new ArrayList<List<Symbol>>();
+                var catchLists = new ArrayList<List<Symbol>>();
                 for (int i = 0; i < n; i++) {
                     code.append("catch(");
-                    var except = randVarFuncName(4);
+                    var except = randVarName(4);
                     code.append(except).append(" ");
                     excepts.add(except);
-                    var typeSet = anyNames(RandTypeName, 12, rand.nextInt(1, 4));
+                    var typeSet = anyNames(RandTypeSymbol, 12, rand.nextInt(1, 4));
                     appendList(code, typeSet, "", "|");
                     code.setCharAt(code.length() - 1, ')');
                     typeSets.add(typeSet);
 
-                    var catchList = anyNames(RandVarFuncName, 12, rand.nextInt(1, 10));
+                    var catchList = anyNames(RandVarSymbol, 12, rand.nextInt(1, 10));
                     appendCalls(code, catchList);
                     catchLists.add(catchList);
                 }
-                var finalBlk = anyNames(RandVarFuncName, 12, rand.nextInt(1, 10));
+                var finalBlk = anyNames(RandVarSymbol, 12, rand.nextInt(1, 10));
                 if (hasFinal) {
                     code.append("finally");
                     appendCalls(code, finalBlk);
@@ -326,20 +327,20 @@ public class StatementParseTest extends BaseParseTest {
     @Test
     public void testReturn() {
         for (int i = 0; i < 10; i++) {
-            var names = anyNames(RandVarFuncName, 8, i);
-            var code = "return " + idList(names) + ";";
+            var symbols = anyNames(RandVarSymbol, 8, i);
+            var code = "return " + idList(symbols) + ";";
             var stmt = (ReturnStatement) parseStmt(code);
             if (i == 0) {
                 Assertions.assertTrue(stmt.result().none());
                 continue;
             }
-            checkIds(names, ((ArrayTuple) stmt.result().get()).values(), BaseParseTest::varName);
+            checkIds(symbols, ((ArrayTuple) stmt.result().get()).values(), BaseParseTest::varName);
         }
     }
 
     @Test
     public void testLabelBlock() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":{}");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(BlockStatement.class, stmt.statement());
@@ -347,7 +348,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelDeclaration() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":var a,b,c int;");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(DeclarationStatement.class, stmt.statement());
@@ -355,7 +356,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelAssignment() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":a,b,c=1,2,3;");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(AssignmentsStatement.class, stmt.statement());
@@ -363,7 +364,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelAssignmentOperation() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":a+=3;");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(AssignmentOperateStatement.class, stmt.statement());
@@ -371,7 +372,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelCall() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":a();");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(CallStatement.class, stmt.statement());
@@ -379,7 +380,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelIf() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":if(a>0)acc();");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(IfStatement.class, stmt.statement());
@@ -387,7 +388,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelSwitch() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":switch(a){}");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(SwitchStatement.class, stmt.statement());
@@ -395,7 +396,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelFor() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":for(a>0)a-=1;");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(ConditionalForStatement.class, stmt.statement());
@@ -403,7 +404,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelThrow() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":throw e;");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(ThrowStatement.class, stmt.statement());
@@ -411,7 +412,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelTry() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":try{e();}finally{}");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(TryStatement.class, stmt.statement());
@@ -419,7 +420,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelDefineFunc() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":func done() {}");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(LocalDefineStatement.class, stmt.statement());
@@ -427,7 +428,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelDefineStruct() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":struct G{}");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(LocalDefineStatement.class, stmt.statement());
@@ -435,7 +436,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelDefineClass() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":class G{}");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(LocalDefineStatement.class, stmt.statement());
@@ -443,7 +444,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelDefineInterface() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":interface G{}");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(LocalDefineStatement.class, stmt.statement());
@@ -451,7 +452,7 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testLabelDefinePrototype() {
-        var name = randVarFuncName(32);
+        var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":func g();");
         Assertions.assertEquals(name, stmt.label());
         Assertions.assertInstanceOf(LocalDefineStatement.class, stmt.statement());
@@ -469,9 +470,9 @@ public class StatementParseTest extends BaseParseTest {
     @Test
     public void testIfTuple() {
         var size = ThreadLocalRandom.current().nextInt(1, 10);
-        var cond = randVarFuncName(8);
-        var yes = anyNames(RandVarFuncName, 8, size);
-        var not = anyNames(RandVarFuncName, 4, size);
+        var cond = symbol(randVarName(8));
+        var yes = anyNames(RandVarSymbol, 8, size);
+        var not = anyNames(RandVarSymbol, 4, size);
         var code = "if(%s) %s else %s".formatted(cond, idList(yes), idList(not));
         var tp = (IfTuple) parseTuple(code);
         Assertions.assertEquals(cond, varName(tp.condition()));
@@ -488,21 +489,21 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testSwitchTuple() {
-        var check = randVarFuncName(8);
+        var check = symbol(randVarName(8));
         var code = new StringBuilder("switch(" + check + "){\n");
         var size = ThreadLocalRandom.current().nextInt(1, 10);
         var num = ThreadLocalRandom.current().nextInt(1, 10);
-        var constants = new ArrayList<List<Identifier>>();
-        var values = new ArrayList<List<Identifier>>();
+        var constants = new ArrayList<List<Symbol>>();
+        var values = new ArrayList<List<Symbol>>();
         for (int i = 0; i < num; i++) {
-            var cs = anyNames(RandVarFuncName, 6, i + 1);
+            var cs = anyNames(RandVarSymbol, 6, i + 1);
             constants.add(cs);
-            var vs = anyNames(RandVarFuncName, 6, size);
+            var vs = anyNames(RandVarSymbol, 6, size);
             values.add(vs);
             code.append("case ").append(idList(cs)).append(":")
                     .append(idList(vs)).append(";\n");
         }
-        var defVals = anyNames(RandVarFuncName, 6, size);
+        var defVals = anyNames(RandVarSymbol, 6, size);
         code.append("default: ").append(idList(defVals)).append(";\n}");
         var tp = (SwitchTuple) parseTuple(code.toString());
 

@@ -46,22 +46,22 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testNew() {
-        var typeName = randTypeName(32);
+        var typeName = randTypeSymbol(32);
         var expr = this.<NewExpression>parseExpr("new(%s)".formatted(typeName));
         var defType = ((NewDefinedType) expr.type()).type();
         Assertions.assertTrue(defType.generic().isEmpty());
-        Assertions.assertEquals(typeName, defType.name());
+        Assertions.assertEquals(typeName, defType.symbol());
     }
 
     @Test
     public void testNewGeneric() {
-        var typeName = randTypeName(32);
+        var typeName = symbol(randTypeName(32));
         for (int i = 1; i <= 8; i++) {
-            var typeParams = anyNames(RandTypeName, 8, i);
+            var typeParams = anyNames(RandTypeSymbol, 8, i);
             var code = "new(%s`%s`)".formatted(typeName, idList(typeParams));
             var expr = this.<NewExpression>parseExpr(code);
             var defType = ((NewDefinedType) expr.type()).type();
-            Assertions.assertEquals(typeName, defType.name());
+            Assertions.assertEquals(typeName, defType.symbol());
             checkIds(typeParams, defType.generic().arguments(),
                     BaseParseTest::typeName);
         }
@@ -69,17 +69,17 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testNewInit() {
-        var typeName = randTypeName(32);
+        var typeName = randTypeSymbol(32);
         var code = "new(%s,{Id=1})".formatted(typeName);
         var expr = this.<NewExpression>parseExpr(code);
         var defType = ((NewDefinedType) expr.type()).type();
-        Assertions.assertEquals(typeName, defType.name());
+        Assertions.assertEquals(typeName, defType.symbol());
         Assertions.assertInstanceOf(ObjectExpression.class, expr.init().must());
     }
 
     @Test
     public void testNewArrayInit() {
-        var typeName = randTypeName(32);
+        var typeName = randTypeSymbol(32);
         var len = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
         var code = "new([%d]%s, [1,2])".formatted(len, typeName);
         var expr = this.<NewExpression>parseExpr(code);
@@ -91,12 +91,12 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testAssert() {
-        var name = randTypeName(8);
-        var typeName = randTypeName(16);
+        var name = randVarSymbol(8);
+        var typeName = randTypeSymbol(16);
         var expr = (AssertExpression) parseExpr("%s?(*%s)".formatted(name, typeName));
         Assertions.assertEquals(name, varName(expr.subject()));
         var type = (DefinedTypeDeclarer) expr.type();
-        Assertions.assertEquals(typeName, type.definedType().name());
+        Assertions.assertEquals(typeName, type.definedType().symbol());
         Assertions.assertTrue(type.definedType().generic().isEmpty());
         Assertions.assertTrue(type.pointer());
         Assertions.assertFalse(type.phantom());
@@ -122,9 +122,9 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testVariable() {
-        var name = randVarFuncName(12);
+        var name = randVarSymbol(12);
         var expr = (ReferExpression) parseExpr(name + "");
-        Assertions.assertEquals(name, expr.name());
+        Assertions.assertEquals(name, expr.symbol());
     }
 
     //
@@ -146,8 +146,8 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testIndexOfPairsExpr() {
-        var pf = randVarFuncName(12);
-        var pv = randVarFuncName(12);
+        var pf = randVarSymbol(12);
+        var pv = randVarSymbol(12);
         var idx = randInt(0, Integer.MAX_VALUE);
         var code = "{%s:%s}[%d]".formatted(pf, pv, idx);
         var expr = (IndexOfExpression) parseExpr(code);
@@ -159,8 +159,8 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testIndexOfByName() {
-        var name = randVarFuncName(12);
-        var index = randVarFuncName(6);
+        var name = randVarSymbol(12);
+        var index = randVarSymbol(6);
         var expr = (IndexOfExpression) parseExpr("%s[%s]".formatted(name, index));
         Assertions.assertEquals(name, varName(expr.subject()));
         Assertions.assertEquals(index, varName(expr.index()));
@@ -168,24 +168,24 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testIndexOfNewArray() {
-        var size = randVarFuncName(12);
-        var type = randTypeName(12);
-        var index = randVarFuncName(12);
+        var size = randVarSymbol(12);
+        var type = randTypeSymbol(12);
+        var index = randVarSymbol(12);
         var expr = (IndexOfExpression) parseExpr("new([%s]%s)[%s]".formatted(size, type, index));
 
         var nt = (NewArrayType) ((NewExpression) expr.subject()).type();
         Assertions.assertEquals(size, varName(nt.length()));
         var dt = (DefinedTypeDeclarer) nt.element();
-        Assertions.assertEquals(type, dt.definedType().name());
+        Assertions.assertEquals(type, dt.definedType().symbol());
 
         Assertions.assertEquals(index, varName(expr.index()));
     }
 
     @Test
     public void testIndexOfIndexOf() {
-        var name = randVarFuncName(12);
-        var index1 = randVarFuncName(6);
-        var index2 = randVarFuncName(6);
+        var name = randVarSymbol(12);
+        var index1 = randVarSymbol(6);
+        var index2 = randVarSymbol(6);
         var expr = (IndexOfExpression) parseExpr("%s[%s][%s]".formatted(name, index1, index2));
 
         var left = (IndexOfExpression) expr.subject();
@@ -197,9 +197,9 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testIndexOfMemberOf() {
-        var name = randVarFuncName(12);
-        var field = randVarFuncName(6);
-        var index = randVarFuncName(6);
+        var name = randVarSymbol(12);
+        var field = randVarName(6);
+        var index = randVarSymbol(6);
         var expr = (IndexOfExpression) parseExpr("%s.%s[%s]".formatted(name, field, index));
 
         var left = (MemberOfExpression) expr.subject();
@@ -211,8 +211,8 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testIndexOfReturnedArray() {
-        var name = randVarFuncName(12);
-        var index = randVarFuncName(6);
+        var name = randVarSymbol(12);
+        var index = randVarSymbol(6);
         var expr = (IndexOfExpression) parseExpr("%s()[%s]".formatted(name, index));
 
         var left = (CallExpression) expr.subject();
@@ -227,9 +227,9 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testMemberOfObjectExpr() {
-        var pf = randVarFuncName(12);
-        var pv = randVarFuncName(12);
-        var field = randVarFuncName(8);
+        var pf = randVarName(12);
+        var pv = randVarSymbol(12);
+        var field = randVarName(8);
         var expr = (MemberOfExpression) parseExpr("{%s=%s}.%s".formatted(pf, pv, field));
         var entries = ((ObjectExpression) expr.subject()).entries();
         Assertions.assertEquals(pv, varName(entries.get(pf)));
@@ -238,8 +238,8 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testMemberOfByName() {
-        var name = randVarFuncName(12);
-        var field = randVarFuncName(8);
+        var name = randVarSymbol(12);
+        var field = randVarName(8);
         var expr = (MemberOfExpression) parseExpr(name + "." + field);
         Assertions.assertEquals(name, varName(expr.subject()));
         Assertions.assertEquals(field, expr.member());
@@ -247,9 +247,9 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testMemberOfField() {
-        var name = randVarFuncName(12);
-        var field1 = randVarFuncName(8);
-        var field2 = randVarFuncName(6);
+        var name = randVarSymbol(12);
+        var field1 = randVarName(8);
+        var field2 = randVarName(6);
         var expr = (MemberOfExpression) parseExpr("%s.%s.%s".formatted(name, field1, field2));
 
         var left = (MemberOfExpression) expr.subject();
@@ -261,9 +261,9 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testMemberOfIndexOf() {
-        var name = randVarFuncName(12);
-        var index = randVarFuncName(6);
-        var field = randVarFuncName(8);
+        var name = randVarSymbol(12);
+        var index = randVarSymbol(6);
+        var field = randVarName(8);
         var expr = (MemberOfExpression) parseExpr("%s[%s].%s".formatted(name, index, field));
 
         var left = (IndexOfExpression) expr.subject();
@@ -275,8 +275,8 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testMemberOfReturnedObj() {
-        var name = randVarFuncName(12);
-        var field = randVarFuncName(8);
+        var name = randVarSymbol(12);
+        var field = randVarName(8);
         var expr = (MemberOfExpression) parseExpr(name + "()." + field);
 
         var left = (CallExpression) expr.subject();
@@ -287,13 +287,13 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testMemberOfNewObj() {
-        var type = randTypeName(16);
-        var field = randVarFuncName(8);
+        var type = randTypeSymbol(16);
+        var field = randVarName(8);
         var expr = (MemberOfExpression) parseExpr("new(%s).%s".formatted(type, field));
 
         var left = (NewExpression) expr.subject();
         var defType = ((NewDefinedType) left.type()).type();
-        Assertions.assertEquals(type, defType.name());
+        Assertions.assertEquals(type, defType.symbol());
 
         Assertions.assertEquals(field, expr.member());
     }
@@ -303,15 +303,15 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testArgSetByName() {
-        var name = randVarFuncName(12);
+        var name = randVarSymbol(12);
         var expr = (CallExpression) parseExpr(name + "()");
         Assertions.assertEquals(name, varName(expr.callee()));
     }
 
     @Test
     public void testArgSetOfMethod() {
-        var name = randVarFuncName(12);
-        var field = randVarFuncName(12);
+        var name = randVarSymbol(12);
+        var field = randVarName(12);
         var expr = (CallExpression) parseExpr(name + "." + field + "()");
         var left = (MemberOfExpression) expr.callee();
         Assertions.assertEquals(name, varName(left.subject()));
@@ -320,8 +320,8 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testArgSetOfIndex() {
-        var name = randVarFuncName(12);
-        var index = randVarFuncName(8);
+        var name = randVarSymbol(12);
+        var index = randVarSymbol(8);
         var expr = (CallExpression) parseExpr(name + "[" + index + "]()");
         var left = (IndexOfExpression) expr.callee();
         Assertions.assertEquals(name, varName(left.subject()));
@@ -330,7 +330,7 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testArgSetReturnedClosure() {
-        var name = randVarFuncName(12);
+        var name = randVarSymbol(12);
         var expr = (CallExpression) parseExpr(name + "()()");
         var left = (CallExpression) expr.callee();
         Assertions.assertEquals(name, varName(left.callee()));
@@ -357,7 +357,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var rand = ThreadLocalRandom.current();
         for (var op : UnaryOperator.values()) {
             var i = rand.nextInt(0, Integer.MAX_VALUE);
-            var expr = (UnaryExpression) parseExpr(symbol(op) + i);
+            var expr = (UnaryExpression) parseExpr(operator(op) + i);
             Assertions.assertSame(op, expr.operator());
             Assertions.assertEquals(BigInteger.valueOf(i), integer(expr.operand()).value());
         }
@@ -366,8 +366,8 @@ public class ExpressionParseTest extends BaseParseTest {
     @Test
     public void testUnaryVariable() {
         for (var op : UnaryOperator.values()) {
-            var name = randVarFuncName(8);
-            var expr = (UnaryExpression) parseExpr(symbol(op) + name);
+            var name = randVarSymbol(8);
+            var expr = (UnaryExpression) parseExpr(operator(op) + name);
             Assertions.assertSame(op, expr.operator());
             Assertions.assertEquals(name, varName(expr.operand()));
         }
@@ -376,9 +376,9 @@ public class ExpressionParseTest extends BaseParseTest {
     @Test
     public void testUnaryIndexOf() {
         for (var op : UnaryOperator.values()) {
-            var name = randVarFuncName(8);
-            var index = randVarFuncName(4);
-            var unary = (UnaryExpression) parseExpr(symbol(op) + name + "[" + index + "]");
+            var name = randVarSymbol(8);
+            var index = randVarSymbol(4);
+            var unary = (UnaryExpression) parseExpr(operator(op) + name + "[" + index + "]");
             Assertions.assertSame(op, unary.operator());
             var indexOf = (IndexOfExpression) unary.operand();
             Assertions.assertEquals(name, varName(indexOf.subject()));
@@ -389,9 +389,9 @@ public class ExpressionParseTest extends BaseParseTest {
     @Test
     public void testUnaryAssert() {
         for (var op : UnaryOperator.values()) {
-            var name = randVarFuncName(8);
-            var type = randTypeName(12);
-            var unary = (UnaryExpression) parseExpr(symbol(op) + name + "?(" + type + ")");
+            var name = randVarSymbol(8);
+            var type = randTypeSymbol(12);
+            var unary = (UnaryExpression) parseExpr(operator(op) + name + "?(" + type + ")");
             Assertions.assertSame(op, unary.operator());
             var ass = (AssertExpression) unary.operand();
             Assertions.assertEquals(name, varName(ass.subject()));
@@ -402,9 +402,9 @@ public class ExpressionParseTest extends BaseParseTest {
     @Test
     public void testUnaryMemberOf() {
         for (var op : UnaryOperator.values()) {
-            var name = randVarFuncName(8);
-            var field = randVarFuncName(4);
-            var unary = (UnaryExpression) parseExpr(symbol(op) + name + "." + field);
+            var name = randVarSymbol(8);
+            var field = randVarName(4);
+            var unary = (UnaryExpression) parseExpr(operator(op) + name + "." + field);
             Assertions.assertSame(op, unary.operator());
             var indexOf = (MemberOfExpression) unary.operand();
             Assertions.assertEquals(name, varName(indexOf.subject()));
@@ -415,8 +415,8 @@ public class ExpressionParseTest extends BaseParseTest {
     @Test
     public void testUnaryArgSet() {
         for (var op : UnaryOperator.values()) {
-            var name = randVarFuncName(8);
-            var unary = (UnaryExpression) parseExpr(symbol(op) + name + "()");
+            var name = randVarSymbol(8);
+            var unary = (UnaryExpression) parseExpr(operator(op) + name + "()");
             Assertions.assertSame(op, unary.operator());
             var argsExpr = (CallExpression) unary.operand();
             Assertions.assertEquals(name, varName(argsExpr.callee()));
@@ -431,8 +431,8 @@ public class ExpressionParseTest extends BaseParseTest {
         var operators = UnaryOperator.values();
         for (var left : operators) {
             for (var right : operators) {
-                var name = randVarFuncName(8);
-                var code = "%s %s %s".formatted(symbol(left), symbol(right), name);
+                var name = randVarSymbol(8);
+                var code = "%s %s %s".formatted(operator(left), operator(right), name);
                 var low = (UnaryExpression) parseExpr(code);
                 Assertions.assertSame(left, low.operator());
                 var high = (UnaryExpression) low.operand();
@@ -446,9 +446,9 @@ public class ExpressionParseTest extends BaseParseTest {
     public void testUnaryBinary() {
         for (var bop : values()) {
             for (var uop : UnaryOperator.values()) {
-                var a = randVarFuncName(6);
-                var b = randVarFuncName(6);
-                var code = a + symbol(bop) + symbol(uop) + b;
+                var a = randVarSymbol(6);
+                var b = randVarSymbol(6);
+                var code = a + operator(bop) + operator(uop) + b;
                 var binary = (BinaryExpression) parseExpr(code);
                 Assertions.assertEquals(a, varName(binary.left()));
                 Assertions.assertSame(bop, binary.operator());
@@ -461,9 +461,9 @@ public class ExpressionParseTest extends BaseParseTest {
 
     @Test
     public void testPowerAssociativity() {
-        var a = randVarFuncName(6);
-        var b = randVarFuncName(6);
-        var c = randVarFuncName(6);
+        var a = randVarSymbol(6);
+        var b = randVarSymbol(6);
+        var c = randVarSymbol(6);
         var code = a + "^" + b + "^" + c;
         var expr = (BinaryExpression) parseExpr(code);
         Assertions.assertSame(POW, expr.operator());
@@ -481,10 +481,10 @@ public class ExpressionParseTest extends BaseParseTest {
         for (var i = 1; i < binaryPriorities.length; i++) {
             for (var l : binaryPriorities[i]) {
                 for (var r : binaryPriorities[i]) {
-                    var a = randVarFuncName(6);
-                    var b = randVarFuncName(6);
-                    var c = randVarFuncName(6);
-                    var code = a + symbol(l) + b + symbol(r) + c;
+                    var a = randVarSymbol(6);
+                    var b = randVarSymbol(6);
+                    var c = randVarSymbol(6);
+                    var code = a + operator(l) + b + operator(r) + c;
                     var expr = (BinaryExpression) parseExpr(code);
                     Assertions.assertSame(r, expr.operator());
                     Assertions.assertEquals(c, varName(expr.right()));
@@ -500,9 +500,9 @@ public class ExpressionParseTest extends BaseParseTest {
     @Test
     public void testUnaryPowerPriority() {
         for (var uop : UnaryOperator.values()) {
-            var a = randVarFuncName(6);
-            var b = randVarFuncName(6);
-            var unary = (UnaryExpression) parseExpr(symbol(uop) + a + symbol(POW) + b);
+            var a = randVarSymbol(6);
+            var b = randVarSymbol(6);
+            var unary = (UnaryExpression) parseExpr(operator(uop) + a + operator(POW) + b);
             Assertions.assertSame(uop, unary.operator());
             var pow = (BinaryExpression) unary.operand();
             Assertions.assertSame(POW, pow.operator());
@@ -514,9 +514,9 @@ public class ExpressionParseTest extends BaseParseTest {
     @Test
     public void testPowerUnaryPriority() {
         for (var uop : UnaryOperator.values()) {
-            var a = randVarFuncName(6);
-            var b = randVarFuncName(6);
-            var pow = (BinaryExpression) parseExpr(a + symbol(POW) + symbol(uop) + b);
+            var a = randVarSymbol(6);
+            var b = randVarSymbol(6);
+            var pow = (BinaryExpression) parseExpr(a + operator(POW) + operator(uop) + b);
             Assertions.assertSame(POW, pow.operator());
             Assertions.assertEquals(a, varName(pow.left()));
             var unary = (UnaryExpression) pow.right();
@@ -545,7 +545,7 @@ public class ExpressionParseTest extends BaseParseTest {
             var a = rand.nextInt(0, Integer.MAX_VALUE);
             var b = rand.nextInt(0, Integer.MAX_VALUE);
             var c = rand.nextInt(0, Integer.MAX_VALUE);
-            var code = "%s %s %s %s %s".formatted(a, symbol(lop), b, symbol(hop), c);
+            var code = "%s %s %s %s %s".formatted(a, operator(lop), b, operator(hop), c);
             var low = (BinaryExpression) parseExpr(code);
             Assertions.assertSame(lop, low.operator());
             Assertions.assertEquals(BigInteger.valueOf(a), integer(low.left()).value());
@@ -559,10 +559,10 @@ public class ExpressionParseTest extends BaseParseTest {
     @Test
     public void testBinaryVariable() {
         testBinaryWithPriority((hop, lop) -> {
-            var a = randVarFuncName(4);
-            var b = randVarFuncName(4);
-            var c = randVarFuncName(4);
-            var code = "%s %s %s %s %s".formatted(a, symbol(lop), b, symbol(hop), c);
+            var a = randVarSymbol(4);
+            var b = randVarSymbol(4);
+            var c = randVarSymbol(4);
+            var code = "%s %s %s %s %s".formatted(a, operator(lop), b, operator(hop), c);
             var low = (BinaryExpression) parseExpr(code);
             Assertions.assertSame(lop, low.operator());
             Assertions.assertEquals(a, varName(low.left()));
@@ -576,14 +576,14 @@ public class ExpressionParseTest extends BaseParseTest {
     @Test
     public void testBinaryIndexOf() {
         testBinaryWithPriority((hop, lop) -> {
-            var a = randVarFuncName(8);
-            var i = randVarFuncName(4);
-            var b = randVarFuncName(8);
-            var j = randVarFuncName(4);
-            var c = randVarFuncName(8);
-            var k = randVarFuncName(4);
-            var code = "%s[%s] %s %s[%s] %s %s[%s]".formatted(a, i, symbol(lop),
-                    b, j, symbol(hop), c, k);
+            var a = randVarSymbol(8);
+            var i = randVarSymbol(4);
+            var b = randVarSymbol(8);
+            var j = randVarSymbol(4);
+            var c = randVarSymbol(8);
+            var k = randVarSymbol(4);
+            var code = "%s[%s] %s %s[%s] %s %s[%s]".formatted(a, i, operator(lop),
+                    b, j, operator(hop), c, k);
             var low = (BinaryExpression) parseExpr(code);
             Assertions.assertSame(lop, low.operator());
             var ll = (IndexOfExpression) low.left();
@@ -605,14 +605,14 @@ public class ExpressionParseTest extends BaseParseTest {
     @Test
     public void testBinaryMemberOf() {
         testBinaryWithPriority((hop, lop) -> {
-            var a = randVarFuncName(8);
-            var i = randVarFuncName(4);
-            var b = randVarFuncName(8);
-            var j = randVarFuncName(4);
-            var c = randVarFuncName(8);
-            var k = randVarFuncName(4);
-            var code = "%s.%s %s %s.%s %s %s.%s".formatted(a, i, symbol(lop),
-                    b, j, symbol(hop), c, k);
+            var a = randVarSymbol(8);
+            var i = randVarName(4);
+            var b = randVarSymbol(8);
+            var j = randVarName(4);
+            var c = randVarSymbol(8);
+            var k = randVarName(4);
+            var code = "%s.%s %s %s.%s %s %s.%s".formatted(a, i, operator(lop),
+                    b, j, operator(hop), c, k);
             var low = (BinaryExpression) parseExpr(code);
             Assertions.assertSame(lop, low.operator());
             var ll = (MemberOfExpression) low.left();
@@ -634,10 +634,10 @@ public class ExpressionParseTest extends BaseParseTest {
     @Test
     public void testBinaryArgSet() {
         testBinaryWithPriority((hop, lop) -> {
-            var a = randVarFuncName(4);
-            var b = randVarFuncName(4);
-            var c = randVarFuncName(4);
-            var code = "%s() %s %s() %s %s()".formatted(a, symbol(lop), b, symbol(hop), c);
+            var a = randVarSymbol(4);
+            var b = randVarSymbol(4);
+            var c = randVarSymbol(4);
+            var code = "%s() %s %s() %s %s()".formatted(a, operator(lop), b, operator(hop), c);
             var low = (BinaryExpression) parseExpr(code);
             Assertions.assertSame(lop, low.operator());
             Assertions.assertEquals(a,

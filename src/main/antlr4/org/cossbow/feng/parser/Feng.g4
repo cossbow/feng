@@ -17,19 +17,14 @@ source
     : import_* global* EOF
     ;
 import_
-    : IMPORT module importSymbolSet SEMI
-    ;
-importSymbolSet
-    : all=MUL
-    | '{' importSymbol (COMMA importSymbol)* '}'
-    ;
-importSymbol
-    : name=Identifier (COLON alias=Identifier)?
+    : IMPORT module (alias=Identifier | flat=MUL)? SEMI
     ;
 module
-    : (Identifier DOT)+
+    : Identifier (DOT Identifier)*
     ;
-
+symbol
+    : (mod=Identifier DOLLAR)? name=Identifier
+    ;
 
 exportable
     : EXPORT?
@@ -277,7 +272,7 @@ assignableOperands
 // assignable on left hand side
 //
 assignableOperand
-    : name=Identifier       # VariableAssignableOperand
+    : symbol                # VariableAssignableOperand
     | primaryExpr indexOf   # IndexAssignableOperand
     | primaryExpr memberOf  # MemberAssignableOperand
     ;
@@ -342,7 +337,7 @@ typeArguments
     : BACKTICK typeDeclarerList BACKTICK
     ;
 definedType
-    : name=Identifier typeArguments?
+    : symbol typeArguments?
     ;
 
 // generic: for definer, with constraint expressions
@@ -590,7 +585,7 @@ operandExpr
     ;
 
 referExpr
-    : name=Identifier typeArguments?
+    : symbol typeArguments?
     ;
 
 argumentSet

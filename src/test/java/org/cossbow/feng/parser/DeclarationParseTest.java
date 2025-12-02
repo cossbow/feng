@@ -48,13 +48,13 @@ public class DeclarationParseTest extends BaseParseTest {
         for (int size = 1; size <= 10; size++) {
             for (var d : DECLARES.entrySet()) {
                 var names = anyNames(RandVarFuncName, 6, size);
-                var type = randTypeName(32);
+                var type = randTypeSymbol(32);
                 var dcl = parseLocalDecl(d.getValue() + " " + idList(names) + "*" + type);
                 var i = 0;
                 for (var v : dcl.variables()) {
                     Assertions.assertEquals(names.get(i), v.name());
                     Assertions.assertEquals(d.getKey(), v.declare());
-                    Assertions.assertEquals(type, typeName(v.type().get()));
+                    Assertions.assertEquals(type, typeName(v.type().must()));
                     i++;
                 }
             }
@@ -70,21 +70,21 @@ public class DeclarationParseTest extends BaseParseTest {
         }
         {
             var dcl = parseLocalDecl("var i int");
-            var type = (DefinedTypeDeclarer) dcl.variables().getFirst().type().get();
-            Assertions.assertEquals("int", type.definedType().name().toString());
+            var type = (DefinedTypeDeclarer) dcl.variables().getFirst().type().must();
+            Assertions.assertEquals("int", type.definedType().symbol().toString());
             Assertions.assertTrue(dcl.init().none());
         }
         {
             var dcl = parseLocalDecl("var u *User");
             var v = dcl.variables().getFirst();
-            var td = (DefinedTypeDeclarer) v.type().get();
+            var td = (DefinedTypeDeclarer) v.type().must();
             Assertions.assertTrue(td.pointer());
             Assertions.assertFalse(td.phantom());
         }
         {
             var dcl = parseLocalDecl("var u &User");
             var v = dcl.variables().getFirst();
-            var td = (DefinedTypeDeclarer) v.type().get();
+            var td = (DefinedTypeDeclarer) v.type().must();
             Assertions.assertTrue(td.pointer());
             Assertions.assertTrue(td.phantom());
         }
@@ -100,10 +100,10 @@ public class DeclarationParseTest extends BaseParseTest {
         };
         for (var fmt : fmtList) {
             for (int i = 0; i < 10; i++) {
-                var name = randTypeName(16);
+                var name = randTypeSymbol(16);
                 var dcl = parseLocalDecl(fmt.formatted(name));
-                var td = (DefinedTypeDeclarer) dcl.variables().getFirst().type().get();
-                Assertions.assertEquals(name, td.definedType().name());
+                var td = (DefinedTypeDeclarer) dcl.variables().getFirst().type().must();
+                Assertions.assertEquals(name, td.definedType().symbol());
             }
         }
     }
@@ -112,7 +112,7 @@ public class DeclarationParseTest extends BaseParseTest {
     public void testLocal5() {
         for (int n = 1; n <= 10; n++) {
             var names = anyNames(RandVarFuncName, 8, n);
-            var values = anyNames(RandVarFuncName, 8, n);
+            var values = anyNames(RandVarSymbol, 8, n);
             var code = "var " + idList(names) + " = " + idList(values);
             var dcl = parseLocalDecl(code);
             Assertions.assertEquals(names, Utils.listOf(dcl.variables(), Variable::name));

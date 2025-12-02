@@ -154,20 +154,9 @@ final class SourceParseVisitor
     @Override
     public Entity visitImport_(FengParser.Import_Context ctx) {
         var pkg = identifiers(ctx.module().Identifier());
-        var setCtx = ctx.importSymbolSet();
-
-        if (setCtx.all != null) {
-            return new Import(posOf(ctx), pkg, true, List.of());
-        }
-        var list = this.<ImportSymbol>visitList(setCtx.importSymbol());
-        return new Import(posOf(ctx), pkg, false, list);
-    }
-
-    @Override
-    public Entity visitImportSymbol(FengParser.ImportSymbolContext ctx) {
-        var name = identifier(ctx.name);
-        var alias = ctx.alias != null ? identifier(ctx.alias) : null;
-        return new ImportSymbol(posOf(ctx.name), name, Optional.of(alias));
+        var alias = identifierOptional(ctx.alias);
+        var flat = ctx.flat != null;
+        return new Import(posOf(ctx), pkg, alias, flat);
     }
 
     @Override
@@ -330,9 +319,9 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitDefinedType(FengParser.DefinedTypeContext ctx) {
-        var name = identifier(ctx.name);
+        var symbol = parseSymbol(ctx.symbol());
         var args = typeArguments(ctx.typeArguments());
-        return new DefinedType(posOf(ctx), name, args);
+        return new DefinedType(posOf(ctx), symbol, args);
     }
 
 
@@ -427,6 +416,12 @@ final class SourceParseVisitor
     private Modifier parseModifier(FengParser.ModifierContext ctx) {
         var attributes = parseAttributes(ctx.attributes());
         return new Modifier(posOf(ctx), attributes);
+    }
+
+    private Symbol parseSymbol(FengParser.SymbolContext ctx) {
+        var mod = identifierOptional(ctx.mod);
+        var name = identifier(ctx.name);
+        return new Symbol(posOf(ctx), mod, name);
     }
 
     //
@@ -546,12 +541,12 @@ final class SourceParseVisitor
         var name = identifier(ctx.name);
         var generic = typeParameters(ctx.typeParameters());
         var methods = new UniqueTable<InterfaceMethod>();
-        var parts = new UniqueTable<DefinedType>();
+        var parts = new ArrayList<DefinedType>();
         var macros = new MultiTable<Macro>();
         for (var imc : ctx.interfaceMember()) {
             if (imc.part != null) {
                 var part = (DefinedType) visit(imc.part.definedType());
-                parts.add(part.name(), part);
+                parts.add(part);
             } else if (imc.method != null) {
                 var method = (InterfaceMethod) visit(imc.method);
                 methods.add(method.name(), method);
@@ -586,12 +581,9 @@ final class SourceParseVisitor
     //
 
 
-    private UniqueTable<DefinedType> parseClassImpl(FengParser.ClassImplContext ctx) {
-        var tab = new UniqueTable<DefinedType>();
-        if (ctx == null) return tab;
-        var list = this.<DefinedType>visitList(ctx.definedType());
-        for (var t : list) tab.add(t.name(), t);
-        return tab;
+    private List<DefinedType> parseClassImpl(FengParser.ClassImplContext ctx) {
+        if (ctx == null) return List.of();
+        return visitList(ctx.definedType());
     }
 
     @Override
@@ -716,9 +708,9 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitReferExpr(FengParser.ReferExprContext ctx) {
-        var name = identifier(ctx.name);
+        var symbol = parseSymbol(ctx.symbol());
         var generic = typeArguments(ctx.typeArguments());
-        return new ReferExpression(posOf(ctx), name, generic);
+        return new ReferExpression(posOf(ctx), symbol, generic);
     }
 
     @Override
@@ -872,7 +864,7 @@ final class SourceParseVisitor
     @Override
     public Entity visitVariableAssignableOperand(
             FengParser.VariableAssignableOperandContext ctx) {
-        var name = identifier(ctx.name);
+        var name = parseSymbol(ctx.symbol());
         return new VariableAssignableOperand(posOf(ctx), name);
     }
 

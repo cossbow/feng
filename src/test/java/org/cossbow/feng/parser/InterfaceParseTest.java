@@ -11,7 +11,7 @@ public class InterfaceParseTest extends BaseParseTest {
     @Test
     public void testMethod1() {
         var typeName = randTypeName(32);
-        var methodName = randVarFuncName(12);
+        var methodName = randVarName(12);
         var code = "interface %s { %s();}".formatted(typeName, methodName);
         var def = (InterfaceDefinition) doParseDefinition(code);
         Assertions.assertEquals(typeName, def.name());
@@ -23,7 +23,7 @@ public class InterfaceParseTest extends BaseParseTest {
     @Test
     public void testMethod2() {
         var typeName = randTypeName(32);
-        var methodName = randVarFuncName(12);
+        var methodName = randVarName(12);
         var code = "interface %s { %s(int);}".formatted(typeName, methodName);
         var def = (InterfaceDefinition) doParseDefinition(code);
         Assertions.assertEquals(typeName, def.name());
@@ -35,7 +35,7 @@ public class InterfaceParseTest extends BaseParseTest {
     @Test
     public void testMethod3() {
         var typeName = randTypeName(32);
-        var methodName = randVarFuncName(12);
+        var methodName = randVarName(12);
         var code = "interface %s { %s()int;}".formatted(typeName, methodName);
         var def = (InterfaceDefinition) doParseDefinition(code);
         Assertions.assertEquals(typeName, def.name());
@@ -47,13 +47,13 @@ public class InterfaceParseTest extends BaseParseTest {
     @Test
     public void testPart1() {
         var typeName = randTypeName(32);
-        var partName = randVarFuncName(12);
+        var partName = symbol(randVarName(12));
         var code = "interface %s { %s;}".formatted(typeName, partName);
         var def = (InterfaceDefinition) doParseDefinition(code);
         Assertions.assertEquals(typeName, def.name());
         Assertions.assertEquals(1, def.parts().size());
-        var part = def.parts().get(partName);
-        Assertions.assertEquals(partName, part.name());
+        var part = def.parts().getFirst();
+        Assertions.assertEquals(partName, part.symbol());
     }
 
 }

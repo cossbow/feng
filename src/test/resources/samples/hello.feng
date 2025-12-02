@@ -1,4 +1,4 @@
-import xxx.io.{println};
+import xxx.io *;
 
 func main() {
     println("Hello Fèng!");

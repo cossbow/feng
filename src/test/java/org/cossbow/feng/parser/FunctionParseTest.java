@@ -9,7 +9,7 @@ public class FunctionParseTest extends BaseParseTest {
 
     @Test
     public void testFunction() {
-        var name = randVarFuncName(16);
+        var name = randVarName(16);
         var fn = (FunctionDefinition) doParseDefinition("func %s(){}".formatted(name));
         Assertions.assertEquals(name, fn.name());
         Assertions.assertTrue(fn.generic().isEmpty());
@@ -17,7 +17,7 @@ public class FunctionParseTest extends BaseParseTest {
 
     @Test
     public void testPrototype() {
-        var name = randVarFuncName(16);
+        var name = randVarName(16);
         var pt = (PrototypeDefinition) doParseDefinition("func %s();".formatted(name));
         Assertions.assertEquals(name, pt.name());
         Assertions.assertTrue(pt.generic().isEmpty());

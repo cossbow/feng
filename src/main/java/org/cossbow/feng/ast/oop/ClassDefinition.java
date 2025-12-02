@@ -6,9 +6,11 @@ import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.Macro;
 
+import java.util.List;
+
 public class ClassDefinition extends TypeDefinition {
     private final Optional<DefinedType> parent;
-    private final UniqueTable<DefinedType> impl;
+    private final List<DefinedType> impl;
     private final UniqueTable<ClassField> fields;
     private final UniqueTable<ClassMethod> methods;
     private final MultiTable<Macro> macros;
@@ -18,7 +20,7 @@ public class ClassDefinition extends TypeDefinition {
                            Optional<Identifier> name,
                            TypeParameters generic,
                            Optional<DefinedType> parent,
-                           UniqueTable<DefinedType> impl,
+                           List<DefinedType> impl,
                            UniqueTable<ClassField> fields,
                            UniqueTable<ClassMethod> methods,
                            MultiTable<Macro> macros) {
@@ -34,7 +36,7 @@ public class ClassDefinition extends TypeDefinition {
         return parent;
     }
 
-    public UniqueTable<DefinedType> impl() {
+    public List<DefinedType> impl() {
         return impl;
     }
 

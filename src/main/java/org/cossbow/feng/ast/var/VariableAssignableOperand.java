@@ -1,18 +1,18 @@
 package org.cossbow.feng.ast.var;
 
-import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.Symbol;
 
 public class VariableAssignableOperand extends AssignableOperand {
-    private final Identifier name;
+    private final Symbol symbol;
 
     public VariableAssignableOperand(Position pos,
-                                     Identifier name) {
+                                     Symbol symbol) {
         super(pos);
-        this.name = name;
+        this.symbol = symbol;
     }
 
-    public Identifier name() {
-        return name;
+    public Symbol symbol() {
+        return symbol;
     }
 }

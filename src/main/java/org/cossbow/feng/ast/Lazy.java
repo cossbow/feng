@@ -1,6 +1,6 @@
 package org.cossbow.feng.ast;
 
-import java.util.Objects;
+import java.util.NoSuchElementException;
 
 public class Lazy<T> {
     private T value;
@@ -21,8 +21,11 @@ public class Lazy<T> {
         return new Lazy<>(null);
     }
 
-    public T get() {
-        return Objects.requireNonNull(value, "value is null");
+    public T must() {
+        if (value == null) {
+            throw new NoSuchElementException("No value present");
+        }
+        return value;
     }
 
     public void set(T value) {

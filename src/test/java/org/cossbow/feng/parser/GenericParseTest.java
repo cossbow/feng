@@ -1,6 +1,7 @@
 package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDomain;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.oop.ClassDefinition;
@@ -64,7 +65,7 @@ public class GenericParseTest extends BaseParseTest {
     public void testTypeConstraint1() {
         for (var fmt : simpleGlobalDefineFmt) {
             var type = randTypeName(2);
-            var cov = randTypeName(8);
+            var cov = symbol(randTypeName(8));
             var code = fmt.formatted(type + " " + cov);
             var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
@@ -93,8 +94,8 @@ public class GenericParseTest extends BaseParseTest {
         for (var op : typeOperatorSymbol.entrySet()) {
             for (var fmt : simpleGlobalDefineFmt) {
                 var type = randTypeName(2);
-                var a = randTypeName(8);
-                var b = randTypeName(8);
+                var a = symbol(randTypeName(8));
+                var b = symbol(randTypeName(8));
                 var code = fmt.formatted(type + " " + a + op.getValue() + b);
                 var param = doParseDefinition(code).generic().params().get(type);
                 Assertions.assertEquals(type, param.name());
@@ -110,9 +111,9 @@ public class GenericParseTest extends BaseParseTest {
     public void testConstraintPriority1() {
         for (var fmt : simpleGlobalDefineFmt) {
             var type = randTypeName(2);
-            var a = randTypeName(8);
-            var b = randTypeName(8);
-            var c = randTypeName(8);
+            var a = symbol(randTypeName(8));
+            var b = symbol(randTypeName(8));
+            var c = symbol(randTypeName(8));
             var code = fmt.formatted("%s %s & %s | %s".formatted(type, a, b, c));
             var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
@@ -129,9 +130,9 @@ public class GenericParseTest extends BaseParseTest {
     public void testConstraintPriority2() {
         for (var fmt : simpleGlobalDefineFmt) {
             var type = randTypeName(2);
-            var a = randTypeName(8);
-            var b = randTypeName(8);
-            var c = randTypeName(8);
+            var a = symbol(randTypeName(8));
+            var b = symbol(randTypeName(8));
+            var c = symbol(randTypeName(8));
             var code = fmt.formatted("%s %s | %s & %s".formatted(type, a, b, c));
             var param = doParseDefinition(code).generic().params().get(type);
             Assertions.assertEquals(type, param.name());
@@ -144,10 +145,10 @@ public class GenericParseTest extends BaseParseTest {
         }
     }
 
-    private Identifier getSimpleTypeParam(TypeConstraint e) {
+    private Symbol getSimpleTypeParam(TypeConstraint e) {
         var dt = ((DefinedTypeConstraint) e).definedType();
         Assertions.assertTrue(dt.generic().isEmpty());
-        return dt.name();
+        return dt.symbol();
     }
 
 }

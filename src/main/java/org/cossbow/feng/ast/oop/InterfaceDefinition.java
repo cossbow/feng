@@ -6,9 +6,11 @@ import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.Macro;
 
+import java.util.List;
+
 public class InterfaceDefinition extends TypeDefinition {
     private final UniqueTable<InterfaceMethod> methods;
-    private final UniqueTable<DefinedType> parts;
+    private final List<DefinedType> parts;
     private final MultiTable<Macro> macros;
 
     public InterfaceDefinition(Position pos,
@@ -16,7 +18,7 @@ public class InterfaceDefinition extends TypeDefinition {
                                Identifier name,
                                TypeParameters generic,
                                UniqueTable<InterfaceMethod> methods,
-                               UniqueTable<DefinedType> parts,
+                               List<DefinedType> parts,
                                MultiTable<Macro> macros) {
         super(pos, modifier, Optional.of(name), generic);
         this.methods = methods;
@@ -28,7 +30,7 @@ public class InterfaceDefinition extends TypeDefinition {
         return methods;
     }
 
-    public UniqueTable<DefinedType> parts() {
+    public List<DefinedType> parts() {
         return parts;
     }
 
