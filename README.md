@@ -395,16 +395,16 @@ var b *Device = new(Device, {});
 
 1. 用一个变量去接收结果，运算表达式返回的是对应类型的引用，这种情况下如果不能转换则抛出[异常](#异常)。同时可以参与表达式计算。
    ```feng
-   func test(o Object) {
+   func test(o *Object) {
       var f *File = o?(*File);   // 转换成File类的引用
-      var w Writer = o?(Writer);  // 转换成Writer接口
-      o?(Writer).write("Hello!"); // 在表达式中使用
+      var w Writer = o?(*Writer);  // 转换成Writer接口
+      o?(*Writer).write("Hello!"); // 在表达式中使用
    }
    ```
 2. 用两个变量去接收的话，就会返回[元组](#元组)，不能参与表达式计算。
    第一个值是类型引用参考第1条；第二个为`bool`值，表示是否能进行转换。这时不会抛出[异常](#异常)。
    ```feng
-   func valid(w Writer) {
+   func valid(w *Writer) {
       var f, ok = w?(*File);
       if (ok) f.close(); // 如果匹配上，转换的结构放在变量f上
    }
@@ -527,31 +527,43 @@ func main() {
 
 ## 类
 
-和Java、C++等一样，使用关键字`class`定义：
+类是用于支持面向对象的派生类型，内部允许定义字段和方法：
 
 1. 支持继承：子类可以继承父类的全部特性，比如字段、方法及运算符。
-2. 支持多态：子类可以覆盖继承过来的方法。
+2. 支持多态：子类可以重新实现父类过来的方法。
+
+比如定义一个名称为`Cat`的类：
+
+```feng
+class Cat {
+    var age int;
+    func meow() {
+    }
+}
+```
 
 ### 字段
 
-在自定义的类中可以定义任意类型的字段， 用`const`和`var`定义，和变量定义的概念一样：
+类字段的类型支持任意类型， 也支持`const`和`var`方式定义，这些和变量一样：
 
 ```feng
 class Cat {
    const id int;
    var name rom;
+   var mothr,father *Cat;
+   var children []*Cat;
 }
 ```
 
-在定义值类型时可以对类进行初始化，`const`定义的字段是不允许修改的，必须要求初始化指定。
+在定义值类型变量时可以对类进行初始化，`const`定义的字段必须初始化。
 
 ```feng
 func main() {
    var c1 Cat = {id: 1001, name: "Tomcat"};
    var c2 Cat = {id: 1001};
-   // var c3 Cat = {name: "Tomcat"}; // 未显示初始化id，不允许
-   // var c4 Cat; // 未初始化id，也不行
-   var c5 Cat = nil; // 初始化为0
+   // var c3 Cat = {name: "Tomcat"}; // 错误：未初始化id
+   // var c4 Cat; // 错误：未初始化id
+   // var c5 Cat = {}; // 错误：未初始化id
 }
 ```
 
@@ -559,11 +571,12 @@ func main() {
 
 ```feng
 func main() {
-   var node *Cat = new(Cat, {id: 1001, name: "Tomcat"});
+   var c1 *Cat = new(Cat, {id: 1001, name: "Tomcat"});
+   // var c2 *Cat = new(Cat, {name: "Tomcat"}); // 错误：未初始化id
 }
 ```
 
-如果类里面没有`const`的字段则不强制要求初始化表达式。
+如果类里面没有`const`的字段则不强制要求初始化。
 
 ```feng
 class Cat {
@@ -572,15 +585,26 @@ class Cat {
 }
 func main() {
    var c1 Cat;
+   var c2 *Cat = new(Cat);
 }
 ```
 
-如果没有指定初始化的字段，编译器必须一律清零（`nil`）。
-比如上面示例中c1的内存区域都应该清零。TODO：默认初始化？还是强制显示初始化？
+如果没有指定初始化的字段，编译器必须一律归零，即底层内存初始化为全`0`的状态，引用类型的字段值就是`nil`。
+但`const`的字段必须初始化，这样一来就有个副作用：如果`const`的字段未导出，在模块外则就无法创建类的实例。
+
+在继承时，子类的字段不能和父类重名：
+
+```feng
+class Device {
+    var id int;
+}
+class Disk : Device {
+    // var id int; // ✖：重名了
+    var diskId int;
+}
+```
 
 ### 方法
-
-方法的名称在同一个类里是唯一的，与函数名称类似，当然也不与函数冲突。
 
 方法定义与函数的差别就是放在类定义内部可以通过`this`关键字使用当前实例的成员，`this`自然就表示访问当前方法的实例本身。
 
@@ -602,6 +626,8 @@ class Task {
 ```
 
 上面举字段的例子，对成员方法也一样处理。
+
+同一个类的方法名不能相同，[多态](#多态)除外。
 
 #### 访问成员
 
@@ -652,22 +678,12 @@ func main() {
 
 ### 继承
 
-#### 类的实例
+#### 多态
 
-使用`new`语法可以创建一个实例，并传递一个引用类型的变量，通过变量使用实例，也可以传递给另一个引用类型的变量：
+多态（polymorphic）是指同一个行为具有多个不同表现形式或形态。
+所以严格来讲抽象（详见[接口](#接口)）也属于多态。
 
-```feng
-func main() {
-    var n *Node = new(Node);  // 创建的实例传递给n
-    var m *Node = n; // 通过赋值将n指向的对象传递给m
-    m.setValue(123); // 通过m修改实例
-    printf("n.value = %d.\n", n.value); // n和m指向同一个对象，所以打印结果为：n.value = 123.
-}
-```
-
-#### 继承与多态
-
-先要有一个父类，并且有一个字段`name`和一个方法`eat`：
+下面举例说明类的多态：先定义一个父类`Animal`，并且有一个字段`name`和一个方法`eat`：
 
 ```feng
 class Animal {
@@ -678,7 +694,7 @@ class Animal {
 }
 ```
 
-然后定义一个子类，就可以继承父类字段`name`，也可以覆盖父类的方法`eat`：
+然后定义一个子类`Cat`，继承了父类字段`name`，下面实现一个与父类的方法`eat`同名同原型的方法：
 
 ```feng
 class Cat : Animal {
@@ -688,7 +704,7 @@ class Cat : Animal {
 }
 ```
 
-父类的引用可以指向一个子类实例，这种情况下调用方法时，应该调用子类的方法：
+允许`Animal`的引用指向一个子类实例，通过父类引用调用`eat`方法时，允许时实际会调用子类的`eat`方法：
 
 ```feng
 func main() {
@@ -697,14 +713,96 @@ func main() {
 }
 ```
 
-但是子类定义的字段不能与继承来的字段重名。
+通过这个例子可以看到，方法`eat`在继承之后可以允许有多个实现，父类引用的不同子类均会指向子类实现的方法。
+**子类在重实现父类方法时要求原型必须一致**。
 
-### root类
-
-语言内置了`Object`类，是所有类的root类，自定义类没有声明继承父类时默认继承`Object`类。`Object`类没有任何成员，其实也不需要。
+支持[断言运算](#断言运算符)来判断子类型：
 
 ```feng
-class Object {}
+func test(animal *Animal) {
+    var cat, ok = animal?(*Cat);
+    if (ok) cat.eat("mouse");
+}
+func main() {
+    test(new(Cat));
+}
+```
+
+父类与子类仅支持引用传递，值类型变量之间不能传递。且传递规则为：
+
+1. 引用类型相同的情况，子类可以传递给父类。
+2. 子类的常量强引用可以传递给父类的虚引用。
+
+比如父类`Animal`和子类`Cat`之间传递：
+
+```feng
+func sample1(lc *Animal) {
+    var c1 *Cat = lc;
+}
+func sample2(lc &Animal) {
+    var c2 &Cat = lc;
+}
+func sample2(lc *Animal) {
+    var c2 &Cat = lc;
+}
+```
+
+#### 抽象
+
+多态的父类的方法也有自己的实现，但[接口](#接口)的方法没有具体实现，而是接口的“子类”给出实现，因此叫抽象。
+抽象出接口更好的作为约定和规范：
+
+1. 管理者只关注接口的实现，隐藏具体的类，并提供已实现接口的实例。
+2. 使用者不必关心是什么类，只要实现了接口就可以使用。
+
+比如定义一个接口`Task`，仅包含一个简单方法`run`：
+
+```feng
+interface Task {
+   run();
+}
+```
+
+定义两个实现类`MyTask`和`YourTask`：
+
+```feng
+class MyTask (Task) {
+   func run() {
+      println("Run my task!");
+   }
+}
+class YourTask {
+   func run() {
+      println("Run your task!");
+   }
+}
+```
+
+用法和多态类似了：
+
+```feng
+func asyncRun(t *Task) {
+    t.run(); // 假装这里在异步执行
+}
+func main() {
+    asyncRun(new(MyTask));      // 打印：Run my task!
+    asyncRun(new(YourTask));    // 打印：Run your task!
+}
+```
+
+当然也支持[断言运算](#断言运算符)判断类型。
+
+### 根类
+
+由于类是单继承的，因此所有类都会按继承关系形成一棵树，而这棵树的根类就是`Object`类。
+这是内置的类，没有声明继承任何父类的类则默认直接继承`Object`类。
+`Object`类没有任何成员，可以创建一个`Object`的对象。
+
+```feng
+func test() {
+    var o *Object = new(Object);
+    o = new(Device);
+}
 ```
 
 ### 导出成员
@@ -745,46 +843,20 @@ class CBuffer {
 
 ## 接口
 
-接口定位为一组方法原型的集合。因此除了能声明一组方法原型外，什么都不能加。
+接口是从多态分离出来的特性，是去掉了具体实现的父类，而且没有字段。
+这样接口看上去是由一组方法的集合，在定义时省去了方法前面的`func`关键字。
 
-### 接口使用
+接口仅仅是约定和规范，不支持实例化，因此接口类型变量只能是引用。
 
-接口的设计主要用于实例的管理者和使用者代码，管理者掌管细节，而对使用者屏蔽细节。
-
-接口的本质是一些方法原型的集合。
-
-```feng
-interface Cache`K, V` {
-   Get(K) (V, bool);
-   Set(K,V) bool;
-   Size() int;
-}
-```
-
-某个类的方法原型与接口里的全部方法兼容（符合类型安全），那这个类就实现了此方法。
-
-```feng
-class Auto {}
-class Bus:Auto {}
-interface Factory {
-   make() *Auto;
-}
-class Ford (Factory) {
-   func make() *Bus { // 返回类型兼容
-      return new(Bus);
-   }
-}
-func test() {
-   var fac Factory = new(Ford); // use
-}
-```
-
-### 组合接口
+### 接口组合
 
 接口可以进行组合：
 
-1. 组合成的接口包含各个组件的所有方法原型
-2. 组合的接口可以赋值给组件接口，因为实现了组合的接口当然也实现了组件接口
+1. 组合成的接口包含各个组件的所有方法原型。
+2. 组合接口可以传递给组件接口，因为实现了组合接口当然也实现了组件接口。
+3. 接口的方法名称会检查冲突，不同组件中同名的方法被视为同一个方法，如果原型不一致则不能编译。
+
+比如文件可以读和写，那可以这样设计接口：
 
 ```feng
 interface Reader {
@@ -800,45 +872,32 @@ interface File {
    query() *FileInfo;
 }
 // 实现File接口的实例自然也实现了Write接口
-func use(file File) Write {
+func use(file *File) Write {
    return file;
 }
 ```
 
-方法原型需要检查名称冲突，不允许同名的方法存在
+### 接口类型变量
 
-### 抽象对象
+接口类型变量是引用类型变量，并且只能引用实现类的实例。
+接口的变量声明需要加上引用标识符来标识引用类型。
 
-只允许类引用实例和枚举值被抽象。
+允许的传递：
 
-1. 可以不用声明要实现的接口，在传递的地方，编译器是可以判断是否已实现的。
-2. 可声明要实现的接口，声明多个用逗号隔开。声明后将强制检查实现。
+1. 引用类型相同的情况，实现类可以传递给接口。
+2. 实现类的常量强引用可以传递给接口的虚引用。
 
-使用示例：
-
-```feng
-interface Task {
-   run();
-}
-class SubTask {
-   func run() {
-      println("Run Sub Task!");
-   }
-}
-class MyTask (Task) { // 声明实现接口Task
-   func run() {
-      println("Run My Task!");
-   }
-}
-```
-
-支持断言：
+比如接口`Cache`和实现类`LocalCache`之间传递：
 
 ```feng
-func runTask(r Object) {
-   if (var t, ok = r?(Task); ok) {
-      t.run();
-   }
+func sample1(lc *LocalCache) {
+    var c1 *Cache = lc;
+}
+func sample2(lc &LocalCache) {
+    var c2 &Cache = lc;
+}
+func sample2(lc *LocalCache) {
+    var c2 &Cache = lc;
 }
 ```
 
@@ -1298,7 +1357,7 @@ interface Map`K,V` {
    get0(K) V;
    get1(K) (V,bool);
 }
-func test(a Map`int,int`) {
+func test(a *Map`int,int`) {
    // get返回值是int默认值是0，但当key不存在时，默认值0就无法区分了了
    var v0 = a.get0(i);
    // 需要提供另一个方法来判断
@@ -1935,7 +1994,7 @@ func test() {
 ##### 强引用类型
 
 强引用表示为`*`带类型符号，比如：`var aDev *Device;`声明了强引用变量`aDev`。
-它可以指向一个类`Device`的实例，或者`Device`[兼容类](#继承与多态)的实例：
+它可以指向一个类`Device`的实例，或者`Device`的[子类](#多态)的实例：
 
 ```feng
 func test() {
