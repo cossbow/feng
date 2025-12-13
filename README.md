@@ -566,43 +566,67 @@ class Cat {
 }
 ```
 
-在定义值类型变量时可以对类进行初始化，`const`定义的字段必须初始化。
+在实例化时，`const`字段则必须初始化指定，`var`字段则可选初始化。
+比如上面的`Cat`类，`id`必须指定初始化值，`name`则不强制：
 
 ```feng
 func main() {
-   var c1 Cat = {id: 1001, name: "Tomcat"};
-   var c2 Cat = {id: 1001};
-   // var c3 Cat = {name: "Tomcat"}; // 错误：未初始化id
-   // var c4 Cat; // 错误：未初始化id
-   // var c5 Cat = {}; // 错误：未初始化id
+   var c1 Cat = {id=1001};
+   var c2 Cat = {id=1001, name="Tom"};
+   // 下面是错误用法
+   // var c3 Cat = {name="Tom"};
+   // var c4 Cat;
+   // var c5 Cat = {};
 }
 ```
 
-`new`创建实例时初始化表达式放在里面：
+同样通过`new`动态实例化也是一样：
 
 ```feng
 func main() {
-   var c1 *Cat = new(Cat, {id: 1001, name: "Tomcat"});
-   // var c2 *Cat = new(Cat, {name: "Tomcat"}); // 错误：未初始化id
+   var c1 *Cat = new(Cat, {id=1001, name="Tom"});
+   // 下面是错误用法
+   // var c2 *Cat = new(Cat);
+   // var c3 *Cat = new(Cat, {name="Tom"});
 }
 ```
 
-如果类里面没有`const`的字段则不强制要求初始化。
+显然如果类里面没有`const`的字段则不强制要求初始化。
 
 ```feng
-class Cat {
+class Mouse {
    var id int;
    var name rom;
 }
 func main() {
-   var c1 Cat;
-   var c2 *Cat = new(Cat);
+   var m1 Mouse;
+   var m2 *Mouse = new(Cat);
 }
 ```
 
-如果没有指定初始化的字段，编译器必须一律归零，即底层内存初始化为全`0`的状态，引用类型的字段值就是`nil`。
-但`const`的字段必须初始化，这样一来就有个副作用：如果`const`的字段未导出，在模块外则就无法创建类的实例。
+如果没有初始化，或者初始化中没有指定的字段，一律置为默认状态：对应内存全`0`，引用类型则是`nil`值。
 
+副作用：一个导出类的，但它有未导出`const`字段，在其他模块就无法实例化该类。
+比如下面的`Dog`类就只能在当前模块实例化：
+
+```feng
+export
+class Dog {
+    const id int;
+    var name rom;
+}
+export
+func newDog(id int) *Dog {
+    return new(Dog, {id=id});
+}
+export
+func dog(id int, name rom) Dog {
+    return {id=id, name=name};
+}
+```
+
+类的字段的定义不要求顺序，和实际内存布局中的位置不需要一一对应。
+不同于[结构类型](#结构类型)的字段。
 
 ### 方法
 
