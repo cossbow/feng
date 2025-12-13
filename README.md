@@ -232,8 +232,8 @@ func main() {
 * 不支持和整数、浮点数的互相转换。
 * `if`、`for`中的条件表达式返回值必须是`bool`类型的。
 
-实际机器上是用整数表示布尔值的，因此规定布尔类型只用最低位表示，且其他位的值不能影响布尔运算结果。
-整数值与布尔值对应：
+布尔类型占1个字节，只使用最低位表示，且其他位的值不能影响布尔运算结果。
+最低位的值与布尔值对应：
 
 | 布尔值   | 整数值 |
 |-------|-----|
@@ -1032,81 +1032,54 @@ var statuses TaskState = TaskState[0];
 
 ## 结构类型
 
-### 结构类型定义
+结构类型定义的是内存上的数据结构，按内存布局分为两种子类型：
 
-结构类型是指`struct`和`union`两种派生类型，设计与C语言基本一致。
-字段只能为基本类型和结构类型的值类型，总之不能出现与指针相关的元素。
+1. 结构体：所有字段的存储按顺序分配。
+2. 联合体：所有字段的存储是重叠的。
+
+字段类型只能是[基本类型](#基本类型)和结构类型，及这两种的[定长数组](#定长数组)。
+
+结构体和联合体的定义格式一样，只是开头的关键字不同：
+
+1. 结构体的定义格式为：`struct` 名称 `{` 字段列表 `}`。
+    ```feng
+    struct Message {
+        type int;
+        success bool;
+        value float32;
+        ext [12]int;
+    }
+    ```
+2. 联合体的定义格式为：`union` 名称 `{` 字段列表 `}`。
+    ```feng
+    union DataType {
+        type int;
+        success bool;
+        uv float32;
+    }
+    ```
+
+相邻且相同类型的字段可以合并，当然不相邻的不能合并。以结构体为例：
 
 ```feng
-struct A {
-    a1 int;
-    a2 : 8 int;
-    a3 Base;
-}
-union B {
-    b1 int;
-    b2 : 8 int;
-    b3 Base;
-}
-func test() {
-   var a A = {a1= 10, a2= 2, a3= {v=-1}};
-   var b B = {b2= 4}; // 显然union在初始化时只能写一个字段
+struct Request {
+    type, code int;
+    data [56]uint8;
 }
 ```
 
-当然字段的内存布局完全与定义的顺序一致。
-
-TODO：内存对齐怎么办？……
-
-### 结构类型与内存
-
-结构类型没有实例的概念，使用`new`语法创建的不是实例，而是内存类型引用的映射。
+位域（bit-field）是字段实际使用的位宽，只能用于基本类型的字段。
+位域取值为该字段类型的位宽范围，放在在字段名称后面。
+例如设置`code`的位域为`6`（`type`未设置）：
 
 ```feng
-struct Foo {
-   score int;
-}
-var foo *Foo = new(Foo, {score= 0});
-func main() {
-   foo.score+=1;
-   println(foo.score);
+struct Request {
+    type, code:6 int;
+    data [56]uint8;
 }
 ```
 
-基本类型也允许这样使用，不过基本类型没有字段，如果要修改其值需要用复制。
-
-可以将一个陌生的内存映射到结构类型上使用，但要在运行时检查越界。
-
-```feng
-func getScore(r rom) int {
-   var f *Foo = r;  // 转换时自动计算并检查大小，防止越界
-   return f.score;
-}
-func writeFoo(f Foo, out Writer) {
-   var r rom = f;
-   out.write(r);
-}
-```
-
-这个操作只对基本类型和结构类型的引用及其数组引用有效。
-
-```feng
-func count(r rom) int {
-   var list []Foo = r;  // 这里必须
-   var t = 0;
-   for ( f : list ) {
-      t += f.score;
-   }
-   return t;
-}
-```
-
-这里的是真的基本类型和结构类型的数组，但是有些情况的容易被看错：
-
-```feng
-var gList [][]Foo;   // 这个数组的元素类型是[]Foo，上文提到这时引用类型
-var gUser []*Foo;    // 这个数组类型元素是*Foo
-```
+结构类型不能实例化，只能作为[mem类型](#mem类型)的映射使用。
 
 ## 数组
 
