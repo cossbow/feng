@@ -132,24 +132,31 @@ module是代码的基本管理单元。
 
 ### 导出符号
 
-比如当前module为`xxx.util`，其中的符号`Node.value`字段、`List`类及`List.size`方法导出给外部使用：
+支持导出任何全局符号；比较特殊的是成员：
+
+1. 导出的类，其成员不跟随导出的，需要单独导出。
+2. 导出的接口的方法默认跟随导出。
+3. 导出的结构类型的字段跟随导出，
+4. 导出的枚举类型的所有值都跟随导出。
+
+例如，下面导出全局变量`gFoo`、函数`aFoo`、类`Foo`及其字段`bar`和方法`go`：
 
 ```feng
-class Node {
-   var prev, next *Node;
-   export var value int;
+export var gFoo Foo;
+export
+func aFoo() Foo {
+    return gFoo;
 }
-export class List {
-   var head *Node;
-   var size int;
-   const tag int; // 类的成员需要单独导出才能被外面使用
-   export func size() {
-      return size;
-   }
+export
+class Foo {
+    export
+    var bar int;
+    export
+    func go() {
+        //
+    }
 }
 ```
-
-另外接口、结构类型及属性的成员不需要单独导出。
 
 ### 导入符号
 
