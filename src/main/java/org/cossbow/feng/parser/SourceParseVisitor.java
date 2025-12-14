@@ -15,10 +15,7 @@ import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.micro.*;
-import org.cossbow.feng.ast.mod.Global;
-import org.cossbow.feng.ast.mod.GlobalDeclaration;
-import org.cossbow.feng.ast.mod.GlobalDefinition;
-import org.cossbow.feng.ast.mod.Import;
+import org.cossbow.feng.ast.mod.*;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
@@ -31,6 +28,7 @@ import org.cossbow.feng.ast.var.VariableAssignableOperand;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.function.Function;
 
@@ -50,29 +48,14 @@ final class SourceParseVisitor
     // symbols table
     //
 
-    private final IdentifierTable<TypeDefinition> namedTypes = new IdentifierTable<>();
-    private final List<TypeDefinition> unnamedTypes = new ArrayList<>();
-    private final IdentifierTable<FunctionDefinition> namedFunctions = new IdentifierTable<>();
-    private final List<Procedure> lambdas = new ArrayList<>();
+    public final IdentifierTable<TypeDefinition> namedTypes = new IdentifierTable<>();
+    public final List<TypeDefinition> unnamedTypes = new ArrayList<>();
+    public final IdentifierTable<FunctionDefinition> namedFunctions = new IdentifierTable<>();
+    public final List<Procedure> lambdas = new ArrayList<>();
 
     public SourceParseVisitor() {
     }
 
-    public IdentifierTable<TypeDefinition> namedTypes() {
-        return namedTypes;
-    }
-
-    public List<TypeDefinition> unnamedTypes() {
-        return unnamedTypes;
-    }
-
-    public IdentifierTable<FunctionDefinition> namedFunctions() {
-        return namedFunctions;
-    }
-
-    public List<Procedure> lambdas() {
-        return lambdas;
-    }
 
     //
     // utils
@@ -150,16 +133,29 @@ final class SourceParseVisitor
     @Override
     public Entity visitSource(FengParser.SourceContext ctx) {
         var imports = this.<Import>visitList(ctx.import_());
+        var set = new HashMap<Module_, Import>(imports.size());
+        for (Import i : imports) {
+            var oi = set.putIfAbsent(i.module(), i);
+            if (oi != null)
+                throw new SyntaxException(
+                        "duplicate import: " + i.module());
+        }
         var globals = this.<Global>visitList(ctx.global());
         return new Source(posOf(ctx), imports, globals);
     }
 
     @Override
     public Entity visitImport_(FengParser.Import_Context ctx) {
-        var pkg = identifiers(ctx.module().Identifier());
+        var mod = (Module_) visit(ctx.module());
         var alias = identifierOptional(ctx.alias);
         var flat = ctx.flat != null;
-        return new Import(posOf(ctx), pkg, alias, flat);
+        return new Import(posOf(ctx), mod, alias, flat);
+    }
+
+    @Override
+    public Entity visitModule(FengParser.ModuleContext ctx) {
+        var path = identifiers(ctx.Identifier());
+        return new Module_(posOf(ctx), path);
     }
 
     @Override

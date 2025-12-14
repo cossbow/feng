@@ -10,6 +10,7 @@ import org.cossbow.feng.ast.dcl.NewArrayType;
 import org.cossbow.feng.ast.dcl.NewDefinedType;
 import org.cossbow.feng.ast.expr.BinaryExpression;
 import org.cossbow.feng.ast.expr.NewExpression;
+import org.cossbow.feng.ast.mod.Module_;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.stmt.ArrayTuple;
 import org.cossbow.feng.ast.stmt.AssignmentsStatement;
@@ -22,6 +23,10 @@ import java.util.List;
 
 public class ExportImportTest extends BaseParseTest {
 
+    static Module_ mod(String... values) {
+        return new Module_(Position.ZERO, identifiers(values));
+    }
+
     // import
 
     @Test
@@ -32,7 +37,7 @@ public class ExportImportTest extends BaseParseTest {
         Assertions.assertEquals(1, imports.size());
 
         var i = imports.getFirst();
-        Assertions.assertEquals(identifiers("a", "b"), i.module());
+        Assertions.assertEquals(mod("a", "b"), i.module());
 
         Assertions.assertFalse(i.alias().has());
         Assertions.assertFalse(i.flat());
@@ -46,7 +51,7 @@ public class ExportImportTest extends BaseParseTest {
         Assertions.assertEquals(1, imports.size());
 
         var i = imports.getFirst();
-        Assertions.assertEquals(identifiers("b", "c", "d"), i.module());
+        Assertions.assertEquals(mod("b", "c", "d"), i.module());
         Assertions.assertEquals(identifier("dist"), i.alias().must());
         Assertions.assertFalse(i.flat());
     }
@@ -59,7 +64,7 @@ public class ExportImportTest extends BaseParseTest {
         Assertions.assertEquals(1, imports.size());
 
         var i = imports.getFirst();
-        Assertions.assertEquals(identifiers("b", "c", "d"), i.module());
+        Assertions.assertEquals(mod("b", "c", "d"), i.module());
         Assertions.assertTrue(i.flat());
     }
 

@@ -8,7 +8,7 @@ import java.util.List;
 
 public class SourceParser {
 
-    public ParseResult parse(CharStream cs) {
+    public static ParseResult parse(CharStream cs) {
         var lexer = new FengLexer(cs);
         var ts = new CommonTokenStream(lexer);
         var parser = new FengParser(ts);

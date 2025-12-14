@@ -5,15 +5,13 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 
-import java.util.List;
-
 public class Import extends Entity {
-    private final List<Identifier> module;
+    private final Module_ module;
     private final Optional<Identifier> alias;
     private final boolean flat;
 
     public Import(Position pos,
-                  List<Identifier> module,
+                  Module_ module,
                   Optional<Identifier> alias,
                   boolean flat) {
         super(pos);
@@ -22,7 +20,7 @@ public class Import extends Entity {
         this.flat = flat;
     }
 
-    public List<Identifier> module() {
+    public Module_ module() {
         return module;
     }
 
