@@ -808,7 +808,7 @@ func main() {
 父类与子类仅支持引用传递，值类型变量之间不能传递。且传递规则为：
 
 1. 引用类型相同的情况，子类可以传递给父类。
-2. 子类的常量强引用可以传递给父类的虚引用。
+2. 子类的常量实引用可以传递给父类的虚引用。
 
 比如父类`Animal`和子类`Cat`之间传递：
 
@@ -979,7 +979,8 @@ func use(file *File) Write {
 允许的传递：
 
 1. 引用类型相同的情况，实现类可以传递给接口。
-2. 实现类的常量强引用可以传递给接口的虚引用。
+2. 类型允许的条件下，接口的常量实引用可以传递给接口的虚引用。
+3. 类型允许的条件下，实现类的常量实引用可以传递给接口的虚引用。
 
 比如接口`Cache`和实现类`LocalCache`之间传递：
 
@@ -990,7 +991,10 @@ func sample1(lc *LocalCache) {
 func sample2(lc &LocalCache) {
     var c2 &Cache = lc;
 }
-func sample2(lc *LocalCache) {
+func sample3(lc *Cache) {
+    var c2 &Cache = lc;
+}
+func sample4(lc *LocalCache) {
     var c2 &Cache = lc;
 }
 ```
@@ -1902,92 +1906,6 @@ func readTxt() String {
 
 注意：`catch`匹配括号里的参数`e`是常量参数。
 
-## 元组
-
-元组是语言内部的特殊类型，由一组元素显示组成。不支持显示定义元组类型的变量。
-
-### 用途
-
-声明了多返回值函数或方法，如果是返回数组，那无法自动解构成多个变量，因此采用元组来处理。
-
-```feng
-func getValue(key int) (int, bool) {
-   var node = get(key);
-   if (node == nil) return 0, false;
-   return node.value, true;
-}
-```
-
-运行同时赋值给多个操作对象：
-
-```feng
-func test() {
-   u.id, ok = 1, true;
-}
-```
-
-在声明变量时也可以使用：
-
-```feng
-func test() {
-   var id, ok = 1, true;
-}
-```
-
-### 特殊元组
-
-调用函数或方法返回的结构是一个元组，当然可以直接当做元组来使用。
-
-```feng
-func result(e int, r *Res) (int, *Res) {
-   return e, r;
-}
-func success(r *Res) (int, *Res) {
-   return result(0, r);
-}
-```
-
-多返回值的函数或方法不能参与表达式计算，但是单返回值的函数可以（编译器应该自动拆开）：
-
-```feng
-func sin(x float64) float64 {    // 单返回值可以作为元组返回也可以参与表达式计算
-   // TODO：……
-}
-func cos(x float64) float64 {
-   return sqrt(1 - sin(x)^2); // 需要自动把元组拆开成单值
-}
-```
-
-if元组和if语句类似，不同的是直接返回的是元组而不是语句：
-
-```feng
-func getValue(key int) (int, bool) {
-   var node = get(key);
-   return if (node == nil) 0, false else node.value, true;
-}
-```
-
-以及与switch语句对应的switch元组：
-
-```feng
-func createIf(c int) (bool, *Object) {
-   return switch(c) {
-   case 0: true, new(Res);
-   default: false, nil;
-   };
-}
-```
-
-不同类型元组可以嵌套组合：
-
-```feng
-func createIf(c int) (bool, *Object) {
-   return if (c > 0) false, nil 
-      else if (c < 0) true, new(Res)
-      else true, new(Res, {code=1000});
-}
-```
-
 ## 变量
 
 声明方式参考[变量声明语句](#变量声明语句)。
@@ -2055,9 +1973,9 @@ func test() {
 }
 ```
 
-##### 强引用类型
+##### 实引用类型
 
-强引用表示为`*`带类型符号，比如：`var aDev *Device;`声明了强引用变量`aDev`。
+实引用表示为`*`带类型符号，比如：`var aDev *Device;`声明了实引用变量`aDev`。
 它可以指向一个类`Device`的实例，或者`Device`的[子类](#多态)的实例：
 
 ```feng
@@ -2079,37 +1997,36 @@ const a *Bus = new(Bus);
 
 [变长数组](#变长数组)也是引用类型的变量，可以引用元素类型相同但长度任意的数组实例。
 
-强引用在自动内存管理中的作用是标识实例是否被使用：
+实引用在自动内存管理中的作用是标识实例是否被使用：
 
-* 被强引用变量引用的实例不能被内存管理器回收；
-* 当一个实例没有被强引用变量引用时就应该被回收。
+* 被实引用变量引用的实例不能被内存管理器回收；
+* 当一个实例没有被实引用变量引用时就应该被回收。
 
 ##### 虚引用类型
 
-自动内存管理在回收实例时不会被虚引用影响。虚引用不能直接引用一个实例。比起强引用，虚引用的用法有一些约束。
+虚引用（Phantom Reference）是指不影响内存释放的引用。
+可以引用动态创建的实例，也可以引用值类型变量的实例，但只在一定条件下才能使用。
 
-虚引用变量只能用`const`声明，且不能为空：
+虚引用变量是常量，即只能用`const`声明：
 
 ```feng
-var gh Host;
 func test() {
+    var gh Host;
     const h1 &Host = gh;
-    // var h2 &Host = gh; // ✖
-    // const h3 &Host = nil; // ✖
 }
 ```
 
-数组不能被虚引用，且数组元素不能是虚引用。
+虚引用只能是本地变量或参数。仅有下面几种情况能传递给虚引用：
 
-虚引用变量的作用域必须在被引用的实例作用域内：
-
-1. 值类型变量可以在作用域内被虚引用。
-2. 常量引用的作用域内，其引用的实例可以被虚引用。虚引用本身也是常量引用。
-3. 一个类实例在可以被虚引用的作用区间内：
+1. 值类型变量在作用域内可以被虚引用指向。
+2. 常量引用变量在作用域内，可以传递实例给虚引用。
+3. 虚引用可以传递实例给新的虚引用。
+4. 本地变量是实引用类型，在传递给虚引用之后，在虚引用作用域之内不可被修改。
+5. 一个类实例在可以被虚引用的作用区间内：
     1. 它的值类型字段可以被虚引用。
     2. 它的常量字段引用的实例可以被虚引用。
 
-全局变量可以被任意代码段虚引用：
+显然全局变量能在所有代码中被引用：
 
 ```feng
 var gDrv Driver;
@@ -2120,19 +2037,28 @@ func use() {
 }
 ```
 
-本地变量需要在作用域内：
+本地变量需要在作用域内使用虚引用：
 
 ```feng
 func sample1() {
     var drv Driver;
     const d1 &Driver = drv;
 }
-func sample2(drv *Driver) { // 参数都是常量
+func sample2() {
+    const drv *Driver = new(Driver);
     const d1 &Driver = drv;
+}
+func sample3() {
+    var drv *Driver = new(Driver);
+    {
+        const d1 &Driver = drv;
+        // drv = nil; // ✖
+    }
+    drv = nil;
 }
 ```
 
-类的字段被虚引用：
+允许被虚引用指向的实例的字段：
 
 ```feng
 class Device {
@@ -2283,6 +2209,92 @@ func test() {
 
 将数组元素列出来放在方括号中：`[1,2,3]`、`["Hello", "Good"]`等等。
 数组元素类型为兼容所有元素的类型，如果没有可兼容的类型则不允许。
+
+## 元组
+
+元组是语言内部的特殊类型，由一组元素显示组成。不支持显示定义元组类型的变量。
+
+### 用途
+
+声明了多返回值函数或方法，如果是返回数组，那无法自动解构成多个变量，因此采用元组来处理。
+
+```feng
+func getValue(key int) (int, bool) {
+   var node = get(key);
+   if (node == nil) return 0, false;
+   return node.value, true;
+}
+```
+
+运行同时赋值给多个操作对象：
+
+```feng
+func test() {
+   u.id, ok = 1, true;
+}
+```
+
+在声明变量时也可以使用：
+
+```feng
+func test() {
+   var id, ok = 1, true;
+}
+```
+
+### 特殊元组
+
+调用函数或方法返回的结构是一个元组，当然可以直接当做元组来使用。
+
+```feng
+func result(e int, r *Res) (int, *Res) {
+   return e, r;
+}
+func success(r *Res) (int, *Res) {
+   return result(0, r);
+}
+```
+
+多返回值的函数或方法不能参与表达式计算，但是单返回值的函数可以（编译器应该自动拆开）：
+
+```feng
+func sin(x float64) float64 {    // 单返回值可以作为元组返回也可以参与表达式计算
+   // TODO：……
+}
+func cos(x float64) float64 {
+   return sqrt(1 - sin(x)^2); // 需要自动把元组拆开成单值
+}
+```
+
+if元组和if语句类似，不同的是直接返回的是元组而不是语句：
+
+```feng
+func getValue(key int) (int, bool) {
+   var node = get(key);
+   return if (node == nil) 0, false else node.value, true;
+}
+```
+
+以及与switch语句对应的switch元组：
+
+```feng
+func createIf(c int) (bool, *Object) {
+   return switch(c) {
+   case 0: true, new(Res);
+   default: false, nil;
+   };
+}
+```
+
+不同类型元组可以嵌套组合：
+
+```feng
+func createIf(c int) (bool, *Object) {
+   return if (c > 0) false, nil 
+      else if (c < 0) true, new(Res)
+      else true, new(Res, {code=1000});
+}
+```
 
 ## 宏
 
