@@ -1,7 +1,7 @@
 package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.Symbol;
-import org.cossbow.feng.ast.UniqueTable;
+import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.struct.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -25,7 +25,7 @@ public class StructureParseTest extends BaseParseTest {
         }
     }
 
-    UniqueTable<StructureField> parseFields(String names) {
+    IdentifierTable<StructureField> parseFields(String names) {
         var code = "struct Foo { %s }".formatted(names);
         var def = (StructureDefinition) doParseDefinition(code);
         return def.fields();

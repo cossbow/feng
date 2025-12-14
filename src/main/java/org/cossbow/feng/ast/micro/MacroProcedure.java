@@ -8,13 +8,13 @@ import java.util.List;
 
 public class MacroProcedure extends Entity {
     private final Identifier name;
-    private final UniqueTable<MacroVariable> params;
+    private final IdentifierTable<MacroVariable> params;
     private final List<Statement> body;
     private final Optional<Expression> result;
 
     public MacroProcedure(Position pos,
                           Identifier name,
-                          UniqueTable<MacroVariable> params,
+                          IdentifierTable<MacroVariable> params,
                           List<Statement> body,
                           Optional<Expression> result) {
         super(pos);
@@ -28,7 +28,7 @@ public class MacroProcedure extends Entity {
         return name;
     }
 
-    public UniqueTable<MacroVariable> params() {
+    public IdentifierTable<MacroVariable> params() {
         return params;
     }
 

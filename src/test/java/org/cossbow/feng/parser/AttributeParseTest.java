@@ -1,7 +1,7 @@
 package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.UniqueTable;
+import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.attr.Attribute;
 import org.cossbow.feng.ast.attr.AttributeDefinition;
 import org.cossbow.feng.ast.expr.ArrayExpression;
@@ -23,7 +23,7 @@ import java.util.function.Function;
 
 public class AttributeParseTest extends BaseParseTest {
 
-    private final List<Function<CharSequence, UniqueTable<Attribute>>> atXxx = List.of(
+    private final List<Function<CharSequence, IdentifierTable<Attribute>>> atXxx = List.of(
             this::atDefineClass,
             this::atDefineInterface,
             this::atDefineEnum,
@@ -110,75 +110,75 @@ public class AttributeParseTest extends BaseParseTest {
         Assertions.assertEquals(2, arr.elements().size());
     }
 
-    private UniqueTable<Attribute> atDefine(String code) {
+    private IdentifierTable<Attribute> atDefine(String code) {
         var def = doParseDefinition(code);
         return def.modifier().attributes();
     }
 
-    private UniqueTable<Attribute> atDefineClass(CharSequence attr) {
+    private IdentifierTable<Attribute> atDefineClass(CharSequence attr) {
         return atDefine(attr + " class A{}");
     }
 
-    private UniqueTable<Attribute> atDefineInterface(CharSequence attr) {
+    private IdentifierTable<Attribute> atDefineInterface(CharSequence attr) {
         return atDefine(attr + " interface A{}");
     }
 
-    private UniqueTable<Attribute> atDefineEnum(CharSequence attr) {
+    private IdentifierTable<Attribute> atDefineEnum(CharSequence attr) {
         return atDefine(attr + " enum A{V,}");
     }
 
-    private UniqueTable<Attribute> atDefineStruct(CharSequence attr) {
+    private IdentifierTable<Attribute> atDefineStruct(CharSequence attr) {
         return atDefine(attr + " struct A{}");
     }
 
-    private UniqueTable<Attribute> atDefineUnion(CharSequence attr) {
+    private IdentifierTable<Attribute> atDefineUnion(CharSequence attr) {
         return atDefine(attr + " union A{}");
     }
 
-    private UniqueTable<Attribute> atDefineAttribute(CharSequence attr) {
+    private IdentifierTable<Attribute> atDefineAttribute(CharSequence attr) {
         return atDefine(attr + " attribute A{}");
     }
 
-    private UniqueTable<Attribute> atDefineFunction(CharSequence attr) {
+    private IdentifierTable<Attribute> atDefineFunction(CharSequence attr) {
         return atDefine(attr + " func all(){}");
     }
 
-    private UniqueTable<Attribute> atDefinePrototype(CharSequence attr) {
+    private IdentifierTable<Attribute> atDefinePrototype(CharSequence attr) {
         return atDefine(attr + " func all();");
     }
 
-    private UniqueTable<Attribute> atClassField(CharSequence attr) {
+    private IdentifierTable<Attribute> atClassField(CharSequence attr) {
         var code = "class A{%s var id int;}".formatted(attr);
         var def = (ClassDefinition) doParseDefinition(code);
         return def.fields().get(identifier("id")).modifier().attributes();
     }
 
-    private UniqueTable<Attribute> atClassMethod(CharSequence attr) {
+    private IdentifierTable<Attribute> atClassMethod(CharSequence attr) {
         var code = "class A{%s func get(){}}".formatted(attr);
         var def = (ClassDefinition) doParseDefinition(code);
         return def.methods().get(identifier("get")).modifier().attributes();
     }
 
-    private UniqueTable<Attribute> atInterfaceMethod(CharSequence attr) {
+    private IdentifierTable<Attribute> atInterfaceMethod(CharSequence attr) {
         var code = "interface A{%s get();}".formatted(attr);
         var def = (InterfaceDefinition) doParseDefinition(code);
         return def.methods().get(identifier("get")).modifier().attributes();
     }
 
-    private UniqueTable<Attribute> atParameter(CharSequence attr) {
+    private IdentifierTable<Attribute> atParameter(CharSequence attr) {
         var code = "func test(%s a A){}".formatted(attr);
         var func = (FunctionDefinition) doParseDefinition(code);
         var ps = (VariableParameterSet) func.procedure().prototype().parameterSet();
         return ps.variables().get(identifier("a")).modifier().attributes();
     }
 
-    private UniqueTable<Attribute> atDeclaration(CharSequence attr) {
+    private IdentifierTable<Attribute> atDeclaration(CharSequence attr) {
         var code = attr + " var a A;";
         var stmt = (DeclarationStatement) doParseLocal(code);
         return stmt.variables().getFirst().modifier().attributes();
     }
 
-    private UniqueTable<Attribute> atTryCatch(CharSequence attr) {
+    private IdentifierTable<Attribute> atTryCatch(CharSequence attr) {
         var code = "try{}catch(%s e Er){}".formatted(attr);
         var stmt = (TryStatement) doParseLocal(code);
         return stmt.catchClauses().getFirst().argument().modifier().attributes();

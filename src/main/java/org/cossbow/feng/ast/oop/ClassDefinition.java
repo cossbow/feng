@@ -4,26 +4,24 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.ast.micro.Macro;
-
-import java.util.List;
+import org.cossbow.feng.ast.micro.MacroTable;
 
 public class ClassDefinition extends TypeDefinition {
     private final Optional<DefinedType> parent;
-    private final List<DefinedType> impl;
-    private final UniqueTable<ClassField> fields;
-    private final UniqueTable<ClassMethod> methods;
-    private final MultiTable<Macro> macros;
+    private final SymbolTable<DefinedType> impl;
+    private final IdentifierTable<ClassField> fields;
+    private final IdentifierTable<ClassMethod> methods;
+    private final MacroTable macros;
 
     public ClassDefinition(Position pos,
                            Modifier modifier,
                            Optional<Identifier> name,
                            TypeParameters generic,
                            Optional<DefinedType> parent,
-                           List<DefinedType> impl,
-                           UniqueTable<ClassField> fields,
-                           UniqueTable<ClassMethod> methods,
-                           MultiTable<Macro> macros) {
+                           SymbolTable<DefinedType> impl,
+                           IdentifierTable<ClassField> fields,
+                           IdentifierTable<ClassMethod> methods,
+                           MacroTable macros) {
         super(pos, modifier, name, generic);
         this.parent = parent;
         this.impl = impl;
@@ -36,19 +34,19 @@ public class ClassDefinition extends TypeDefinition {
         return parent;
     }
 
-    public List<DefinedType> impl() {
+    public SymbolTable<DefinedType> impl() {
         return impl;
     }
 
-    public UniqueTable<ClassField> fields() {
+    public IdentifierTable<ClassField> fields() {
         return fields;
     }
 
-    public UniqueTable<ClassMethod> methods() {
+    public IdentifierTable<ClassMethod> methods() {
         return methods;
     }
 
-    public MultiTable<Macro> macros() {
+    public MacroTable macros() {
         return macros;
     }
 }

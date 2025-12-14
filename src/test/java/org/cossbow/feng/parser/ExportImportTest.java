@@ -163,7 +163,7 @@ public class ExportImportTest extends BaseParseTest {
         var def = (ClassDefinition) doParseDefinition(code);
         Assertions.assertEquals(parent, def.parent().must().symbol());
         for (int i = 0; i < ifs.length; i++) {
-            Assertions.assertEquals(ifs[i], def.impl().get(i).symbol());
+            Assertions.assertEquals(ifs[i], def.impl().getValue(i).symbol());
         }
     }
 

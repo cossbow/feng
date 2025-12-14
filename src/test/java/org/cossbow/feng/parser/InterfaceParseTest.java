@@ -52,7 +52,7 @@ public class InterfaceParseTest extends BaseParseTest {
         var def = (InterfaceDefinition) doParseDefinition(code);
         Assertions.assertEquals(typeName, def.name());
         Assertions.assertEquals(1, def.parts().size());
-        var part = def.parts().getFirst();
+        var part = def.parts().getValue(0);
         Assertions.assertEquals(partName, part.symbol());
     }
 

@@ -4,37 +4,35 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.ast.micro.Macro;
-
-import java.util.List;
+import org.cossbow.feng.ast.micro.MacroTable;
 
 public class InterfaceDefinition extends TypeDefinition {
-    private final UniqueTable<InterfaceMethod> methods;
-    private final List<DefinedType> parts;
-    private final MultiTable<Macro> macros;
+    private final IdentifierTable<InterfaceMethod> methods;
+    private final SymbolTable<DefinedType> parts;
+    private final MacroTable macros;
 
     public InterfaceDefinition(Position pos,
                                Modifier modifier,
                                Identifier name,
                                TypeParameters generic,
-                               UniqueTable<InterfaceMethod> methods,
-                               List<DefinedType> parts,
-                               MultiTable<Macro> macros) {
+                               IdentifierTable<InterfaceMethod> methods,
+                               SymbolTable<DefinedType> parts,
+                               MacroTable macros) {
         super(pos, modifier, Optional.of(name), generic);
         this.methods = methods;
         this.parts = parts;
         this.macros = macros;
     }
 
-    public UniqueTable<InterfaceMethod> methods() {
+    public IdentifierTable<InterfaceMethod> methods() {
         return methods;
     }
 
-    public List<DefinedType> parts() {
+    public SymbolTable<DefinedType> parts() {
         return parts;
     }
 
-    public MultiTable<Macro> macros() {
+    public MacroTable macros() {
         return macros;
     }
 }

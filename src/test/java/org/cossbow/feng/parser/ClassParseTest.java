@@ -1,6 +1,6 @@
 package org.cossbow.feng.parser;
 
-import org.cossbow.feng.ast.UniqueTable;
+import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
 import org.cossbow.feng.ast.oop.ClassDefinition;
@@ -50,7 +50,7 @@ public class ClassParseTest extends BaseParseTest {
             Assertions.assertEquals(types.size(), def.impl().size());
             for (int i = 0; i < types.size(); i++) {
                 var type = types.get(i);
-                var impl = def.impl().get(i);
+                var impl = def.impl().getValue(i);
                 Assertions.assertEquals(type, impl.symbol());
                 Assertions.assertTrue(impl.generic().isEmpty());
             }
@@ -58,7 +58,7 @@ public class ClassParseTest extends BaseParseTest {
     }
 
 
-    private UniqueTable<ClassField> parseFields(String fields) {
+    private IdentifierTable<ClassField> parseFields(String fields) {
         var def = (ClassDefinition) doParseDefinition("class A {" + fields + "}");
         return def.fields();
     }

@@ -1,9 +1,10 @@
 package org.cossbow.feng.parser;
 
-import org.cossbow.feng.ast.MultiTable;
 import org.cossbow.feng.ast.expr.BinaryExpression;
 import org.cossbow.feng.ast.expr.MemberOfExpression;
-import org.cossbow.feng.ast.micro.*;
+import org.cossbow.feng.ast.micro.MacroClass;
+import org.cossbow.feng.ast.micro.MacroFunc;
+import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
 import org.cossbow.feng.ast.stmt.AssignmentsStatement;
@@ -16,18 +17,18 @@ import java.util.function.Function;
 
 public class MacroParseTest extends BaseParseTest {
 
-    private final List<Function<String, MultiTable<Macro>>> macroMap = List.of(
+    private final List<Function<String, MacroTable>> macroMap = List.of(
             this::interfaceMacro,
             this::classMacro
     );
 
-    private MultiTable<Macro> interfaceMacro(String c) {
+    private MacroTable interfaceMacro(String c) {
         var code = "interface A{macro %s}".formatted(c);
         var def = (InterfaceDefinition) doParseDefinition(code);
         return (def.macros());
     }
 
-    private MultiTable<Macro> classMacro(String c) {
+    private MacroTable classMacro(String c) {
         var code = "class A{macro %s}".formatted(c);
         var def = (ClassDefinition) doParseDefinition(code);
         return (def.macros());

@@ -6,14 +6,14 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 
 public class StructureDefinition extends TypeDefinition {
     private final boolean union;
-    private final UniqueTable<StructureField> fields;
+    private final IdentifierTable<StructureField> fields;
 
     public StructureDefinition(Position pos,
                                Modifier modifier,
                                Optional<Identifier> name,
                                TypeParameters generic,
                                boolean union,
-                               UniqueTable<StructureField> fields) {
+                               IdentifierTable<StructureField> fields) {
         super(pos, modifier, name, generic);
         this.union = union;
         this.fields = fields;
@@ -23,7 +23,7 @@ public class StructureDefinition extends TypeDefinition {
         return union;
     }
 
-    public UniqueTable<StructureField> fields() {
+    public IdentifierTable<StructureField> fields() {
         return fields;
     }
 

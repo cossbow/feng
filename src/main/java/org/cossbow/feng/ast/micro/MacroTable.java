@@ -1,19 +1,23 @@
-package org.cossbow.feng.ast;
+package org.cossbow.feng.ast.micro;
+
+import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.IdentifierTable;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.function.BiConsumer;
 
-public class MultiTable<T> {
-    private final Map<Identifier, UniqueTable<T>> tables = new HashMap<>();
+public class MacroTable {
+    private final Map<Identifier, IdentifierTable<Macro>> tables
+            = new HashMap<>();
 
-    public void add(Identifier group, Identifier id, T value) {
-        tables.computeIfAbsent(group, g -> new UniqueTable<>())
+    public void add(Identifier group, Identifier id, Macro value) {
+        tables.computeIfAbsent(group, g -> new IdentifierTable<>())
                 .add(id, value);
     }
 
-    public UniqueTable<T> get(Identifier group) {
+    public IdentifierTable<Macro> get(Identifier group) {
         var table = tables.get(group);
         if (table == null) {
             throw new NoSuchElementException("not exists '" + group + "'");
@@ -21,7 +25,7 @@ public class MultiTable<T> {
         return table;
     }
 
-    public T get(Identifier group, Identifier id) {
+    public Macro get(Identifier group, Identifier id) {
         return get(group).get(id);
     }
 
@@ -30,7 +34,4 @@ public class MultiTable<T> {
         return table != null && table.exists(id);
     }
 
-    public void forEach(BiConsumer<Identifier, UniqueTable<T>> action) {
-        tables.forEach(action);
-    }
 }

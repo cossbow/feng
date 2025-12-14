@@ -3,18 +3,18 @@ package org.cossbow.feng.ast.gen;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.UniqueTable;
+import org.cossbow.feng.ast.IdentifierTable;
 
 public class TypeParameters extends Entity {
-    private final UniqueTable<TypeParameter> params;
+    private final IdentifierTable<TypeParameter> params;
 
     public TypeParameters(Position pos,
-                          UniqueTable<TypeParameter> params) {
+                          IdentifierTable<TypeParameter> params) {
         super(pos);
         this.params = params;
     }
 
-    public UniqueTable<TypeParameter> params() {
+    public IdentifierTable<TypeParameter> params() {
         return params;
     }
 
@@ -33,7 +33,7 @@ public class TypeParameters extends Entity {
     //
 
     public static TypeParameters empty() {
-        return new TypeParameters(Position.ZERO, new UniqueTable<>());
+        return new TypeParameters(Position.ZERO, new IdentifierTable<>());
     }
 
 }

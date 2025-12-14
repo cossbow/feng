@@ -248,10 +248,10 @@ public class BaseParseTest {
 
 
     public static <T, R> void checkIds(List<R> names,
-                                       UniqueTable<T> table) {
+                                       IdentifierTable<T> table) {
         Assertions.assertEquals(names.size(), table.size());
         for (int i = 0; i < names.size(); i++) {
-            Assertions.assertEquals(names.get(i), table.getId(i));
+            Assertions.assertEquals(names.get(i), table.getKey(i));
         }
     }
 

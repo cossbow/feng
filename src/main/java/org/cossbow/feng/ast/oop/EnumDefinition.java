@@ -6,17 +6,17 @@ import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
 public class EnumDefinition extends TypeDefinition {
-    private final UniqueTable<Value> values;
+    private final IdentifierTable<Value> values;
 
     public EnumDefinition(Position pos,
                           Modifier modifier,
                           Identifier name,
-                          UniqueTable<Value> values) {
+                          IdentifierTable<Value> values) {
         super(pos, modifier, Optional.of(name), TypeParameters.empty());
         this.values = values;
     }
 
-    public UniqueTable<Value> values() {
+    public IdentifierTable<Value> values() {
         return values;
     }
 

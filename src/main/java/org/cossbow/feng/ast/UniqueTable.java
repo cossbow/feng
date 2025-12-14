@@ -4,9 +4,9 @@ import org.cossbow.feng.parser.SyntaxException;
 
 import java.util.*;
 
-public class UniqueTable<T> {
-    private final HashMap<Identifier, Node<T>> table;
-    private final ArrayList<Node<T>> nodes;
+public class UniqueTable<K extends Entity, V> {
+    private final HashMap<K, Node<K, V>> table;
+    private final ArrayList<Node<K, V>> nodes;
 
     public UniqueTable() {
         table = new HashMap<>();
@@ -18,7 +18,7 @@ public class UniqueTable<T> {
         nodes = new ArrayList<>(initCapacity);
     }
 
-    public void add(Identifier id, T value) {
+    public void add(K id, V value) {
         var node = new Node<>(id, value);
         var old = table.putIfAbsent(id, node);
         if (old != null) {
@@ -28,7 +28,7 @@ public class UniqueTable<T> {
         nodes.add(node);
     }
 
-    public T get(Identifier id) {
+    public V get(K id) {
         var node = table.get(id);
         if (node != null) {
             return node.value;
@@ -36,19 +36,19 @@ public class UniqueTable<T> {
         throw new NoSuchElementException("not exists '" + id + "'");
     }
 
-    public Identifier getId(int i) {
+    public K getKey(int i) {
         return nodes.get(i).id;
     }
 
-    public T getValue(int i) {
+    public V getValue(int i) {
         return nodes.get(i).value;
     }
 
-    public boolean exists(Identifier id) {
+    public boolean exists(K id) {
         return table.containsKey(id);
     }
 
-    public List<T> values() {
+    public List<V> values() {
         return new PhantomList();
     }
 
@@ -60,13 +60,13 @@ public class UniqueTable<T> {
         return table.isEmpty();
     }
 
-    public record Node<T>(Identifier id, T value) {
+    public record Node<K, T>(K id, T value) {
     }
 
-    class PhantomList extends AbstractList<T> {
+    class PhantomList extends AbstractList<V> {
 
         @Override
-        public T get(int index) {
+        public V get(int index) {
             return nodes.get(index).value;
         }
 

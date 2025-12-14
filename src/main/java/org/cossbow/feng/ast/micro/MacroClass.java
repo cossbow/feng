@@ -2,18 +2,18 @@ package org.cossbow.feng.ast.micro;
 
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.UniqueTable;
+import org.cossbow.feng.ast.IdentifierTable;
 
 public class MacroClass extends Macro {
     private final Identifier name;
-    private final UniqueTable<MacroVariable> fields;
-    private final UniqueTable<MacroProcedure> methods;
+    private final IdentifierTable<MacroVariable> fields;
+    private final IdentifierTable<MacroProcedure> methods;
 
     public MacroClass(Position pos,
                       Identifier type,
                       Identifier name,
-                      UniqueTable<MacroVariable> fields,
-                      UniqueTable<MacroProcedure> methods) {
+                      IdentifierTable<MacroVariable> fields,
+                      IdentifierTable<MacroProcedure> methods) {
         super(pos, type);
         this.name = name;
         this.fields = fields;
@@ -24,11 +24,11 @@ public class MacroClass extends Macro {
         return name;
     }
 
-    public UniqueTable<MacroVariable> fields() {
+    public IdentifierTable<MacroVariable> fields() {
         return fields;
     }
 
-    public UniqueTable<MacroProcedure> methods() {
+    public IdentifierTable<MacroProcedure> methods() {
         return methods;
     }
 }
