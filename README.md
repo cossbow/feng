@@ -480,12 +480,12 @@ class Complex {
    var real,imag float64;
    // 实现+运算
    // result存放结果，并计算完成后返回
-   #operator add(lhs, rhs, result) {
+   macro operator add(lhs, rhs, result) {
       result.real = lhs.real + rhs.real;
       result.imag = lhs.imag + rhs.imag;
    }
    // 实现*运算
-   #operator mul(lhs, rhs, result) {
+   macro operator mul(lhs, rhs, result) {
       result.real = lhs.real * rhs.real + lhs.imag * rhs.imag;
       result.imag = lhs.real * rhs.imag + lhs.imag * rhs.real;
    }
@@ -510,12 +510,12 @@ func testMul(a,b *Complex) *Complex {
 ```feng
 class Map {
    // 索引读
-   #operator indexGet(key, operand, exists) {
+   macro operator indexGet(key, operand, exists) {
       var n = getNode(key);
       operand, exists = if (n != nil) n.value, true else nil, nil;
    }
    // 索引写
-   #operator indexSet(key int, value String) {
+   macro operator indexSet(key int, value String) {
       set(key, value);
    }
 }
@@ -1672,8 +1672,8 @@ class Node`T` {
 export
 class List`T` {
     var head *Node`T`;
-    #helper Iterator {
-        cursor *Node`T`;
+    macro helper Iterator {
+        cursor *Node`T`,
         index int;
         initializer() {
             cursor = head;
@@ -2302,7 +2302,7 @@ func createIf(c int) (bool, *Object) {
 特定用途就是指某种语言特性，比如当宏用于实现[自定义运算符](#自定义运算符)时，由运算本身设定了代码格式。
 目前宏仅支持在类和接口里。
 
-宏统一由`#`开头定义，主要格式有过程宏和类宏两种。
+宏统一由`macro`开头定义，主要格式有过程宏和类宏两种。
 
 ### 过程宏
 
@@ -2319,7 +2319,7 @@ func createIf(c int) (bool, *Object) {
 class Vector {
     var x float;
     var y float;
-    #operator add(left, right, sum) {
+    macro operator add(left, right, sum) {
         sum.x = left.x + right.x;
         sum.y = left.y + right.y;
     }
@@ -2347,7 +2347,7 @@ class Error {
       var s Stack = {fn=fn,line=line};
       stacks.add(s);
    }
-   #error tracestack(fn uint64, line uint32) {
+   macro error tracestack(fn uint64, line uint32) {
       tracestack(fn, line);
    }
 }
