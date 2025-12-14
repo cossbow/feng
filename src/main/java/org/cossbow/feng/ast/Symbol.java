@@ -42,6 +42,11 @@ public class Symbol extends Entity {
     public String toString() {
         if (module.none()) return name.toString();
         return module.get().toString() +
-                "$" + name.toString();
+                DELIMITER + name.toString();
     }
+
+    //
+
+    public static final char DELIMITER = '#';
+
 }
