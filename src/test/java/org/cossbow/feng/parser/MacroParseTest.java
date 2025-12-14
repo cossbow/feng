@@ -22,13 +22,13 @@ public class MacroParseTest extends BaseParseTest {
     );
 
     private MultiTable<Macro> interfaceMacro(String c) {
-        var code = "interface A{# %s}".formatted(c);
+        var code = "interface A{macro %s}".formatted(c);
         var def = (InterfaceDefinition) doParseDefinition(code);
         return (def.macros());
     }
 
     private MultiTable<Macro> classMacro(String c) {
-        var code = "class A{# %s}".formatted(c);
+        var code = "class A{macro %s}".formatted(c);
         var def = (ClassDefinition) doParseDefinition(code);
         return (def.macros());
     }

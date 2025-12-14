@@ -242,8 +242,8 @@ returnSet
 // macros
 //
 macro
-    : HASH type=Identifier macroType        # MacroClass
-    | HASH type=Identifier macroProcedure   # MacroFunc
+    : MACRO type=Identifier macroType        # MacroClass
+    | MACRO type=Identifier macroProcedure   # MacroFunc
     ;
 macroType
     : name=Identifier '{' fields=macroVariables SEMI macroProcedure+ '}'
@@ -751,6 +751,7 @@ ATTRIBUTE       : 'attribute' ;
 INTERFACE       : 'interface' ;
 CLASS           : 'class' ;
 FUNC            : 'func' ;
+MACRO           : 'macro' ;
 CONST           : 'const' ;
 VAR             : 'var' ;
 NEW             : 'new' ;

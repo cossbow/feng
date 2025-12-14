@@ -3,7 +3,7 @@ class Vector {
     var x float;
     var y float;
 
-    #operator add(left,right,sum) {
+    macro operator add(left,right,sum) {
         sum.x = left.x + right.x;
         sum.y = left.y + right.y;
     }
@@ -16,7 +16,7 @@ class Node`T` {
 export
 class List`T` {
     var head *Node`T`;
-    #helper iterator {
+    macro helper iterator {
         cursor *Node`T`,
         count int;
         initializer() {
