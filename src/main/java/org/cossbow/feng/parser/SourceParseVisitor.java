@@ -815,6 +815,7 @@ final class SourceParseVisitor
 
     private Declare parseDeclare(Token declare) {
         return switch (declare.getType()) {
+            case FengParser.LET -> Declare.LET;
             case FengParser.VAR -> Declare.VAR;
             case FengParser.CONST -> Declare.CONST;
             default -> throw new UnsupportedOperationException("unreachable branch");

@@ -13,8 +13,10 @@ import java.util.Map;
 
 public class DeclarationParseTest extends BaseParseTest {
 
-    private static final Map<Declare, String> DECLARES =
-            Map.of(Declare.VAR, "var", Declare.CONST, "const");
+    private static final Map<Declare, String> DECLARES = Map.of(
+            Declare.LET, "let",
+            Declare.VAR, "var",
+            Declare.CONST, "const");
 
     @Test
     public void testGlobalVar() {
