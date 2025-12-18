@@ -314,10 +314,10 @@ primaryTypeDeclarer
     | funcTypeDeclarer
     ;
 definedTypeDeclarer
-    : pointerType? definedType
+    : reference? definedType
     ;
-pointerType
-    : kind=(MUL|BITAND)
+reference
+    : kind=(MUL|BITAND|BITXOR)
     ;
 funcTypeDeclarer
     : FUNC prototype

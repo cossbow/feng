@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
+import static org.cossbow.feng.ast.dcl.Reference.STRONG;
+
 public class ClassParseTest extends BaseParseTest {
 
     private static final Map<Declare, String> DECLARES =
@@ -82,20 +84,20 @@ public class ClassParseTest extends BaseParseTest {
                     var t = (DefinedTypeDeclarer) f.type();
                     Assertions.assertEquals(type, t.definedType().symbol());
                     Assertions.assertTrue(t.definedType().generic().isEmpty());
-                    Assertions.assertFalse(t.pointer());
-                    Assertions.assertFalse(t.phantom());
+                    Assertions.assertTrue(t.reference().none());
                 }
             }
         }
     }
 
     @Test
-    public void testFieldPointer() {
+    public void testFieldReference() {
         for (var dcl : DECLARES.entrySet()) {
             for (int size = 1; size <= 8; size++) {
                 var names = anyNames(RandVarFuncName, 10, size);
                 var type = randTypeSymbol(16);
-                var fields = parseFields("%s %s *%s;".formatted(dcl.getValue(), idList(names), type));
+                var fields = parseFields("%s %s *%s;".formatted(
+                        dcl.getValue(), idList(names), type));
                 Assertions.assertEquals(size, fields.size());
                 for (var name : names) {
                     var f = fields.get(name);
@@ -104,8 +106,7 @@ public class ClassParseTest extends BaseParseTest {
                     var t = (DefinedTypeDeclarer) f.type();
                     Assertions.assertEquals(type, t.definedType().symbol());
                     Assertions.assertTrue(t.definedType().generic().isEmpty());
-                    Assertions.assertTrue(t.pointer());
-                    Assertions.assertFalse(t.phantom());
+                    Assertions.assertSame(STRONG, t.reference().get());
                 }
             }
         }

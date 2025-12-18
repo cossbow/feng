@@ -29,6 +29,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 final class SourceParseVisitor
@@ -266,16 +267,26 @@ final class SourceParseVisitor
         return new ArrayTypeDeclarer(posOf(ctx), typeDcl, size);
     }
 
+
+    private static final Map<Integer, Optional<Reference>> references = Map.of(
+            FengParser.MUL, Optional.of(Reference.STRONG),
+            FengParser.BITXOR, Optional.of(Reference.WEAK),
+            FengParser.BITAND, Optional.of(Reference.PHANTOM)
+    );
+
+    private Optional<Reference> parseReference(
+            FengParser.ReferenceContext ctx) {
+        if (ctx == null) return Optional.empty();
+        var rt = references.get(ctx.kind.getType());
+        if (rt != null) return rt;
+        throw new UnsupportedOperationException("unreachable branch");
+    }
+
     @Override
     public Entity visitDefinedTypeDeclarer(FengParser.DefinedTypeDeclarerContext ctx) {
-        var ptr = ctx.pointerType();
-        var isPointer = ptr != null;
-        var isPhantom = false;
-        if (isPointer) {
-            isPhantom = ptr.kind.getType() == FengParser.BITAND;
-        }
         var dt = (DefinedType) visit(ctx.definedType());
-        return new DefinedTypeDeclarer(posOf(ctx), dt, isPointer, isPhantom);
+        var reference = parseReference(ctx.reference());
+        return new DefinedTypeDeclarer(posOf(ctx), dt, reference);
     }
 
     @Override

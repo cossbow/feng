@@ -22,6 +22,10 @@ public class Optional<T> {
         return value == null;
     }
 
+    public boolean is(T v) {
+        return value == v;
+    }
+
     public T must() {
         if (value == null) {
             throw new NoSuchElementException("No value present");

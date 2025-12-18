@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
+import static org.cossbow.feng.ast.dcl.Reference.*;
+
 public class DeclarationParseTest extends BaseParseTest {
 
     private static final Map<Declare, String> DECLARES = Map.of(
@@ -80,15 +82,19 @@ public class DeclarationParseTest extends BaseParseTest {
             var dcl = parseLocalDecl("var u *User");
             var v = dcl.variables().getFirst();
             var td = (DefinedTypeDeclarer) v.type().must();
-            Assertions.assertTrue(td.pointer());
-            Assertions.assertFalse(td.phantom());
+            Assertions.assertSame(STRONG, td.reference().get());
         }
         {
             var dcl = parseLocalDecl("var u &User");
             var v = dcl.variables().getFirst();
             var td = (DefinedTypeDeclarer) v.type().must();
-            Assertions.assertTrue(td.pointer());
-            Assertions.assertTrue(td.phantom());
+            Assertions.assertSame(PHANTOM, td.reference().get());
+        }
+        {
+            var dcl = parseLocalDecl("var u ~User");
+            var v = dcl.variables().getFirst();
+            var td = (DefinedTypeDeclarer) v.type().must();
+            Assertions.assertSame(WEAK, td.reference().get());
         }
     }
 
