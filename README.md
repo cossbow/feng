@@ -1029,8 +1029,10 @@ func sample4(lc *LocalCache) {
 枚举类型的值的个数是有限的，且必须在定义时把全部值都列举出来：
 
 ```feng
-enum TaskState {WAIT, RUN, DONE,}
+enum TaskState {WAIT, RUN, DONE,}   // 注意结尾必须有个逗号“,”
 ```
+
+[枚举变量](#枚举变量)的值必须是枚举值中的一个，当然不能为空。
 
 枚举类型内置了特殊属性，这些属性在编译时就已经确定：
 
@@ -1038,14 +1040,34 @@ enum TaskState {WAIT, RUN, DONE,}
 * `name`：就是定义的字面名称。比如上面定义的`WAIT`，其名称就是`"WAIT"`。
 * `value`：允许自定义的属性，整数类型。在未定义情况下，第一个枚举值的`value`等于`0`，后面的等于上一个的`vaue`递增1。
 
-使用枚举的值需要枚举类型为前缀：枚举名称.枚举值，例如：
+使用枚举的值通常需要枚举类型为前缀，当然如果变量的类型明确就可以省略前缀，例如：
 
 ```feng
 enum TaskState {WAIT, RUN, DONE,}   // 未设置value，就等于id
 enum BillState {WAIT, PAID=4, SEND, DONE,} // 这里WAIT=0，SEND=5，DONE=6，……
 func main() {
-   var a int = TaskState.RUN;   // a初始化为整数：1
-   var b &rom = TaskState.DONE;  // b初始化为字符串："DONE"，b的类型只能是：&rom
+   var s1 = TaskState.WAIT;             // s1初始化为枚举值：WAIT
+   s1 = RUN;                            // s1类型已知，因此省略前缀
+   var s2 TaskState = DONE;             // s2已知，也可以省略前缀
+   var i int = TaskState.RUN.id;        // i初始化为整数：1
+   i = s2.id;                           // i赋值为：3
+   var n *rom = s2.name;                // n初始化为rom引用，内容为字符串"DONE"
+   var v int = BillState.SEND.value;    // v初始化为整数：5
+}
+```
+
+类型明确的情况还有`switch`语句中：
+
+```feng
+func sample(s BillState) {
+    switch(s) {
+    case WAIT:
+        // TODO
+    case PAID, SEND:
+        // TODO
+    default:
+        // TODO
+    }
 }
 ```
 
@@ -1061,7 +1083,10 @@ func main() {
 支持直接通过索引取值：
 
 ```feng
-var statuses TaskState = TaskState[0];
+func sample() {
+    var s1 TaskState = TaskState[0];
+    var s2, ok = TaskState[4];
+}
 ```
 
 枚举的变量或数组元素的默认值为第一个枚举值（`id`等于`0`的）。
@@ -1971,7 +1996,7 @@ func readTxt() String {
 
 ### 变量值的类型
 
-变量按值的类型分两种情况：值类型和引用类型。
+变量的类型分三种情况：值类型、引用类型、枚举。
 
 #### 值类型变量
 
@@ -2134,6 +2159,10 @@ func sample2(dev *Device) {
 ```
 
 **虚引用仅限为上面的场景才能使用**，例如函数返回值不能是虚引用类型的。
+
+#### 枚举变量
+
+枚举变量的使用详见[枚举](#枚举)。
 
 ### 常量
 
