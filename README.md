@@ -673,13 +673,13 @@ class Node {
 ```feng
 enum TaskState {WAIT, RUN, DONE,}
 class Task {
-   var state int;
+   var state TaskState;
    func isRunning() bool {
-      return state == TaskState.RUN;
+      return state == RUN;
    }
    func start() {
       if (isRunning()) return;   // 调用另一个方法
-      state = TaskState.RUN;     // 修改状态
+      state = RUN;     // 修改状态
    }
 }
 ```
@@ -690,7 +690,7 @@ class Task {
 func sample1() {
    var task Task;
    task.start();
-   printf("task state: %d\n", task.state);   // 打印：task state: 1
+   printf("task state '%s'\n", task.state.name);   // 打印：task state: 'RUN'
 }
 ```
 
@@ -700,7 +700,6 @@ func sample1() {
 func sample2() {
    var task *Task = new(Task);
    task.start();
-   printf("task state: %d\n", task.state);   // 打印：task state: 1
 }
 ```
 
@@ -940,22 +939,6 @@ class CBuffer {
 
 资源类只能通过`new`创建实例。这个限制可以避免重复调用。
 比如上面的`CBuffer`类，值类型在赋值中复制了`buf`的值，多个实例在释放时就会重复调用`cFree(buf);`。
-
-如果使用引用计数管理内存，那这个特性能辅助程序员解决循环引用的问题，当然也适合其他数据结构（比如红黑树）。
-
-```feng
-class Node {
-   var prev,next *Node;
-}
-class DualQueue {
-   var head *Node;
-   func release() {
-      for (var p = head; p != nil; p = p.next) {
-         p.prev = nil;
-      }
-   }
-}
-```
 
 但是外部资源的关闭往往是耗时操作，如果放在这里处理可能对性能的影响难以预料，而且还需要处理IO错误或异常，
 所以应该采用[异常语句](#异常语句)来处理。
