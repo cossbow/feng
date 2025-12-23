@@ -47,6 +47,6 @@ public class Symbol extends Entity {
 
     //
 
-    public static final char DELIMITER = '#';
+    public static final char DELIMITER = '$';
 
 }

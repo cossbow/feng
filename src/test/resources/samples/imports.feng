@@ -1,16 +1,17 @@
 import a.b *;
-var a *b#User;
-var b []b#Host;
-var b []*b#Host;
-class Win`T h#R | t#Tee & u#Rest` : b#Sys (b#Boot,b#Init) {
-    var a*b#Device;
+var a *b$User;
+var b []b$Host;
+var b []*b$Host;
+class Win`T h$R | t$Tee & u$Rest` : b$Sys (b$Boot,b$Init) {
+    var a*h$Device;
+    var b*h$Device;
 }
 struct Dos {
-    id:2 b#Hash;
+    id:2 b$Hash;
 }
-func test`T h#R | t#Tee & u#Rest`(b &b#Boot) {
-    b#add();
-    b#ct += b#gct;
-    b#aa.id = 1;
-    b#bb[id]= 1;
+func test`T h$R | t$Tee & u$Rest`(b &b$Boot) {
+    b$add();
+    b$ct += b$gct;
+    b$aa.id = 1;
+    b$bb[id]= 1;
 }

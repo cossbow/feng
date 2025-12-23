@@ -23,7 +23,7 @@ module
     : Identifier (DOT Identifier)*
     ;
 symbol
-    : (mod=Identifier HASH)? name=Identifier
+    : (mod=Identifier DOLLAR)? name=Identifier
     ;
 
 exportable
