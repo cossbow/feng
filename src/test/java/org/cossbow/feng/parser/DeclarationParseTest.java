@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static org.cossbow.feng.ast.dcl.Reference.*;
+import static org.cossbow.feng.ast.dcl.ReferenceType.*;
 
 public class DeclarationParseTest extends BaseParseTest {
 
@@ -82,19 +82,41 @@ public class DeclarationParseTest extends BaseParseTest {
             var dcl = parseLocalDecl("var u *User");
             var v = dcl.variables().getFirst();
             var td = (DefinedTypeDeclarer) v.type().must();
-            Assertions.assertSame(STRONG, td.reference().get());
+            var ref = td.reference().get();
+            Assertions.assertSame(STRONG, ref.type());
+            Assertions.assertFalse(ref.required());
+        }
+        {
+            var dcl = parseLocalDecl("var u *!User");
+            var v = dcl.variables().getFirst();
+            var td = (DefinedTypeDeclarer) v.type().must();
+            var ref = td.reference().get();
+            Assertions.assertSame(STRONG, ref.type());
+            Assertions.assertTrue(ref.required());
         }
         {
             var dcl = parseLocalDecl("var u &User");
             var v = dcl.variables().getFirst();
             var td = (DefinedTypeDeclarer) v.type().must();
-            Assertions.assertSame(PHANTOM, td.reference().get());
+            var ref = td.reference().get();
+            Assertions.assertSame(PHANTOM, ref.type());
+            Assertions.assertFalse(ref.required());
+        }
+        {
+            var dcl = parseLocalDecl("var u &!User");
+            var v = dcl.variables().getFirst();
+            var td = (DefinedTypeDeclarer) v.type().must();
+            var ref = td.reference().get();
+            Assertions.assertSame(PHANTOM, ref.type());
+            Assertions.assertTrue(ref.required());
         }
         {
             var dcl = parseLocalDecl("var u ~User");
             var v = dcl.variables().getFirst();
             var td = (DefinedTypeDeclarer) v.type().must();
-            Assertions.assertSame(WEAK, td.reference().get());
+            var ref = td.reference().get();
+            Assertions.assertSame(WEAK, ref.type());
+            Assertions.assertFalse(ref.required());
         }
     }
 

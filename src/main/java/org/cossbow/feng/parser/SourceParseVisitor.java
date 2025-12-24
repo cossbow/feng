@@ -15,7 +15,10 @@ import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.micro.*;
-import org.cossbow.feng.ast.mod.*;
+import org.cossbow.feng.ast.mod.Global;
+import org.cossbow.feng.ast.mod.GlobalDeclaration;
+import org.cossbow.feng.ast.mod.GlobalDefinition;
+import org.cossbow.feng.ast.mod.Import;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
@@ -29,8 +32,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
+
+import static org.cossbow.feng.ast.dcl.ReferenceType.*;
 
 final class SourceParseVisitor
         extends FengBaseVisitor<Entity>
@@ -267,19 +271,18 @@ final class SourceParseVisitor
         return new ArrayTypeDeclarer(posOf(ctx), typeDcl, size);
     }
 
-
-    private static final Map<Integer, Optional<Reference>> references = Map.of(
-            FengParser.MUL, Optional.of(Reference.STRONG),
-            FengParser.BITXOR, Optional.of(Reference.WEAK),
-            FengParser.BITAND, Optional.of(Reference.PHANTOM)
-    );
-
     private Optional<Reference> parseReference(
             FengParser.ReferenceContext ctx) {
         if (ctx == null) return Optional.empty();
-        var rt = references.get(ctx.kind.getType());
-        if (rt != null) return rt;
-        throw new UnsupportedOperationException("unreachable branch");
+        var type = switch (ctx.kind.getType()) {
+            case FengParser.MUL -> STRONG;
+            case FengParser.BITAND -> PHANTOM;
+            case FengParser.BITXOR -> WEAK;
+            default -> throw new UnsupportedOperationException(
+                    "unreachable branch");
+        };
+        var required = ctx.required != null;
+        return Optional.of(new Reference(posOf(ctx), type, required));
     }
 
     @Override

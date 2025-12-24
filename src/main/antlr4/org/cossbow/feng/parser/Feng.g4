@@ -317,7 +317,7 @@ definedTypeDeclarer
     : reference? definedType
     ;
 reference
-    : kind=(MUL|BITAND|BITXOR)
+    : kind=(MUL|BITAND|BITXOR) required=NOT?
     ;
 funcTypeDeclarer
     : FUNC prototype
