@@ -91,6 +91,19 @@ public class ExpressionParseTest extends BaseParseTest {
     }
 
     @Test
+    public void testNewArrayImmutable() {
+        var typeName = randTypeSymbol(32);
+        var len = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
+        var code = "new([%d#]%s)".formatted(len, typeName);
+        var expr = this.<NewExpression>parseExpr(code);
+        var arr = (NewArrayType) expr.type();
+        Assertions.assertEquals(typeName, typeName(arr.element()));
+        Assertions.assertEquals(BigInteger.valueOf(len), integer(arr.length()).value());
+        Assertions.assertTrue(arr.immutable());
+        Assertions.assertTrue(expr.init().none());
+    }
+
+    @Test
     public void testAssert() {
         var name = randVarSymbol(8);
         var typeName = randTypeSymbol(16);

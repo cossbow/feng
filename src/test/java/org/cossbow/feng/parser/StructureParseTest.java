@@ -115,13 +115,6 @@ public class StructureParseTest extends BaseParseTest {
     @Test
     public void testArrayField1() {
         {
-            var fields = parseFields("a []int;");
-            var field = fields.get(identifier("a"));
-            var type = (ArrayStructureType) field.type();
-            checkTypeName(type.elementType(), symbol("int"));
-            Assertions.assertTrue(type.length().none());
-        }
-        {
             var length = randInt(10, 100);
             var fields = parseFields("a [%d]int;".formatted(length));
             var field = fields.get(identifier("a"));
@@ -133,15 +126,6 @@ public class StructureParseTest extends BaseParseTest {
 
     @Test
     public void testArrayField2() {
-        {
-            var length = randInt(10, 100);
-            var fields = parseFields("a [][%d]int;".formatted(length));
-            var at = (ArrayStructureType) fields.get(identifier("a")).type();
-            Assertions.assertTrue(at.length().none());
-            var eat = (ArrayStructureType) at.elementType();
-            Assertions.assertEquals(length, integer(eat.length()).value());
-            checkTypeName(eat.elementType(), symbol("int"));
-        }
         {
             var len1 = randInt(10, 100);
             var len2 = randInt(10, 100);
@@ -156,12 +140,6 @@ public class StructureParseTest extends BaseParseTest {
 
     @Test
     public void testArrayField3() {
-        {
-            var fields = parseFields("a []struct{a int;};");
-            var at = (ArrayStructureType) fields.get(identifier("a")).type();
-            Assertions.assertInstanceOf(UnnamedStructureType.class, at.elementType());
-            Assertions.assertTrue(at.length().none());
-        }
         {
             var len = randInt(10, 100);
             var fields = parseFields("a [%d]struct{a int;};".formatted(len));

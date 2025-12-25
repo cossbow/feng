@@ -260,15 +260,15 @@ final class SourceParseVisitor
     // declare: start
     //
 
-    private Optional<Expression> parseArraySizeExpr(FengParser.ArrayDeclarerContext ctx) {
-        return visitOptional(ctx.expression());
-    }
 
     @Override
-    public Entity visitArrayTypeDeclarer(FengParser.ArrayTypeDeclarerContext ctx) {
-        var size = parseArraySizeExpr(ctx.arrayDeclarer());
+    public Entity visitArrayTypeDeclarer(
+            FengParser.ArrayTypeDeclarerContext ctx) {
+        var immutable = ctx.immutable != null;
+        var len = this.<Expression>visitOptional(ctx.len);
         var typeDcl = (TypeDeclarer) visit(ctx.typeDeclarer());
-        return new ArrayTypeDeclarer(posOf(ctx), typeDcl, size);
+        return new ArrayTypeDeclarer(posOf(ctx),
+                typeDcl, len, immutable);
     }
 
     private Optional<Reference> parseReference(
@@ -278,11 +278,14 @@ final class SourceParseVisitor
             case FengParser.MUL -> STRONG;
             case FengParser.BITAND -> PHANTOM;
             case FengParser.BITXOR -> WEAK;
-            default -> throw new UnsupportedOperationException(
-                    "unreachable branch");
+            default -> throw
+                    new UnsupportedOperationException(
+                            "unreachable branch");
         };
         var required = ctx.required != null;
-        return Optional.of(new Reference(posOf(ctx), type, required));
+        var immutable = ctx.immutable != null;
+        return Optional.of(new Reference(posOf(ctx),
+                type, required, immutable));
     }
 
     @Override
@@ -304,16 +307,18 @@ final class SourceParseVisitor
     }
 
     @Override
-    public Entity visitNewDefinedType(FengParser.NewDefinedTypeContext ctx) {
-        var dt = (DefinedType) visit(ctx.definedType());
-        return new NewDefinedType(posOf(ctx), dt);
-    }
-
-    @Override
-    public Entity visitNewArrayType(FengParser.NewArrayTypeContext ctx) {
-        var element = (TypeDeclarer) visit(ctx.typeDeclarer());
-        var length = (Expression) visit(ctx.expression());
-        return new NewArrayType(posOf(ctx), element, length);
+    public Entity visitNewType(FengParser.NewTypeContext ctx) {
+        var pos = posOf(ctx);
+        var defTp = ctx.definedType();
+        if (defTp != null) {
+            var dt = (DefinedType) visit(defTp);
+            return new NewDefinedType(pos, dt);
+        }
+        var at = ctx.newArrayType();
+        var element = (TypeDeclarer) visit(at.typeDeclarer());
+        var length = (Expression) visit(at.expression());
+        var immutable = at.immutable != null;
+        return new NewArrayType(pos, element, length, immutable);
     }
 
     //
@@ -503,9 +508,9 @@ final class SourceParseVisitor
     @Override
     public Entity visitArrayStructureFieldType(
             FengParser.ArrayStructureFieldTypeContext ctx) {
-        var elementType = (StructureType) visit(ctx.elementType);
-        var length = parseArraySizeExpr(ctx.arrayDeclarer());
-        return new ArrayStructureType(posOf(ctx), elementType, length);
+        var et = (StructureType) visit(ctx.element);
+        var len = this.<Expression>visitOptional(ctx.len);
+        return new ArrayStructureType(posOf(ctx), et, len);
     }
 
     @Override

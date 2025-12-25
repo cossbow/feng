@@ -1,6 +1,7 @@
 package org.cossbow.feng.parser;
 
 import org.cossbow.feng.Utils;
+import org.cossbow.feng.ast.dcl.ArrayTypeDeclarer;
 import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.Variable;
@@ -95,6 +96,15 @@ public class DeclarationParseTest extends BaseParseTest {
             Assertions.assertTrue(ref.required());
         }
         {
+            var dcl = parseLocalDecl("var u *#User");
+            var v = dcl.variables().getFirst();
+            var td = (DefinedTypeDeclarer) v.type().must();
+            var ref = td.reference().get();
+            Assertions.assertSame(STRONG, ref.type());
+            Assertions.assertFalse(ref.required());
+            Assertions.assertTrue(ref.immutable());
+        }
+        {
             var dcl = parseLocalDecl("var u &User");
             var v = dcl.variables().getFirst();
             var td = (DefinedTypeDeclarer) v.type().must();
@@ -109,6 +119,15 @@ public class DeclarationParseTest extends BaseParseTest {
             var ref = td.reference().get();
             Assertions.assertSame(PHANTOM, ref.type());
             Assertions.assertTrue(ref.required());
+        }
+        {
+            var dcl = parseLocalDecl("var u &#User");
+            var v = dcl.variables().getFirst();
+            var td = (DefinedTypeDeclarer) v.type().must();
+            var ref = td.reference().get();
+            Assertions.assertSame(PHANTOM, ref.type());
+            Assertions.assertFalse(ref.required());
+            Assertions.assertTrue(ref.immutable());
         }
         {
             var dcl = parseLocalDecl("var u ~User");
@@ -148,6 +167,64 @@ public class DeclarationParseTest extends BaseParseTest {
             Assertions.assertEquals(names, Utils.listOf(dcl.variables(), Variable::name));
             Assertions.assertEquals(values, Utils.listOf(exprs(dcl.init().must()),
                     BaseParseTest::varName));
+        }
+    }
+
+    @Test
+    public void testLocal6() {
+        {
+            var dcl = parseLocalDecl("var a []Host");
+            var v = dcl.variables().getFirst();
+            var td = (ArrayTypeDeclarer) v.type().must();
+            Assertions.assertEquals(symbol("Host"), typeName(td.element()));
+            Assertions.assertTrue(td.length().none());
+            Assertions.assertFalse(td.immutable());
+        }
+        {
+            var len = randInt(1, 16);
+            var dcl = parseLocalDecl("var a [%s]Host".formatted(len));
+            var v = dcl.variables().getFirst();
+            var td = (ArrayTypeDeclarer) v.type().must();
+            Assertions.assertEquals(symbol("Host"), typeName(td.element()));
+            Assertions.assertEquals(len, integer(td.length().get()).value());
+            Assertions.assertFalse(td.immutable());
+        }
+        {
+            var dcl = parseLocalDecl("var a [#]Host");
+            var v = dcl.variables().getFirst();
+            var td = (ArrayTypeDeclarer) v.type().must();
+            Assertions.assertEquals(symbol("Host"), typeName(td.element()));
+            Assertions.assertTrue(td.length().none());
+            Assertions.assertTrue(td.immutable());
+        }
+        {
+            var len = randInt(1, 16);
+            var dcl = parseLocalDecl("var a [%s]Host".formatted(len));
+            var v = dcl.variables().getFirst();
+            var td = (ArrayTypeDeclarer) v.type().must();
+            Assertions.assertEquals(symbol("Host"), typeName(td.element()));
+            Assertions.assertEquals(len, integer(td.length().get()).value());
+            Assertions.assertFalse(td.immutable());
+        }
+        {
+            var len = randInt(1, 16);
+            var dcl = parseLocalDecl("var a [%s#]Host".formatted(len));
+            var v = dcl.variables().getFirst();
+            var td = (ArrayTypeDeclarer) v.type().must();
+            Assertions.assertEquals(symbol("Host"), typeName(td.element()));
+            Assertions.assertEquals(len, integer(td.length().get()).value());
+            Assertions.assertTrue(td.immutable());
+        }
+        {
+            var len = randInt(1, 16);
+            var dcl = parseLocalDecl("var a [%s][#]Host".formatted(len));
+            var v = dcl.variables().getFirst();
+            var td = (ArrayTypeDeclarer) v.type().must();
+            Assertions.assertEquals(len, integer(td.length().get()).value());
+            Assertions.assertFalse(td.immutable());
+            var td2 = (ArrayTypeDeclarer) td.element();
+            Assertions.assertEquals(symbol("Host"), typeName(td2.element()));
+            Assertions.assertTrue(td2.immutable());
         }
     }
 

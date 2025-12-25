@@ -119,7 +119,7 @@ structureFieldType
     | arrayStructureFieldType
     ;
 arrayStructureFieldType
-    : arrayDeclarer elementType=structureFieldType
+    : '[' len=expression ']' element=structureFieldType
     ;
 structureFields
     : structureField (COMMA structureField)*
@@ -307,7 +307,7 @@ typeDeclarer
     | arrayTypeDeclarer
     ;
 arrayTypeDeclarer
-    : arrayDeclarer typeDeclarer
+    : '[' len=expression? immutable=HASH? ']' typeDeclarer
     ;
 primaryTypeDeclarer
     : definedTypeDeclarer
@@ -317,7 +317,7 @@ definedTypeDeclarer
     : reference? definedType
     ;
 reference
-    : kind=(MUL|BITAND|BITXOR) required=NOT?
+    : kind=(MUL|BITAND|BITXOR) required=NOT? immutable=HASH?
     ;
 funcTypeDeclarer
     : FUNC prototype
@@ -622,10 +622,6 @@ pair
 
 
 
-// array: fixed length at declaration
-arrayDeclarer
-    : '[' expression? ']'
-    ;
 
 
 // index: default for array
@@ -639,15 +635,18 @@ memberOf
 
 
 // type for new
-newType
-    : definedType                       # NewDefinedType
-    | '[' expression ']' typeDeclarer   # NewArrayType
-    ;
 new
     : NEW '(' newType (COMMA expression)? ')'
     ;
 assert
     : QUESTION '(' typeDeclarer ')'
+    ;
+newType
+    : definedType
+    | newArrayType
+    ;
+newArrayType
+    : '[' len=expression immutable=HASH? ']' typeDeclarer
     ;
 
 
