@@ -730,33 +730,59 @@ func sample() {
 }
 ```
 
-`this`只能传递给[虚引用类型](#虚引用类型)的变量：
+`this`能传递给[虚引用类型](#虚引用类型)的变量，但如果强引用调用方法时可传递给强引用，
+如果值类型调用时可赋值给值变量。例如：
 
 ```feng
 class Foo {
    var name String;
-   func bar() {
+   func aaa() {
       var x &Cat = this;
-      // var y *Cat = this; // ✖
    }
+   func bbb() {
+      var x *Cat = this;
+   }
+   func ccc() {
+      var x Cat = this;
+   }
+}
+func use1() {
+    var f Foo;
+    f.aaa();
+    // f.bbb(); // ✖
+    f.ccc();
+}
+func use2(f *Foo) {
+    f.aaa();
+    f.bbb();
+    // f.ccc(); // ✖
+}
+func use3(f &Foo) {
+    f.aaa();
+    // f.bbb(); // ✖
+    // f.ccc(); // ✖
 }
 ```
 
-`this`可以放在返回值的地方，但不能声明其他返回值，然后该方法返回值不能传递给变量，但可以在后面使用该类的成员：
+`this`可以放在返回值的地方，但也是不表示某种类型，而是当前实例本身。
+当然能立即调用方法和引用字段，也可以赋值给与调用者同类型的变量：
 
 ```feng
 class Car {
    var speed int;
-   func forward() this {
-   }
-   func stop() this {
-   }
-   func backward() this {
-   }
+   func forward() this {}
+   func stop() this {}
+   func backward() this {}
 }
-func sample() {
-   var c Car;
+func sample1(c Car) {
    var speed = c.forward().stop().backward().speed;   // 链式调用
+   var c2 Car = c.forward();
+}
+func sample2(c *Car) {
+    var c2 *Car = c.forward();
+}
+func sample2(c &Car) {
+    var c2 &Car = c.forward();
 }
 ```
 
@@ -2067,8 +2093,8 @@ func readTxt() String {
 
 变量能引用的实例有类型安全的约束：
 
-1. [类](#类)和[接口](#接口)的引用有[多态](#多态)与[抽象](#抽象)的约束；
-2. [接口](#接口)引用类的实例有抽象兼容的约束；
+1. [类](#类)和[接口](#接口)的引用有[多态](#多态)与[抽象](#抽象)的约束。
+2. [接口](#接口)引用类的实例有抽象兼容的约束。
 
 比如下面的`Device`和`Bus`尽管结构一样，但却不能引用：
 
