@@ -3,8 +3,8 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.Position;
 
 public class IndexOfExpression extends PrimaryExpression {
-    private final PrimaryExpression subject;
-    private final Expression index;
+    private PrimaryExpression subject;
+    private Expression index;
 
     public IndexOfExpression(Position pos,
                              PrimaryExpression subject,
@@ -20,5 +20,13 @@ public class IndexOfExpression extends PrimaryExpression {
 
     public Expression index() {
         return index;
+    }
+
+    //
+
+
+    @Override
+    public String toString() {
+        return subject + "[" + index + "]";
     }
 }

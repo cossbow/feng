@@ -6,7 +6,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.IdentifierTable;
 
 public class TypeParameters extends Entity {
-    private final IdentifierTable<TypeParameter> params;
+    private IdentifierTable<TypeParameter> params;
 
     public TypeParameters(Position pos,
                           IdentifierTable<TypeParameter> params) {

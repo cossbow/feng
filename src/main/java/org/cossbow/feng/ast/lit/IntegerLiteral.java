@@ -1,12 +1,16 @@
 package org.cossbow.feng.ast.lit;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.dcl.Primitive;
+import org.cossbow.feng.util.Optional;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 
-public class IntegerLiteral extends Literal {
+public class IntegerLiteral extends Literal
+        implements Comparable<IntegerLiteral> {
     private final BigInteger value;
-    private final int radix;
+    private final transient int radix;
 
     public IntegerLiteral(Position pos,
                           BigInteger value,
@@ -16,11 +20,70 @@ public class IntegerLiteral extends Literal {
         this.radix = radix;
     }
 
+    public IntegerLiteral(Position pos,
+                          BigInteger value) {
+        this(pos, value, 10);
+    }
+
+    public IntegerLiteral(Position pos,
+                          long value) {
+        this(pos, BigInteger.valueOf(value), 10);
+    }
+
     public BigInteger value() {
         return value;
     }
 
     public int radix() {
         return radix;
+    }
+
+    public int compareTo(long v) {
+        return value.compareTo(BigInteger.valueOf(v));
+    }
+
+    public int compareTo(BigInteger v) {
+        return value.compareTo(v);
+    }
+
+    @Override
+    public int compareTo(IntegerLiteral o) {
+        return value.compareTo(o.value);
+    }
+
+    //
+
+    @Override
+    public Optional<Primitive> compatible() {
+        return Optional.of(Primitive.INT);
+    }
+
+    public FloatLiteral toFloat() {
+        return new FloatLiteral(pos(), new BigDecimal(value));
+    }
+
+    //
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof IntegerLiteral f)) return false;
+        return value.equals(f.value);
+    }
+
+    @Override
+    public int hashCode() {
+        return value.hashCode();
+    }
+
+    @Override
+    public String type() {
+        return "integer";
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        return value.toString(radix);
     }
 }

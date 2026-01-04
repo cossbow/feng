@@ -3,28 +3,60 @@ package org.cossbow.feng.ast.struct;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.layout.StructureLayout;
+import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.Optional;
+
+import java.util.List;
 
 public class StructureDefinition extends TypeDefinition {
-    private final boolean union;
-    private final IdentifierTable<StructureField> fields;
+    private IdentifierTable<StructureField> fields;
+
 
     public StructureDefinition(Position pos,
                                Modifier modifier,
-                               Optional<Identifier> name,
+                               Symbol symbol,
                                TypeParameters generic,
-                               boolean union,
+                               TypeDomain domain,
                                IdentifierTable<StructureField> fields) {
-        super(pos, modifier, name, generic);
-        this.union = union;
+        super(pos, modifier, symbol, generic, domain);
         this.fields = fields;
-    }
-
-    public boolean union() {
-        return union;
     }
 
     public IdentifierTable<StructureField> fields() {
         return fields;
     }
 
+    public Optional<StructureField> field(Identifier name) {
+        return fields.tryGet(name);
+    }
+
+    private final Lazy<List<StructureDefinition>> initDeps = Lazy.nil();
+    private int pack = 0;
+    private long size = 1;
+    private final Lazy<StructureLayout> layout = Lazy.nil();
+
+    public Lazy<List<StructureDefinition>> initDeps() {
+        return initDeps;
+    }
+
+    public int pack() {
+        return pack;
+    }
+
+    public void pack(int pack) {
+        this.pack = pack;
+    }
+
+    public long size() {
+        return size;
+    }
+
+    public void size(long size) {
+        this.size = size;
+    }
+
+    public Lazy<StructureLayout> layout() {
+        return layout;
+    }
 }

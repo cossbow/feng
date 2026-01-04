@@ -2,7 +2,7 @@ package org.cossbow.feng.ast;
 
 abstract
 public class Entity {
-    private final Position pos;
+    private Position pos;
 
     public Entity(Position pos) {
         this.pos = pos;

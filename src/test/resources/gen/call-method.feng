@@ -1,0 +1,21 @@
+
+class A{
+    var id int;
+    func set(id int) {
+        this.id=id;
+    }
+    func run() {
+        set(-1);
+    }
+}
+
+func test(n int) {
+    new(A).run();
+}
+
+func main() int32 {
+    test(5);
+    return 0;
+}
+
+

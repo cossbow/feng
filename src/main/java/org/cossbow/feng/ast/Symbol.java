@@ -1,6 +1,6 @@
 package org.cossbow.feng.ast;
 
-import java.util.Objects;
+import org.cossbow.feng.util.Optional;
 
 public class Symbol extends Entity {
     private final Optional<Identifier> module;
@@ -18,6 +18,10 @@ public class Symbol extends Entity {
         this(pos, Optional.empty(), name);
     }
 
+    public Symbol(Identifier name) {
+        this(name.pos(), Optional.empty(), name);
+    }
+
     public Optional<Identifier> module() {
         return module;
     }
@@ -28,14 +32,14 @@ public class Symbol extends Entity {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof Symbol symbol)) return false;
-        return Objects.equals(module, symbol.module) &&
-                Objects.equals(name, symbol.name);
+        return o instanceof Symbol s &&
+                module.equals(s.module) &&
+                name.equals(s.name);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(module, name);
+        return 31 * module.hashCode() + name.hashCode();
     }
 
     @Override

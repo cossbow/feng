@@ -1,0 +1,80 @@
+
+class Node final {
+    var key int;
+    var value *Object;
+    var next *Node;
+}
+
+class HashMap {
+    var buckets [*]*Node;
+    var size int;
+    var threshold int;
+
+    func indexed(k int) int {
+        return k % buckets.length;
+    }
+
+    func rehash() [*]*Node {
+        if (buckets == nil) {
+            buckets = new([16]*Node);
+        } else if (size < threshold) {
+            return buckets;
+        } else {
+            var cap = buckets.length << 1;
+            var newBuck = new([cap]*Node);
+            for (var i=0; i<buckets.length; i += 1) {
+                var cur = buckets[i];
+                for (cur != nil) {
+                    var next = cur.next;
+                    var idx = cur.key % cap;
+                    cur.next = newBuck[idx];
+                    newBuck[idx] = cur;
+                    cur = next;
+                }
+            }
+            buckets = newBuck;
+        }
+        threshold = int(float32(buckets.length) * 0.75);
+        return buckets;
+    }
+
+    func set(key int, value *Object) *Object {
+        var bucks = rehash();
+        var idx = indexed(key);
+        var cur = bucks[idx];
+        if (cur == nil) {
+            bucks[idx] = new(Node, {key=key,value=value});
+            size += 1;
+            return nil;
+        }
+
+        var prev *Node = nil;
+        for (cur != nil) {
+            if (key == cur.key) {
+                var o = cur.value;
+                cur.value = value;
+                return o;
+            }
+            prev = cur;
+            cur = cur.next;
+        }
+        prev.next = new(Node, {key=key,value=value});
+
+        size += 1;
+
+        return nil;
+    }
+
+    func get(key int) *Object {
+        var idx = indexed(key);
+        var cur = buckets[idx];
+        if (cur == nil) {
+            return nil;
+        }
+
+        for (cur.key != key) {
+            cur = cur.next;
+        }
+        return cur.value;
+    }
+}

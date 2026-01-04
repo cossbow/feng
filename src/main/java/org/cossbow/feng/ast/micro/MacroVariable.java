@@ -2,13 +2,13 @@ package org.cossbow.feng.ast.micro;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Lazy;
+import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 public class MacroVariable extends Entity {
-    private final Identifier name;
-    private final Lazy<TypeDeclarer> type;
+    private Identifier name;
+    private Lazy<TypeDeclarer> type;
 
     public MacroVariable(Position pos,
                          Identifier name,

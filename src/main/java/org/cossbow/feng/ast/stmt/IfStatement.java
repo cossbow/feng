@@ -1,14 +1,21 @@
 package org.cossbow.feng.ast.stmt;
 
-import org.cossbow.feng.ast.Optional;
+import org.cossbow.feng.ast.Scope;
+import org.cossbow.feng.ast.dcl.Variable;
+import org.cossbow.feng.ast.lit.BoolLiteral;
+import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
-public class IfStatement extends Statement {
-    private final Optional<Statement> init;
-    private final Expression condition;
-    private final Statement yes;
-    private final Optional<Statement> not;
+import java.util.ArrayList;
+import java.util.List;
+
+public class IfStatement extends Statement implements Scope {
+    private Optional<Statement> init;
+    private Expression condition;
+    private Statement yes;
+    private Optional<Statement> not;
 
     public IfStatement(Position pos,
                        Optional<Statement> init,
@@ -30,6 +37,10 @@ public class IfStatement extends Statement {
         return condition;
     }
 
+    public void condition(Expression condition) {
+        this.condition = condition;
+    }
+
     public Statement yes() {
         return yes;
     }
@@ -37,4 +48,24 @@ public class IfStatement extends Statement {
     public Optional<Statement> not() {
         return not;
     }
+
+
+    private final Lazy<BoolLiteral> cond = Lazy.nil();
+
+    public Lazy<BoolLiteral> cond() {
+        return cond;
+    }
+
+    //
+
+    private volatile List<Variable> stack = List.of();
+
+    public List<Variable> stack() {
+        return stack;
+    }
+
+    public void stack(List<Variable> variables) {
+        stack = variables;
+    }
+
 }

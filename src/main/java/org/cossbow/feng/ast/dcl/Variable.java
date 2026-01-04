@@ -2,33 +2,32 @@ package org.cossbow.feng.ast.dcl;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Lazy;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
+import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.util.Lazy;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Variable extends Entity {
     private final Modifier modifier;
     private final Declare declare;
     private final Identifier name;
     private final Lazy<TypeDeclarer> type;
+    private final Lazy<Expression> value;
 
     public Variable(Position pos,
                     Modifier modifier,
                     Declare declare,
                     Identifier name,
-                    Lazy<TypeDeclarer> type) {
+                    Lazy<TypeDeclarer> type,
+                    Lazy<Expression> value) {
         super(pos);
         this.modifier = modifier;
         this.declare = declare;
         this.name = name;
         this.type = type;
-    }
-
-    public Variable(Position pos,
-                    Modifier modifier,
-                    Declare declare,
-                    Identifier name) {
-        this(pos, modifier, declare, name, Lazy.nil());
+        this.value = value;
     }
 
     public Modifier modifier() {
@@ -45,5 +44,50 @@ public class Variable extends Entity {
 
     public Lazy<TypeDeclarer> type() {
         return type;
+    }
+
+    public Lazy<Expression> value() {
+        return value;
+    }
+
+    public Expression requireValue() {
+        return value.has() ? value.must() : defVal.must();
+    }
+
+    private final Lazy<Expression> defVal = Lazy.nil();
+    private final int id = IdGenerator.getAndIncrement();
+
+    public Lazy<Expression> defVal() {
+        return defVal;
+    }
+
+    public int id() {
+        return id;
+    }
+
+
+    //
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof Variable v))
+            return false;
+        return id == v.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return id;
+    }
+
+    private static final AtomicInteger IdGenerator =
+            new AtomicInteger(1);
+
+    //
+
+    @Override
+    public String toString() {
+        if (type.none()) return declare.code + " " + name;
+        return declare.code + " " + name + " " + type.get();
     }
 }

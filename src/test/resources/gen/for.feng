@@ -1,0 +1,40 @@
+
+enum E{S,R,W,P,}
+
+func eeee(i int) {
+    var s E = E.S;
+    var v = E[i];
+    for (v:E) {
+        if (v == E.P)
+            var x = v.id;
+            var y = v.value;
+    }
+}
+
+class A {
+    var id int;
+}
+
+func test(n int) {
+    var a [4]*A;
+    for (var i=0;i < a.length; i+=1) {
+        const x = a[i];
+    }
+    for (v,i:a) {
+        const x &A = v;
+    }
+
+    var b= new([n]*A);
+    for (var i=0;i < b.length; i+=1) {
+        const x = b[i];
+    }
+    for (v,i:b) {
+        var x = v;
+    }
+}
+
+
+func main() int32 {
+    test(15);
+    return 0;
+}

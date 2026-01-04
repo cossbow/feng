@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.TypeDomain;
 
 public class DomainTypeConstraint extends TypeConstraint {
-    private final TypeDomain domain;
+    private TypeDomain domain;
 
     public DomainTypeConstraint(Position pos, TypeDomain domain) {
         super(pos);

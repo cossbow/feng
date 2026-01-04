@@ -9,7 +9,7 @@ import java.util.NoSuchElementException;
 import java.util.function.BiConsumer;
 
 public class MacroTable {
-    private final Map<Identifier, IdentifierTable<Macro>> tables
+    private Map<Identifier, IdentifierTable<Macro>> tables
             = new HashMap<>();
 
     public void add(Identifier group, Identifier id, Macro value) {
@@ -34,4 +34,7 @@ public class MacroTable {
         return table != null && table.exists(id);
     }
 
+    public boolean isEmpty() {
+        return tables.isEmpty();
+    }
 }

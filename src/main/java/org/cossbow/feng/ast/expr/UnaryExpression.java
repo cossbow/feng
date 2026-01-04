@@ -4,8 +4,8 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.UnaryOperator;
 
 public class UnaryExpression extends Expression {
-    private final UnaryOperator operator;
-    private final Expression operand;
+    private UnaryOperator operator;
+    private Expression operand;
 
     public UnaryExpression(Position pos,
                            UnaryOperator operator,
@@ -21,5 +21,12 @@ public class UnaryExpression extends Expression {
 
     public Expression operand() {
         return operand;
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        return operator.toString() + operand;
     }
 }

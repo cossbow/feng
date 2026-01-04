@@ -4,13 +4,14 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
 public class AttributeDefinition extends TypeDefinition {
-    private final IdentifierTable<AttributeField> fields;
+    private IdentifierTable<AttributeField> fields;
 
     public AttributeDefinition(Position pos,
                                Modifier modifier,
-                               Identifier name,
+                               Symbol symbol,
                                IdentifierTable<AttributeField> fields) {
-        super(pos, modifier, Optional.of(name), TypeParameters.empty());
+        super(pos, modifier, symbol, TypeParameters.empty(),
+                TypeDomain.ATTRIBUTE);
         this.fields = fields;
     }
 

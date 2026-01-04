@@ -22,7 +22,7 @@ func assignDeclare(t *Object) {
 
 func assignments()  {
     a,b.id,c[1] = t, t*2, t*3;
-    return t,t+1,t+2;
+    return t;
 }
 
 func newThings() {
@@ -61,11 +61,7 @@ func call() {
     math().mod(x, y);
 }
 
-func lambda() {
-    var sq func(int) int = func(v int) int {
-        return v*v;
-    };
-}
+
 
 func array() {
     var a=[[[]]][0];

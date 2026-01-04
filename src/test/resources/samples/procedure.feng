@@ -7,7 +7,7 @@ func pi() float64 {
 func params(i,j int, u, v float) {
 }
 
-func doCalc(n uint32, c []int) {
+func doCalc(n uint32, c [*]int) {
     if (n <= 1) {
         return c[n];
     } else if (c[n] > 0) {

@@ -1,20 +1,19 @@
 package org.cossbow.feng.ast.oop;
 
-import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Exportable;
+import org.cossbow.feng.ast.Field;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.dcl.Variable;
+import org.cossbow.feng.util.Lazy;
 
-public class ClassField extends Entity
-        implements Exportable {
-    private final Modifier modifier;
-    private final boolean export;
-    private final Declare declare;
-    private final Identifier name;
-    private final TypeDeclarer type;
+public class ClassField extends Field implements Exportable {
+    private Modifier modifier;
+    private boolean export;
+    private Declare declare;
 
     public ClassField(Position pos,
                       Modifier modifier,
@@ -22,20 +21,14 @@ public class ClassField extends Entity
                       Declare declare,
                       Identifier name,
                       TypeDeclarer type) {
-        super(pos);
+        super(pos, name, type);
         this.export = export;
         this.declare = declare;
-        this.type = type;
         this.modifier = modifier;
-        this.name = name;
     }
 
     public Declare declare() {
         return declare;
-    }
-
-    public TypeDeclarer type() {
-        return type;
     }
 
     public Modifier modifier() {
@@ -47,7 +40,46 @@ public class ClassField extends Entity
         return export;
     }
 
-    public Identifier name() {
-        return name;
+    public FieldVariable variable() {
+        return new FieldVariable(pos(), modifier, declare,
+                name(), Lazy.of(type()), this);
+    }
+
+    @Override
+    public boolean immutable() {
+        return declare == Declare.CONST;
+    }
+
+    //
+
+    private final Lazy<ClassDefinition> master = Lazy.nil();
+
+    public Lazy<ClassDefinition> master() {
+        return master;
+    }
+
+    //
+
+    public static class FieldVariable extends Variable {
+        private final ClassField field;
+
+        public FieldVariable(Position pos, Modifier modifier,
+                             Declare declare, Identifier name,
+                             Lazy<TypeDeclarer> type, ClassField field) {
+            super(pos, modifier, declare, name, type,
+                    Lazy.nil());
+            this.field = field;
+        }
+
+        public ClassField field() {
+            return field;
+        }
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        return declare + " " + super.toString();
     }
 }

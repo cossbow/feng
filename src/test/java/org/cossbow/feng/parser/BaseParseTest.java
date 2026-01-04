@@ -4,28 +4,27 @@ package org.cossbow.feng.parser;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.cossbow.feng.ast.*;
-import org.cossbow.feng.ast.Optional;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.LiteralExpression;
-import org.cossbow.feng.ast.expr.ReferExpression;
+import org.cossbow.feng.ast.expr.SymbolExpression;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.lit.Literal;
 import org.cossbow.feng.ast.lit.StringLiteral;
-import org.cossbow.feng.ast.mod.Global;
-import org.cossbow.feng.ast.mod.GlobalDefinition;
+import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.ast.stmt.ArrayTuple;
 import org.cossbow.feng.ast.stmt.CallStatement;
 import org.cossbow.feng.ast.stmt.Statement;
-import org.cossbow.feng.ast.stmt.Tuple;
+import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.Optional;
 import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
@@ -56,40 +55,67 @@ public class BaseParseTest {
     static final int EDGE_ALL = EDGE_LOWERCASE + 1;
 
     static ParseResult doParse(CharStream cs) {
-        return SourceParser.parse(cs);
+        return new SourceParser("", StandardCharsets.UTF_8,
+                new ParseSymbolTable()).parse(cs);
     }
 
-    static Source doParseFile(String code, String name) {
-        var r = doParse(CharStreams.fromString(code, name));
+    public static Source doParseFile(String code) {
+        var r = doParse(CharStreams.fromString(code, "test"));
         Assertions.assertTrue(r.errors().isEmpty(),
-                "parse %s error: %s".formatted(name, code));
+                "parse error: %s".formatted(code));
         return r.root();
     }
 
-    static Source doParseFile(String code) {
-        return doParseFile(code, "unknow");
-    }
-
-    static Source doParseFile(InputStream is, String name) {
+    public static Source doParseFile(InputStream is) {
         try {
             var r = doParse(CharStreams.fromStream(is));
             Assertions.assertTrue(r.errors().isEmpty(),
-                    "parse %s error: %s".formatted(name, r.errors()));
+                    "parse error: %s".formatted(r.errors()));
             return r.root();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    public static Global doParseGlobal(String def) {
-        var sf = doParseFile(def, "global");
-        Assertions.assertEquals(1, sf.definitions().size());
-        return sf.definitions().getFirst();
+    public static Definition doParseFirstDef(String def) {
+        var src = doParseFile(def);
+        return firstDef(src);
     }
 
-    public static Definition doParseDefinition(String def) {
-        var gd = (GlobalDefinition) doParseGlobal(def);
-        return gd.definition();
+    public static Definition firstDef(Source src) {
+        var type = src.types().stream()
+                .filter(t -> t != ClassDefinition.ObjectClass).findFirst();
+        if (type.isPresent()) return type.get();
+        var functions = src.functions();
+        if (!functions.isEmpty()) return functions.getFirst();
+        return ErrorUtil.syntax("parse fail");
+    }
+
+    public static TypeDefinition doParseType(String def, Identifier name) {
+        var src = doParseFile(def);
+        return src.table().namedTypes.get(name);
+    }
+
+    public static TypeDefinition doParseType(String def, Symbol name) {
+        return doParseType(def, name.name());
+    }
+
+    public static TypeDefinition doParseType(String def, String name) {
+        return doParseType(def, identifier(name));
+    }
+
+    public static FunctionDefinition doParseFunc(String def, Identifier name) {
+        var src = doParseFile(def);
+        return src.table().namedFunctions.get(name);
+    }
+
+    public static FunctionDefinition doParseFunc(String def, String name) {
+        return doParseFunc(def, identifier(name));
+    }
+
+    public static GlobalVariable doParseDeclaration(String def) {
+        var src = doParseFile(def);
+        return src.variables().getFirst();
     }
 
     public static final Map<Enum<?>, String> operatorSymbols = Map.ofEntries(
@@ -119,22 +145,23 @@ public class BaseParseTest {
     );
 
     public static String operator(BinaryOperator op) {
-        return Objects.requireNonNull(operatorSymbols.get(op));
+        return op.code;
     }
 
     public static String operator(UnaryOperator op) {
-        return Objects.requireNonNull(operatorSymbols.get(op));
+        return op.code;
     }
 
     //
 
-    public static ProcDefinition doParseProc(String def) {
-        return (ProcDefinition) doParseDefinition(def);
+    public static FunctionDefinition doParseProc(String def) {
+        var src = doParseFile(def);
+        return src.functions().getFirst();
     }
 
     public static Statement doParseLocal(String stmt) {
         var fun = "func main() { %s }".formatted(stmt);
-        var func = (FunctionDefinition) doParseProc(fun);
+        var func = doParseProc(fun);
         return func.procedure().body().list().getFirst();
     }
 
@@ -171,7 +198,7 @@ public class BaseParseTest {
     }
 
     public static Symbol symbol(Identifier name) {
-        return new Symbol(name.pos(), name);
+        return new Symbol(name);
     }
 
     public static Symbol symbol(String name) {
@@ -218,7 +245,7 @@ public class BaseParseTest {
     }
 
     public static String string(Expression expr) {
-        return ((StringLiteral) lit(expr)).value();
+        return ((StringLiteral) lit(expr)).string();
     }
 
     public static IntegerLiteral integer(Expression expr) {
@@ -230,21 +257,12 @@ public class BaseParseTest {
     }
 
     public static Symbol varName(Expression expr) {
-        return ((ReferExpression) expr).symbol();
+        return ((SymbolExpression) expr).symbol();
     }
 
     public static Symbol calleeName(Statement stmt) {
         return varName(((CallStatement) stmt).call().callee());
     }
-
-    public static List<Expression> exprs(Tuple tuple) {
-        return ((ArrayTuple) tuple).values();
-    }
-
-    public static Expression first(Tuple tuple) {
-        return exprs(tuple).getFirst();
-    }
-
 
     public static <T, R> void checkIds(List<R> names,
                                        IdentifierTable<T> table) {
@@ -264,7 +282,7 @@ public class BaseParseTest {
     }
 
     public static Symbol typeName(TypeDeclarer td) {
-        return ((DefinedTypeDeclarer) td).definedType().symbol();
+        return ((DerivedTypeDeclarer) td).derivedType().symbol();
     }
 
 }

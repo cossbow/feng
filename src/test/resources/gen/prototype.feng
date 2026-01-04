@@ -1,0 +1,23 @@
+
+func Callback(int)bool;
+
+func positive(a int)bool{
+    return a > 0;
+}
+
+func use1(a Callback) func(int)bool {
+    return a;
+}
+func use2(a func(int)bool) func(int)bool {
+    return use1(a);
+}
+
+func test(n int) {
+    var check = use2(positive);
+    var r=check(2);
+}
+
+func main() int32 {
+    test(5);
+    return 0;
+}

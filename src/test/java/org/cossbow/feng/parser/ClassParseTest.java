@@ -2,7 +2,7 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.dcl.Declare;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassField;
 import org.junit.jupiter.api.Assertions;
@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static org.cossbow.feng.ast.dcl.ReferenceType.STRONG;
+import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 
 public class ClassParseTest extends BaseParseTest {
 
@@ -18,11 +18,25 @@ public class ClassParseTest extends BaseParseTest {
             Map.of(Declare.VAR, "var", Declare.CONST, "const");
 
     @Test
-    public void testDefine() {
-        var name = randTypeName(32);
-        var def = (ClassDefinition) doParseDefinition("class " + name + " {}");
-        Assertions.assertEquals(name, def.name());
-        Assertions.assertTrue(def.parent().none());
+    public void testDefine1() {
+        var name = randTypeSymbol(32);
+        var def = (ClassDefinition) doParseType("class " + name + " {}", name);
+        Assertions.assertFalse(def.isFinal());
+        Assertions.assertEquals(name, def.symbol());
+        Assertions.assertEquals(ClassDefinition.ObjectType, def.inherit().get());
+        Assertions.assertTrue(def.impl().isEmpty());
+        Assertions.assertTrue(def.generic().isEmpty());
+        Assertions.assertTrue(def.fields().isEmpty());
+        Assertions.assertTrue(def.methods().isEmpty());
+    }
+
+    @Test
+    public void testDefine2() {
+        var name = randTypeSymbol(32);
+        var def = (ClassDefinition) doParseType("class " + name + " final {}", name);
+        Assertions.assertTrue(def.isFinal());
+        Assertions.assertEquals(name, def.symbol());
+        Assertions.assertTrue(def.inherit().none());
         Assertions.assertTrue(def.impl().isEmpty());
         Assertions.assertTrue(def.generic().isEmpty());
         Assertions.assertTrue(def.fields().isEmpty());
@@ -31,22 +45,25 @@ public class ClassParseTest extends BaseParseTest {
 
     @Test
     public void testInherit() {
-        var name = randTypeName(32);
+        var name = randTypeSymbol(32);
         var parent = randTypeSymbol(32);
-        var def = (ClassDefinition) doParseDefinition("class %s : %s {}".formatted(name, parent));
-        Assertions.assertEquals(name, def.name());
-        var ref = def.parent().must();
+        var def = (ClassDefinition) doParseType(
+                "class %s : %s {}".formatted(name, parent), name);
+        Assertions.assertFalse(def.isFinal());
+        Assertions.assertEquals(name, def.symbol());
+        var ref = def.inherit().must();
         Assertions.assertEquals(parent, ref.symbol());
     }
 
     @Test
     public void testImpls() {
         for (int size = 1; size <= 8; size++) {
-            var name = randTypeName(16);
+            var name = randTypeSymbol(16);
             var types = anyNames(RandTypeSymbol, 8, size);
             var code = "class %s (%s) {}".formatted(name, idList(types));
-            var def = (ClassDefinition) doParseDefinition(code);
-            Assertions.assertEquals(name, def.name());
+            var def = (ClassDefinition) doParseType(code, name);
+            Assertions.assertFalse(def.isFinal());
+            Assertions.assertEquals(name, def.symbol());
             Assertions.assertEquals(types.size(), def.impl().size());
             for (int i = 0; i < types.size(); i++) {
                 var type = types.get(i);
@@ -59,7 +76,7 @@ public class ClassParseTest extends BaseParseTest {
 
 
     private IdentifierTable<ClassField> parseFields(String fields) {
-        var def = (ClassDefinition) doParseDefinition("class A {" + fields + "}");
+        var def = (ClassDefinition) doParseType("class A {" + fields + "}", "A");
         return def.fields();
     }
 
@@ -81,10 +98,10 @@ public class ClassParseTest extends BaseParseTest {
                     var f = fields.get(name);
                     Assertions.assertSame(dcl.getKey(), f.declare());
                     Assertions.assertEquals(name, f.name());
-                    var t = (DefinedTypeDeclarer) f.type();
-                    Assertions.assertEquals(type, t.definedType().symbol());
-                    Assertions.assertTrue(t.definedType().generic().isEmpty());
-                    Assertions.assertTrue(t.reference().none());
+                    var t = (DerivedTypeDeclarer) f.type();
+                    Assertions.assertEquals(type, t.derivedType().symbol());
+                    Assertions.assertTrue(t.derivedType().generic().isEmpty());
+                    Assertions.assertTrue(t.refer().none());
                 }
             }
         }
@@ -103,11 +120,11 @@ public class ClassParseTest extends BaseParseTest {
                     var f = fields.get(name);
                     Assertions.assertSame(dcl.getKey(), f.declare());
                     Assertions.assertEquals(name, f.name());
-                    var t = (DefinedTypeDeclarer) f.type();
-                    Assertions.assertEquals(type, t.definedType().symbol());
-                    Assertions.assertTrue(t.definedType().generic().isEmpty());
-                    var ref = t.reference().get();
-                    Assertions.assertSame(STRONG, ref.type());
+                    var t = (DerivedTypeDeclarer) f.type();
+                    Assertions.assertEquals(type, t.derivedType().symbol());
+                    Assertions.assertTrue(t.derivedType().generic().isEmpty());
+                    var ref = t.refer().get();
+                    Assertions.assertSame(STRONG, ref.kind());
                     Assertions.assertFalse(ref.required());
                 }
             }
@@ -118,17 +135,17 @@ public class ClassParseTest extends BaseParseTest {
     public void testMethod1() {
         var name = randVarName(16);
         var code = "class A { func %s() {} }".formatted(name);
-        var def = (ClassDefinition) doParseDefinition(code);
-        var method = def.methods().get(name);
-        Assertions.assertEquals(name, method.name());
-        Assertions.assertFalse(method.export());
+        var def = (ClassDefinition) doParseType(code, "A");
+        var m = def.methods().get(name);
+        Assertions.assertEquals(name, m.name());
+        Assertions.assertFalse(m.export());
     }
 
     @Test
     public void testMethod2() {
         var name = randVarName(16);
         var code = "class A { export func %s() {} }".formatted(name);
-        var def = (ClassDefinition) doParseDefinition(code);
+        var def = (ClassDefinition) doParseType(code, "A");
         var method = def.methods().get(name);
         Assertions.assertEquals(name, method.name());
         Assertions.assertTrue(method.export());

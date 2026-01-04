@@ -4,18 +4,15 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
 public class NewArrayType extends NewType {
-    private final TypeDeclarer element;
-    private final Expression length;
-    private final boolean immutable;
+    private TypeDeclarer element;
+    private Expression length;
 
     public NewArrayType(Position pos,
                         TypeDeclarer element,
-                        Expression length,
-                        boolean immutable) {
+                        Expression length) {
         super(pos);
         this.element = element;
         this.length = length;
-        this.immutable = immutable;
     }
 
     public TypeDeclarer element() {
@@ -26,7 +23,15 @@ public class NewArrayType extends NewType {
         return length;
     }
 
-    public boolean immutable() {
-        return immutable;
+    public void length(Expression length) {
+        this.length = length;
+    }
+
+
+    //
+
+    @Override
+    public String toString() {
+        return "[" + length + "]" + element;
     }
 }

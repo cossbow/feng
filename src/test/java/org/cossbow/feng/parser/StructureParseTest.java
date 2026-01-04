@@ -2,6 +2,8 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.ast.TypeDomain;
+import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.struct.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -13,13 +15,13 @@ public class StructureParseTest extends BaseParseTest {
 
     @Test
     public void testTypeDefine() {
-        enum Domain {struct, union}
-        for (var domain : Domain.values()) {
-            var name = randTypeName(32);
+        TypeDomain[] domains = {TypeDomain.STRUCT, TypeDomain.UNION};
+        for (var domain : domains) {
+            var name = randTypeSymbol(32);
             var code = "%s %s{}".formatted(domain, name);
-            var def = (StructureDefinition) doParseDefinition(code);
-            Assertions.assertEquals(name, def.name());
-            Assertions.assertEquals(domain == Domain.union, def.union());
+            var def = (StructureDefinition) doParseType(code, name);
+            Assertions.assertEquals(name, def.symbol());
+            Assertions.assertSame(domain, def.domain());
             Assertions.assertTrue(def.fields().isEmpty());
             Assertions.assertTrue(def.generic().isEmpty());
         }
@@ -27,13 +29,21 @@ public class StructureParseTest extends BaseParseTest {
 
     IdentifierTable<StructureField> parseFields(String names) {
         var code = "struct Foo { %s }".formatted(names);
-        var def = (StructureDefinition) doParseDefinition(code);
+        var def = (StructureDefinition) doParseType(code, "Foo");
         return def.fields();
     }
 
-    public static void checkTypeName(StructureType type, Symbol name) {
-        var dst = (DefinedStructureType) type;
-        Assertions.assertEquals(name, dst.type().symbol());
+    public static void checkTypeName(TypeDeclarer type, Symbol name) {
+        if (type instanceof PrimitiveTypeDeclarer pt) {
+            Assertions.assertSame(pt.primitive(),
+                    Primitive.ofCode(name.name().value()).get());
+            return;
+        }
+        if (type instanceof DerivedTypeDeclarer dt) {
+            Assertions.assertEquals(name, dt.derivedType().symbol());
+            return;
+        }
+        Assertions.fail("invalid type: %s".formatted(type));
     }
 
     @Test
@@ -50,12 +60,15 @@ public class StructureParseTest extends BaseParseTest {
 
     @Test
     public void testFieldBit() {
-        for (int i = 1; i < 64; i++) {
-            var fields = parseFields("a:%d int64;".formatted(i));
-            var field = fields.get(identifier("a"));
-            Assertions.assertEquals(identifier("a"), field.name());
-            var bf = field.bitfield().must();
-            Assertions.assertEquals(BigInteger.valueOf(i), integer(bf).value());
+        String[] types = {"int", "A", "[2]int", "struct{}", "[3]struct{}"};
+        for (var t : types) {
+            for (int i = 1; i < 64; i++) {
+                var fields = parseFields("a(%d) %s;".formatted(i, t));
+                var field = fields.get(identifier("a"));
+                Assertions.assertEquals(identifier("a"), field.name());
+                var bf = field.bitfield().must();
+                Assertions.assertEquals(BigInteger.valueOf(i), integer(bf).value());
+            }
         }
     }
 
@@ -64,7 +77,7 @@ public class StructureParseTest extends BaseParseTest {
         var a = randVarName(8);
         var bit = ThreadLocalRandom.current().nextInt(0, 64) + 1;
         var b = randVarName(8);
-        var fields = parseFields("%s:%d, %s int64;".formatted(a, bit, b));
+        var fields = parseFields("%s(%d), %s int64;".formatted(a, bit, b));
         var af = fields.get(a);
         Assertions.assertEquals(a, af.name());
         var bitfield = af.bitfield().must();
@@ -97,15 +110,16 @@ public class StructureParseTest extends BaseParseTest {
         var a = randVarName(6);
         var b = randVarName(6);
         var bt = randTypeSymbol(12);
-        var code = "%s struct{%s %s;};".formatted(a, b, bt);
-        var fields = parseFields(code);
-        Assertions.assertEquals(1, fields.size());
-        var f = fields.get(a);
+        var code = "struct Foo { %s struct{%s %s;}; }".formatted(a, b, bt);
+        var src = doParseFile(code);
+        var foo = (StructureDefinition) src.type(identifier("Foo"));
+        Assertions.assertEquals(1, foo.fields().size());
+        var f = foo.fields().get(a);
         Assertions.assertEquals(a, f.name());
 
-        var def = ((UnnamedStructureType) f.type()).definition();
-        Assertions.assertFalse(def.named());
-        Assertions.assertFalse(def.union());
+        var dt = ((DerivedTypeDeclarer) f.type()).derivedType();
+        Assertions.assertTrue(dt.symbol().module().none());
+        var def = (StructureDefinition) src.table().namedTypes.get(dt.symbol().name());
         Assertions.assertEquals(1, def.fields().size());
         var bf = def.fields().get(b);
         Assertions.assertEquals(b, bf.name());
@@ -118,8 +132,8 @@ public class StructureParseTest extends BaseParseTest {
             var length = randInt(10, 100);
             var fields = parseFields("a [%d]int;".formatted(length));
             var field = fields.get(identifier("a"));
-            var type = (ArrayStructureType) field.type();
-            checkTypeName(type.elementType(), symbol("int"));
+            var type = (ArrayTypeDeclarer) field.type();
+            checkTypeName(type.element(), symbol("int"));
             Assertions.assertEquals(length, integer(type.length()).value());
         }
     }
@@ -130,11 +144,11 @@ public class StructureParseTest extends BaseParseTest {
             var len1 = randInt(10, 100);
             var len2 = randInt(10, 100);
             var fields = parseFields("a [%s][%s]int;".formatted(len1, len2));
-            var at = (ArrayStructureType) fields.get(identifier("a")).type();
+            var at = (ArrayTypeDeclarer) fields.get(identifier("a")).type();
             Assertions.assertEquals(len1, integer(at.length()).value());
-            var eat = (ArrayStructureType) at.elementType();
+            var eat = (ArrayTypeDeclarer) at.element();
             Assertions.assertEquals(len2, integer(eat.length()).value());
-            checkTypeName(eat.elementType(), symbol("int"));
+            checkTypeName(eat.element(), symbol("int"));
         }
     }
 
@@ -143,8 +157,8 @@ public class StructureParseTest extends BaseParseTest {
         {
             var len = randInt(10, 100);
             var fields = parseFields("a [%d]struct{a int;};".formatted(len));
-            var at = (ArrayStructureType) fields.get(identifier("a")).type();
-            Assertions.assertInstanceOf(UnnamedStructureType.class, at.elementType());
+            var at = (ArrayTypeDeclarer) fields.get(identifier("a")).type();
+            Assertions.assertInstanceOf(DerivedTypeDeclarer.class, at.element());
             Assertions.assertEquals(len, integer(at.length()).value());
         }
     }

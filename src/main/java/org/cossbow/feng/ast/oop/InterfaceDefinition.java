@@ -2,23 +2,28 @@ package org.cossbow.feng.ast.oop;
 
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.gen.DefinedType;
+import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
 
-public class InterfaceDefinition extends TypeDefinition {
-    private final IdentifierTable<InterfaceMethod> methods;
-    private final SymbolTable<DefinedType> parts;
-    private final MacroTable macros;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+
+public class InterfaceDefinition extends ObjectDefinition {
+    private IdentifierTable<InterfaceMethod> methods;
+    private SymbolTable<DerivedType> parts;
+    private MacroTable macros;
 
     public InterfaceDefinition(Position pos,
                                Modifier modifier,
-                               Identifier name,
+                               Symbol symbol,
                                TypeParameters generic,
                                IdentifierTable<InterfaceMethod> methods,
-                               SymbolTable<DefinedType> parts,
+                               SymbolTable<DerivedType> parts,
                                MacroTable macros) {
-        super(pos, modifier, Optional.of(name), generic);
+        super(pos, modifier, symbol, generic, TypeDomain.INTERFACE);
         this.methods = methods;
         this.parts = parts;
         this.macros = macros;
@@ -28,11 +33,31 @@ public class InterfaceDefinition extends TypeDefinition {
         return methods;
     }
 
-    public SymbolTable<DefinedType> parts() {
+    public SymbolTable<DerivedType> parts() {
         return parts;
     }
 
     public MacroTable macros() {
         return macros;
     }
+
+    //
+
+    private final int id = IdGenerator.getAndIncrement();
+    public final List<InterfaceDefinition> partDefs = new ArrayList<>();
+    public final IdentifierTable<InterfaceMethod> allMethods = new IdentifierTable<>();
+
+    public int id() {
+        return id;
+    }
+
+    public void visitParts(Consumer<InterfaceDefinition> user) {
+        for (var d : partDefs) {
+            user.accept(d);
+            d.visitParts(user);
+        }
+    }
+
+    //
+    private static final AtomicInteger IdGenerator = new AtomicInteger(0);
 }

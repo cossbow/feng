@@ -1,14 +1,17 @@
 package org.cossbow.feng.ast.stmt;
 
-import org.cossbow.feng.ast.Optional;
+import org.cossbow.feng.ast.Scope;
+import org.cossbow.feng.ast.dcl.Variable;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class TryStatement extends Statement {
-    private final BlockStatement body;
-    private final List<CatchClause> catchClauses;
-    private final Optional<BlockStatement> finallyClause;
+    private BlockStatement body;
+    private List<CatchClause> catchClauses;
+    private Optional<BlockStatement> finallyClause;
 
     public TryStatement(Position pos,
                         BlockStatement body,
@@ -31,4 +34,7 @@ public class TryStatement extends Statement {
     public Optional<BlockStatement> finallyClause() {
         return finallyClause;
     }
+
+    //
+
 }

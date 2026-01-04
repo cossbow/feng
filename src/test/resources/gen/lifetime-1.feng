@@ -1,0 +1,100 @@
+
+class A {
+    var id int;
+    var n *A;
+    var cb func();
+    func run() {
+        id = 0;
+    }
+    func get() int{
+        return id;
+    }
+}
+
+func aaa() {
+}
+
+func make(n int) *A{
+    var r= new(A, {id=n+11, cb=aaa, n=new(A)});
+    return r;
+}
+func alloc(n int) [*]int{
+    return new([n]int);
+}
+func arr(n int) [2]A{
+    return [
+       {id=n+12, cb=aaa},
+       {id=n+13, cb=aaa}
+    ];
+}
+func obj(n int) A {
+    return {id=n+2, cb=aaa};
+}
+
+func testArr(n int) {
+    {
+        var a0 [2]*int = [new(int,n+1),new(int,n+2)];
+        var a1 [2]A = [{id=n,n=new(A)}];
+        var a2 [2]*A = [new(A,{id=n,n=new(A)})];
+    }
+    {
+        var a0 [*]*int = new([6]*int, [new(int,n+1),new(int,n+2)] );
+        var a1 [*]A = new([3]A, [{id=n,n=new(A)}] );
+        var a2 [*]*A = new([3]*A, [new(A,{id=n,n=new(A)})] );
+        var a3 [*][2]*A = new([3][2]*A, [[new(A,{id=n,n=new(A)})]] );
+    }
+    {
+        var a1 = {
+            var a = new(A, {id=n, n=new(A,{id=n+n})});
+            var t = new(int);
+            a
+        };
+        var a2 = {
+            [2]*A[new(A)]
+        };
+    }
+}
+
+func test(n int) {
+    var x1 = new(A).id + n;
+    var x2 = new([4]int, [2,3,4])[1] + n;
+    new(A).id = n+1;
+    new([12]int,[1])[0] = 112;
+    new(A).run();
+    new(A, {cb=aaa}).cb();
+    var i1 = new(A).get() + n-1;
+
+    make(n).id = n+1;
+    alloc(n)[0] = n+2;
+    obj(n).run();
+    obj(n).cb();
+    arr(n)[0].run();
+    make(n).run();
+    make(n).cb();
+    var i2 = make(n).get()-n+1;
+
+    var r0 = make(n) != make(n);
+    if (make(n) != make(n)){}
+    var cb1 func();
+    var cb2 func() = aaa;
+
+    make(n).get();
+
+    var y1 = make(n+3);
+    {
+        var y1 = make(n+4);
+        if (n>1){
+            var y1 = make(n+5);
+            return;
+        }
+    }
+    var y2 = make(n+11);
+
+    testArr(n);
+}
+
+
+func main() int32 {
+    test(5);
+    return 0;
+}

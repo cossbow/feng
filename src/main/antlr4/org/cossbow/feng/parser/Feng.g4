@@ -126,7 +126,7 @@ structureFields
     ;
 // structure field: bitfield must be constant expression
 structureField
-    : name=Identifier (COLON expression)?
+    : name=Identifier ('(' expression ')')?
     ;
 definedStructureFieldType
     : definedType
@@ -162,7 +162,11 @@ interfaceMemberPart
 // class
 //
 classDefinition
-    : modifier CLASS name=Identifier typeParameters? classInherit? classImpl? '{' classMember* '}'
+    : modifier CLASS name=Identifier typeParameters? classExtension '{' classMember* '}'
+    ;
+classExtension
+    : FINAL
+    | classInherit? classImpl?
     ;
 classMember
     : modifier exportable classMemberImpl
@@ -234,7 +238,7 @@ parameter
     ;
 returnSet
     : typeDeclarer
-    | '(' typeDeclarerList ')'
+    | current=THIS
     ;
 
 
@@ -263,18 +267,19 @@ macroVariable
 
 // assignment
 assignments
-    : operands=assignableOperands op=(ASSIGN|COPY) tuple
+    : operands op=ASSIGN values=expressionList
     ;
-assignableOperands
-    : assignableOperand (COMMA assignableOperand)*
+operands
+    : operand (COMMA operand)*
     ;
 //
 // assignable on left hand side
 //
-assignableOperand
-    : symbol                # VariableAssignableOperand
-    | primaryExpr indexOf   # IndexAssignableOperand
-    | primaryExpr memberOf  # MemberAssignableOperand
+operand
+    : symbol                # VariableOperand
+    | primaryExpr indexOf   # IndexOperand
+    | primaryExpr memberOf  # FieldOperand
+    | MUL primaryExpr       # DereferOperand
     ;
 
 
@@ -289,10 +294,10 @@ onlyDeclaration
     : declaredNames typeDeclarer
     ;
 assignedDeclaration
-    : declaredNames typeDeclarer? ASSIGN tuple
+    : declaredNames typeDeclarer? ASSIGN values=expressionList
     ;
 declaredNames
-    : modifier declare=(LET|VAR|CONST) identifierList
+    : modifier declare=(VAR|CONST) identifierList
     ;
 
 
@@ -307,17 +312,21 @@ typeDeclarer
     | arrayTypeDeclarer
     ;
 arrayTypeDeclarer
-    : '[' len=expression? immutable=HASH? ']' typeDeclarer
+    : '[' arrayType ']' typeDeclarer
+    ;
+arrayType
+    : len=expression
+    | refer
     ;
 primaryTypeDeclarer
     : definedTypeDeclarer
     | funcTypeDeclarer
     ;
 definedTypeDeclarer
-    : reference? definedType
+    : refer? definedType
     ;
-reference
-    : kind=(MUL|BITAND|BITXOR) required=NOT? immutable=HASH?
+refer
+    : kind=(MUL|BITAND) required=NOT? immutable=HASH?
     ;
 funcTypeDeclarer
     : FUNC prototype
@@ -332,7 +341,7 @@ typeDeclarerList
 // generic
 //
 
-// generic: reference
+// generic: use
 typeArguments
     : BACKTICK typeDeclarerList BACKTICK
     ;
@@ -374,7 +383,6 @@ statement
     | forStatement
     | throwStatement
     | tryStatement
-    | localDefineStatement
     | returnStatement
     | continueStatement
     | breakStatement
@@ -396,9 +404,6 @@ callStatement
 ifStatement
     : IF '(' (init=embedAssignment SEMI)? expression ')' yes=statement (ELSE not=statement)?
     ;
-ifTuple
-    : IF '(' condition=expression ')' yes=tuple ELSE not=tuple
-    ;
 // statement: for
 forStatement
     : FOR '(' expression ')' statement      # UnaryForStatement
@@ -418,20 +423,10 @@ switchStatement
                 '{' switchBranch* def=switchBranchDefault? '}'
     ;
 switchBranch
-    : CASE expressionList COLON statementList (FALLTHROUGH SEMI)?
+    : CASE expressionList body=blockStatement
     ;
 switchBranchDefault
-    : DEFAULT COLON statementList
-    ;
-// mult-expression
-switchTuple
-    : SWITCH '(' expression ')' '{' switchRule* switchRuleDefault '}'
-    ;
-switchRule
-    : CASE constants=expressionList COLON values=tuple SEMI
-    ;
-switchRuleDefault
-    : DEFAULT COLON tuple SEMI
+    : DEFAULT body=blockStatement
     ;
 // assignment in control statements
 embedAssignment
@@ -445,8 +440,8 @@ throwStatement
     ;
 // statement: try
 tryStatement
-    : tryPrefix catchClause      # TryWithCatchStatement
-    | tryPrefix finallyClause    # TryWithFinallyStatement
+    : tryPrefix catchClause     # TryWithCatchStatement
+    | tryPrefix finalClause     # TryWithFinalStatement
     ;
 tryPrefix
     : TRY blockStatement catchClause*
@@ -457,13 +452,13 @@ catchClause
 catchTypeSet
     : typeDeclarer (BITOR typeDeclarer)*
     ;
-finallyClause
-    : FINALLY blockStatement
+finalClause
+    : FINAL blockStatement
     ;
 
 
 assignmentOperation
-    : assignableOperand assignmentOperator expression
+    : operand assignmentOperator expression
     ;
 assignmentOperator
     : op=( ASSIGN_AND
@@ -491,18 +486,10 @@ declarationStatement
     ;
 
 
-localDefineStatement
-    : localDefinition
-    ;
-localDefinition
-    : typeDefinition
-    | functionDefinition
-    ;
-
 
 // statement: return
 returnStatement
-    : RETURN result=tuple? SEMI
+    : RETURN result=expression? SEMI
     ;
 // statement: loop control
 continueStatement
@@ -517,17 +504,6 @@ gotoStatement
 // statement: mark label to a statement
 labeledStatement
     : label=Identifier COLON statement
-    ;
-
-
-// tuple
-tuple
-    : arrayTuple
-    | ifTuple
-    | switchTuple
-    ;
-arrayTuple
-    : values=expressionList
     ;
 
 
@@ -571,6 +547,7 @@ primaryExpr
     | primaryExpr indexOf                               # IndexOfExpression
     | primaryExpr memberOf typeArguments?               # MemberOfExpression
     | primaryExpr argumentSet                           # CallExpression
+    | MUL primaryExpr                                   # DereferExpression
     ;
 
 operandExpr
@@ -578,19 +555,25 @@ operandExpr
     | objectExpr                # ObjectExpression
     | arrayExpr                 # ArrayExpression
     | pairsExpr                 # PairsExpression
-    | referExpr                 # ReferExpression
+    | symbol typeArguments?     # SymbolExpression
+    | current=(THIS|SUPER)      # CurrentExpression
     | FUNC procedure            # LambdaExpression
     | '(' expression ')'        # ParenExpression
     | new                       # NewExpression
+    | blockExpr                 # BlockExpression
+    | sizeof                    # SizeofExpression
     ;
 
-referExpr
-    : symbol typeArguments?
-    ;
 
 argumentSet
     : '(' args=expressionList? ')'
     ;
+
+// closure
+blockExpr
+    : '{' statementList expression '}'
+    ;
+
 
 expressionList
     : expression (COMMA expression)*
@@ -603,14 +586,14 @@ expressionList
 
 // init class & struct & union
 objectExpr
-    : '{' (objectEntry (COMMA objectEntry)*)? '}'
+    : definedType? '{' (objectEntry (COMMA objectEntry)*)? '}'
     ;
 objectEntry
     : name=Identifier ASSIGN value=expression
     ;
 // init array
 arrayExpr
-    : '[' elements=expressionList? ']'
+    : ('[' len=expression? ']' et=typeDeclarer)? '[' elements=expressionList? ']'
     ;
 // init with key-value pair
 pairsExpr
@@ -646,8 +629,12 @@ newType
     | newArrayType
     ;
 newArrayType
-    : '[' len=expression immutable=HASH? ']' typeDeclarer
+    : '[' len=expression ']' typeDeclarer
     ;
+sizeof
+    : SIZEOF '(' typeDeclarer ')'
+    ;
+
 
 
 //
@@ -739,6 +726,10 @@ NilLiteral                          : 'nil';
 //
 // Keywords
 //
+// name of this language
+FENG1            : 'Feng' ;
+FENG2            : 'feng' ;
+FENG3            : 'FENG' ;
 // Keywords: export & import
 EXPORT          : 'export' ;
 IMPORT          : 'import' ;
@@ -753,8 +744,8 @@ FUNC            : 'func' ;
 MACRO           : 'macro' ;
 CONST           : 'const' ;
 VAR             : 'var' ;
-LET             : 'let' ;
 NEW             : 'new' ;
+SIZEOF          : 'sizeof' ;
 // Keywords: Control
 RETURN          : 'return' ;
 IF              : 'if' ;
@@ -764,14 +755,15 @@ CONTINUE        : 'continue' ;
 BREAK           : 'break' ;
 SWITCH          : 'switch' ;
 CASE            : 'case' ;
-FALLTHROUGH     : 'fallthrough' ;
 DEFAULT         : 'default' ;
 GOTO            : 'goto' ;
 THROW           : 'throw' ;
 TRY             : 'try' ;
 CATCH           : 'catch' ;
-FINALLY         : 'finally' ;
-
+FINAL           : 'final' ;
+// Class
+THIS            : 'this' ;
+SUPER           : 'super' ;
 //
 // Separators
 //
@@ -797,6 +789,8 @@ BACKSLASH       : '\\' ;
 //
 ASSIGN              : '=' ;
 COPY                : ':=' ;
+ARROW_L             : '<-' ;
+ARROW_R             : '->' ;
 // combines
 ASSIGN_AND          : '&&=' ;
 ASSIGN_OR           : '||=' ;

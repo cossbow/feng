@@ -1,12 +1,12 @@
 
 interface Codec {
-    encode(*Object) ram;
-    decode(ram) *Object;
+    encode(*Object) [*]uint8;
+    decode([*]uint8) *Object;
 }
 
 interface Storage {
-    read(ram) (ram, int);
-    write(ram, ram) int;
+    read([*]uint8) [*]uint8;
+    write([*]uint8, [*]uint8) int;
 }
 
 export
@@ -17,14 +17,14 @@ class Redis : KvDb (Connection,Codec,Source) {
     var count int;
 
     export
-    func get(key *Object) (*Object, bool) {
+    func get(key *Object) *Object {
         var kd = keyCodec.encode(key);
-        var vd, er = storage.read(kd);
-        if (er == 1) return nil, false;
+        var vd = storage.read(kd);
+        if (vd == nil) return nil;
         else if (er != nil) {
             throw errorReadStorage(er);
         }
-        return valueCodec.decode(vd), true;
+        return valueCodec.decode(vd);
     }
 
     export

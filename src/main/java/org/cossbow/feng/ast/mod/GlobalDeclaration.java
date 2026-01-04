@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.stmt.DeclarationStatement;
 
 public class GlobalDeclaration extends Global {
-    private final DeclarationStatement statement;
+    private DeclarationStatement statement;
 
     public GlobalDeclaration(Position pos,
                              boolean export,

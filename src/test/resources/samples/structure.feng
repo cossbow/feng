@@ -1,13 +1,13 @@
 struct A {
     a1 int;
-    a2 : 8 int;
-    a3 : 2, a4 : 2, a5 int;
+    a2 (8) int;
+    a3 (2), a4 (2), a5 int;
     a6 Base;
 }
 union B {
     b1 int;
-    b2 : 8 int;
-    b3 : 2, b4 : 2, b5 int;
+    b2 (8) int;
+    b3 (2), b4 (2), b5 int;
     b6 Base;
 }
 struct C {

@@ -3,20 +3,31 @@ package org.cossbow.feng.parser;
 import org.antlr.v4.runtime.*;
 import org.cossbow.feng.ast.Source;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
 public class SourceParser {
 
-    public static ParseResult parse(CharStream cs) {
+    private final String file;
+    private final Charset charset;
+    private final ParseSymbolTable tab;
+
+    public SourceParser(String file, Charset charset, ParseSymbolTable tab) {
+        this.file = file;
+        this.charset = charset;
+        this.tab = tab;
+    }
+
+    public ParseResult parse(CharStream cs) {
         var lexer = new FengLexer(cs);
         var ts = new CommonTokenStream(lexer);
         var parser = new FengParser(ts);
         var ec = new ErrorCollector();
         parser.addErrorListener(ec);
-        var visitor = new SourceParseVisitor();
-        var file = (Source) visitor.visit(parser.source());
-        return new ParseResult(file, ec.errors);
+        var visitor = new SourceParseVisitor(file, charset, tab);
+        var root = (Source) visitor.visit(parser.source());
+        return new ParseResult(root, ec.errors);
     }
 
     static class ErrorCollector extends BaseErrorListener

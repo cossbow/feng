@@ -14,7 +14,7 @@ public class LiteralParseTest extends BaseParseTest {
     Literal parseLiteral(String lit) {
         var stmt = "a = %s;".formatted(lit);
         var as = (AssignmentsStatement) doParseLocal(stmt);
-        var expr = (LiteralExpression) first(as.tuple());
+        var expr = (LiteralExpression) as.value(0);
         return expr.literal();
     }
 
@@ -90,7 +90,7 @@ public class LiteralParseTest extends BaseParseTest {
         sb.append('"');
         var value = sb.toString();
         var sl = (StringLiteral) parseLiteral(value);
-        Assertions.assertEquals(value, '"' + sl.value() + '"');
+        Assertions.assertEquals(value, sl.toString());
     }
 
     @Test

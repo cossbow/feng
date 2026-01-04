@@ -2,13 +2,21 @@ package org.cossbow.feng.ast;
 
 import org.antlr.v4.runtime.Token;
 
-public record Position(Token start, Token stop) {
+public record Position(String file, Token start, Token stop) {
 
     @Override
     public String toString() {
-        return "(" + start.getLine() + ","
-                + start.getCharPositionInLine() + ")";
+        if (file.isEmpty()) {
+            if (start == null) return "";
+            return "(" + start.getLine() + ","
+                    + (start.getCharPositionInLine() + 1)
+                    + ")";
+        }
+        if (start == null) return "(" + file + ")";
+        return "(" + file + ":" + start.getLine() + ","
+                + (start.getCharPositionInLine() + 1)
+                + ")";
     }
 
-    public static final Position ZERO = new Position(null, null);
+    public static final Position ZERO = new Position("", null, null);
 }

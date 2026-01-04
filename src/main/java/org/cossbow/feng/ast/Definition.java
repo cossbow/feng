@@ -5,17 +5,17 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 
 abstract
 public class Definition extends Entity {
-    private final Modifier modifier;
-    private final Optional<Identifier> name;
-    private final TypeParameters generic;
+    private Modifier modifier;
+    private Symbol symbol;
+    private TypeParameters generic;
 
     public Definition(Position pos,
                       Modifier modifier,
-                      Optional<Identifier> name,
+                      Symbol symbol,
                       TypeParameters generic) {
         super(pos);
         this.modifier = modifier;
-        this.name = name;
+        this.symbol = symbol;
         this.generic = generic;
     }
 
@@ -23,19 +23,24 @@ public class Definition extends Entity {
         return modifier;
     }
 
-    public Identifier name() {
-        return name.must();
-    }
-
-    public boolean named() {
-        return name.has();
-    }
-
-    public boolean unnamed() {
-        return name.none();
+    public Symbol symbol() {
+        return symbol;
     }
 
     public TypeParameters generic() {
         return generic;
     }
+
+    //
+
+    private volatile boolean builtin;
+
+    public boolean builtin() {
+        return builtin;
+    }
+
+    public void builtin(boolean builtin) {
+        this.builtin = builtin;
+    }
+
 }

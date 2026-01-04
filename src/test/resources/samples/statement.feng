@@ -12,7 +12,7 @@ func commons() {
 
 // if..else
 
-func checkIfStatement(code int) rom {
+func checkIfStatement(code int) [*]uint8 {
     if (c < 0) throw new(OutBoundError, 0);
 
     if (var c=code; c == 0) return "SUCCESS";
@@ -36,7 +36,7 @@ func checkForStatement(max int,
         i += 1;
     }
     // iterable
-    var src []int = [1,2,3,4,5,6,7,8,9];
+    var src [16]int = [1,2,3,4,5,6,7,8,9];
     for ( j : src ) {
         handle(j, max);
     }
@@ -47,19 +47,15 @@ func checkForStatement(max int,
 
 func checkSwitchStatement(c int) {
     switch( var v = c % 4 ; c) {
-    case 0:
-    case 1:
-        return v;
-    case 2:
-        fallthrough;
-    case 3:
-        print(v);
-    default:
+    case 0 {}
+    case 1 {return v;}
+    case 2,3 {print(v);}
+    default {}
     }
 }
 
 
-// try..catch..finally
+// try..catch..final
 
 func throwStatement() {
     throw error.simpleError("");
@@ -77,7 +73,7 @@ func tryStatement(run func()) {
     // type 2
     try {
         run();
-    } finally {
+    } final {
         done();
     }
     // type 3
@@ -87,34 +83,11 @@ func tryStatement(run func()) {
     } catch (e IoError|FmtError) {
     } catch (e InnerError) {
         checkError(e);
-    } finally {
+    } final {
         done();
     }
 }
 
 
 
-func multiIf(a, b int) int {
-    var a = if(a<b) true, "ok" else false, "not ok";
-    a = if(a<b) true, "ok" else false, "not ok";
-    return if(a<b) true, "ok" else false, "not ok";
-}
-
-func multiSwitch(a, b int) (int,int) {
-    var a = switch(a) {
-        case 1,2: 0,0;
-        case -1: 0;
-        default: 1,2;
-    };
-    a = switch(a) {
-        case 1,2: 0,0;
-        case -1: 0;
-        default: 1,2;
-    };
-    return switch(a) {
-        case 1,2: 0,0;
-        case -1: 0;
-        default: 1,2;
-    };
-}
 

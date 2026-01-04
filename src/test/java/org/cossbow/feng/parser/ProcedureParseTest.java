@@ -4,7 +4,7 @@ package org.cossbow.feng.parser;
 import org.cossbow.feng.Pair;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Symbol;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.BlockStatement;
 import org.cossbow.feng.ast.stmt.CallStatement;
@@ -18,7 +18,7 @@ public class ProcedureParseTest extends BaseParseTest {
 
     Procedure parseProcedure(String procedure) {
         var code = "func test" + procedure;
-        var func = (FunctionDefinition) doParseDefinition(code);
+        var func = doParseFunc(code, "test");
         return func.procedure();
     }
 
@@ -38,31 +38,19 @@ public class ProcedureParseTest extends BaseParseTest {
             var code = "()";
             var prototype = parsePrototype(code);
             Assertions.assertTrue(prototype.parameterSet().isEmpty());
-            Assertions.assertTrue(prototype.returnSet().isEmpty());
+            Assertions.assertTrue(prototype.returnSet().none());
         }
         {
             var code = "(int)";
             var prototype = parsePrototype(code);
             Assertions.assertEquals(1, prototype.parameterSet().size());
-            Assertions.assertTrue(prototype.returnSet().isEmpty());
-        }
-        {
-            var code = "(i,j int)";
-            var prototype = parsePrototype(code);
-            Assertions.assertEquals(2, prototype.parameterSet().size());
-            Assertions.assertTrue(prototype.returnSet().isEmpty());
+            Assertions.assertTrue(prototype.returnSet().none());
         }
         {
             var code = "() int ";
             var prototype = parsePrototype(code);
             Assertions.assertTrue(prototype.parameterSet().isEmpty());
-            Assertions.assertEquals(1, prototype.returnSet().size());
-        }
-        {
-            var code = "() (int,float) ";
-            var prototype = parsePrototype(code);
-            Assertions.assertTrue(prototype.parameterSet().isEmpty());
-            Assertions.assertEquals(2, prototype.returnSet().size());
+            Assertions.assertTrue(prototype.returnSet().has());
         }
     }
 
@@ -79,16 +67,16 @@ public class ProcedureParseTest extends BaseParseTest {
             }
             var code = "(%s)".formatted(String.join(",", paramsSet));
             var prototype = parsePrototype(code);
-            var params = (VariableParameterSet) prototype.parameterSet();
+            var params = prototype.parameterSet().variables();
             Assertions.assertEquals(expectParams.size(), params.size());
             for (var expect : expectParams) {
                 var variable = params.get(expect.a());
                 Assertions.assertEquals(expect.a(), variable.name());
-                var vtd = (DefinedTypeDeclarer) variable.type().must();
-                Assertions.assertEquals(expect.b(), vtd.definedType().symbol());
-                Assertions.assertTrue(vtd.reference().none());
+                var vtd = (DerivedTypeDeclarer) variable.type().must();
+                Assertions.assertEquals(expect.b(), vtd.derivedType().symbol());
+                Assertions.assertTrue(vtd.refer().none());
             }
-            Assertions.assertTrue(prototype.returnSet().isEmpty());
+            Assertions.assertTrue(prototype.returnSet().none());
         }
     }
 
@@ -97,10 +85,11 @@ public class ProcedureParseTest extends BaseParseTest {
         for (int size = 1; size <= 16; size++) {
             var expectTypes = anyNames(RandTypeSymbol, 12, size);
             var prototype = parsePrototype("(%s)".formatted(idList(expectTypes)));
-            var params = (UnnamedParameterSet) prototype.parameterSet();
+            var params = prototype.parameterSet();
             Assertions.assertEquals(expectTypes.size(), params.size());
             for (int i = 0; i < size; i++) {
-                Assertions.assertEquals(expectTypes.get(i), typeName(params.get(i)));
+                Assertions.assertEquals(expectTypes.get(i),
+                        typeName(params.getType(i)));
             }
         }
     }
@@ -110,16 +99,14 @@ public class ProcedureParseTest extends BaseParseTest {
         {
             var prototype = parsePrototype("()");
             var types = prototype.returnSet();
-            Assertions.assertTrue(types.isEmpty());
+            Assertions.assertTrue(types.none());
         }
-        for (int n = 1; n <= 10; n++) {
-            var defTypes = anyNames(RandTypeSymbol, 12, n);
-            var prototype = parsePrototype("()(%s)".formatted(idList(defTypes)));
+        {
+            var name = randTypeSymbol(12);
+            var prototype = parsePrototype("()%s".formatted(name));
             var types = prototype.returnSet();
-            Assertions.assertEquals(n, types.size());
-            for (int i = 0; i < types.size(); i++) {
-                Assertions.assertEquals(defTypes.get(i), typeName(types.get(i)));
-            }
+            Assertions.assertTrue(types.has());
+            Assertions.assertEquals(name, typeName(types.get()));
         }
     }
 

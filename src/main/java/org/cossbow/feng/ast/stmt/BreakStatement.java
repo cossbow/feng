@@ -1,11 +1,11 @@
 package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Optional;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 
 public class BreakStatement extends Statement {
-    private final Optional<Identifier> label;
+    private Optional<Identifier> label;
 
     public BreakStatement(Position pos,
                           Optional<Identifier> label) {

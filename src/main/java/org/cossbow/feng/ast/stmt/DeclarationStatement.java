@@ -1,28 +1,24 @@
 package org.cossbow.feng.ast.stmt;
 
-import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Variable;
 
 import java.util.List;
 
 public class DeclarationStatement extends Statement {
-    private final List<Variable> variables;
-    private final Optional<Tuple> init;
+    private List<Variable> variables;
 
     public DeclarationStatement(Position pos,
-                                List<Variable> variables,
-                                Optional<Tuple> init) {
+                                List<Variable> variables) {
         super(pos);
         this.variables = variables;
-        this.init = init;
     }
 
     public List<Variable> variables() {
         return variables;
     }
 
-    public Optional<Tuple> init() {
-        return init;
+    public int size() {
+        return variables.size();
     }
 }

@@ -1,6 +1,6 @@
 interface Connection {
     connect();
-    read(buf ram) int;
+    read(buf [*]uint8) int;
 }
 interface HttpConnection {
     Connection;

@@ -5,7 +5,7 @@ import org.cossbow.feng.ast.Position;
 
 public class BinaryExpression extends Expression {
     private final BinaryOperator operator;
-    private final Expression left, right;
+    private Expression left, right;
 
     public BinaryExpression(Position pos,
                             BinaryOperator operator,
@@ -24,9 +24,22 @@ public class BinaryExpression extends Expression {
         return left;
     }
 
+    public void left(Expression left) {
+        this.left = left;
+    }
+
     public Expression right() {
         return right;
     }
 
+    public void right(Expression right) {
+        this.right = right;
+    }
 
+    //
+
+    @Override
+    public String toString() {
+        return left + operator.code + right;
+    }
 }

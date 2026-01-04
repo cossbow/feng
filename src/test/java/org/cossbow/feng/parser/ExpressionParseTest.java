@@ -2,12 +2,14 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.UnaryOperator;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.NewArrayType;
 import org.cossbow.feng.ast.dcl.NewDefinedType;
 import org.cossbow.feng.ast.expr.*;
+import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.stmt.AssignmentsStatement;
+import org.cossbow.feng.ast.stmt.DeclarationStatement;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +20,7 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import static org.cossbow.feng.ast.BinaryOperator.*;
-import static org.cossbow.feng.ast.dcl.ReferenceType.STRONG;
+import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 
 public class ExpressionParseTest extends BaseParseTest {
 
@@ -49,7 +51,7 @@ public class ExpressionParseTest extends BaseParseTest {
     public void testNew() {
         var typeName = randTypeSymbol(32);
         var expr = this.<NewExpression>parseExpr("new(%s)".formatted(typeName));
-        var defType = ((NewDefinedType) expr.type()).type();
+        var defType = (DerivedType) ((NewDefinedType) expr.type()).type();
         Assertions.assertTrue(defType.generic().isEmpty());
         Assertions.assertEquals(typeName, defType.symbol());
     }
@@ -58,10 +60,10 @@ public class ExpressionParseTest extends BaseParseTest {
     public void testNewGeneric() {
         var typeName = symbol(randTypeName(32));
         for (int i = 1; i <= 8; i++) {
-            var typeParams = anyNames(RandTypeSymbol, 8, i);
+            var typeParams = anyNames(RandTypeSymbol, 12, i);
             var code = "new(%s`%s`)".formatted(typeName, idList(typeParams));
             var expr = this.<NewExpression>parseExpr(code);
-            var defType = ((NewDefinedType) expr.type()).type();
+            var defType = (DerivedType) ((NewDefinedType) expr.type()).type();
             Assertions.assertEquals(typeName, defType.symbol());
             checkIds(typeParams, defType.generic().arguments(),
                     BaseParseTest::typeName);
@@ -73,9 +75,9 @@ public class ExpressionParseTest extends BaseParseTest {
         var typeName = randTypeSymbol(32);
         var code = "new(%s,{Id=1})".formatted(typeName);
         var expr = this.<NewExpression>parseExpr(code);
-        var defType = ((NewDefinedType) expr.type()).type();
+        var defType = (DerivedType) ((NewDefinedType) expr.type()).type();
         Assertions.assertEquals(typeName, defType.symbol());
-        Assertions.assertInstanceOf(ObjectExpression.class, expr.init().must());
+        Assertions.assertInstanceOf(ObjectExpression.class, expr.arg().must());
     }
 
     @Test
@@ -87,20 +89,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var arr = (NewArrayType) expr.type();
         Assertions.assertEquals(typeName, typeName(arr.element()));
         Assertions.assertEquals(BigInteger.valueOf(len), integer(arr.length()).value());
-        Assertions.assertInstanceOf(ArrayExpression.class, expr.init().must());
-    }
-
-    @Test
-    public void testNewArrayImmutable() {
-        var typeName = randTypeSymbol(32);
-        var len = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
-        var code = "new([%d#]%s)".formatted(len, typeName);
-        var expr = this.<NewExpression>parseExpr(code);
-        var arr = (NewArrayType) expr.type();
-        Assertions.assertEquals(typeName, typeName(arr.element()));
-        Assertions.assertEquals(BigInteger.valueOf(len), integer(arr.length()).value());
-        Assertions.assertTrue(arr.immutable());
-        Assertions.assertTrue(expr.init().none());
+        Assertions.assertInstanceOf(ArrayExpression.class, expr.arg().must());
     }
 
     @Test
@@ -109,27 +98,12 @@ public class ExpressionParseTest extends BaseParseTest {
         var typeName = randTypeSymbol(16);
         var expr = (AssertExpression) parseExpr("%s?(*%s)".formatted(name, typeName));
         Assertions.assertEquals(name, varName(expr.subject()));
-        var type = (DefinedTypeDeclarer) expr.type();
-        Assertions.assertEquals(typeName, type.definedType().symbol());
-        Assertions.assertTrue(type.definedType().generic().isEmpty());
-        var ref = type.reference().get();
-        Assertions.assertSame(STRONG, ref.type());
+        var type = (DerivedTypeDeclarer) expr.type();
+        Assertions.assertEquals(typeName, type.derivedType().symbol());
+        Assertions.assertTrue(type.derivedType().generic().isEmpty());
+        var ref = type.refer().get();
+        Assertions.assertSame(STRONG, ref.kind());
         Assertions.assertFalse(ref.required());
-    }
-
-    //
-    // lambda
-
-    @Test
-    public void testLambda() {
-        {
-            var expr = parseExpr("func(){}");
-            Assertions.assertInstanceOf(LambdaExpression.class, expr);
-        }
-        {
-            var expr = parseExpr("func(int, s float){ var a bool; }");
-            Assertions.assertInstanceOf(LambdaExpression.class, expr);
-        }
     }
 
     //
@@ -138,7 +112,7 @@ public class ExpressionParseTest extends BaseParseTest {
     @Test
     public void testVariable() {
         var name = randVarSymbol(12);
-        var expr = (ReferExpression) parseExpr(name + "");
+        var expr = (SymbolExpression) parseExpr(name + "");
         Assertions.assertEquals(name, expr.symbol());
     }
 
@@ -190,8 +164,8 @@ public class ExpressionParseTest extends BaseParseTest {
 
         var nt = (NewArrayType) ((NewExpression) expr.subject()).type();
         Assertions.assertEquals(size, varName(nt.length()));
-        var dt = (DefinedTypeDeclarer) nt.element();
-        Assertions.assertEquals(type, dt.definedType().symbol());
+        var dt = (DerivedTypeDeclarer) nt.element();
+        Assertions.assertEquals(type, dt.derivedType().symbol());
 
         Assertions.assertEquals(index, varName(expr.index()));
     }
@@ -307,7 +281,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var expr = (MemberOfExpression) parseExpr("new(%s).%s".formatted(type, field));
 
         var left = (NewExpression) expr.subject();
-        var defType = ((NewDefinedType) left.type()).type();
+        var defType = (DerivedType) ((NewDefinedType) left.type()).type();
         Assertions.assertEquals(type, defType.symbol());
 
         Assertions.assertEquals(field, expr.member());
@@ -351,20 +325,13 @@ public class ExpressionParseTest extends BaseParseTest {
         Assertions.assertEquals(name, varName(left.callee()));
     }
 
-    @Test
-    public void testArgSetLambda() {
-        var expr = (CallExpression) parseExpr("func(){}()");
-        var procedure = ((LambdaExpression) expr.callee()).procedure();
-        Assertions.assertTrue(procedure.prototype().parameterSet().isEmpty());
-    }
-
     //
     // unary
 
     @SuppressWarnings("unchecked")
     <E extends Expression> E parseExpr(String expr) {
         var stmt = (AssignmentsStatement) doParseLocal("a = " + expr + ";");
-        return (E) first(stmt.tuple());
+        return (E) stmt.value(0);
     }
 
     @Test
@@ -463,7 +430,8 @@ public class ExpressionParseTest extends BaseParseTest {
             for (var uop : UnaryOperator.values()) {
                 var a = randVarSymbol(6);
                 var b = randVarSymbol(6);
-                var code = a + operator(bop) + operator(uop) + b;
+                var code = "%s %s %s %s".formatted(
+                        a, operator(bop), operator(uop), b);
                 var binary = (BinaryExpression) parseExpr(code);
                 Assertions.assertEquals(a, varName(binary.left()));
                 Assertions.assertSame(bop, binary.operator());
@@ -670,7 +638,7 @@ public class ExpressionParseTest extends BaseParseTest {
 
 
     @Test
-    public void testObject() {
+    public void testObject1() {
         var oe = (ObjectExpression) parseExpr("{id=5,fc=1.2,nm=\"gg\",ok=true,ex=nil,li=[1],ch={sid=8},t={a1:b1}}");
 
         Assertions.assertEquals(8, oe.entries().size());
@@ -686,13 +654,22 @@ public class ExpressionParseTest extends BaseParseTest {
         Assertions.assertInstanceOf(PairsExpression.class, entries.get(identifier("t")));
     }
 
+    @Test
+    public void testObject2() {
+        var type = randTypeSymbol(10);
+        var oe = (ObjectExpression) parseExpr(type + "{id=1}");
+        Assertions.assertTrue(oe.type().has());
+        var t = oe.type().must();
+        Assertions.assertEquals(type, t.derivedType().symbol());
+    }
+
     // array
 
     @Test
-    public void testArray() {
-        var ae = (ArrayExpression) parseExpr("[15,1.5,\"yy\",false,nil,{id=0},[3],{a2:b2},-9,2+5]");
+    public void testArray1() {
+        var ae = (ArrayExpression) parseExpr("[15,1.5,\"yy\",false,nil,{id=0},[3],-9,2+5]");
 
-        Assertions.assertEquals(10, ae.elements().size());
+        Assertions.assertEquals(9, ae.size());
         var els = ae.elements();
 
         Assertions.assertInstanceOf(IntegerLiteral.class, ((LiteralExpression) els.get(0)).literal());
@@ -702,9 +679,107 @@ public class ExpressionParseTest extends BaseParseTest {
         Assertions.assertInstanceOf(NilLiteral.class, ((LiteralExpression) els.get(4)).literal());
         Assertions.assertInstanceOf(ObjectExpression.class, (els.get(5)));
         Assertions.assertInstanceOf(ArrayExpression.class, (els.get(6)));
-        Assertions.assertInstanceOf(PairsExpression.class, (els.get(7)));
-        Assertions.assertInstanceOf(UnaryExpression.class, (els.get(8)));
-        Assertions.assertInstanceOf(BinaryExpression.class, (els.get(9)));
+        Assertions.assertInstanceOf(UnaryExpression.class, (els.get(7)));
+        Assertions.assertInstanceOf(BinaryExpression.class, (els.get(8)));
     }
+
+    @Test
+    public void testArray2() {
+        {
+            var size = randInt(0, Integer.MAX_VALUE);
+            var type = randTypeSymbol(10);
+            var ae = (ArrayExpression) parseExpr("[%d]%s[]".formatted(size, type));
+            Assertions.assertTrue(ae.type().has());
+            var at = ae.type().must();
+            Assertions.assertEquals(size, integer(at.length()).value());
+            Assertions.assertEquals(type, typeName(at.element()));
+        }
+        {
+            var size = randInt(0, 100);
+            var list = anyNames(RandVarFuncName, 10, size.intValue());
+            var type = randTypeSymbol(10);
+            var ae = (ArrayExpression) parseExpr("[]%s[%s]".formatted(type, idList(list)));
+            Assertions.assertTrue(ae.type().has());
+            var at = ae.type().must();
+            Assertions.assertEquals(size, integer(at.length()).value());
+            Assertions.assertEquals(type, typeName(at.element()));
+        }
+    }
+
+    // block
+
+    @Test
+    public void testBlock1() {
+        var i = randInt(0, Integer.MAX_VALUE);
+        var be = (BlockExpression) parseExpr("{ %d }".formatted(i));
+        Assertions.assertTrue(be.block().isEmpty());
+        var r = be.result();
+        Assertions.assertEquals(i, integer(r).value());
+    }
+
+    @Test
+    public void testBlock2() {
+        var name = randVarSymbol(10);
+        var i = randInt(0, Integer.MAX_VALUE);
+        var be = (BlockExpression) parseExpr("{ var %s = %d; %s }"
+                .formatted(name, i, name));
+        Assertions.assertEquals(1, be.block().size());
+        var s = (DeclarationStatement) be.block().getFirst();
+        var v = s.variables().getFirst();
+        Assertions.assertEquals(name, symbol(v.name()));
+        Assertions.assertEquals(i, integer(v.value().must()).value());
+        var r = be.result();
+        Assertions.assertEquals(name, varName(r));
+    }
+
+    // derefer
+
+    @Test
+    public void testDerefer1() {
+        var a = randVarSymbol(10);
+        var ue = (UnaryExpression) parseExpr("-*" + a);
+        var de = (DereferExpression) ue.operand();
+        Assertions.assertEquals(a, varName(de.subject()));
+    }
+
+    @Test
+    public void testDerefer2() {
+        var a = randVarSymbol(10);
+        var b = randVarSymbol(10);
+        var be = (BinaryExpression) parseExpr("*" + a + "+*" + b);
+        var da = (DereferExpression) be.left();
+        var db = (DereferExpression) be.right();
+        Assertions.assertEquals(a, varName(da.subject()));
+        Assertions.assertEquals(b, varName(db.subject()));
+    }
+
+    @Test
+    public void testDerefer3() {
+        var a = randVarSymbol(10);
+        var m = randVarName(8);
+        var de = (DereferExpression) parseExpr("*" + a + "." + m);
+        var me = (MemberOfExpression) de.subject();
+        Assertions.assertEquals(a, varName(me.subject()));
+        Assertions.assertEquals(m, me.member());
+    }
+
+    @Test
+    public void testDerefer4() {
+        var a = randVarSymbol(10);
+        var i = randVarSymbol(8);
+        var de = (DereferExpression) parseExpr("*" + a + "[" + i + "]");
+        var me = (IndexOfExpression) de.subject();
+        Assertions.assertEquals(a, varName(me.subject()));
+        Assertions.assertEquals(i, varName(me.index()));
+    }
+
+    @Test
+    public void testDerefer5() {
+        var a = randVarSymbol(10);
+        var de = (DereferExpression) parseExpr("*" + a + "()");
+        var me = (CallExpression) de.subject();
+        Assertions.assertEquals(a, varName(me.callee()));
+    }
+
 
 }

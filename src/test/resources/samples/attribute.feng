@@ -1,8 +1,8 @@
 attribute Document {}
 
 attribute Proxy {
-    name rom;
-    code rom = "feng";
+    name uint8;
+    code int = 0;
     tags []int;
     props []Property = [Property.ID];
 }
@@ -49,7 +49,7 @@ class An {
 
     @Document
     @API
-    func a(@Param id int) String {
+    func b(@Param id int) String {
         return a;
     }
 }

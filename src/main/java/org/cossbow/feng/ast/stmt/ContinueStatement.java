@@ -1,11 +1,11 @@
 package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Optional;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 
 public class ContinueStatement extends Statement {
-    private final Optional<Identifier> label;
+    private Optional<Identifier> label;
 
     public ContinueStatement(Position pos,
                              Optional<Identifier> label) {

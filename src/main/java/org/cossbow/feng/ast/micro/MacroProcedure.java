@@ -3,14 +3,15 @@ package org.cossbow.feng.ast.micro;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.stmt.Statement;
+import org.cossbow.feng.util.Optional;
 
 import java.util.List;
 
 public class MacroProcedure extends Entity {
-    private final Identifier name;
-    private final IdentifierTable<MacroVariable> params;
-    private final List<Statement> body;
-    private final Optional<Expression> result;
+    private Identifier name;
+    private IdentifierTable<MacroVariable> params;
+    private List<Statement> body;
+    private Optional<Expression> result;
 
     public MacroProcedure(Position pos,
                           Identifier name,

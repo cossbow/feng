@@ -1,0 +1,33 @@
+
+export
+enum CharCode {
+    ASCII,
+    UTF8,
+}
+
+class String {
+    const value [*]uint8;
+    const code CharCode;
+
+    func value() [*]uint8 {
+        return value;
+    }
+
+    func char(index int) int32 {
+        if (CharCode.ASCII == code) {
+            const s [&]uint8 = value;
+            return int32(s[index]);
+        }
+        const s [&]uint16 = value;
+        return int32(s[index]);
+    }
+
+    func len() int {
+        return value.length << code.id;
+    }
+
+    func isEmpty() bool {
+        return value.length == 0;
+    }
+
+}

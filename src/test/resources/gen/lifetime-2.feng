@@ -1,0 +1,92 @@
+
+interface I {
+    run();
+    get(n int) int;
+}
+
+class S (I) {
+    var id int;
+    var cb func();
+    var n *S;
+    func run() {
+    }
+    func get(n int) int {
+        return id;
+    }
+    func clone() *!S {
+        return new(S, {id=id,cb=cb});
+    }
+}
+
+func make(id int) *!S {
+    return new(S, {id=id});
+}
+func build(id int) *!I {
+    return new(S, {id=id});
+}
+func alloc(n int) [*!]S {
+    return new([n]S);
+}
+
+
+class R final {
+    var s S;
+    var id int;
+    func see() {}
+}
+
+
+class T {
+    var r R;
+}
+func create(n int) *T {
+    return new(T, {r={id=n, s={n=new(S)}}});
+}
+
+func test(n int) {
+    if (make(n) == nil) {}
+    if (make(n) == make(n+1)) {}
+    if (alloc(n) == alloc(n+1)) {}
+
+    make(n);
+    make(n).run();
+    make(n).get(n);
+    make(n).clone();
+
+    {
+        var i1 = make(0).get(1);
+        var i2 = make(0).clone();
+        make(0).get(1);
+        make(0).clone();
+        create(n).r.see();
+    }
+    {
+        var i1 = new(S, {id=-1}).get(1);
+        var i2 = new(S, {id=-1}).clone();
+        new(S, {id=-2}).get(1);
+        new(S, {id=-2}).clone();
+    }
+    {
+        var i1 = new(S, {id=-1}).get(1);
+        var i2 = new(S, {id=-1}).clone();
+        new(S, {id=-2}).get(1);
+        new(S, {id=-2}).clone();
+    }
+    {
+        var v1= make(n).id;
+        var v2= create(n).r.id;
+        var v3= create(n).r.s.id;
+    }
+    {
+        make(0).id = 1;
+        new(S).id=2;
+        alloc(4)[0] = {};
+        alloc(4)[0].id = 1;
+    }
+}
+
+
+func main() int32 {
+    test(15);
+    return 0;
+}

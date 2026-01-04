@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 
 public class GotoStatement extends Statement {
-    private final Identifier label;
+    private Identifier label;
 
     public GotoStatement(Position pos,
                          Identifier label) {

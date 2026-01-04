@@ -1,13 +1,15 @@
 package org.cossbow.feng.ast.stmt;
 
-import org.cossbow.feng.ast.Optional;
+import org.cossbow.feng.ast.lit.BoolLiteral;
+import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
 public class ConditionalForStatement extends ForStatement {
-    private final Optional<Statement> initializer;
-    private final Expression condition;
-    private final Optional<Statement> updater;
+    private Optional<Statement> initializer;
+    private Expression condition;
+    private Optional<Statement> updater;
 
     public ConditionalForStatement(Position pos,
                                    Statement body,
@@ -28,7 +30,19 @@ public class ConditionalForStatement extends ForStatement {
         return condition;
     }
 
+    public void condition(Expression condition) {
+        this.condition = condition;
+    }
+
     public Optional<Statement> updater() {
         return updater;
+    }
+
+    //
+
+    private final Lazy<BoolLiteral> cond = Lazy.nil();
+
+    public Lazy<BoolLiteral> cond() {
+        return cond;
     }
 }

@@ -1,7 +1,7 @@
 package org.cossbow.feng.parser;
 
 import org.cossbow.feng.Pair;
-import org.cossbow.feng.ast.oop.EnumDefinition;
+import org.cossbow.feng.ast.EnumDefinition;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -22,8 +22,8 @@ public class EnumParseTest extends BaseParseTest {
                     STOP =0b010,
                 }
                 """;
-        var et = (EnumDefinition) doParseDefinition(code);
-        Assertions.assertEquals(identifier("TaskStatus"), et.name());
+        var et = (EnumDefinition) doParseType(code, "TaskStatus");
+        Assertions.assertEquals(symbol("TaskStatus"), et.symbol());
 
         var expect = List.of(Pair.<String, Integer>of("INIT", null),
                 Pair.of("WAIT", 1001),
@@ -38,7 +38,7 @@ public class EnumParseTest extends BaseParseTest {
                 Assertions.assertTrue(v.init().none());
             } else {
                 Assertions.assertEquals(BigInteger.valueOf(pair.b()),
-                        integer(v.init().get()).value());
+                        integer(v.init().must()).value());
             }
         }
     }

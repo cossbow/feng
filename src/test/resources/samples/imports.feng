@@ -1,13 +1,18 @@
-import a.b *;
+import a.b;
+import a.b.h;
+import a.b.h.t;
+import a.b.h.u;
+import a.catalogue cat;
+
 var a *b$User;
-var b []b$Host;
-var b []*b$Host;
+var b [*]b$Host;
+var c [*]*b$Host;
 class Win`T h$R | t$Tee & u$Rest` : b$Sys (b$Boot,b$Init) {
     var a*h$Device;
     var b*h$Device;
 }
 struct Dos {
-    id:2 b$Hash;
+    id(2) b$Hash;
 }
 func test`T h$R | t$Tee & u$Rest`(b &b$Boot) {
     b$add();

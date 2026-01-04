@@ -8,8 +8,7 @@ import org.cossbow.feng.ast.expr.ArrayExpression;
 import org.cossbow.feng.ast.expr.ObjectExpression;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
-import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.ast.proc.VariableParameterSet;
+import org.cossbow.feng.ast.proc.ParameterSet;
 import org.cossbow.feng.ast.stmt.DeclarationStatement;
 import org.cossbow.feng.ast.stmt.TryStatement;
 import org.junit.jupiter.api.Assertions;
@@ -44,10 +43,10 @@ public class AttributeParseTest extends BaseParseTest {
 
     @Test
     public void testDefine() {
-        var name = randTypeName(16);
+        var name = randTypeSymbol(16);
         var code = "attribute %s {}".formatted(name);
-        var def = (AttributeDefinition) doParseDefinition(code);
-        Assertions.assertEquals(name, def.name());
+        var def = (AttributeDefinition) doParseType(code, name);
+        Assertions.assertEquals(name, def.symbol());
         Assertions.assertTrue(def.fields().isEmpty());
     }
 
@@ -56,7 +55,7 @@ public class AttributeParseTest extends BaseParseTest {
         var name = randVarName(12);
         var type = randTypeName(20);
         var code = "export attribute Server { %s %s; }".formatted(name, type);
-        var def = (AttributeDefinition) doParseDefinition(code);
+        var def = (AttributeDefinition) doParseType(code, "Server");
         Assertions.assertEquals(1, def.fields().size());
         var field = def.fields().getValue(0);
         Assertions.assertEquals(name, field.name());
@@ -71,7 +70,7 @@ public class AttributeParseTest extends BaseParseTest {
         var type = randTypeName(20);
         var init = ThreadLocalRandom.current().nextInt(0, Integer.MAX_VALUE);
         var code = "export attribute Server { %s %s = %d; }".formatted(name, type, init);
-        var def = (AttributeDefinition) doParseDefinition(code);
+        var def = (AttributeDefinition) doParseType(code, "Server");
         Assertions.assertEquals(1, def.fields().size());
         var field = def.fields().getValue(0);
         Assertions.assertEquals(name, field.name());
@@ -86,7 +85,7 @@ public class AttributeParseTest extends BaseParseTest {
         var fieldName = randVarName(12);
         var fieldType = randTypeName(20);
         var code = "export attribute Server { %s []%s; }".formatted(fieldName, fieldType);
-        var def = (AttributeDefinition) doParseDefinition(code);
+        var def = (AttributeDefinition) doParseType(code, "Server");
         Assertions.assertEquals(1, def.fields().size());
         var field = def.fields().getValue(0);
         Assertions.assertEquals(fieldName, field.name());
@@ -100,18 +99,19 @@ public class AttributeParseTest extends BaseParseTest {
         var fieldName = randVarName(12);
         var fieldType = randTypeName(20);
         var code = "export attribute Server { %s []%s = [10,20]; }".formatted(fieldName, fieldType);
-        var def = (AttributeDefinition) doParseDefinition(code);
+        var def = (AttributeDefinition) doParseType(code, "Server");
         Assertions.assertEquals(1, def.fields().size());
         var field = def.fields().getValue(0);
         Assertions.assertEquals(fieldName, field.name());
         Assertions.assertEquals(fieldType, field.type());
         Assertions.assertTrue(field.array());
         var arr = (ArrayExpression) field.init().must();
-        Assertions.assertEquals(2, arr.elements().size());
+        Assertions.assertEquals(2, arr.size());
     }
 
     private IdentifierTable<Attribute> atDefine(String code) {
-        var def = doParseDefinition(code);
+        var src = doParseFile(code);
+        var def = firstDef(src);
         return def.modifier().attributes();
     }
 
@@ -149,26 +149,26 @@ public class AttributeParseTest extends BaseParseTest {
 
     private IdentifierTable<Attribute> atClassField(CharSequence attr) {
         var code = "class A{%s var id int;}".formatted(attr);
-        var def = (ClassDefinition) doParseDefinition(code);
+        var def = (ClassDefinition) doParseType(code, "A");
         return def.fields().get(identifier("id")).modifier().attributes();
     }
 
     private IdentifierTable<Attribute> atClassMethod(CharSequence attr) {
         var code = "class A{%s func get(){}}".formatted(attr);
-        var def = (ClassDefinition) doParseDefinition(code);
-        return def.methods().get(identifier("get")).modifier().attributes();
+        var def = (ClassDefinition) doParseType(code, "A");
+        return def.methods().get(identifier("get")).func().modifier().attributes();
     }
 
     private IdentifierTable<Attribute> atInterfaceMethod(CharSequence attr) {
         var code = "interface A{%s get();}".formatted(attr);
-        var def = (InterfaceDefinition) doParseDefinition(code);
+        var def = (InterfaceDefinition) doParseType(code, "A");
         return def.methods().get(identifier("get")).modifier().attributes();
     }
 
     private IdentifierTable<Attribute> atParameter(CharSequence attr) {
         var code = "func test(%s a A){}".formatted(attr);
-        var func = (FunctionDefinition) doParseDefinition(code);
-        var ps = (VariableParameterSet) func.procedure().prototype().parameterSet();
+        var func = doParseFunc(code, "test");
+        var ps = (ParameterSet) func.procedure().prototype().parameterSet();
         return ps.variables().get(identifier("a")).modifier().attributes();
     }
 

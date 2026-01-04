@@ -1,34 +1,39 @@
 package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.var.AssignableOperand;
+import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.var.Assignment;
+import org.cossbow.feng.ast.var.Operand;
 
 import java.util.List;
 
 public class AssignmentsStatement extends Statement {
-    private final List<AssignableOperand> operands;
-    private final Tuple tuple;
-    private final boolean copy;
+    private List<Assignment> list;
 
     public AssignmentsStatement(Position pos,
-                                List<AssignableOperand> operands,
-                                Tuple tuple,
-                                boolean copy) {
+                                List<Assignment> list) {
         super(pos);
-        this.operands = operands;
-        this.tuple = tuple;
-        this.copy = copy;
+        this.list = list;
     }
 
-    public List<AssignableOperand> operands() {
-        return operands;
+    public List<Assignment> list() {
+        return list;
     }
 
-    public Tuple tuple() {
-        return tuple;
+    public void list(List<Assignment> list) {
+        this.list = list;
     }
 
-    public boolean copy() {
-        return copy;
+    public Assignment get(int i) {
+        return list.get(i);
     }
+
+    public Operand operand(int i) {
+        return list.get(i).operand();
+    }
+
+    public Expression value(int i) {
+        return list.get(i).value();
+    }
+
 }

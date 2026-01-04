@@ -8,4 +8,7 @@ public class Statement extends Entity {
     public Statement(Position pos) {
         super(pos);
     }
+
+    //
+
 }

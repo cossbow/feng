@@ -3,8 +3,8 @@ package org.cossbow.feng.ast.gen;
 import org.cossbow.feng.ast.Position;
 
 public class BinaryTypeConstraint extends TypeConstraint {
-    private final TypeOperator operator;
-    private final TypeConstraint left, right;
+    private TypeOperator operator;
+    private TypeConstraint left, right;
 
     public BinaryTypeConstraint(Position pos,
                                 TypeOperator operator,

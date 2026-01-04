@@ -11,7 +11,28 @@ public class LiteralExpression extends PrimaryExpression {
         this.literal = literal;
     }
 
+    public LiteralExpression(Literal literal) {
+        this(literal.pos(), literal);
+    }
+
     public Literal literal() {
         return literal;
     }
+
+    @Override
+    public boolean isFinal() {
+        return true;
+    }
+
+    @Override
+    public boolean unbound() {
+        return true;
+    }
+
+    //
+    @Override
+    public String toString() {
+        return literal.toString();
+    }
+
 }
