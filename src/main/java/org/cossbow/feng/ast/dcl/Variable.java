@@ -7,10 +7,10 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 
 public class Variable extends Entity {
-    private final Modifier modifier;
-    private final Declare declare;
-    private final Identifier name;
-    private final Lazy<TypeDeclarer> type;
+    private Modifier modifier;
+    private Declare declare;
+    private Identifier name;
+    private Lazy<TypeDeclarer> type;
 
     public Variable(Position pos,
                     Modifier modifier,

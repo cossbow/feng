@@ -7,11 +7,11 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
 
 public class ClassDefinition extends TypeDefinition {
-    private final Optional<DefinedType> parent;
-    private final SymbolTable<DefinedType> impl;
-    private final IdentifierTable<ClassField> fields;
-    private final IdentifierTable<ClassMethod> methods;
-    private final MacroTable macros;
+    private Optional<DefinedType> parent;
+    private SymbolTable<DefinedType> impl;
+    private IdentifierTable<ClassField> fields;
+    private IdentifierTable<ClassMethod> methods;
+    private MacroTable macros;
 
     public ClassDefinition(Position pos,
                            Modifier modifier,

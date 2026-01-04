@@ -6,7 +6,7 @@ import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
 public class EnumDefinition extends TypeDefinition {
-    private final IdentifierTable<Value> values;
+    private IdentifierTable<Value> values;
 
     public EnumDefinition(Position pos,
                           Modifier modifier,

@@ -5,8 +5,8 @@ import org.cossbow.feng.ast.Position;
 import java.util.List;
 
 public class CallExpression extends PrimaryExpression {
-    private final PrimaryExpression callee;
-    private final List<Expression> arguments;
+    private PrimaryExpression callee;
+    private List<Expression> arguments;
 
 
     public CallExpression(Position pos,

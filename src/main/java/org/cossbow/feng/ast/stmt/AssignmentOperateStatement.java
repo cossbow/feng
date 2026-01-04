@@ -6,9 +6,9 @@ import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.var.AssignableOperand;
 
 public class AssignmentOperateStatement extends Statement {
-    private final AssignableOperand operand;
-    private final BinaryOperator operator;
-    private final Expression value;
+    private AssignableOperand operand;
+    private BinaryOperator operator;
+    private Expression value;
 
     public AssignmentOperateStatement(Position pos,
                                       AssignableOperand operand,

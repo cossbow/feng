@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 
 public class MacroFunc extends Macro {
-    private final MacroProcedure procedure;
+    private MacroProcedure procedure;
 
     public MacroFunc(Position pos,
                      Identifier type,

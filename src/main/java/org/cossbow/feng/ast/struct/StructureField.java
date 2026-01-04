@@ -7,9 +7,9 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
 public class StructureField extends Entity {
-    private final Identifier name;
-    private final Optional<Expression> bitfield;
-    private final StructureType type;
+    private Identifier name;
+    private Optional<Expression> bitfield;
+    private StructureType type;
 
     public StructureField(Position pos,
                           Identifier name,

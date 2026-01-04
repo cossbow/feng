@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.gen.DefinedType;
 
 public class NewDefinedType extends NewType {
-    private final DefinedType type;
+    private DefinedType type;
 
     public NewDefinedType(Position pos,
                           DefinedType type) {

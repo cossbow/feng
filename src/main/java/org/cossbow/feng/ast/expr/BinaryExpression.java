@@ -4,8 +4,8 @@ import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.Position;
 
 public class BinaryExpression extends Expression {
-    private final BinaryOperator operator;
-    private final Expression left, right;
+    private BinaryOperator operator;
+    private Expression left, right;
 
     public BinaryExpression(Position pos,
                             BinaryOperator operator,

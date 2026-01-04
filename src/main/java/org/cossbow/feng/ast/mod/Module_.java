@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class Module_ extends Entity {
-    private final List<Identifier> path;
+    private List<Identifier> path;
 
     public Module_(Position pos, List<Identifier> path) {
         super(pos);

@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.proc.Prototype;
 
 public class FuncTypeDeclarer extends TypeDeclarer {
-    private final Prototype prototype;
+    private Prototype prototype;
 
     public FuncTypeDeclarer(Position pos,
                             Prototype prototype) {
@@ -14,5 +14,13 @@ public class FuncTypeDeclarer extends TypeDeclarer {
 
     public Prototype prototype() {
         return prototype;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (other instanceof FuncTypeDeclarer ftd) {
+            return prototype.equals(ftd.prototype);
+        }
+        return false;
     }
 }

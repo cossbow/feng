@@ -6,4 +6,9 @@ public class NilLiteral extends Literal {
     public NilLiteral(Position pos) {
         super(pos);
     }
+
+    @Override
+    public String type() {
+        return "nil";
+    }
 }

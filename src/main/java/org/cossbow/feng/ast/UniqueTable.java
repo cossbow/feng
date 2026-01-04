@@ -1,8 +1,9 @@
 package org.cossbow.feng.ast;
 
-import org.cossbow.feng.parser.SyntaxException;
+import org.cossbow.feng.util.ErrorUtil;
 
 import java.util.*;
+import java.util.function.Function;
 
 public class UniqueTable<K extends Entity, V> {
     private final HashMap<K, Node<K, V>> table;
@@ -22,8 +23,7 @@ public class UniqueTable<K extends Entity, V> {
         var node = new Node<>(id, value);
         var old = table.putIfAbsent(id, node);
         if (old != null) {
-            throw new SyntaxException("parse duplicate '%s' at %s, prev at %s"
-                    .formatted(id, id.pos(), old.id.pos()));
+            ErrorUtil.duplicate(id, old.id);
         }
         nodes.add(node);
     }

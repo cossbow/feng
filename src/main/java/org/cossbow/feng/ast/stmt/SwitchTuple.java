@@ -6,9 +6,9 @@ import org.cossbow.feng.ast.expr.Expression;
 import java.util.List;
 
 public class SwitchTuple extends Tuple {
-    private final Expression value;
-    private final List<Rule> rules;
-    private final Tuple defaultRule;
+    private Expression value;
+    private List<Rule> rules;
+    private Tuple defaultRule;
 
     public SwitchTuple(Position pos,
                        Expression value,
@@ -30,6 +30,11 @@ public class SwitchTuple extends Tuple {
 
     public Tuple defaultRule() {
         return defaultRule;
+    }
+
+    @Override
+    public int size() {
+        return defaultRule.size();
     }
 
     //

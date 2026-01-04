@@ -4,9 +4,11 @@ import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 
+import java.util.Objects;
+
 public class DefinedType extends Entity {
-    private final Symbol symbol;
-    private final TypeArguments generic;
+    private Symbol symbol;
+    private TypeArguments generic;
 
     public DefinedType(Position pos,
                        Symbol symbol,
@@ -23,4 +25,12 @@ public class DefinedType extends Entity {
     public TypeArguments generic() {
         return generic;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof DefinedType that)) return false;
+        return Objects.equals(symbol, that.symbol) &&
+                Objects.equals(generic, that.generic);
+    }
+
 }

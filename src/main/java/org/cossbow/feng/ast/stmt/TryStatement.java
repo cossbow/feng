@@ -6,9 +6,9 @@ import org.cossbow.feng.ast.Position;
 import java.util.List;
 
 public class TryStatement extends Statement {
-    private final BlockStatement body;
-    private final List<CatchClause> catchClauses;
-    private final Optional<BlockStatement> finallyClause;
+    private BlockStatement body;
+    private List<CatchClause> catchClauses;
+    private Optional<BlockStatement> finallyClause;
 
     public TryStatement(Position pos,
                         BlockStatement body,

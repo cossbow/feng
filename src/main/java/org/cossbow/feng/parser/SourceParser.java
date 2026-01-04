@@ -15,8 +15,8 @@ public class SourceParser {
         var ec = new ErrorCollector();
         parser.addErrorListener(ec);
         var visitor = new SourceParseVisitor();
-        var file = (Source) visitor.visit(parser.source());
-        return new ParseResult(file, ec.errors);
+        var root = (Source) visitor.visit(parser.source());
+        return new ParseResult(root, visitor.gst, ec.errors);
     }
 
     static class ErrorCollector extends BaseErrorListener

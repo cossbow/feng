@@ -7,8 +7,8 @@ import org.cossbow.feng.ast.expr.Expression;
 import java.util.List;
 
 public class IterableForStatement extends ForStatement {
-    private final List<Identifier> arguments;
-    private final Expression iterable;
+    private List<Identifier> arguments;
+    private Expression iterable;
 
     public IterableForStatement(Position pos, Statement body,
                                 List<Identifier> arguments,

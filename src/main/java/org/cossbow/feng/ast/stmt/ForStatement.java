@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Position;
 
 abstract
 public class ForStatement extends Statement {
-    private final Statement body;
+    private Statement body;
 
     public ForStatement(Position pos, Statement body) {
         super(pos);

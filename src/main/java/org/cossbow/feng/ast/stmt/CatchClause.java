@@ -8,9 +8,9 @@ import org.cossbow.feng.ast.dcl.Variable;
 import java.util.List;
 
 public class CatchClause extends Entity {
-    private final Variable argument;
-    private final List<TypeDeclarer> typeSet;
-    private final BlockStatement body;
+    private Variable argument;
+    private List<TypeDeclarer> typeSet;
+    private BlockStatement body;
 
     public CatchClause(Position pos,
                        Variable argument,

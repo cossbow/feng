@@ -4,10 +4,12 @@ import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
+import java.util.Objects;
+
 public class ArrayTypeDeclarer extends TypeDeclarer {
-    private final TypeDeclarer element;
-    private final Optional<Expression> length;
-    private final boolean immutable;
+    private TypeDeclarer element;
+    private Optional<Expression> length;
+    private boolean immutable;
 
     public ArrayTypeDeclarer(Position pos,
                              TypeDeclarer element,
@@ -30,4 +32,13 @@ public class ArrayTypeDeclarer extends TypeDeclarer {
     public boolean immutable() {
         return immutable;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof ArrayTypeDeclarer atd)) return false;
+        return immutable == atd.immutable &&
+                Objects.equals(element, atd.element) &&
+                Objects.equals(length, atd.length);
+    }
+
 }

@@ -7,8 +7,8 @@ import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import java.util.List;
 
 public class Prototype extends Entity {
-    private final ParameterSet parameterSet;
-    private final List<TypeDeclarer> returnSet;
+    private ParameterSet parameterSet;
+    private List<TypeDeclarer> returnSet;
 
     public Prototype(Position pos,
                      ParameterSet parameterSet,

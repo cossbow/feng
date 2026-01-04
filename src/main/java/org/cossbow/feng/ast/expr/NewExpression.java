@@ -5,8 +5,8 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.NewType;
 
 public class NewExpression extends PrimaryExpression {
-    private final NewType type;
-    private final Optional<Expression> init;
+    private NewType type;
+    private Optional<Expression> init;
 
     public NewExpression(Position pos,
                          NewType type,

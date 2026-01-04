@@ -6,8 +6,8 @@ import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 
 public class TypeParameter extends Entity {
-    private final Identifier name;
-    private final Optional<TypeConstraint> constraint;
+    private Identifier name;
+    private Optional<TypeConstraint> constraint;
 
     public TypeParameter(Position pos,
                          Identifier name,

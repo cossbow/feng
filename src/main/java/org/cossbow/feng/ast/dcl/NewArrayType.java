@@ -4,9 +4,9 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
 public class NewArrayType extends NewType {
-    private final TypeDeclarer element;
-    private final Expression length;
-    private final boolean immutable;
+    private TypeDeclarer element;
+    private Expression length;
+    private boolean immutable;
 
     public NewArrayType(Position pos,
                         TypeDeclarer element,

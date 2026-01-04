@@ -5,7 +5,7 @@ import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import java.util.List;
 
 public class UnnamedParameterSet extends ParameterSet {
-    private final List<TypeDeclarer> types;
+    private List<TypeDeclarer> types;
 
     public UnnamedParameterSet(List<TypeDeclarer> types) {
         this.types = types;

@@ -6,7 +6,7 @@ import org.cossbow.feng.ast.expr.Expression;
 import java.util.List;
 
 public class ArrayTuple extends Tuple {
-    private final List<Expression> values;
+    private List<Expression> values;
 
     public ArrayTuple(Position pos,
                       List<Expression> values) {
@@ -16,5 +16,10 @@ public class ArrayTuple extends Tuple {
 
     public List<Expression> values() {
         return values;
+    }
+
+    @Override
+    public int size() {
+        return values.size();
     }
 }

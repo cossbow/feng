@@ -5,10 +5,10 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
 public class IfStatement extends Statement {
-    private final Optional<Statement> init;
-    private final Expression condition;
-    private final Statement yes;
-    private final Optional<Statement> not;
+    private Optional<Statement> init;
+    private Expression condition;
+    private Statement yes;
+    private Optional<Statement> not;
 
     public IfStatement(Position pos,
                        Optional<Statement> init,

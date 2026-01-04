@@ -4,8 +4,8 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 
 public class LabeledStatement extends Statement {
-    private final Identifier label;
-    private final Statement statement;
+    private Identifier label;
+    private Statement statement;
 
     public LabeledStatement(Position pos,
                             Identifier label,

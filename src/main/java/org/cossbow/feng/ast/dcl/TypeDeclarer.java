@@ -8,4 +8,7 @@ public class TypeDeclarer extends Entity {
     public TypeDeclarer(Position pos) {
         super(pos);
     }
+
+    abstract public boolean equals(Object obj);
+
 }

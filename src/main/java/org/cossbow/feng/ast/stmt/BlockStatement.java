@@ -5,7 +5,7 @@ import org.cossbow.feng.ast.Position;
 import java.util.List;
 
 public class BlockStatement extends Statement {
-    private final List<Statement> list;
+    private List<Statement> list;
 
     public BlockStatement(Position pos,
                           List<Statement> list) {

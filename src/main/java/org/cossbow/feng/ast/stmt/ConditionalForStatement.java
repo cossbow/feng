@@ -5,9 +5,9 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
 public class ConditionalForStatement extends ForStatement {
-    private final Optional<Statement> initializer;
-    private final Expression condition;
-    private final Optional<Statement> updater;
+    private Optional<Statement> initializer;
+    private Expression condition;
+    private Optional<Statement> updater;
 
     public ConditionalForStatement(Position pos,
                                    Statement body,

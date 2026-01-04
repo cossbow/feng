@@ -24,11 +24,12 @@ import org.cossbow.feng.ast.var.AssignableOperand;
 import org.cossbow.feng.ast.var.IndexAssignableOperand;
 import org.cossbow.feng.ast.var.MemberAssignableOperand;
 import org.cossbow.feng.ast.var.VariableAssignableOperand;
+import org.cossbow.feng.util.ErrorUtil;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.function.Function;
 
@@ -48,10 +49,7 @@ final class SourceParseVisitor
     // symbols table
     //
 
-    public final IdentifierTable<TypeDefinition> namedTypes = new IdentifierTable<>();
-    public final List<TypeDefinition> unnamedTypes = new ArrayList<>();
-    public final IdentifierTable<FunctionDefinition> namedFunctions = new IdentifierTable<>();
-    public final List<Procedure> lambdas = new ArrayList<>();
+    public final GlobalSymbolTable gst = new GlobalSymbolTable();
 
     public SourceParseVisitor() {
     }
@@ -133,12 +131,11 @@ final class SourceParseVisitor
     @Override
     public Entity visitSource(FengParser.SourceContext ctx) {
         var imports = this.<Import>visitList(ctx.import_());
-        var set = new HashMap<Module_, Import>(imports.size());
-        for (Import i : imports) {
-            var oi = set.putIfAbsent(i.module(), i);
-            if (oi != null)
-                throw new SyntaxException(
-                        "duplicate import: " + i.module());
+        var set = new HashSet<Module_>(imports.size());
+        for (var i : imports) {
+            if (!set.add(i.module()))
+                ErrorUtil.semantic("duplicate import: %s",
+                        i.module());
         }
         var globals = this.<Global>visitList(ctx.global());
         return new Source(posOf(ctx), imports, globals);
@@ -161,14 +158,16 @@ final class SourceParseVisitor
     @Override
     public Entity visitGlobalTypeDefinition(FengParser.GlobalTypeDefinitionContext ctx) {
         var export = isExport(ctx.exportable());
-        var definition = (Definition) visit(ctx.def);
+        var definition = (TypeDefinition) visit(ctx.def);
+        if (export) gst.exportedTypes.add(definition.name(), definition);
         return new GlobalDefinition(posOf(ctx), export, definition);
     }
 
     @Override
     public Entity visitGlobalFunctionDefinition(FengParser.GlobalFunctionDefinitionContext ctx) {
         var export = isExport(ctx.exportable());
-        var definition = (Definition) visit(ctx.def);
+        var definition = (FunctionDefinition) visit(ctx.def);
+        if (export) gst.exportedFunctions.add(definition.name(), definition);
         return new GlobalDefinition(posOf(ctx), export, definition);
     }
 
@@ -176,6 +175,11 @@ final class SourceParseVisitor
     public Entity visitGlobalDeclaration(FengParser.GlobalDeclarationContext ctx) {
         var export = isExport(ctx.exportable());
         var stmt = (DeclarationStatement) visit(ctx.declaration());
+        if (export)
+            for (var v : stmt.variables())
+                gst.exportedVariables.add(v.name(), v);
+        for (var v : stmt.variables())
+            gst.variables.add(v.name(), v);
         return new GlobalDeclaration(posOf(ctx), export, stmt);
     }
 
@@ -285,6 +289,23 @@ final class SourceParseVisitor
     @Override
     public Entity visitDefinedTypeDeclarer(FengParser.DefinedTypeDeclarerContext ctx) {
         var dt = (DefinedType) visit(ctx.definedType());
+        if (dt.symbol().module().none()) {
+            var name = dt.symbol().name().value();
+            if (dt.generic().isEmpty()) {
+                var pri = Primitive.ofCode(name);
+                if (pri != null)
+                    return new PrimitiveTypeDeclarer(posOf(ctx), pri);
+            }
+            var mt = MemTypeDeclarer.TYPES.get(name);
+            if (mt != null) {
+                var args = dt.generic().arguments();
+                if (args.size() > 1) {
+                    ErrorUtil.semantic("at most, %s can only map one type", name);
+                }
+                var mapped = args.isEmpty() ? null : args.getFirst();
+                return new MemTypeDeclarer(posOf(ctx), mt, Optional.of(mapped));
+            }
+        }
         var reference = parseReference(ctx.reference());
         return new DefinedTypeDeclarer(posOf(ctx), dt, reference);
     }
@@ -393,7 +414,7 @@ final class SourceParseVisitor
         var fields = this.parseUniques(new IdentifierTable<>(),
                 ctx.attributeMember(), AttributeField::name);
         var def = new AttributeDefinition(posOf(ctx), modifier, name, fields);
-        namedTypes.add(name, def);
+        gst.namedTypes.add(name, def);
         return def;
     }
 
@@ -456,7 +477,7 @@ final class SourceParseVisitor
         var fields = parseStructureMembers(ctx.structureFieldsDef());
         var def = new StructureDefinition(posOf(ctx), modifier,
                 Optional.of(name), generic, union, fields);
-        namedTypes.add(name, def);
+        gst.namedTypes.add(name, def);
         return def;
     }
 
@@ -468,7 +489,7 @@ final class SourceParseVisitor
         var fields = parseStructureMembers(ctx.structureFieldsDef());
         var def = new StructureDefinition(pos, Modifier.empty(), Optional.empty(),
                 TypeParameters.empty(), union, fields);
-        unnamedTypes.add(def);
+        gst.unnamedTypes.add(def);
         return def;
     }
 
@@ -536,7 +557,7 @@ final class SourceParseVisitor
             values.add(v.name(), v);
         }
         var def = new EnumDefinition(posOf(ctx), modifier, name, values);
-        namedTypes.add(name, def);
+        gst.namedTypes.add(name, def);
         return def;
     }
 
@@ -571,7 +592,7 @@ final class SourceParseVisitor
         }
         var def = new InterfaceDefinition(posOf(ctx),
                 modifier, name, generic, methods, parts, macros);
-        namedTypes.add(name, def);
+        gst.namedTypes.add(name, def);
         return def;
     }
 
@@ -643,7 +664,7 @@ final class SourceParseVisitor
         var def = new ClassDefinition(posOf(ctx), modifier,
                 Optional.of(name), generic,
                 parent, impl, fields, methods, macros);
-        namedTypes.add(name, def);
+        gst.namedTypes.add(name, def);
         return def;
     }
 
@@ -690,7 +711,7 @@ final class SourceParseVisitor
     @Override
     public Entity visitLambdaExpression(FengParser.LambdaExpressionContext ctx) {
         var procedure = (Procedure) visit(ctx.procedure());
-        lambdas.add(procedure);
+        gst.lambdas.add(procedure);
         return new LambdaExpression(posOf(ctx), procedure);
     }
 
@@ -795,7 +816,7 @@ final class SourceParseVisitor
         var bin = parseBinaryOperator(ctx.op);
         var lhs = (Expression) visit(ctx.primaryExpr());
         var rhs = (Expression) visit(ctx.rightAssocExpr());
-        return new BinaryExpression(posOf(ctx), bin, lhs, rhs);
+        return new BinaryExpression(posOf(ctx.op), bin, lhs, rhs);
     }
 
     @Override
@@ -873,7 +894,13 @@ final class SourceParseVisitor
     @Override
     public Entity visitDeclarationStatement(
             FengParser.DeclarationStatementContext ctx) {
-        return visit(ctx.declaration());
+        var ds = (DeclarationStatement) visit(ctx.declaration());
+        if (ds.init().none()) return ds;
+        var tp = ds.init().must();
+        if (ds.variables().size() != tp.size()) {
+            ErrorUtil.align(ds.variables().getFirst().pos(), tp.pos());
+        }
+        return ds;
     }
 
     // statement: assignment
@@ -952,6 +979,9 @@ final class SourceParseVisitor
         var condition = (Expression) visit(ctx.condition);
         var yes = (Tuple) visit(ctx.yes);
         var not = (Tuple) visit(ctx.not);
+        if (yes.size() != not.size()) {
+            ErrorUtil.align(yes.pos(), not.pos());
+        }
         return new IfTuple(posOf(ctx), condition, yes, not);
     }
 
@@ -963,8 +993,13 @@ final class SourceParseVisitor
             var values = (Tuple) visit(rc.values);
             return new SwitchTuple.Rule(constants, values);
         }).toList();
-        var defaultRule = (Tuple) visit(ctx.switchRuleDefault().tuple());
-        return new SwitchTuple(posOf(ctx), value, rules, defaultRule);
+        var defTp = (Tuple) visit(ctx.switchRuleDefault().tuple());
+        for (var rule : rules) {
+            if (rule.tuple().size() != defTp.size()) {
+                ErrorUtil.align(defTp.pos(), rule.tuple().pos());
+            }
+        }
+        return new SwitchTuple(posOf(ctx), value, rules, defTp);
     }
 
     @Override
@@ -1251,7 +1286,7 @@ final class SourceParseVisitor
         var generic = typeParameters(ctx.typeParameters());
         var def = new PrototypeDefinition(posOf(ctx), modifier,
                 Optional.of(name), generic, prototype);
-        namedTypes.add(name, def);
+        gst.namedTypes.add(name, def);
         return def;
     }
 
@@ -1264,7 +1299,7 @@ final class SourceParseVisitor
         var procedure = (Procedure) visit(ctx.procedure());
         var def = new FunctionDefinition(posOf(ctx), modifier,
                 Optional.of(name), generic, procedure);
-        namedFunctions.add(name, def);
+        gst.namedFunctions.add(name, def);
         return def;
     }
 

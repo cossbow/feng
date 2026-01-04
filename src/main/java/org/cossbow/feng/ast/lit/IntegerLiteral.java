@@ -23,4 +23,10 @@ public class IntegerLiteral extends Literal {
     public int radix() {
         return radix;
     }
+
+    @Override
+    public String type() {
+        return "integer";
+    }
+
 }

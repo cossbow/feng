@@ -5,9 +5,9 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.IdentifierTable;
 
 public class MacroClass extends Macro {
-    private final Identifier name;
-    private final IdentifierTable<MacroVariable> fields;
-    private final IdentifierTable<MacroProcedure> methods;
+    private Identifier name;
+    private IdentifierTable<MacroVariable> fields;
+    private IdentifierTable<MacroProcedure> methods;
 
     public MacroClass(Position pos,
                       Identifier type,

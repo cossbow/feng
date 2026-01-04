@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
 public class ThrowStatement extends Statement {
-    private final Expression exception;
+    private Expression exception;
 
     public ThrowStatement(Position pos,
                           Expression exception) {

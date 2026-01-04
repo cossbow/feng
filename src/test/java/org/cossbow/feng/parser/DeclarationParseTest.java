@@ -70,7 +70,7 @@ public class DeclarationParseTest extends BaseParseTest {
     public void testLocal3() {
         {
             var dcl = parseLocalDecl("var i = 0");
-            Assertions.assertTrue(dcl.variables().getFirst().type().isNil());
+            Assertions.assertTrue(dcl.variables().getFirst().type().none());
             Assertions.assertTrue(dcl.init().has());
         }
         {

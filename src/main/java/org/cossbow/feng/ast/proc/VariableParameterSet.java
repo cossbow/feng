@@ -5,7 +5,7 @@ import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.dcl.Variable;
 
 public class VariableParameterSet extends ParameterSet {
-    private final IdentifierTable<Variable> variables;
+    private IdentifierTable<Variable> variables;
 
     public VariableParameterSet(IdentifierTable<Variable> variables) {
         this.variables = variables;

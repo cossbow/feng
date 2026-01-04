@@ -4,9 +4,11 @@ import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.gen.DefinedType;
 
+import java.util.Objects;
+
 public class DefinedTypeDeclarer extends TypeDeclarer {
-    private final DefinedType definedType;
-    private final Optional<Reference> reference;
+    private DefinedType definedType;
+    private Optional<Reference> reference;
 
     public DefinedTypeDeclarer(Position pos,
                                DefinedType definedType,
@@ -22,6 +24,13 @@ public class DefinedTypeDeclarer extends TypeDeclarer {
 
     public Optional<Reference> reference() {
         return reference;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof DefinedTypeDeclarer that)) return false;
+        return Objects.equals(definedType, that.definedType)
+                && Objects.equals(reference, that.reference);
     }
 
 }

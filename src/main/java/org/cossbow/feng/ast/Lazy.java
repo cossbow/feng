@@ -32,8 +32,12 @@ public class Lazy<T> {
         this.value = value;
     }
 
-    public boolean isNil() {
+    public boolean none() {
         return value == null;
+    }
+
+    public boolean has() {
+        return value != null;
     }
 
 }

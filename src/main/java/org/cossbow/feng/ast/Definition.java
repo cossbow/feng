@@ -5,9 +5,9 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 
 abstract
 public class Definition extends Entity {
-    private final Modifier modifier;
-    private final Optional<Identifier> name;
-    private final TypeParameters generic;
+    private Modifier modifier;
+    private Optional<Identifier> name;
+    private TypeParameters generic;
 
     public Definition(Position pos,
                       Modifier modifier,

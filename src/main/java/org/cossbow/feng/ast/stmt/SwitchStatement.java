@@ -7,10 +7,10 @@ import org.cossbow.feng.ast.expr.Expression;
 import java.util.List;
 
 public class SwitchStatement extends Statement {
-    private final Optional<Statement> init;
-    private final Expression value;
-    private final List<SwitchBranch> branches;
-    private final List<Statement> defaultBranch;
+    private Optional<Statement> init;
+    private Expression value;
+    private List<SwitchBranch> branches;
+    private List<Statement> defaultBranch;
 
     public SwitchStatement(Position pos,
                            Optional<Statement> init,

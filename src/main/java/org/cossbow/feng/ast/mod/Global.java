@@ -6,7 +6,7 @@ import org.cossbow.feng.ast.Position;
 
 abstract
 public class Global extends Entity implements Exportable {
-    private final boolean export;
+    private boolean export;
 
     public Global(Position pos, boolean export) {
         super(pos);

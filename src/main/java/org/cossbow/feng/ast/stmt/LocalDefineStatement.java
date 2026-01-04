@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Definition;
 import org.cossbow.feng.ast.Position;
 
 public class LocalDefineStatement extends Statement {
-    private final Definition definition;
+    private Definition definition;
 
     public LocalDefineStatement(Position pos,
                                 Definition definition) {

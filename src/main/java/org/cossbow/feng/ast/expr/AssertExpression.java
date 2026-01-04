@@ -4,8 +4,8 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 public class AssertExpression extends PrimaryExpression {
-    private final PrimaryExpression subject;
-    private final TypeDeclarer type;
+    private PrimaryExpression subject;
+    private TypeDeclarer type;
 
     public AssertExpression(Position pos,
                             PrimaryExpression subject,

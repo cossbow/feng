@@ -13,4 +13,9 @@ public class StringLiteral extends Literal {
     public String value() {
         return value;
     }
+
+    @Override
+    public String type() {
+        return "string";
+    }
 }

@@ -6,9 +6,9 @@ import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 
 public class Import extends Entity {
-    private final Module_ module;
-    private final Optional<Identifier> alias;
-    private final boolean flat;
+    private Module_ module;
+    private Optional<Identifier> alias;
+    private boolean flat;
 
     public Import(Position pos,
                   Module_ module,

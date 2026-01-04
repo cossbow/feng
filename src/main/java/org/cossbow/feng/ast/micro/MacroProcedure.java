@@ -7,10 +7,10 @@ import org.cossbow.feng.ast.stmt.Statement;
 import java.util.List;
 
 public class MacroProcedure extends Entity {
-    private final Identifier name;
-    private final IdentifierTable<MacroVariable> params;
-    private final List<Statement> body;
-    private final Optional<Expression> result;
+    private Identifier name;
+    private IdentifierTable<MacroVariable> params;
+    private List<Statement> body;
+    private Optional<Expression> result;
 
     public MacroProcedure(Position pos,
                           Identifier name,

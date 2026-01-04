@@ -6,9 +6,9 @@ import org.cossbow.feng.ast.var.AssignableOperand;
 import java.util.List;
 
 public class AssignmentsStatement extends Statement {
-    private final List<AssignableOperand> operands;
-    private final Tuple tuple;
-    private final boolean copy;
+    private List<AssignableOperand> operands;
+    private Tuple tuple;
+    private boolean copy;
 
     public AssignmentsStatement(Position pos,
                                 List<AssignableOperand> operands,

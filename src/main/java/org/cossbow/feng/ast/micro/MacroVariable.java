@@ -7,8 +7,8 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 public class MacroVariable extends Entity {
-    private final Identifier name;
-    private final Lazy<TypeDeclarer> type;
+    private Identifier name;
+    private Lazy<TypeDeclarer> type;
 
     public MacroVariable(Position pos,
                          Identifier name,

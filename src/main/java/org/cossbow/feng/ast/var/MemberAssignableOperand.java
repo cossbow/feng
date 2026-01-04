@@ -5,8 +5,8 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 
 public class MemberAssignableOperand extends AssignableOperand {
-    private final PrimaryExpression subject;
-    private final Identifier member;
+    private PrimaryExpression subject;
+    private Identifier member;
 
     public MemberAssignableOperand(Position pos,
                                    PrimaryExpression subject,

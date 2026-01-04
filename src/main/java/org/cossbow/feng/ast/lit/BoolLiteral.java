@@ -13,4 +13,13 @@ public class BoolLiteral extends Literal {
     public boolean value() {
         return value;
     }
+
+    public BoolLiteral not() {
+        return new BoolLiteral(pos(), !value);
+    }
+
+    @Override
+    public String type() {
+        return "bool";
+    }
 }

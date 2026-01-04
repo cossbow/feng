@@ -10,11 +10,11 @@ import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 public class ClassField extends Entity
         implements Exportable {
-    private final Modifier modifier;
-    private final boolean export;
-    private final Declare declare;
-    private final Identifier name;
-    private final TypeDeclarer type;
+    private Modifier modifier;
+    private boolean export;
+    private Declare declare;
+    private Identifier name;
+    private TypeDeclarer type;
 
     public ClassField(Position pos,
                       Modifier modifier,

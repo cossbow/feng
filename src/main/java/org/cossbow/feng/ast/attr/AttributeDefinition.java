@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
 public class AttributeDefinition extends TypeDefinition {
-    private final IdentifierTable<AttributeField> fields;
+    private IdentifierTable<AttributeField> fields;
 
     public AttributeDefinition(Position pos,
                                Modifier modifier,

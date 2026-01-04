@@ -5,7 +5,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.IdentifierTable;
 
 public class Modifier extends Entity {
-    private final IdentifierTable<Attribute> attributes;
+    private IdentifierTable<Attribute> attributes;
 
     public Modifier(Position pos,
                     IdentifierTable<Attribute> attributes) {

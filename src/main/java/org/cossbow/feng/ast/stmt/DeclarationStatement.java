@@ -7,8 +7,8 @@ import org.cossbow.feng.ast.dcl.Variable;
 import java.util.List;
 
 public class DeclarationStatement extends Statement {
-    private final List<Variable> variables;
-    private final Optional<Tuple> init;
+    private List<Variable> variables;
+    private Optional<Tuple> init;
 
     public DeclarationStatement(Position pos,
                                 List<Variable> variables,

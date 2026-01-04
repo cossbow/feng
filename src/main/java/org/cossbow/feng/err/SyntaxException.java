@@ -1,4 +1,4 @@
-package org.cossbow.feng.parser;
+package org.cossbow.feng.err;
 
 public class SyntaxException extends RuntimeException {
 

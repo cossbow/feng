@@ -8,4 +8,8 @@ public class Tuple extends Entity {
     public Tuple(Position pos) {
         super(pos);
     }
+
+    abstract
+    public int size();
+
 }

@@ -3,7 +3,7 @@ package org.cossbow.feng.ast;
 import java.util.Objects;
 
 public class Identifier extends Entity {
-    private final String value;
+    private String value;
 
     public Identifier(Position pos, String value) {
         super(pos);

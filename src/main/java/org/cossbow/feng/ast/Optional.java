@@ -2,9 +2,10 @@ package org.cossbow.feng.ast;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.function.Function;
 
 public class Optional<T> {
-    private final T value;
+    private T value;
 
     private Optional(T value) {
         this.value = value;
@@ -33,7 +34,15 @@ public class Optional<T> {
         return value;
     }
 
+    public <R> Optional<R> map(Function<T, R> f) {
+        if (none()) return empty();
+        return of(f.apply(value));
+    }
+
+    //
+
     public static <T> Optional<T> of(T value) {
+        if (value == null) return empty();
         return new Optional<>(value);
     }
 
@@ -41,6 +50,8 @@ public class Optional<T> {
     public static <T> Optional<T> empty() {
         return (Optional<T>) empty;
     }
+
+    //
 
     @Override
     public boolean equals(Object o) {

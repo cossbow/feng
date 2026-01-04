@@ -5,7 +5,7 @@ import org.cossbow.feng.ast.Position;
 import java.util.List;
 
 public class PairsExpression extends PrimaryExpression {
-    private final List<Pair> pairs;
+    private List<Pair> pairs;
 
     public PairsExpression(Position pos,
                            List<Pair> pairs) {

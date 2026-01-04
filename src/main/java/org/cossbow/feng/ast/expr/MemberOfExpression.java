@@ -5,9 +5,9 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.gen.TypeArguments;
 
 public class MemberOfExpression extends PrimaryExpression {
-    private final PrimaryExpression subject;
-    private final Identifier member;
-    private final TypeArguments generic;
+    private PrimaryExpression subject;
+    private Identifier member;
+    private TypeArguments generic;
 
     public MemberOfExpression(Position pos,
                               PrimaryExpression subject,

@@ -7,8 +7,8 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
 public class Attribute extends Entity {
-    private final Identifier type;
-    private final Optional<Expression> init;
+    private Identifier type;
+    private Optional<Expression> init;
 
     public Attribute(Position pos,
                      Identifier type,

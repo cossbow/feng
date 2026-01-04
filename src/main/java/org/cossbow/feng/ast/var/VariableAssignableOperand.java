@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 
 public class VariableAssignableOperand extends AssignableOperand {
-    private final Symbol symbol;
+    private Symbol symbol;
 
     public VariableAssignableOperand(Position pos,
                                      Symbol symbol) {

@@ -8,4 +8,7 @@ public class Literal extends Entity {
     public Literal(Position pos) {
         super(pos);
     }
+
+    abstract
+    public String type();
 }

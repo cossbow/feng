@@ -7,9 +7,9 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
 
 public class InterfaceDefinition extends TypeDefinition {
-    private final IdentifierTable<InterfaceMethod> methods;
-    private final SymbolTable<DefinedType> parts;
-    private final MacroTable macros;
+    private IdentifierTable<InterfaceMethod> methods;
+    private SymbolTable<DefinedType> parts;
+    private MacroTable macros;
 
     public InterfaceDefinition(Position pos,
                                Modifier modifier,

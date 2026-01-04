@@ -128,13 +128,13 @@ public class BaseParseTest {
 
     //
 
-    public static ProcDefinition doParseProc(String def) {
-        return (ProcDefinition) doParseDefinition(def);
+    public static FunctionDefinition doParseProc(String def) {
+        return (FunctionDefinition) doParseDefinition(def);
     }
 
     public static Statement doParseLocal(String stmt) {
         var fun = "func main() { %s }".formatted(stmt);
-        var func = (FunctionDefinition) doParseProc(fun);
+        var func = doParseProc(fun);
         return func.procedure().body().list().getFirst();
     }
 

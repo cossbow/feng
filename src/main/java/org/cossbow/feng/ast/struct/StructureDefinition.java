@@ -5,8 +5,8 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
 public class StructureDefinition extends TypeDefinition {
-    private final boolean union;
-    private final IdentifierTable<StructureField> fields;
+    private boolean union;
+    private IdentifierTable<StructureField> fields;
 
     public StructureDefinition(Position pos,
                                Modifier modifier,

@@ -4,8 +4,8 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
 public class IfTuple extends Tuple {
-    private final Expression condition;
-    private final Tuple yes, not;
+    private Expression condition;
+    private Tuple yes, not;
 
     public IfTuple(Position pos,
                    Expression condition,
@@ -27,5 +27,10 @@ public class IfTuple extends Tuple {
 
     public Tuple not() {
         return not;
+    }
+
+    @Override
+    public int size() {
+        return yes.size();
     }
 }

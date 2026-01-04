@@ -8,7 +8,7 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
 public class PrototypeDefinition extends TypeDefinition {
-    private final Prototype prototype;
+    private Prototype prototype;
 
     public PrototypeDefinition(Position pos,
                                Modifier modifier,

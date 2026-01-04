@@ -5,7 +5,7 @@ import org.cossbow.feng.ast.Position;
 import java.util.List;
 
 public class ArrayExpression extends PrimaryExpression {
-    private final List<Expression> elements;
+    private List<Expression> elements;
 
     public ArrayExpression(Position pos,
                            List<Expression> elements) {

@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.gen.DefinedType;
 
 public class DefinedStructureType extends StructureType {
-    private final DefinedType type;
+    private DefinedType type;
 
     public DefinedStructureType(Position pos,
                                 DefinedType type) {

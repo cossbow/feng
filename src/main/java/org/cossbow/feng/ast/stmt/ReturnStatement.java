@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.Position;
 
 public class ReturnStatement extends Statement {
-    private final Optional<Tuple> result;
+    private Optional<Tuple> result;
 
     public ReturnStatement(Position pos,
                            Optional<Tuple> result) {

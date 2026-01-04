@@ -7,9 +7,9 @@ import org.cossbow.feng.ast.expr.Expression;
 import java.util.List;
 
 public class SwitchBranch extends Entity {
-    private final List<Expression> constants;
-    private final List<Statement> statements;
-    private final boolean fallthrough;
+    private List<Expression> constants;
+    private List<Statement> statements;
+    private boolean fallthrough;
 
     public SwitchBranch(Position pos,
                         List<Expression> constants,

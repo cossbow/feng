@@ -15,4 +15,10 @@ public class FloatLiteral extends Literal {
     public BigDecimal value() {
         return value;
     }
+
+    @Override
+    public String type() {
+        return "float";
+    }
+
 }

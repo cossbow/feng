@@ -7,10 +7,10 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
 public class AttributeField extends Entity {
-    private final Identifier name;
-    private final Identifier type;
-    private final boolean array;
-    private final Optional<Expression> init;
+    private Identifier name;
+    private Identifier type;
+    private boolean array;
+    private Optional<Expression> init;
 
     public AttributeField(Position pos,
                           Identifier name,

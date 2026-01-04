@@ -3,7 +3,7 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.Position;
 
 public class ParenExpression extends PrimaryExpression {
-    private final Expression child;
+    private Expression child;
 
     public ParenExpression(Position pos,
                            Expression child) {
