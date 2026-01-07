@@ -5,6 +5,10 @@ import io.github.classgraph.ClassInfo;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.lit.Literal;
+import org.cossbow.feng.ast.micro.Macro;
+import org.cossbow.feng.ast.stmt.Statement;
+import org.cossbow.feng.ast.stmt.Tuple;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -30,15 +34,14 @@ public class VisitorGenerator {
         for (var p : pkgs) sb.append("import ").append(p).append(".*;\n");
         sb.append("import org.cossbow.feng.util.ErrorUtil;\n");
         var rootName = root.getSimpleName();
-        var result = TypeDeclarer.class.getSimpleName();
-        sb.append("\npublic interface ").append(rootName).append("Visitor {\n\n");
+        sb.append("\npublic interface ").append(rootName).append("Parser<R> {\n\n");
         visitClass(root, ci -> {
             var name = ci.getSimpleName();
             if (!ci.isAbstract()) {
-                sb.append("\t").append(result).append(" visit(").append(name).append(" e);\n\n");
+                sb.append("\tdefault R visit(").append(name).append(" e) { return null; }\n\n");
                 return;
             }
-            sb.append("\tdefault ").append(result).append(" visit(").append(name).append(" e) {\n");
+            sb.append("\tdefault R visit(").append(name).append(" e) {\n");
 
             sb.append("\t\treturn switch (e) {\n");
 
@@ -55,16 +58,20 @@ public class VisitorGenerator {
         });
         sb.append("}\n");
 
-        Files.write(Path.of(rootName + "Visitor.java"), List.of(sb),
+        Files.write(Path.of(rootName + "Parser.java"), List.of(sb),
                 StandardCharsets.UTF_8);
     }
 
-    public static void main(String[] args) throws IOException {
+    static <T> void genForType(Class<T> type) throws IOException {
         try (var cg = new ClassGraph().enableAllInfo()
                 .acceptPackages(Entity.class.getPackageName()).scan()) {
-            var root = cg.getAllClasses().get(Expression.class.getName());
+            var root = cg.getAllClasses().get(type.getName());
             genVisitor(root);
         }
+    }
+
+    public static void main(String[] args) throws IOException {
+        genForType(Entity.class);
     }
 
 }

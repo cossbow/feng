@@ -5,8 +5,8 @@ import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.gen.TypeArguments;
 
 public class ReferExpression extends PrimaryExpression {
-    private final Symbol symbol;
-    private final TypeArguments generic;
+    private Symbol symbol;
+    private TypeArguments generic;
 
     public ReferExpression(Position pos,
                            Symbol symbol,

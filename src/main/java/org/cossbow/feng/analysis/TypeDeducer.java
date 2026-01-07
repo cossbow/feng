@@ -3,16 +3,25 @@ package org.cossbow.feng.analysis;
 import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
+import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.lit.BoolLiteral;
 import org.cossbow.feng.ast.lit.FloatLiteral;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.lit.StringLiteral;
+import org.cossbow.feng.parser.GlobalSymbolTable;
 import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.visit.EntityParser;
 import org.cossbow.feng.visit.ExpressionParser;
 
 import java.math.BigInteger;
 
-public class TypeDeducer implements ExpressionParser<TypeDeclarer> {
+public class TypeDeducer implements EntityParser<TypeDeclarer> {
+
+    private final GlobalSymbolTable gst;
+
+    public TypeDeducer(GlobalSymbolTable gst) {
+        this.gst = gst;
+    }
 
     boolean isPrimitive(TypeDeclarer td) {
         return td instanceof PrimitiveTypeDeclarer;
@@ -92,6 +101,9 @@ public class TypeDeducer implements ExpressionParser<TypeDeclarer> {
 
     @Override
     public TypeDeclarer visit(CallExpression e) {
+        var callee = visit(e.callee());
+        if (callee instanceof FuncTypeDeclarer) {
+        }
         return ErrorUtil.unsupported("未完待续：推导返回值类型");
     }
 
@@ -108,19 +120,20 @@ public class TypeDeducer implements ExpressionParser<TypeDeclarer> {
     @Override
     public TypeDeclarer visit(LambdaExpression e) {
         return new FuncTypeDeclarer(e.pos(),
-                e.procedure().prototype());
+                e.procedure().prototype(),
+                TypeArguments.EMPTY);
     }
 
     @Override
     public TypeDeclarer visit(LiteralExpression e) {
         return switch (e.literal()) {
-            case IntegerLiteral _ -> new PrimitiveTypeDeclarer(e.pos(),
+            case IntegerLiteral ee -> new PrimitiveTypeDeclarer(ee.pos(),
                     Primitive.INT);
-            case FloatLiteral _ -> new PrimitiveTypeDeclarer(e.pos(),
+            case FloatLiteral ee -> new PrimitiveTypeDeclarer(ee.pos(),
                     Primitive.FLOAT);
-            case BoolLiteral _ -> new PrimitiveTypeDeclarer(e.pos(),
+            case BoolLiteral ee -> new PrimitiveTypeDeclarer(ee.pos(),
                     Primitive.BOOL);
-            case StringLiteral _ -> new MemTypeDeclarer(e.pos(),
+            case StringLiteral ee -> new MemTypeDeclarer(ee.pos(),
                     true, Optional.empty());
             case null, default -> ErrorUtil.semantic(
                     "can'nt infer the type by: %s", e.literal());
@@ -161,6 +174,14 @@ public class TypeDeducer implements ExpressionParser<TypeDeclarer> {
 
     @Override
     public TypeDeclarer visit(ReferExpression e) {
+        var s = e.symbol();
+        if (s.module().none()) {
+            var fd = gst.namedFunctions.get(s.name());
+            if (fd != null) return new FuncTypeDeclarer(e.pos(),
+                    fd.procedure().prototype(), e.generic());
+            var v = gst.variables.get(s.name());
+            if (v != null) return v.type().must();
+        }
         return ErrorUtil.unsupported("未完待续：查询符号类型");
     }
 }

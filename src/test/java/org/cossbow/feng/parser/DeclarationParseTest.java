@@ -1,10 +1,7 @@
 package org.cossbow.feng.parser;
 
 import org.cossbow.feng.Utils;
-import org.cossbow.feng.ast.dcl.ArrayTypeDeclarer;
-import org.cossbow.feng.ast.dcl.Declare;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
-import org.cossbow.feng.ast.dcl.Variable;
+import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.mod.GlobalDeclaration;
 import org.cossbow.feng.ast.stmt.DeclarationStatement;
 import org.junit.jupiter.api.Assertions;
@@ -73,10 +70,10 @@ public class DeclarationParseTest extends BaseParseTest {
             Assertions.assertTrue(dcl.variables().getFirst().type().none());
             Assertions.assertTrue(dcl.init().has());
         }
-        {
-            var dcl = parseLocalDecl("var i int");
-            var type = (DefinedTypeDeclarer) dcl.variables().getFirst().type().must();
-            Assertions.assertEquals("int", type.definedType().symbol().toString());
+        for (var prim : Primitive.values()) {
+            var dcl = parseLocalDecl("var i " + prim.code);
+            var type = (PrimitiveTypeDeclarer) dcl.variables().getFirst().type().must();
+            Assertions.assertEquals(prim, type.primitive());
             Assertions.assertTrue(dcl.init().none());
         }
         {

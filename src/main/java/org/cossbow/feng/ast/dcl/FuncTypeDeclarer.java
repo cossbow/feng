@@ -1,25 +1,34 @@
 package org.cossbow.feng.ast.dcl;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.proc.Prototype;
 
 public class FuncTypeDeclarer extends TypeDeclarer {
     private Prototype prototype;
+    private TypeArguments generic;
 
     public FuncTypeDeclarer(Position pos,
-                            Prototype prototype) {
+                            Prototype prototype,
+                            TypeArguments generic) {
         super(pos);
         this.prototype = prototype;
+        this.generic = generic;
     }
 
     public Prototype prototype() {
         return prototype;
     }
 
+    public TypeArguments generic() {
+        return generic;
+    }
+
     @Override
     public boolean equals(Object other) {
         if (other instanceof FuncTypeDeclarer ftd) {
-            return prototype.equals(ftd.prototype);
+            return prototype.equals(ftd.prototype)
+                    || generic.equals(ftd.generic);
         }
         return false;
     }

@@ -313,7 +313,7 @@ final class SourceParseVisitor
     @Override
     public Entity visitFuncTypeDeclarer(FengParser.FuncTypeDeclarerContext ctx) {
         var prototype = (Prototype) visit(ctx.prototype());
-        return new FuncTypeDeclarer(posOf(ctx), prototype);
+        return new FuncTypeDeclarer(posOf(ctx), prototype, TypeArguments.EMPTY);
     }
 
     public List<TypeDeclarer> parseTypeDeclarerList(
@@ -894,13 +894,7 @@ final class SourceParseVisitor
     @Override
     public Entity visitDeclarationStatement(
             FengParser.DeclarationStatementContext ctx) {
-        var ds = (DeclarationStatement) visit(ctx.declaration());
-        if (ds.init().none()) return ds;
-        var tp = ds.init().must();
-        if (ds.variables().size() != tp.size()) {
-            ErrorUtil.align(ds.variables().getFirst().pos(), tp.pos());
-        }
-        return ds;
+        return visit(ctx.declaration());
     }
 
     // statement: assignment
@@ -979,9 +973,6 @@ final class SourceParseVisitor
         var condition = (Expression) visit(ctx.condition);
         var yes = (Tuple) visit(ctx.yes);
         var not = (Tuple) visit(ctx.not);
-        if (yes.size() != not.size()) {
-            ErrorUtil.align(yes.pos(), not.pos());
-        }
         return new IfTuple(posOf(ctx), condition, yes, not);
     }
 
@@ -994,11 +985,6 @@ final class SourceParseVisitor
             return new SwitchTuple.Rule(constants, values);
         }).toList();
         var defTp = (Tuple) visit(ctx.switchRuleDefault().tuple());
-        for (var rule : rules) {
-            if (rule.tuple().size() != defTp.size()) {
-                ErrorUtil.align(defTp.pos(), rule.tuple().pos());
-            }
-        }
         return new SwitchTuple(posOf(ctx), value, rules, defTp);
     }
 

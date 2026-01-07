@@ -1,7 +1,7 @@
 import a.b *;
 var a *b$User;
 var b []b$Host;
-var b []*b$Host;
+var c []*b$Host;
 class Win`T h$R | t$Tee & u$Rest` : b$Sys (b$Boot,b$Init) {
     var a*h$Device;
     var b*h$Device;

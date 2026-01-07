@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 import java.util.List;
+import java.util.Objects;
 
 public class TypeArguments extends Entity {
     private final List<TypeDeclarer> arguments;
@@ -21,6 +22,12 @@ public class TypeArguments extends Entity {
 
     public boolean isEmpty() {
         return arguments.isEmpty();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof TypeArguments that)) return false;
+        return Objects.equals(arguments, that.arguments);
     }
 
     //
