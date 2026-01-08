@@ -49,9 +49,12 @@ final class SourceParseVisitor
     // symbols table
     //
 
-    public final GlobalSymbolTable gst = new GlobalSymbolTable();
+    final String file;
+    final GlobalSymbolTable gst;
 
-    public SourceParseVisitor() {
+    public SourceParseVisitor(String file, GlobalSymbolTable gst) {
+        this.file = file;
+        this.gst = gst;
     }
 
 
@@ -87,15 +90,15 @@ final class SourceParseVisitor
 
 
     Position posOf(Token t) {
-        return new Position(t, null);
+        return new Position(file, t, null);
     }
 
     Position posOf(TerminalNode tn) {
-        return new Position(tn.getSymbol(), null);
+        return new Position(file, tn.getSymbol(), null);
     }
 
     Position posOf(ParserRuleContext ctx) {
-        return new Position(ctx.getStart(), ctx.getStop());
+        return new Position(file, ctx.getStart(), ctx.getStop());
     }
 
     //
@@ -131,7 +134,7 @@ final class SourceParseVisitor
     @Override
     public Entity visitSource(FengParser.SourceContext ctx) {
         var imports = this.<Import>visitList(ctx.import_());
-        var set = new HashSet<Module_>(imports.size());
+        var set = new HashSet<List<Identifier>>(imports.size());
         for (var i : imports) {
             if (!set.add(i.module()))
                 ErrorUtil.semantic("duplicate import: %s",
@@ -143,16 +146,10 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitImport_(FengParser.Import_Context ctx) {
-        var mod = (Module_) visit(ctx.module());
+        var mod = identifiers(ctx.module().Identifier());
         var alias = identifierOptional(ctx.alias);
         var flat = ctx.flat != null;
         return new Import(posOf(ctx), mod, alias, flat);
-    }
-
-    @Override
-    public Entity visitModule(FengParser.ModuleContext ctx) {
-        var path = identifiers(ctx.Identifier());
-        return new Module_(posOf(ctx), path);
     }
 
     @Override
@@ -991,6 +988,11 @@ final class SourceParseVisitor
     @Override
     public Entity visitArrayTuple(FengParser.ArrayTupleContext ctx) {
         var values = parseExpressions(ctx.values);
+        if (values.size() == 1) {
+            var v = values.getFirst();
+            if (v instanceof CallExpression ce)
+                return new ReturnTuple(posOf(ctx), ce);
+        }
         return new ArrayTuple(posOf(ctx), values);
     }
 

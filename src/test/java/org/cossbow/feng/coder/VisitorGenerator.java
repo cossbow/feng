@@ -34,7 +34,7 @@ public class VisitorGenerator {
         for (var p : pkgs) sb.append("import ").append(p).append(".*;\n");
         sb.append("import org.cossbow.feng.util.ErrorUtil;\n");
         var rootName = root.getSimpleName();
-        sb.append("\npublic interface ").append(rootName).append("Parser<R> {\n\n");
+        sb.append("\npublic interface ").append(rootName).append("Visitor<R> {\n\n");
         visitClass(root, ci -> {
             var name = ci.getSimpleName();
             if (!ci.isAbstract()) {
@@ -58,7 +58,7 @@ public class VisitorGenerator {
         });
         sb.append("}\n");
 
-        Files.write(Path.of(rootName + "Parser.java"), List.of(sb),
+        Files.write(Path.of(rootName + "Visitor.java"), List.of(sb),
                 StandardCharsets.UTF_8);
     }
 

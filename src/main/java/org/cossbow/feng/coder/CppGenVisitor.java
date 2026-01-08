@@ -2,36 +2,17 @@ package org.cossbow.feng.coder;
 
 import org.cossbow.feng.visit.EntityVisitor;
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.ast.Symbol;
-import org.cossbow.feng.ast.attr.Attribute;
-import org.cossbow.feng.ast.attr.AttributeDefinition;
-import org.cossbow.feng.ast.attr.AttributeField;
-import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
-import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
-import org.cossbow.feng.ast.lit.*;
-import org.cossbow.feng.ast.micro.MacroClass;
-import org.cossbow.feng.ast.micro.MacroFunc;
-import org.cossbow.feng.ast.micro.MacroProcedure;
-import org.cossbow.feng.ast.micro.MacroVariable;
-import org.cossbow.feng.ast.mod.GlobalDeclaration;
-import org.cossbow.feng.ast.mod.GlobalDefinition;
-import org.cossbow.feng.ast.mod.Import;
-import org.cossbow.feng.ast.mod.Module_;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
-import org.cossbow.feng.ast.struct.*;
-import org.cossbow.feng.ast.var.IndexAssignableOperand;
-import org.cossbow.feng.ast.var.MemberAssignableOperand;
-import org.cossbow.feng.ast.var.VariableAssignableOperand;
 import org.cossbow.feng.util.ErrorUtil;
 
 import java.io.IOException;
 
-public class CppGenVisitor implements EntityVisitor {
+public class CppGenVisitor implements EntityVisitor<CppGenVisitor> {
     private final Appendable a;
 
     public CppGenVisitor(Appendable a) {
@@ -59,12 +40,7 @@ public class CppGenVisitor implements EntityVisitor {
     //
 
     @Override
-    public void visit(AttributeDefinition e) {
-
-    }
-
-    @Override
-    public void visit(ClassDefinition cd) {
+    public CppGenVisitor visit(ClassDefinition cd) {
         write("class ");
         visit(cd.name());
         write(' ');
@@ -95,31 +71,7 @@ public class CppGenVisitor implements EntityVisitor {
             visit(m);
         }
         write('}');
-    }
-
-    @Override
-    public void visit(EnumDefinition e) {
-
-    }
-
-    @Override
-    public void visit(InterfaceDefinition e) {
-
-    }
-
-    @Override
-    public void visit(PrototypeDefinition e) {
-
-    }
-
-    @Override
-    public void visit(InterfaceMethod e) {
-
-    }
-
-    @Override
-    public void visit(StructureDefinition e) {
-
+        return this;
     }
 
     void visit(UnnamedParameterSet ps) {
@@ -141,7 +93,7 @@ public class CppGenVisitor implements EntityVisitor {
     }
 
     @Override
-    public void visit(FunctionDefinition fd) {
+    public CppGenVisitor visit(FunctionDefinition fd) {
         var proc = fd.procedure();
         var ps = proc.prototype().parameterSet();
         var rs = proc.prototype().returnSet();
@@ -166,74 +118,43 @@ public class CppGenVisitor implements EntityVisitor {
         }
         write(")\n");
         visit(proc.body());
+        return this;
     }
 
     @Override
-    public void visit(ClassMethod cm) {
-        visit((FunctionDefinition) cm);
+    public CppGenVisitor visit(ClassMethod cm) {
+      return   visit((FunctionDefinition) cm);
     }
 
     @Override
-    public void visit(Identifier id) {
+    public CppGenVisitor visit(Identifier id) {
         write(id.value());
+        return this;
     }
 
     @Override
-    public void visit(Source e) {
-
-    }
-
-    @Override
-    public void visit(Symbol s) {
+    public CppGenVisitor visit(Symbol s) {
         if (s.module().has()) {
             visit(s.module().get());
             write('$');
         }
         visit(s.name());
+        return this;
     }
 
     @Override
-    public void visit(Attribute e) {
-
-    }
-
-    @Override
-    public void visit(AttributeField e) {
-
-    }
-
-    @Override
-    public void visit(Modifier e) {
-
-    }
-
-    @Override
-    public void visit(NewArrayType e) {
-
-    }
-
-    @Override
-    public void visit(NewDefinedType e) {
-
-    }
-
-    @Override
-    public void visit(Reference e) {
-
-    }
-
-    @Override
-    public void visit(ArrayTypeDeclarer td) {
+    public CppGenVisitor visit(ArrayTypeDeclarer td) {
         write('[');
         if (td.length().has()) {
             ErrorUtil.unsupported("未实现定长数组");
         }
         write(']');
         visit(td.element());
+        return this;
     }
 
     @Override
-    public void visit(DefinedTypeDeclarer td) {
+    public CppGenVisitor visit(DefinedTypeDeclarer td) {
         visit(td.definedType());
         if (td.reference().has()) {
             var ref = td.reference().get();
@@ -245,11 +166,7 @@ public class CppGenVisitor implements EntityVisitor {
                     ErrorUtil.unsupported("其他引用未实现");
             }
         }
-    }
-
-    @Override
-    public void visit(FuncTypeDeclarer e) {
-
+        return this;
     }
 
     void visit(Declare d) {
@@ -257,354 +174,51 @@ public class CppGenVisitor implements EntityVisitor {
     }
 
     @Override
-    public void visit(Variable v) {
+    public CppGenVisitor visit(Variable v) {
         visit(v.declare());
         write(' ');
         visit(v.type().must());
         write(' ');
         visit(v.name());
+        return this;
     }
 
     @Override
-    public void visit(BinaryExpression e) {
-
-    }
-
-    @Override
-    public void visit(ArrayExpression e) {
-
-    }
-
-    @Override
-    public void visit(AssertExpression e) {
-
-    }
-
-    @Override
-    public void visit(CallExpression e) {
-
-    }
-
-    @Override
-    public void visit(IndexOfExpression e) {
-
-    }
-
-    @Override
-    public void visit(LambdaExpression e) {
-
-    }
-
-    @Override
-    public void visit(LiteralExpression e) {
-
-    }
-
-    @Override
-    public void visit(MemberOfExpression e) {
-
-    }
-
-    @Override
-    public void visit(NewExpression e) {
-
-    }
-
-    @Override
-    public void visit(ObjectExpression e) {
-
-    }
-
-    @Override
-    public void visit(PairsExpression e) {
-
-    }
-
-    @Override
-    public void visit(ParenExpression e) {
-
-    }
-
-    @Override
-    public void visit(ReferExpression e) {
-
-    }
-
-    @Override
-    public void visit(UnaryExpression e) {
-
-    }
-
-    @Override
-    public void visit(DefinedType dt) {
+    public CppGenVisitor visit(DefinedType dt) {
         visit(dt.symbol());
         if (!dt.generic().isEmpty())
             ErrorUtil.unsupported("泛型未实现");
+        return this;
     }
 
     @Override
-    public void visit(TypeArguments e) {
-
-    }
-
-    @Override
-    public void visit(BinaryTypeConstraint e) {
-
-    }
-
-    @Override
-    public void visit(DefinedTypeConstraint e) {
-
-    }
-
-    @Override
-    public void visit(DomainTypeConstraint e) {
-
-    }
-
-    @Override
-    public void visit(TypeParameter e) {
-
-    }
-
-    @Override
-    public void visit(TypeParameters e) {
-
-    }
-
-    @Override
-    public void visit(BoolLiteral e) {
-
-    }
-
-    @Override
-    public void visit(FloatLiteral e) {
-
-    }
-
-    @Override
-    public void visit(IntegerLiteral e) {
-
-    }
-
-    @Override
-    public void visit(NilLiteral e) {
-
-    }
-
-    @Override
-    public void visit(StringLiteral e) {
-
-    }
-
-    @Override
-    public void visit(MacroClass e) {
-
-    }
-
-    @Override
-    public void visit(MacroFunc e) {
-
-    }
-
-    @Override
-    public void visit(MacroProcedure e) {
-
-    }
-
-    @Override
-    public void visit(MacroVariable e) {
-
-    }
-
-    @Override
-    public void visit(GlobalDeclaration e) {
-
-    }
-
-    @Override
-    public void visit(GlobalDefinition e) {
-
-    }
-
-    @Override
-    public void visit(Import e) {
-
-    }
-
-    @Override
-    public void visit(Module_ e) {
-
-    }
-
-    @Override
-    public void visit(ClassField cf) {
+    public CppGenVisitor visit(ClassField cf) {
         visit(cf.declare());
         write(' ');
         visit(cf.type());
         write(' ');
         visit(cf.name());
         write(";\n");
+        return this;
     }
 
-    @Override
-    public void visit(Procedure e) {
-
-    }
 
     @Override
-    public void visit(Prototype e) {
-
-    }
-
-    @Override
-    public void visit(CatchClause e) {
-
-    }
-
-    @Override
-    public void visit(AssignmentOperateStatement e) {
-
-    }
-
-    @Override
-    public void visit(AssignmentsStatement e) {
-
-    }
-
-    @Override
-    public void visit(BlockStatement bs) {
+    public CppGenVisitor visit(BlockStatement bs) {
         write("{\n");
         for (var s : bs.list())
             visit(s);
         write("}\n\n");
+        return this;
     }
 
     @Override
-    public void visit(BreakStatement e) {
-
-    }
-
-    @Override
-    public void visit(CallStatement e) {
-
-    }
-
-    @Override
-    public void visit(ContinueStatement e) {
-
-    }
-
-    @Override
-    public void visit(DeclarationStatement e) {
-
-    }
-
-    @Override
-    public void visit(ConditionalForStatement e) {
-
-    }
-
-    @Override
-    public void visit(IterableForStatement e) {
-
-    }
-
-    @Override
-    public void visit(GotoStatement e) {
-
-    }
-
-    @Override
-    public void visit(IfStatement e) {
-
-    }
-
-    @Override
-    public void visit(LabeledStatement e) {
-
-    }
-
-    @Override
-    public void visit(LocalDefineStatement e) {
-
-    }
-
-    @Override
-    public void visit(ReturnStatement rs) {
+    public CppGenVisitor visit(ReturnStatement rs) {
         write("return ");
         if (rs.result().has())
             visit(rs.result().get());
         write(";\n");
+        return this;
     }
 
-    @Override
-    public void visit(SwitchStatement e) {
-
-    }
-
-    @Override
-    public void visit(ThrowStatement e) {
-
-    }
-
-    @Override
-    public void visit(TryStatement e) {
-
-    }
-
-    @Override
-    public void visit(SwitchBranch e) {
-
-    }
-
-    @Override
-    public void visit(ArrayTuple e) {
-
-    }
-
-    @Override
-    public void visit(IfTuple e) {
-
-    }
-
-    @Override
-    public void visit(SwitchTuple e) {
-
-    }
-
-    @Override
-    public void visit(StructureField e) {
-
-    }
-
-    @Override
-    public void visit(ArrayStructureType e) {
-
-    }
-
-    @Override
-    public void visit(DefinedStructureType e) {
-
-    }
-
-    @Override
-    public void visit(UnnamedStructureType e) {
-
-    }
-
-    @Override
-    public void visit(IndexAssignableOperand e) {
-
-    }
-
-    @Override
-    public void visit(MemberAssignableOperand e) {
-
-    }
-
-    @Override
-    public void visit(VariableAssignableOperand e) {
-
-    }
 }

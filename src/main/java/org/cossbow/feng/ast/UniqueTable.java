@@ -36,6 +36,14 @@ public class UniqueTable<K extends Entity, V> {
         throw new NoSuchElementException("not exists '" + id + "'");
     }
 
+    public Optional<V> tryGet(K id) {
+        var node = table.get(id);
+        if (node != null) {
+            return Optional.of(node.value);
+        }
+        return Optional.empty();
+    }
+
     public K getKey(int i) {
         return nodes.get(i).id;
     }

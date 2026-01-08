@@ -1,534 +1,400 @@
 package org.cossbow.feng.visit;
 
-import org.cossbow.feng.ast.*;
-import org.cossbow.feng.ast.attr.Attribute;
-import org.cossbow.feng.ast.attr.AttributeDefinition;
-import org.cossbow.feng.ast.attr.AttributeField;
-import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.dcl.*;
-import org.cossbow.feng.ast.expr.Expression;
-import org.cossbow.feng.ast.gen.*;
-import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.micro.*;
 import org.cossbow.feng.ast.mod.*;
-import org.cossbow.feng.ast.oop.*;
-import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.ast.proc.Procedure;
-import org.cossbow.feng.ast.proc.Prototype;
-import org.cossbow.feng.ast.proc.PrototypeDefinition;
-import org.cossbow.feng.ast.stmt.*;
+import org.cossbow.feng.ast.var.*;
+import org.cossbow.feng.ast.proc.*;
+import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.struct.*;
-import org.cossbow.feng.ast.var.AssignableOperand;
-import org.cossbow.feng.ast.var.IndexAssignableOperand;
-import org.cossbow.feng.ast.var.MemberAssignableOperand;
-import org.cossbow.feng.ast.var.VariableAssignableOperand;
+import org.cossbow.feng.ast.stmt.*;
+import org.cossbow.feng.ast.attr.*;
+import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.oop.*;
+import org.cossbow.feng.ast.gen.*;
+import org.cossbow.feng.ast.lit.*;
+import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.util.ErrorUtil;
 
-public interface EntityVisitor extends ExpressionVisitor {
+public interface EntityVisitor<R> {
 
-	default void visit(Entity e) {
-		switch (e) {
-			case Definition ee:
-				visit(ee);
-				break;
-			case Identifier ee:
-				visit(ee);
-				break;
-			case Source ee:
-				visit(ee);
-				break;
-			case Symbol ee:
-				visit(ee);
-				break;
-			case Attribute ee:
-				visit(ee);
-				break;
-			case AttributeField ee:
-				visit(ee);
-				break;
-			case Modifier ee:
-				visit(ee);
-				break;
-			case NewType ee:
-				visit(ee);
-				break;
-			case Reference ee:
-				visit(ee);
-				break;
-			case TypeDeclarer ee:
-				visit(ee);
-				break;
-			case Variable ee:
-				visit(ee);
-				break;
-			case Expression ee:
-				visit(ee);
-				break;
-			case DefinedType ee:
-				visit(ee);
-				break;
-			case TypeArguments ee:
-				visit(ee);
-				break;
-			case TypeConstraint ee:
-				visit(ee);
-				break;
-			case TypeParameter ee:
-				visit(ee);
-				break;
-			case TypeParameters ee:
-				visit(ee);
-				break;
-			case Literal ee:
-				visit(ee);
-				break;
-			case Macro ee:
-				visit(ee);
-				break;
-			case MacroProcedure ee:
-				visit(ee);
-				break;
-			case MacroVariable ee:
-				visit(ee);
-				break;
-			case Global ee:
-				visit(ee);
-				break;
-			case Import ee:
-				visit(ee);
-				break;
-			case Module_ ee:
-				visit(ee);
-				break;
-			case ClassField ee:
-				visit(ee);
-				break;
-			case Procedure ee:
-				visit(ee);
-				break;
-			case Prototype ee:
-				visit(ee);
-				break;
-			case CatchClause ee:
-				visit(ee);
-				break;
-			case Statement ee:
-				visit(ee);
-				break;
-			case SwitchBranch ee:
-				visit(ee);
-				break;
-			case Tuple ee:
-				visit(ee);
-				break;
-			case StructureField ee:
-				visit(ee);
-				break;
-			case StructureType ee:
-				visit(ee);
-				break;
-			case AssignableOperand ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(Entity e) {
+		return switch (e) {
+			case Definition ee -> visit(ee);
+			case Identifier ee -> visit(ee);
+			case Source ee -> visit(ee);
+			case Symbol ee -> visit(ee);
+			case Attribute ee -> visit(ee);
+			case AttributeField ee -> visit(ee);
+			case Modifier ee -> visit(ee);
+			case NewType ee -> visit(ee);
+			case Reference ee -> visit(ee);
+			case TypeDeclarer ee -> visit(ee);
+			case Variable ee -> visit(ee);
+			case Expression ee -> visit(ee);
+			case DefinedType ee -> visit(ee);
+			case TypeArguments ee -> visit(ee);
+			case TypeConstraint ee -> visit(ee);
+			case TypeParameter ee -> visit(ee);
+			case TypeParameters ee -> visit(ee);
+			case Literal ee -> visit(ee);
+			case Macro ee -> visit(ee);
+			case MacroProcedure ee -> visit(ee);
+			case MacroVariable ee -> visit(ee);
+			case Global ee -> visit(ee);
+			case Import ee -> visit(ee);
+			case ClassField ee -> visit(ee);
+			case Procedure ee -> visit(ee);
+			case Prototype ee -> visit(ee);
+			case CatchClause ee -> visit(ee);
+			case Statement ee -> visit(ee);
+			case SwitchBranch ee -> visit(ee);
+			case Tuple ee -> visit(ee);
+			case StructureField ee -> visit(ee);
+			case StructureType ee -> visit(ee);
+			case AssignableOperand ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(Definition e) {
-		switch (e) {
-			case TypeDefinition ee:
-				visit(ee);
-				break;
-			case FunctionDefinition ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(Definition e) {
+		return switch (e) {
+			case TypeDefinition ee -> visit(ee);
+			case FunctionDefinition ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(TypeDefinition e) {
-		switch (e) {
-			case AttributeDefinition ee:
-				visit(ee);
-				break;
-			case ClassDefinition ee:
-				visit(ee);
-				break;
-			case EnumDefinition ee:
-				visit(ee);
-				break;
-			case InterfaceDefinition ee:
-				visit(ee);
-				break;
-			case PrototypeDefinition ee:
-				visit(ee);
-				break;
-			case StructureDefinition ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(TypeDefinition e) {
+		return switch (e) {
+			case AttributeDefinition ee -> visit(ee);
+			case ClassDefinition ee -> visit(ee);
+			case EnumDefinition ee -> visit(ee);
+			case InterfaceDefinition ee -> visit(ee);
+			case PrototypeDefinition ee -> visit(ee);
+			case StructureDefinition ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(AttributeDefinition e) {}
+	default R visit(AttributeDefinition e) { return null; }
 
-	default void visit(ClassDefinition e) {}
+	default R visit(ClassDefinition e) { return null; }
 
-	default void visit(EnumDefinition e) {}
+	default R visit(EnumDefinition e) { return null; }
 
-	default void visit(InterfaceDefinition e) {}
+	default R visit(InterfaceDefinition e) { return null; }
 
-	default void visit(PrototypeDefinition e) {}
+	default R visit(PrototypeDefinition e) { return null; }
 
-	default void visit(InterfaceMethod e) {}
+	default R visit(InterfaceMethod e) { return null; }
 
-	default void visit(StructureDefinition e) {}
+	default R visit(StructureDefinition e) { return null; }
 
-	default void visit(FunctionDefinition e) {}
+	default R visit(FunctionDefinition e) { return null; }
 
-	default void visit(ClassMethod e) {}
+	default R visit(ClassMethod e) { return null; }
 
-	default void visit(Identifier e) {}
+	default R visit(Identifier e) { return null; }
 
-	default void visit(Source e) {}
+	default R visit(Source e) { return null; }
 
-	default void visit(Symbol e) {}
+	default R visit(Symbol e) { return null; }
 
-	default void visit(Attribute e) {}
+	default R visit(Attribute e) { return null; }
 
-	default void visit(AttributeField e) {}
+	default R visit(AttributeField e) { return null; }
 
-	default void visit(Modifier e) {}
+	default R visit(Modifier e) { return null; }
 
-	default void visit(NewType e) {
-		switch (e) {
-			case NewArrayType ee:
-				visit(ee);
-				break;
-			case NewDefinedType ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(NewType e) {
+		return switch (e) {
+			case NewArrayType ee -> visit(ee);
+			case NewDefinedType ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(NewArrayType e) {}
+	default R visit(NewArrayType e) { return null; }
 
-	default void visit(NewDefinedType e) {}
+	default R visit(NewDefinedType e) { return null; }
 
-	default void visit(Reference e) {}
+	default R visit(Reference e) { return null; }
 
-	default void visit(TypeDeclarer e) {
-		switch (e) {
-			case ArrayTypeDeclarer ee:
-				visit(ee);
-				break;
-			case DefinedTypeDeclarer ee:
-				visit(ee);
-				break;
-			case FuncTypeDeclarer ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(TypeDeclarer e) {
+		return switch (e) {
+			case ArrayTypeDeclarer ee -> visit(ee);
+			case DefinedTypeDeclarer ee -> visit(ee);
+			case FuncTypeDeclarer ee -> visit(ee);
+			case MemTypeDeclarer ee -> visit(ee);
+			case PrimitiveTypeDeclarer ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(ArrayTypeDeclarer e) {}
+	default R visit(ArrayTypeDeclarer e) { return null; }
 
-	default void visit(DefinedTypeDeclarer e) {}
+	default R visit(DefinedTypeDeclarer e) { return null; }
 
-	default void visit(FuncTypeDeclarer e) {}
+	default R visit(FuncTypeDeclarer e) { return null; }
 
-	default void visit(Variable e) {}
+	default R visit(MemTypeDeclarer e) { return null; }
 
-	default void visit(DefinedType e) {}
+	default R visit(PrimitiveTypeDeclarer e) { return null; }
 
-	default void visit(TypeArguments e) {}
+	default R visit(Variable e) { return null; }
 
-	default void visit(TypeConstraint e) {
-		switch (e) {
-			case BinaryTypeConstraint ee:
-				visit(ee);
-				break;
-			case DefinedTypeConstraint ee:
-				visit(ee);
-				break;
-			case DomainTypeConstraint ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(Expression e) {
+		return switch (e) {
+			case BinaryExpression ee -> visit(ee);
+			case PrimaryExpression ee -> visit(ee);
+			case UnaryExpression ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(BinaryTypeConstraint e) {}
+	default R visit(BinaryExpression e) { return null; }
 
-	default void visit(DefinedTypeConstraint e) {}
-
-	default void visit(DomainTypeConstraint e) {}
-
-	default void visit(TypeParameter e) {}
-
-	default void visit(TypeParameters e) {}
-
-	default void visit(Literal e) {
-		switch (e) {
-			case BoolLiteral ee:
-				visit(ee);
-				break;
-			case FloatLiteral ee:
-				visit(ee);
-				break;
-			case IntegerLiteral ee:
-				visit(ee);
-				break;
-			case NilLiteral ee:
-				visit(ee);
-				break;
-			case StringLiteral ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(PrimaryExpression e) {
+		return switch (e) {
+			case ArrayExpression ee -> visit(ee);
+			case AssertExpression ee -> visit(ee);
+			case CallExpression ee -> visit(ee);
+			case IndexOfExpression ee -> visit(ee);
+			case LambdaExpression ee -> visit(ee);
+			case LiteralExpression ee -> visit(ee);
+			case MemberOfExpression ee -> visit(ee);
+			case NewExpression ee -> visit(ee);
+			case ObjectExpression ee -> visit(ee);
+			case PairsExpression ee -> visit(ee);
+			case ParenExpression ee -> visit(ee);
+			case ReferExpression ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(BoolLiteral e) {}
+	default R visit(ArrayExpression e) { return null; }
 
-	default void visit(FloatLiteral e) {}
+	default R visit(AssertExpression e) { return null; }
 
-	default void visit(IntegerLiteral e) {}
+	default R visit(CallExpression e) { return null; }
 
-	default void visit(NilLiteral e) {}
+	default R visit(IndexOfExpression e) { return null; }
 
-	default void visit(StringLiteral e) {}
+	default R visit(LambdaExpression e) { return null; }
 
-	default void visit(Macro e) {
-		switch (e) {
-			case MacroClass ee:
-				visit(ee);
-				break;
-			case MacroFunc ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(LiteralExpression e) { return null; }
+
+	default R visit(MemberOfExpression e) { return null; }
+
+	default R visit(NewExpression e) { return null; }
+
+	default R visit(ObjectExpression e) { return null; }
+
+	default R visit(PairsExpression e) { return null; }
+
+	default R visit(ParenExpression e) { return null; }
+
+	default R visit(ReferExpression e) { return null; }
+
+	default R visit(UnaryExpression e) { return null; }
+
+	default R visit(DefinedType e) { return null; }
+
+	default R visit(TypeArguments e) { return null; }
+
+	default R visit(TypeConstraint e) {
+		return switch (e) {
+			case BinaryTypeConstraint ee -> visit(ee);
+			case DefinedTypeConstraint ee -> visit(ee);
+			case DomainTypeConstraint ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(MacroClass e) {}
+	default R visit(BinaryTypeConstraint e) { return null; }
 
-	default void visit(MacroFunc e) {}
+	default R visit(DefinedTypeConstraint e) { return null; }
 
-	default void visit(MacroProcedure e) {}
+	default R visit(DomainTypeConstraint e) { return null; }
 
-	default void visit(MacroVariable e) {}
+	default R visit(TypeParameter e) { return null; }
 
-	default void visit(Global e) {
-		switch (e) {
-			case GlobalDeclaration ee:
-				visit(ee);
-				break;
-			case GlobalDefinition ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(TypeParameters e) { return null; }
+
+	default R visit(Literal e) {
+		return switch (e) {
+			case BoolLiteral ee -> visit(ee);
+			case FloatLiteral ee -> visit(ee);
+			case IntegerLiteral ee -> visit(ee);
+			case NilLiteral ee -> visit(ee);
+			case StringLiteral ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(GlobalDeclaration e) {}
+	default R visit(BoolLiteral e) { return null; }
 
-	default void visit(GlobalDefinition e) {}
+	default R visit(FloatLiteral e) { return null; }
 
-	default void visit(Import e) {}
+	default R visit(IntegerLiteral e) { return null; }
 
-	default void visit(Module_ e) {}
+	default R visit(NilLiteral e) { return null; }
 
-	default void visit(ClassField e) {}
+	default R visit(StringLiteral e) { return null; }
 
-	default void visit(Procedure e) {}
-
-	default void visit(Prototype e) {}
-
-	default void visit(CatchClause e) {}
-
-	default void visit(Statement e) {
-		switch (e) {
-			case AssignmentOperateStatement ee:
-				visit(ee);
-				break;
-			case AssignmentsStatement ee:
-				visit(ee);
-				break;
-			case BlockStatement ee:
-				visit(ee);
-				break;
-			case BreakStatement ee:
-				visit(ee);
-				break;
-			case CallStatement ee:
-				visit(ee);
-				break;
-			case ContinueStatement ee:
-				visit(ee);
-				break;
-			case DeclarationStatement ee:
-				visit(ee);
-				break;
-			case ForStatement ee:
-				visit(ee);
-				break;
-			case GotoStatement ee:
-				visit(ee);
-				break;
-			case IfStatement ee:
-				visit(ee);
-				break;
-			case LabeledStatement ee:
-				visit(ee);
-				break;
-			case LocalDefineStatement ee:
-				visit(ee);
-				break;
-			case ReturnStatement ee:
-				visit(ee);
-				break;
-			case SwitchStatement ee:
-				visit(ee);
-				break;
-			case ThrowStatement ee:
-				visit(ee);
-				break;
-			case TryStatement ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(Macro e) {
+		return switch (e) {
+			case MacroClass ee -> visit(ee);
+			case MacroFunc ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(AssignmentOperateStatement e) {}
+	default R visit(MacroClass e) { return null; }
 
-	default void visit(AssignmentsStatement e) {}
+	default R visit(MacroFunc e) { return null; }
 
-	default void visit(BlockStatement e) {}
+	default R visit(MacroProcedure e) { return null; }
 
-	default void visit(BreakStatement e) {}
+	default R visit(MacroVariable e) { return null; }
 
-	default void visit(CallStatement e) {}
-
-	default void visit(ContinueStatement e) {}
-
-	default void visit(DeclarationStatement e) {}
-
-	default void visit(ForStatement e) {
-		switch (e) {
-			case ConditionalForStatement ee:
-				visit(ee);
-				break;
-			case IterableForStatement ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(Global e) {
+		return switch (e) {
+			case GlobalDeclaration ee -> visit(ee);
+			case GlobalDefinition ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(ConditionalForStatement e) {}
+	default R visit(GlobalDeclaration e) { return null; }
 
-	default void visit(IterableForStatement e) {}
+	default R visit(GlobalDefinition e) { return null; }
 
-	default void visit(GotoStatement e) {}
+	default R visit(Import e) { return null; }
 
-	default void visit(IfStatement e) {}
+	default R visit(ClassField e) { return null; }
 
-	default void visit(LabeledStatement e) {}
+	default R visit(Procedure e) { return null; }
 
-	default void visit(LocalDefineStatement e) {}
+	default R visit(Prototype e) { return null; }
 
-	default void visit(ReturnStatement e) {}
+	default R visit(CatchClause e) { return null; }
 
-	default void visit(SwitchStatement e) {}
-
-	default void visit(ThrowStatement e) {}
-
-	default void visit(TryStatement e) {}
-
-	default void visit(SwitchBranch e) {}
-
-	default void visit(Tuple e) {
-		switch (e) {
-			case ArrayTuple ee:
-				visit(ee);
-				break;
-			case IfTuple ee:
-				visit(ee);
-				break;
-			case SwitchTuple ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(Statement e) {
+		return switch (e) {
+			case AssignmentOperateStatement ee -> visit(ee);
+			case AssignmentsStatement ee -> visit(ee);
+			case BlockStatement ee -> visit(ee);
+			case BreakStatement ee -> visit(ee);
+			case CallStatement ee -> visit(ee);
+			case ContinueStatement ee -> visit(ee);
+			case DeclarationStatement ee -> visit(ee);
+			case ForStatement ee -> visit(ee);
+			case GotoStatement ee -> visit(ee);
+			case IfStatement ee -> visit(ee);
+			case LabeledStatement ee -> visit(ee);
+			case LocalDefineStatement ee -> visit(ee);
+			case ReturnStatement ee -> visit(ee);
+			case SwitchStatement ee -> visit(ee);
+			case ThrowStatement ee -> visit(ee);
+			case TryStatement ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(ArrayTuple e) {}
+	default R visit(AssignmentOperateStatement e) { return null; }
 
-	default void visit(IfTuple e) {}
+	default R visit(AssignmentsStatement e) { return null; }
 
-	default void visit(SwitchTuple e) {}
+	default R visit(BlockStatement e) { return null; }
 
-	default void visit(StructureField e) {}
+	default R visit(BreakStatement e) { return null; }
 
-	default void visit(StructureType e) {
-		switch (e) {
-			case ArrayStructureType ee:
-				visit(ee);
-				break;
-			case DefinedStructureType ee:
-				visit(ee);
-				break;
-			case UnnamedStructureType ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(CallStatement e) { return null; }
+
+	default R visit(ContinueStatement e) { return null; }
+
+	default R visit(DeclarationStatement e) { return null; }
+
+	default R visit(ForStatement e) {
+		return switch (e) {
+			case ConditionalForStatement ee -> visit(ee);
+			case IterableForStatement ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(ArrayStructureType e) {}
+	default R visit(ConditionalForStatement e) { return null; }
 
-	default void visit(DefinedStructureType e) {}
+	default R visit(IterableForStatement e) { return null; }
 
-	default void visit(UnnamedStructureType e) {}
+	default R visit(GotoStatement e) { return null; }
 
-	default void visit(AssignableOperand e) {
-		switch (e) {
-			case IndexAssignableOperand ee:
-				visit(ee);
-				break;
-			case MemberAssignableOperand ee:
-				visit(ee);
-				break;
-			case VariableAssignableOperand ee:
-				visit(ee);
-				break;
-			case null, default:
-				ErrorUtil.unreachable();
-		}
+	default R visit(IfStatement e) { return null; }
+
+	default R visit(LabeledStatement e) { return null; }
+
+	default R visit(LocalDefineStatement e) { return null; }
+
+	default R visit(ReturnStatement e) { return null; }
+
+	default R visit(SwitchStatement e) { return null; }
+
+	default R visit(ThrowStatement e) { return null; }
+
+	default R visit(TryStatement e) { return null; }
+
+	default R visit(SwitchBranch e) { return null; }
+
+	default R visit(Tuple e) {
+		return switch (e) {
+			case ArrayTuple ee -> visit(ee);
+			case IfTuple ee -> visit(ee);
+			case SwitchTuple ee -> visit(ee);
+			case ReturnTuple ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
 	}
 
-	default void visit(IndexAssignableOperand e) {}
+	default R visit(ArrayTuple e) { return null; }
 
-	default void visit(MemberAssignableOperand e) {}
+	default R visit(IfTuple e) { return null; }
 
-	default void visit(VariableAssignableOperand e) {}
+	default R visit(SwitchTuple e) { return null; }
+
+	default R visit(ReturnTuple e) { return null; }
+
+	default R visit(StructureField e) { return null; }
+
+	default R visit(StructureType e) {
+		return switch (e) {
+			case ArrayStructureType ee -> visit(ee);
+			case DefinedStructureType ee -> visit(ee);
+			case UnnamedStructureType ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
+	}
+
+	default R visit(ArrayStructureType e) { return null; }
+
+	default R visit(DefinedStructureType e) { return null; }
+
+	default R visit(UnnamedStructureType e) { return null; }
+
+	default R visit(AssignableOperand e) {
+		return switch (e) {
+			case IndexAssignableOperand ee -> visit(ee);
+			case MemberAssignableOperand ee -> visit(ee);
+			case VariableAssignableOperand ee -> visit(ee);
+			case null, default -> ErrorUtil.unreachable();
+		};
+	}
+
+	default R visit(IndexAssignableOperand e) { return null; }
+
+	default R visit(MemberAssignableOperand e) { return null; }
+
+	default R visit(VariableAssignableOperand e) { return null; }
 
 }
 

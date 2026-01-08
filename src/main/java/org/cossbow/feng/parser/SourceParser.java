@@ -8,15 +8,23 @@ import java.util.List;
 
 public class SourceParser {
 
-    public static ParseResult parse(CharStream cs) {
+    private final String file;
+    private final GlobalSymbolTable gst;
+
+    public SourceParser(String file, GlobalSymbolTable gst) {
+        this.file = file;
+        this.gst = gst;
+    }
+
+    public ParseResult parse(CharStream cs) {
         var lexer = new FengLexer(cs);
         var ts = new CommonTokenStream(lexer);
         var parser = new FengParser(ts);
         var ec = new ErrorCollector();
         parser.addErrorListener(ec);
-        var visitor = new SourceParseVisitor();
+        var visitor = new SourceParseVisitor(file, gst);
         var root = (Source) visitor.visit(parser.source());
-        return new ParseResult(root, visitor.gst, ec.errors);
+        return new ParseResult(root, ec.errors);
     }
 
     static class ErrorCollector extends BaseErrorListener
