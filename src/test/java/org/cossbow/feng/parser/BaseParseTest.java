@@ -16,10 +16,7 @@ import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.mod.Global;
 import org.cossbow.feng.ast.mod.GlobalDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.ast.stmt.ArrayTuple;
-import org.cossbow.feng.ast.stmt.CallStatement;
-import org.cossbow.feng.ast.stmt.Statement;
-import org.cossbow.feng.ast.stmt.Tuple;
+import org.cossbow.feng.ast.stmt.*;
 import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
@@ -242,6 +239,8 @@ public class BaseParseTest {
     }
 
     public static Expression first(Tuple tuple) {
+        if (tuple instanceof ReturnTuple rt)
+            return rt.call();
         return exprs(tuple).getFirst();
     }
 

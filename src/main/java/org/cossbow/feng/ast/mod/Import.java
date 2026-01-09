@@ -8,22 +8,26 @@ import org.cossbow.feng.ast.Position;
 import java.util.List;
 
 public class Import extends Entity {
-    private List<Identifier> module;
+    private List<Identifier> path;
     private Optional<Identifier> alias;
     private boolean flat;
 
     public Import(Position pos,
-                  List<Identifier> module,
+                  List<Identifier> path,
                   Optional<Identifier> alias,
                   boolean flat) {
         super(pos);
-        this.module = module;
+        this.path = path;
         this.alias = alias;
         this.flat = flat;
     }
 
-    public List<Identifier> module() {
-        return module;
+    public List<Identifier> path() {
+        return path;
+    }
+
+    public Identifier module() {
+        return alias.getOrElse(path.getLast());
     }
 
     public Optional<Identifier> alias() {

@@ -57,6 +57,7 @@ final class SourceParseVisitor
         this.gst = gst;
     }
 
+    final IdentifierTable<Import> imports = new IdentifierTable<>();
 
     //
     // utils
@@ -136,9 +137,9 @@ final class SourceParseVisitor
         var imports = this.<Import>visitList(ctx.import_());
         var set = new HashSet<List<Identifier>>(imports.size());
         for (var i : imports) {
-            if (!set.add(i.module()))
+            if (!set.add(i.path()))
                 ErrorUtil.semantic("duplicate import: %s",
-                        i.module());
+                        i.path());
         }
         var globals = this.<Global>visitList(ctx.global());
         return new Source(posOf(ctx), imports, globals);
@@ -149,7 +150,11 @@ final class SourceParseVisitor
         var mod = identifiers(ctx.module().Identifier());
         var alias = identifierOptional(ctx.alias);
         var flat = ctx.flat != null;
-        return new Import(posOf(ctx), mod, alias, flat);
+        var im = new Import(posOf(ctx), mod, alias, flat);
+        if (flat) return im;
+        if (alias.has()) imports.add(alias.get(), im);
+        else imports.add(mod.getLast(), im);
+        return im;
     }
 
     @Override
@@ -452,6 +457,10 @@ final class SourceParseVisitor
 
     private Symbol parseSymbol(FengParser.SymbolContext ctx) {
         var mod = identifierOptional(ctx.mod);
+        if (mod.has() && imports.get(mod.get()) == null) {
+            return ErrorUtil.semantic(
+                    "module %s not imported", mod.get());
+        }
         var name = identifier(ctx.name);
         return new Symbol(posOf(ctx), mod, name);
     }

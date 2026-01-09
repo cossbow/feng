@@ -1,4 +1,8 @@
-import a.b *;
+import a.b;
+import a.b.h;
+import a.b.h.t;
+import a.b.h.u;
+
 var a *b$User;
 var b []b$Host;
 var c []*b$Host;

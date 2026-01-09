@@ -15,6 +15,10 @@ public class Optional<T> {
         return value;
     }
 
+    public T getOrElse(T defVal) {
+        return has() ? value : defVal;
+    }
+
     public boolean has() {
         return value != null;
     }
@@ -23,12 +27,12 @@ public class Optional<T> {
         return value == null;
     }
 
-    public boolean is(T v) {
+    public boolean was(T v) {
         return value == v;
     }
 
     public T must() {
-        if (value == null) {
+        if (none()) {
             throw new NoSuchElementException("No value present");
         }
         return value;

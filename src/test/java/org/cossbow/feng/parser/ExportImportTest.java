@@ -2,20 +2,19 @@ package org.cossbow.feng.parser;
 
 
 import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.Optional;
 import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.NewArrayType;
 import org.cossbow.feng.ast.dcl.NewDefinedType;
 import org.cossbow.feng.ast.expr.BinaryExpression;
 import org.cossbow.feng.ast.expr.NewExpression;
 import org.cossbow.feng.ast.oop.ClassDefinition;
-import org.cossbow.feng.ast.stmt.ArrayTuple;
-import org.cossbow.feng.ast.stmt.AssignmentsStatement;
-import org.cossbow.feng.ast.stmt.CallStatement;
-import org.cossbow.feng.ast.stmt.DeclarationStatement;
+import org.cossbow.feng.ast.stmt.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class ExportImportTest extends BaseParseTest {
 
@@ -33,7 +32,7 @@ public class ExportImportTest extends BaseParseTest {
         Assertions.assertEquals(1, imports.size());
 
         var i = imports.getFirst();
-        Assertions.assertEquals(mod("a", "b"), i.module());
+        Assertions.assertEquals(mod("a", "b"), i.path());
 
         Assertions.assertFalse(i.alias().has());
         Assertions.assertFalse(i.flat());
@@ -47,7 +46,7 @@ public class ExportImportTest extends BaseParseTest {
         Assertions.assertEquals(1, imports.size());
 
         var i = imports.getFirst();
-        Assertions.assertEquals(mod("b", "c", "d"), i.module());
+        Assertions.assertEquals(mod("b", "c", "d"), i.path());
         Assertions.assertEquals(identifier("dist"), i.alias().must());
         Assertions.assertFalse(i.flat());
     }
@@ -60,23 +59,42 @@ public class ExportImportTest extends BaseParseTest {
         Assertions.assertEquals(1, imports.size());
 
         var i = imports.getFirst();
-        Assertions.assertEquals(mod("b", "c", "d"), i.module());
+        Assertions.assertEquals(mod("b", "c", "d"), i.path());
         Assertions.assertTrue(i.flat());
     }
 
     // module prefix
 
     private Symbol randVar(int ml, int nl) {
+        var mod = ml > 0 ? randVarName(ml) : null;
         return new Symbol(Position.ZERO,
-                Optional.of(randVarName(ml)),
+                Optional.of(mod),
                 randVarName(nl));
+    }
+
+    private String makeImports(Collection<Identifier> set) {
+        return set.stream().map("import %s;"::formatted)
+                .collect(Collectors.joining("\n"));
+    }
+
+    private String makeImports(Identifier... arr) {
+        return makeImports(Set.of(arr));
+    }
+
+    private String makeImports(Symbol... ss) {
+        var mod = new ArrayList<Identifier>(ss.length);
+        for (Symbol s : ss) {
+            if (s.module().has()) mod.add(s.module().must());
+        }
+        return makeImports(mod);
     }
 
     private void testTypeDeclarer(String flag) {
         var name = randVarName(12);
         var type = randVar(12, 32);
+        var im = makeImports(type.module().must());
         var code = "var %s %s%s = {};".formatted(name, flag, type);
-        var ds = (DeclarationStatement) doParseLocal(code);
+        var ds = (DeclarationStatement) parseLocal(im, code);
         var v = ds.variables().getFirst();
         Assertions.assertEquals(name, v.name());
         var dt = ((DefinedTypeDeclarer) v.type().must())
@@ -99,12 +117,19 @@ public class ExportImportTest extends BaseParseTest {
         testTypeDeclarer("&");
     }
 
+    Statement parseLocal(String im, String stmt) {
+        var fun = im + "func main() { %s }".formatted(stmt);
+        var func = doParseProc(fun);
+        return func.procedure().body().list().getFirst();
+    }
+
     @Test
     public void testNewType() {
         var type = randVar(12, 32);
         var param = randVar(8, 16);
+        var im = makeImports(type, param);
         var code = "var a = new(%s`%s`);".formatted(type, param);
-        var ds = (DeclarationStatement) doParseLocal(code);
+        var ds = (DeclarationStatement) parseLocal(im, code);
         var e = ((ArrayTuple) ds.init().must()).values().getFirst();
         var n = (NewExpression) e;
         var t = ((NewDefinedType) n.type()).type();
@@ -117,8 +142,9 @@ public class ExportImportTest extends BaseParseTest {
     public void testNewArray() {
         var index = randVar(8, 24);
         var type = randVar(12, 32);
+        var im = makeImports(index, type);
         var code = "var a = new([%s]%s);".formatted(index, type);
-        var ds = (DeclarationStatement) doParseLocal(code);
+        var ds = (DeclarationStatement) parseLocal(im, code);
         var e = ((ArrayTuple) ds.init().must()).values().getFirst();
         var n = (NewExpression) e;
         var t = (NewArrayType) n.type();
@@ -132,8 +158,9 @@ public class ExportImportTest extends BaseParseTest {
             var o = operator(op);
             var a = randVar(4, 12);
             var b = randVar(3, 15);
+            var im = makeImports(a, b);
             var code = "r=%s%s%s;".formatted(a, o, b);
-            var as = (AssignmentsStatement) doParseLocal(code);
+            var as = (AssignmentsStatement) parseLocal(im, code);
             var be = (BinaryExpression) ((ArrayTuple) as.tuple())
                     .values().getFirst();
             Assertions.assertEquals(op, be.operator());
@@ -145,8 +172,9 @@ public class ExportImportTest extends BaseParseTest {
     @Test
     public void testCallee() {
         var name = randVar(16, 32);
+        var im = makeImports(List.of(name.module().must()));
         var code = name + "();";
-        var cs = (CallStatement) doParseLocal(code);
+        var cs = (CallStatement) parseLocal(im, code);
         Assertions.assertEquals(name, varName(cs.call().callee()));
     }
 
@@ -154,12 +182,15 @@ public class ExportImportTest extends BaseParseTest {
     public void testClass() {
         var parent = randVar(10, 32);
         var ifs = new Symbol[10];
+        var mods = new HashSet<Identifier>(16);
+        mods.add(parent.module().must());
         var impls = new String[ifs.length];
         for (int i = 0; i < ifs.length; i++) {
             ifs[i] = randVar(i + 1, 32);
+            mods.add(ifs[i].module().must());
             impls[i] = ifs[i].toString();
         }
-        var code = "class Dev:%s(%s){}".formatted(parent,
+        var code = makeImports(mods) + "class Dev:%s(%s){}".formatted(parent,
                 String.join(",", impls));
         var def = (ClassDefinition) doParseDefinition(code);
         Assertions.assertEquals(parent, def.parent().must().symbol());
