@@ -1,24 +1,23 @@
 package org.cossbow.feng.parser;
 
-import java.util.Arrays;
-import java.util.List;
+import java.nio.file.Path;
 import java.util.Objects;
 
 public class ModulePath {
-    private final String[] path;
+    private final Path path;
 
-    public ModulePath(String[] path) {
+    public ModulePath(Path path) {
         this.path = path;
     }
 
-    public String[] path() {
+    public Path path() {
         return path;
     }
 
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof ModulePath t)) return false;
-        return Arrays.equals(path, t.path);
+        return Objects.equals(path, t.path);
     }
 
     @Override

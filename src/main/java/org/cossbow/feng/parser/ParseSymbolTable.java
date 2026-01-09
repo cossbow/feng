@@ -9,7 +9,7 @@ import org.cossbow.feng.ast.proc.Procedure;
 import java.util.ArrayList;
 import java.util.List;
 
-public class GlobalSymbolTable {
+public class ParseSymbolTable {
     public final IdentifierTable<TypeDefinition> namedTypes = new IdentifierTable<>();
     public final List<TypeDefinition> unnamedTypes = new ArrayList<>();
     public final IdentifierTable<FunctionDefinition> namedFunctions = new IdentifierTable<>();

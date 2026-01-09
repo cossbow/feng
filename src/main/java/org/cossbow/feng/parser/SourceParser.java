@@ -9,11 +9,11 @@ import java.util.List;
 public class SourceParser {
 
     private final String file;
-    private final GlobalSymbolTable gst;
+    private final ParseSymbolTable tab;
 
-    public SourceParser(String file, GlobalSymbolTable gst) {
+    public SourceParser(String file, ParseSymbolTable tab) {
         this.file = file;
-        this.gst = gst;
+        this.tab = tab;
     }
 
     public ParseResult parse(CharStream cs) {
@@ -22,7 +22,7 @@ public class SourceParser {
         var parser = new FengParser(ts);
         var ec = new ErrorCollector();
         parser.addErrorListener(ec);
-        var visitor = new SourceParseVisitor(file, gst);
+        var visitor = new SourceParseVisitor(file, tab);
         var root = (Source) visitor.visit(parser.source());
         return new ParseResult(root, ec.errors);
     }

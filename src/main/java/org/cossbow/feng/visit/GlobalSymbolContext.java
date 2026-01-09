@@ -5,14 +5,14 @@ import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.parser.GlobalSymbolTable;
+import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.ErrorUtil;
 
 public class GlobalSymbolContext implements SymbolContext {
 
-    private final GlobalSymbolTable gst;
+    private final ParseSymbolTable gst;
 
-    public GlobalSymbolContext(GlobalSymbolTable gst) {
+    public GlobalSymbolContext(ParseSymbolTable gst) {
         this.gst = gst;
     }
 

@@ -50,14 +50,14 @@ final class SourceParseVisitor
     //
 
     final String file;
-    final GlobalSymbolTable gst;
+    final ParseSymbolTable gst;
 
-    public SourceParseVisitor(String file, GlobalSymbolTable gst) {
+    public SourceParseVisitor(String file, ParseSymbolTable gst) {
         this.file = file;
         this.gst = gst;
     }
 
-    final IdentifierTable<Import> imports = new IdentifierTable<>();
+    final IdentifierTable<Import> importModName = new IdentifierTable<>();
 
     //
     // utils
@@ -152,8 +152,8 @@ final class SourceParseVisitor
         var flat = ctx.flat != null;
         var im = new Import(posOf(ctx), mod, alias, flat);
         if (flat) return im;
-        if (alias.has()) imports.add(alias.get(), im);
-        else imports.add(mod.getLast(), im);
+        if (alias.has()) importModName.add(alias.get(), im);
+        else importModName.add(mod.getLast(), im);
         return im;
     }
 
@@ -457,7 +457,7 @@ final class SourceParseVisitor
 
     private Symbol parseSymbol(FengParser.SymbolContext ctx) {
         var mod = identifierOptional(ctx.mod);
-        if (mod.has() && imports.get(mod.get()) == null) {
+        if (mod.has() && importModName.get(mod.get()) == null) {
             return ErrorUtil.semantic(
                     "module %s not imported", mod.get());
         }

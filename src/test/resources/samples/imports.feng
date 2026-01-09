@@ -2,6 +2,7 @@ import a.b;
 import a.b.h;
 import a.b.h.t;
 import a.b.h.u;
+import a.catalogue cat;
 
 var a *b$User;
 var b []b$Host;

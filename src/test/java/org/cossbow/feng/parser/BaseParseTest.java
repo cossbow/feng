@@ -53,7 +53,7 @@ public class BaseParseTest {
     static final int EDGE_ALL = EDGE_LOWERCASE + 1;
 
     static ParseResult doParse(CharStream cs) {
-        return new SourceParser("", new GlobalSymbolTable()).parse(cs);
+        return new SourceParser("", new ParseSymbolTable()).parse(cs);
     }
 
     static Source doParseFile(String code, String name) {

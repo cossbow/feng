@@ -68,7 +68,9 @@ public class UniqueTable<K extends Entity, V> {
         return table.isEmpty();
     }
 
-    public record Node<K, T>(K id, T value) {
+    //
+
+    record Node<K, T>(K id, T value) {
     }
 
     class PhantomList extends AbstractList<V> {

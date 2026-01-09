@@ -1,6 +1,5 @@
 package org.cossbow.feng.parser;
 
-import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.cossbow.feng.ast.FModule;
 import org.cossbow.feng.ast.Source;
@@ -16,27 +15,26 @@ import java.util.List;
 public class ModuleParser {
 
     private FModule parse(List<Path> list) throws IOException {
-        var gst = new GlobalSymbolTable();
+        var table = new ParseSymbolTable();
         var sources = new ArrayList<Source>(list.size());
         for (var f : list) {
             try (var is = Files.newInputStream(f)) {
                 var fn = f.getFileName().toString();
+                if (!fn.endsWith(Constants.SRC_EXT)) continue;
                 var cs = CharStreams.fromStream(is);
-                var pr = new SourceParser(fn, gst).parse(cs);
+                var pr = new SourceParser(fn, table).parse(cs);
                 if (!pr.errors().isEmpty())
                     ErrorUtil.syntax("parse error: %s", pr.errors());
                 sources.add(pr.root());
             }
         }
-        return new FModule(sources);
+        return new FModule(sources, table);
     }
 
-    public FModule parse(String base, ModulePath mp) throws IOException {
-        var m = Path.of(base, mp.path());
-        try (var ls = Files.list(m)) {
-            var list = ls.filter(Files::isRegularFile)
-                    .filter(p -> p.endsWith(Constants.SRC_EXT))
-                    .toList();
+    public FModule parse(Path base, Path module) throws IOException {
+        var fp = base.resolve(module);
+        try (var ls = Files.list(fp)) {
+            var list = ls.filter(Files::isRegularFile).toList();
             return parse(list);
         }
     }
