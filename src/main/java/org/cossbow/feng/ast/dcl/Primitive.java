@@ -1,5 +1,7 @@
 package org.cossbow.feng.ast.dcl;
 
+import org.cossbow.feng.ast.Optional;
+
 import java.util.Arrays;
 import java.util.Map;
 import java.util.function.Function;
@@ -34,8 +36,8 @@ public enum Primitive {
 
     private static final Map<String, Primitive> CodeMap;
 
-    public static Primitive ofCode(String code) {
-        return CodeMap.get(code);
+    public static Optional<Primitive> ofCode(String code) {
+        return Optional.of(CodeMap.get(code));
     }
 
     static {

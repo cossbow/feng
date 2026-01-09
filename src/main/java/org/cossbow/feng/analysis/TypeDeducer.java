@@ -109,17 +109,14 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     @Override
     public TypeDeclarer visit(CallExpression e) {
         var td = visit(e.callee());
-        if (!(td instanceof FuncTypeDeclarer ftd))
-            return ErrorUtil.semantic(
-                    "callee not callable: %s", e.pos());
+        if (td instanceof FuncTypeDeclarer ftd)
+            return visit(ftd);
+        if (td instanceof PrimitiveTypeDeclarer ptd)
+            return visit(ptd);
 
-        var rs = ftd.prototype().returnSet();
-        if (rs.isEmpty())
-            return new VoidTypeDeclarer(e.pos());
-        if (rs.size() == 1) {
-            return rs.getFirst();
-        }
-        return new TupleTypeDeclarer(e.pos(), rs);
+
+        return ErrorUtil.semantic(
+                "callee not callable: %s", e.pos());
     }
 
     @Override
@@ -204,7 +201,31 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             return v.get().type().must();
         }
 
-        return ErrorUtil.unsupported("未完待续：查询符号类型");
+        if (s.module().none()) {
+            var pri = Primitive.ofCode(s.name().value());
+            if (pri.has())
+                return new PrimitiveTypeDeclarer(e.pos(), pri.get());
+        }
+
+        return ErrorUtil.semantic("这是什么？%s", s);
+    }
+
+    //
+
+    @Override
+    public TypeDeclarer visit(FuncTypeDeclarer ftd) {
+        var rs = ftd.prototype().returnSet();
+        if (rs.isEmpty())
+            return new VoidTypeDeclarer(ftd.pos());
+        if (rs.size() == 1) {
+            return rs.getFirst();
+        }
+        return new TupleTypeDeclarer(ftd.pos(), rs);
+    }
+
+    @Override
+    public TypeDeclarer visit(PrimitiveTypeDeclarer e) {
+        return e;
     }
 
     //

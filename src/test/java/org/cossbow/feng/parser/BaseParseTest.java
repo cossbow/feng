@@ -56,18 +56,18 @@ public class BaseParseTest {
         return new SourceParser("", new ParseSymbolTable()).parse(cs);
     }
 
-    static Source doParseFile(String code, String name) {
+    public static Source doParseFile(String code, String name) {
         var r = doParse(CharStreams.fromString(code, name));
         Assertions.assertTrue(r.errors().isEmpty(),
                 "parse %s error: %s".formatted(name, code));
         return r.root();
     }
 
-    static Source doParseFile(String code) {
+    public static Source doParseFile(String code) {
         return doParseFile(code, "unknow");
     }
 
-    static Source doParseFile(InputStream is, String name) {
+    public static Source doParseFile(InputStream is, String name) {
         try {
             var r = doParse(CharStreams.fromStream(is));
             Assertions.assertTrue(r.errors().isEmpty(),
@@ -80,8 +80,8 @@ public class BaseParseTest {
 
     public static Global doParseGlobal(String def) {
         var sf = doParseFile(def, "global");
-        Assertions.assertEquals(1, sf.definitions().size());
-        return sf.definitions().getFirst();
+        Assertions.assertEquals(1, sf.globals().size());
+        return sf.globals().getFirst();
     }
 
     public static Definition doParseDefinition(String def) {

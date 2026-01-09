@@ -142,7 +142,15 @@ final class SourceParseVisitor
                         i.path());
         }
         var globals = this.<Global>visitList(ctx.global());
-        return new Source(posOf(ctx), imports, globals);
+        var definitions = new ArrayList<Definition>();
+        var declarations = new ArrayList<DeclarationStatement>();
+        for (var g : globals) {
+            if (g instanceof GlobalDefinition def)
+                definitions.add(def.definition());
+            else if (g instanceof GlobalDeclaration dcl)
+                declarations.add(dcl.statement());
+        };
+        return new Source(posOf(ctx), imports, definitions, declarations);
     }
 
     @Override
@@ -295,8 +303,8 @@ final class SourceParseVisitor
             var name = dt.symbol().name().value();
             if (dt.generic().isEmpty()) {
                 var pri = Primitive.ofCode(name);
-                if (pri != null)
-                    return new PrimitiveTypeDeclarer(posOf(ctx), pri);
+                if (pri.has())
+                    return new PrimitiveTypeDeclarer(posOf(ctx), pri.get());
             }
             var mt = MemTypeDeclarer.TYPES.get(name);
             if (mt != null) {

@@ -70,8 +70,8 @@ public class Optional<T> {
 
     @Override
     public String toString() {
-        if (value == null) return "[]";
-        return "[" + value + "]";
+        if (value == null) return "<>";
+        return "<" + value + ">";
     }
 
     //
