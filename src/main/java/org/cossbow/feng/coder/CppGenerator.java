@@ -110,14 +110,14 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
 
     public CppGenerator visit(PrimitiveTypeDeclarer dt) {
         String type = switch (dt.primitive()) {
-            case INT8 -> "int8";
-            case INT16 -> "int16";
-            case INT32 -> "int32";
-            case INT64, INT -> "int64";
-            case UINT8 -> "uint8";
-            case UINT16 -> "uint16";
-            case UINT32 -> "uint32";
-            case UINT64, UINT -> "uint64";
+            case INT8 -> "int8_t";
+            case INT16 -> "int16_t";
+            case INT32 -> "int32_t";
+            case INT64, INT -> "int64_t";
+            case UINT8 -> "uint8_t";
+            case UINT16 -> "uint16_t";
+            case UINT32 -> "uint32_t";
+            case UINT64, UINT -> "uint64_t";
             case FLOAT32 -> "float";
             case FLOAT64, FLOAT -> "double";
             case BOOL -> "bool";
@@ -160,16 +160,64 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         }
         write("{\n");
         if (!cd.fields().isEmpty()) write("public:\n");
-        for (var f : cd.fields().values()) {
+        for (var f : cd.fields().values())
             visit(f);
-        }
+
         if (!cd.methods().isEmpty()) write("public:\n");
-        for (var m : cd.methods().values()) {
+        for (var m : cd.methods().values())
             visit(m);
-        }
+
         write("};\n");
         return this;
     }
+
+    @Override
+    public CppGenerator visit(ClassMethod cm) {
+        return visit((FunctionDefinition) cm);
+    }
+
+    @Override
+    public CppGenerator visit(Identifier id) {
+        write(id.value());
+        return this;
+    }
+
+    @Override
+    public CppGenerator visit(Symbol s) {
+        if (s.module().has()) {
+            visit(s.module().get());
+            write('$');
+        }
+        visit(s.name());
+        return this;
+    }
+
+
+    @Override
+    public CppGenerator visit(Variable v) {
+        visit(v.type().must());
+        write(' ');
+        visit(v.name());
+        return this;
+    }
+
+    @Override
+    public CppGenerator visit(DefinedType dt) {
+        visit(dt.symbol());
+        if (!dt.generic().isEmpty())
+            unsupported("泛型未实现");
+        return this;
+    }
+
+    @Override
+    public CppGenerator visit(ClassField cf) {
+        visit(cf.type());
+        write(' ');
+        visit(cf.name());
+        write(";\n");
+        return this;
+    }
+
 
     @Override
     public CppGenerator visit(FunctionDefinition fd) {
@@ -201,67 +249,11 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
     }
 
     @Override
-    public CppGenerator visit(ClassMethod cm) {
-        return visit((FunctionDefinition) cm);
-    }
-
-    @Override
-    public CppGenerator visit(Identifier id) {
-        write(id.value());
-        return this;
-    }
-
-    @Override
-    public CppGenerator visit(Symbol s) {
-        if (s.module().has()) {
-            visit(s.module().get());
-            write('$');
-        }
-        visit(s.name());
-        return this;
-    }
-
-
-    void visit(Declare d) {
-        if (d == Declare.CONST) write("const");
-    }
-
-    @Override
-    public CppGenerator visit(Variable v) {
-        visit(v.declare());
-        write(' ');
-        visit(v.type().must());
-        write(' ');
-        visit(v.name());
-        return this;
-    }
-
-    @Override
-    public CppGenerator visit(DefinedType dt) {
-        visit(dt.symbol());
-        if (!dt.generic().isEmpty())
-            unsupported("泛型未实现");
-        return this;
-    }
-
-    @Override
-    public CppGenerator visit(ClassField cf) {
-        visit(cf.declare());
-        write(' ');
-        visit(cf.type());
-        write(' ');
-        visit(cf.name());
-        write(";\n");
-        return this;
-    }
-
-
-    @Override
     public CppGenerator visit(BlockStatement bs) {
         write("{\n");
         for (var s : bs.list())
             visit(s);
-        write("}\n\n");
+        write("}\n");
         return this;
     }
 
@@ -271,6 +263,16 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         if (rs.result().has())
             visit(rs.result().get());
         write(";\n");
+        return this;
+    }
+
+    @Override
+    public CppGenerator visit(DeclarationStatement ds) {
+        var size = ds.variables().size();
+        for (int i = 0; i < size; i++) {
+            var v = ds.variables().get(i);
+            var e = ds.init();  // TODO: tuple怎么处理
+        }
         return this;
     }
 
