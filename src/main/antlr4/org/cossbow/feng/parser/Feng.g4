@@ -235,6 +235,7 @@ parameter
 returnSet
     : typeDeclarer
     | '(' typeDeclarerList ')'
+    | current=THIS
     ;
 
 
@@ -586,6 +587,7 @@ operandExpr
 
 referExpr
     : symbol typeArguments?
+    | current=(THIS|SUPER)
     ;
 
 argumentSet
@@ -771,7 +773,9 @@ THROW           : 'throw' ;
 TRY             : 'try' ;
 CATCH           : 'catch' ;
 FINALLY         : 'finally' ;
-
+// Class
+THIS            : 'this' ;
+SUPER           : 'super' ;
 //
 // Separators
 //

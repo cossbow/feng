@@ -151,7 +151,7 @@ final class SourceParseVisitor
                 definitions.add(def.definition());
             else if (g instanceof GlobalDeclaration dcl)
                 declarations.add(dcl.statement());
-        };
+        }
         return new Source(posOf(ctx), imports, definitions,
                 declarations, gst);
     }
@@ -762,6 +762,13 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitReferExpr(FengParser.ReferExprContext ctx) {
+        var current = switch (ctx.current.getType()) {
+            case FengParser.THIS -> new CurrentExpression(posOf(ctx), true);
+            case FengParser.SUPER -> new CurrentExpression(posOf(ctx), false);
+            default -> null;
+        };
+        if (current != null) return current;
+
         var symbol = parseSymbol(ctx.symbol());
         var generic = typeArguments(ctx.typeArguments());
         return new ReferExpression(posOf(ctx), symbol, generic);
@@ -1199,6 +1206,9 @@ final class SourceParseVisitor
 
     private List<TypeDeclarer> parseReturnSet(FengParser.ReturnSetContext ctx) {
         if (ctx == null) return List.of();
+        if (ctx.current != null)
+            return List.of(new ThisTypeDeclarer(posOf(ctx)));
+
         var tdCtx = ctx.typeDeclarer();
         if (tdCtx != null) {
             var type = (TypeDeclarer) visit(tdCtx);

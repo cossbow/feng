@@ -13,9 +13,7 @@ import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.dcl.*;
-import org.cossbow.feng.util.ErrorUtil;
-
-import static org.cossbow.feng.util.ErrorUtil.unreachable;
+import static org.cossbow.feng.util.ErrorUtil.*;
 
 public interface EntityVisitor<R> {
 
@@ -28,6 +26,7 @@ public interface EntityVisitor<R> {
 			case Attribute ee -> visit(ee);
 			case AttributeField ee -> visit(ee);
 			case Modifier ee -> visit(ee);
+			case Declaration ee -> visit(ee);
 			case NewType ee -> visit(ee);
 			case Reference ee -> visit(ee);
 			case TypeDeclarer ee -> visit(ee);
@@ -108,6 +107,8 @@ public interface EntityVisitor<R> {
 
 	default R visit(Modifier e) { return unreachable(); }
 
+	default R visit(Declaration e) { return unreachable(); }
+
 	default R visit(NewType e) {
 		return switch (e) {
 			case NewArrayType ee -> visit(ee);
@@ -129,6 +130,9 @@ public interface EntityVisitor<R> {
 			case FuncTypeDeclarer ee -> visit(ee);
 			case MemTypeDeclarer ee -> visit(ee);
 			case PrimitiveTypeDeclarer ee -> visit(ee);
+			case ThisTypeDeclarer ee -> visit(ee);
+			case TupleTypeDeclarer ee -> visit(ee);
+			case VoidTypeDeclarer ee -> visit(ee);
 			case null, default -> unreachable();
 		};
 	}
@@ -143,11 +147,18 @@ public interface EntityVisitor<R> {
 
 	default R visit(PrimitiveTypeDeclarer e) { return unreachable(); }
 
+	default R visit(ThisTypeDeclarer e) { return unreachable(); }
+
+	default R visit(TupleTypeDeclarer e) { return unreachable(); }
+
+	default R visit(VoidTypeDeclarer e) { return unreachable(); }
+
 	default R visit(Variable e) { return unreachable(); }
 
 	default R visit(Expression e) {
 		return switch (e) {
 			case BinaryExpression ee -> visit(ee);
+			case CurrentExpression ee -> visit(ee);
 			case PrimaryExpression ee -> visit(ee);
 			case UnaryExpression ee -> visit(ee);
 			case null, default -> unreachable();
@@ -155,6 +166,8 @@ public interface EntityVisitor<R> {
 	}
 
 	default R visit(BinaryExpression e) { return unreachable(); }
+
+	default R visit(CurrentExpression e) { return unreachable(); }
 
 	default R visit(PrimaryExpression e) {
 		return switch (e) {
@@ -352,8 +365,8 @@ public interface EntityVisitor<R> {
 		return switch (e) {
 			case ArrayTuple ee -> visit(ee);
 			case IfTuple ee -> visit(ee);
-			case SwitchTuple ee -> visit(ee);
 			case ReturnTuple ee -> visit(ee);
+			case SwitchTuple ee -> visit(ee);
 			case null, default -> unreachable();
 		};
 	}
@@ -362,9 +375,9 @@ public interface EntityVisitor<R> {
 
 	default R visit(IfTuple e) { return unreachable(); }
 
-	default R visit(SwitchTuple e) { return unreachable(); }
-
 	default R visit(ReturnTuple e) { return unreachable(); }
+
+	default R visit(SwitchTuple e) { return unreachable(); }
 
 	default R visit(StructureField e) { return unreachable(); }
 

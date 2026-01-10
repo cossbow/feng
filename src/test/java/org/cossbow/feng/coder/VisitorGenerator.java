@@ -32,13 +32,13 @@ public class VisitorGenerator {
         visitClass(root, ci -> pkgs.add(ci.getPackageName()));
         var sb = new StringBuilder("package org.cossbow.feng.visit;\n\n");
         for (var p : pkgs) sb.append("import ").append(p).append(".*;\n");
-        sb.append("import org.cossbow.feng.util.ErrorUtil;\n");
+        sb.append("import static org.cossbow.feng.util.ErrorUtil.*;\n");
         var rootName = root.getSimpleName();
         sb.append("\npublic interface ").append(rootName).append("Visitor<R> {\n\n");
         visitClass(root, ci -> {
             var name = ci.getSimpleName();
             if (!ci.isAbstract()) {
-                sb.append("\tdefault R visit(").append(name).append(" e) { return null; }\n\n");
+                sb.append("\tdefault R visit(").append(name).append(" e) { return unreachable(); }\n\n");
                 return;
             }
             sb.append("\tdefault R visit(").append(name).append(" e) {\n");
@@ -50,7 +50,7 @@ public class VisitorGenerator {
                 sb.append("visit(ee);\n");
             }
             sb.append("\t\t\tcase null, default -> ");
-            sb.append("ErrorUtil.unreachable();\n");
+            sb.append("unreachable();\n");
 
             sb.append("\t\t};\n");
 
