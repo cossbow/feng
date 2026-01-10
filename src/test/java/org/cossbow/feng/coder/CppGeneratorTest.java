@@ -48,6 +48,12 @@ public class CppGeneratorTest {
 
     @Test
     public void testClass3() {
+        var code = "class A { var id int; func getId() int { return this.id; }}";
+        trans(code);
+    }
+
+    @Test
+    public void testClass4() {
         var code = "class A {}\nclass B : A {}";
         trans(code);
     }

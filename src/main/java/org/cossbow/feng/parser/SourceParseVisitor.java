@@ -640,10 +640,14 @@ final class SourceParseVisitor
         return parseUniques(tab, ctx.definedType(), DefinedType::symbol);
     }
 
+    private volatile Identifier enterClassName;
+
     @Override
     public Entity visitClassDefinition(FengParser.ClassDefinitionContext ctx) {
+        assert enterClassName != null;
         var modifier = parseModifier(ctx.modifier());
         var name = identifier(ctx.name);
+        enterClassName = name;
         var generic = typeParameters(ctx.typeParameters());
         var parent = this.<DefinedType>visitOptional(ctx.classInherit());
         var impl = parseClassImpl(ctx.classImpl());
@@ -682,6 +686,7 @@ final class SourceParseVisitor
                 Optional.of(name), generic,
                 parent, impl, fields, methods, macros);
         gst.namedTypes.add(name, def);
+        enterClassName = null;
         return def;
     }
 
@@ -762,16 +767,19 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitReferExpr(FengParser.ReferExprContext ctx) {
+        var pos = posOf(ctx);
         var current = switch (ctx.current.getType()) {
-            case FengParser.THIS -> new CurrentExpression(posOf(ctx), true);
-            case FengParser.SUPER -> new CurrentExpression(posOf(ctx), false);
+            case FengParser.THIS -> new CurrentExpression(
+                    pos, enterClassName, true);
+            case FengParser.SUPER -> new CurrentExpression(
+                    pos, enterClassName, false);
             default -> null;
         };
         if (current != null) return current;
 
         var symbol = parseSymbol(ctx.symbol());
         var generic = typeArguments(ctx.typeArguments());
-        return new ReferExpression(posOf(ctx), symbol, generic);
+        return new ReferExpression(pos, symbol, generic);
     }
 
     @Override

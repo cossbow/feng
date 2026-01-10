@@ -4,11 +4,14 @@ import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
+import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.lit.BoolLiteral;
 import org.cossbow.feng.ast.lit.FloatLiteral;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.lit.StringLiteral;
+import org.cossbow.feng.ast.mod.Global;
+import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.stmt.ArrayTuple;
 import org.cossbow.feng.ast.stmt.IfTuple;
 import org.cossbow.feng.ast.stmt.ReturnTuple;
@@ -73,6 +76,18 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         }
         return ErrorUtil.unsupported("binary-operation: %s %s %s",
                 lt, e.operator(), rt);
+    }
+
+    @Override
+    public TypeDeclarer visit(CurrentExpression e) {
+        DefinedType dt;
+        if (e.isSelf()) {
+            dt = new DefinedType(e.pos(), e.type(), TypeArguments.EMPTY);
+        } else {
+            var type = (ClassDefinition) context.findType(e.type()).must();
+            dt = type.parent().must();
+        }
+        return new DefinedTypeDeclarer(e.pos(), dt, Optional.empty());
     }
 
     @Override
