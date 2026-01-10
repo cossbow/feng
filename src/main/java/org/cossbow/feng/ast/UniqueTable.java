@@ -1,9 +1,9 @@
 package org.cossbow.feng.ast;
 
 import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.Optional;
 
 import java.util.*;
-import java.util.function.Function;
 
 public class UniqueTable<K extends Entity, V> {
     private final HashMap<K, Node<K, V>> table;
@@ -36,10 +36,10 @@ public class UniqueTable<K extends Entity, V> {
         throw new NoSuchElementException("not exists '" + id + "'");
     }
 
-    public Optional<V> tryGet(K id) {
+    public org.cossbow.feng.util.Optional<V> tryGet(K id) {
         var node = table.get(id);
         if (node != null) {
-            return Optional.of(node.value);
+            return org.cossbow.feng.util.Optional.of(node.value);
         }
         return Optional.empty();
     }

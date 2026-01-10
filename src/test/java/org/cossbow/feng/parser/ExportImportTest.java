@@ -2,7 +2,8 @@ package org.cossbow.feng.parser;
 
 
 import org.cossbow.feng.ast.*;
-import org.cossbow.feng.ast.Optional;
+import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.NewArrayType;
 import org.cossbow.feng.ast.dcl.NewDefinedType;
@@ -192,7 +193,7 @@ public class ExportImportTest extends BaseParseTest {
         }
         var code = makeImports(mods) + "class Dev:%s(%s){}".formatted(parent,
                 String.join(",", impls));
-        var def = (ClassDefinition) doParseDefinition(code);
+        var def = (ClassDefinition) doParseType(code, "Dev");
         Assertions.assertEquals(parent, def.parent().must().symbol());
         for (int i = 0; i < ifs.length; i++) {
             Assertions.assertEquals(ifs[i], def.impl().getValue(i).symbol());
@@ -202,7 +203,7 @@ public class ExportImportTest extends BaseParseTest {
     // export
 
     @Test
-    public void testExportGlobal() {
+    public void testExportGlobalDefinition() {
         var globalCodes = List.of(
                 "func sin(){}",
                 "func Run();",
@@ -211,15 +212,34 @@ public class ExportImportTest extends BaseParseTest {
                 "enum Status{A,}",
                 "struct Block{}",
                 "union Result{}",
-                "attribute Test{}",
+                "attribute Test{}"
+        );
+        for (int i = 0; i <= 1; i++) {
+            for (var gc : globalCodes) {
+                var code = (i > 0 ? "export " : "") + gc;
+                var src = doParseFile(code);
+                var def = src.definitions().getFirst();
+                var exported = def instanceof FunctionDefinition ?
+                        src.table().exportedFunctions.exists(def.name()) :
+                        src.table().exportedTypes.exists(def.name());
+                Assertions.assertEquals(i > 0, exported);
+            }
+        }
+    }
+
+    @Test
+    public void testExportGlobalDeclaration() {
+        var globalCodes = List.of(
                 "var engine Engine;",
                 "const PI =3.14;"
         );
         for (int i = 0; i <= 1; i++) {
             for (var gc : globalCodes) {
                 var code = (i > 0 ? "export " : "") + gc;
-                var global = doParseGlobal(code);
-                Assertions.assertEquals(i > 0, global.export());
+                var src = doParseFile(code);
+                var v = src.declarations().getFirst().variables().getFirst();
+                var tab = src.table().exportedVariables;
+                Assertions.assertEquals(i > 0, tab.exists(v.name()));
             }
         }
     }
@@ -228,7 +248,7 @@ public class ExportImportTest extends BaseParseTest {
     public void testExportClassField() {
         for (int i = 0; i <= 1; i++) {
             var code = "class Cat{%s var price float;}".formatted(i > 0 ? "export" : "");
-            var def = (ClassDefinition) doParseDefinition(code);
+            var def = (ClassDefinition) doParseType(code, "Cat");
             var field = def.fields().get(identifier("price"));
             Assertions.assertEquals(i > 0, field.export());
         }
@@ -238,7 +258,7 @@ public class ExportImportTest extends BaseParseTest {
     public void testExportClassMethod() {
         for (int i = 0; i <= 1; i++) {
             var code = "class Cat{%s func run(){} }".formatted(i > 0 ? "export" : "");
-            var def = (ClassDefinition) doParseDefinition(code);
+            var def = (ClassDefinition) doParseType(code, "Cat");
             var method = def.methods().get(identifier("run"));
             Assertions.assertEquals(i > 0, method.export());
         }

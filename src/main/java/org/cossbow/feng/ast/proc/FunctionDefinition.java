@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.proc;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.util.Optional;
 
 public class FunctionDefinition extends Definition {
     private Procedure procedure;

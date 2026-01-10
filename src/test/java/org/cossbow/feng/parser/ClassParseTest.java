@@ -20,7 +20,7 @@ public class ClassParseTest extends BaseParseTest {
     @Test
     public void testDefine() {
         var name = randTypeName(32);
-        var def = (ClassDefinition) doParseDefinition("class " + name + " {}");
+        var def = (ClassDefinition) doParseType("class " + name + " {}", name);
         Assertions.assertEquals(name, def.name());
         Assertions.assertTrue(def.parent().none());
         Assertions.assertTrue(def.impl().isEmpty());
@@ -33,7 +33,8 @@ public class ClassParseTest extends BaseParseTest {
     public void testInherit() {
         var name = randTypeName(32);
         var parent = randTypeSymbol(32);
-        var def = (ClassDefinition) doParseDefinition("class %s : %s {}".formatted(name, parent));
+        var def = (ClassDefinition) doParseType(
+                "class %s : %s {}".formatted(name, parent), name);
         Assertions.assertEquals(name, def.name());
         var ref = def.parent().must();
         Assertions.assertEquals(parent, ref.symbol());
@@ -45,7 +46,7 @@ public class ClassParseTest extends BaseParseTest {
             var name = randTypeName(16);
             var types = anyNames(RandTypeSymbol, 8, size);
             var code = "class %s (%s) {}".formatted(name, idList(types));
-            var def = (ClassDefinition) doParseDefinition(code);
+            var def = (ClassDefinition) doParseType(code, name);
             Assertions.assertEquals(name, def.name());
             Assertions.assertEquals(types.size(), def.impl().size());
             for (int i = 0; i < types.size(); i++) {
@@ -59,7 +60,7 @@ public class ClassParseTest extends BaseParseTest {
 
 
     private IdentifierTable<ClassField> parseFields(String fields) {
-        var def = (ClassDefinition) doParseDefinition("class A {" + fields + "}");
+        var def = (ClassDefinition) doParseType("class A {" + fields + "}", "A");
         return def.fields();
     }
 
@@ -118,7 +119,7 @@ public class ClassParseTest extends BaseParseTest {
     public void testMethod1() {
         var name = randVarName(16);
         var code = "class A { func %s() {} }".formatted(name);
-        var def = (ClassDefinition) doParseDefinition(code);
+        var def = (ClassDefinition) doParseType(code, "A");
         var method = def.methods().get(name);
         Assertions.assertEquals(name, method.name());
         Assertions.assertFalse(method.export());
@@ -128,7 +129,7 @@ public class ClassParseTest extends BaseParseTest {
     public void testMethod2() {
         var name = randVarName(16);
         var code = "class A { export func %s() {} }".formatted(name);
-        var def = (ClassDefinition) doParseDefinition(code);
+        var def = (ClassDefinition) doParseType(code, "A");
         var method = def.methods().get(name);
         Assertions.assertEquals(name, method.name());
         Assertions.assertTrue(method.export());

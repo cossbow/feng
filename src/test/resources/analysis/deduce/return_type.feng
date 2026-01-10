@@ -1,0 +1,7 @@
+
+func add(a, b int) int {
+}
+
+func main() {
+    var a = add(1, 2);
+}

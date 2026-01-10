@@ -46,7 +46,7 @@ public class AttributeParseTest extends BaseParseTest {
     public void testDefine() {
         var name = randTypeName(16);
         var code = "attribute %s {}".formatted(name);
-        var def = (AttributeDefinition) doParseDefinition(code);
+        var def = (AttributeDefinition) doParseType(code, name);
         Assertions.assertEquals(name, def.name());
         Assertions.assertTrue(def.fields().isEmpty());
     }
@@ -56,7 +56,7 @@ public class AttributeParseTest extends BaseParseTest {
         var name = randVarName(12);
         var type = randTypeName(20);
         var code = "export attribute Server { %s %s; }".formatted(name, type);
-        var def = (AttributeDefinition) doParseDefinition(code);
+        var def = (AttributeDefinition) doParseType(code, "Server");
         Assertions.assertEquals(1, def.fields().size());
         var field = def.fields().getValue(0);
         Assertions.assertEquals(name, field.name());
@@ -71,7 +71,7 @@ public class AttributeParseTest extends BaseParseTest {
         var type = randTypeName(20);
         var init = ThreadLocalRandom.current().nextInt(0, Integer.MAX_VALUE);
         var code = "export attribute Server { %s %s = %d; }".formatted(name, type, init);
-        var def = (AttributeDefinition) doParseDefinition(code);
+        var def = (AttributeDefinition) doParseType(code, "Server");
         Assertions.assertEquals(1, def.fields().size());
         var field = def.fields().getValue(0);
         Assertions.assertEquals(name, field.name());
@@ -86,7 +86,7 @@ public class AttributeParseTest extends BaseParseTest {
         var fieldName = randVarName(12);
         var fieldType = randTypeName(20);
         var code = "export attribute Server { %s []%s; }".formatted(fieldName, fieldType);
-        var def = (AttributeDefinition) doParseDefinition(code);
+        var def = (AttributeDefinition) doParseType(code, "Server");
         Assertions.assertEquals(1, def.fields().size());
         var field = def.fields().getValue(0);
         Assertions.assertEquals(fieldName, field.name());
@@ -100,7 +100,7 @@ public class AttributeParseTest extends BaseParseTest {
         var fieldName = randVarName(12);
         var fieldType = randTypeName(20);
         var code = "export attribute Server { %s []%s = [10,20]; }".formatted(fieldName, fieldType);
-        var def = (AttributeDefinition) doParseDefinition(code);
+        var def = (AttributeDefinition) doParseType(code, "Server");
         Assertions.assertEquals(1, def.fields().size());
         var field = def.fields().getValue(0);
         Assertions.assertEquals(fieldName, field.name());
@@ -111,7 +111,7 @@ public class AttributeParseTest extends BaseParseTest {
     }
 
     private IdentifierTable<Attribute> atDefine(String code) {
-        var def = doParseDefinition(code);
+        var def = doParseFirstDef(code);
         return def.modifier().attributes();
     }
 
@@ -149,25 +149,25 @@ public class AttributeParseTest extends BaseParseTest {
 
     private IdentifierTable<Attribute> atClassField(CharSequence attr) {
         var code = "class A{%s var id int;}".formatted(attr);
-        var def = (ClassDefinition) doParseDefinition(code);
+        var def = (ClassDefinition) doParseType(code, "A");
         return def.fields().get(identifier("id")).modifier().attributes();
     }
 
     private IdentifierTable<Attribute> atClassMethod(CharSequence attr) {
         var code = "class A{%s func get(){}}".formatted(attr);
-        var def = (ClassDefinition) doParseDefinition(code);
+        var def = (ClassDefinition) doParseType(code, "A");
         return def.methods().get(identifier("get")).modifier().attributes();
     }
 
     private IdentifierTable<Attribute> atInterfaceMethod(CharSequence attr) {
         var code = "interface A{%s get();}".formatted(attr);
-        var def = (InterfaceDefinition) doParseDefinition(code);
+        var def = (InterfaceDefinition) doParseType(code, "A");
         return def.methods().get(identifier("get")).modifier().attributes();
     }
 
     private IdentifierTable<Attribute> atParameter(CharSequence attr) {
         var code = "func test(%s a A){}".formatted(attr);
-        var func = (FunctionDefinition) doParseDefinition(code);
+        var func = doParseFunc(code, "test");
         var ps = (VariableParameterSet) func.procedure().prototype().parameterSet();
         return ps.variables().get(identifier("a")).modifier().attributes();
     }

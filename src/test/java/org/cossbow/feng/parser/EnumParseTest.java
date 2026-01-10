@@ -22,7 +22,7 @@ public class EnumParseTest extends BaseParseTest {
                     STOP =0b010,
                 }
                 """;
-        var et = (EnumDefinition) doParseDefinition(code);
+        var et = (EnumDefinition) doParseType(code, "TaskStatus");
         Assertions.assertEquals(identifier("TaskStatus"), et.name());
 
         var expect = List.of(Pair.<String, Integer>of("INIT", null),

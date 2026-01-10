@@ -1,4 +1,4 @@
-package org.cossbow.feng.ast;
+package org.cossbow.feng.util;
 
 import java.util.NoSuchElementException;
 

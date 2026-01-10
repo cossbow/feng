@@ -13,7 +13,7 @@ public class InterfaceParseTest extends BaseParseTest {
         var typeName = randTypeName(32);
         var methodName = randVarName(12);
         var code = "interface %s { %s();}".formatted(typeName, methodName);
-        var def = (InterfaceDefinition) doParseDefinition(code);
+        var def = (InterfaceDefinition) doParseFirstDef(code);
         Assertions.assertEquals(typeName, def.name());
         Assertions.assertEquals(1, def.methods().size());
         var method = def.methods().get(methodName);
@@ -25,7 +25,7 @@ public class InterfaceParseTest extends BaseParseTest {
         var typeName = randTypeName(32);
         var methodName = randVarName(12);
         var code = "interface %s { %s(int);}".formatted(typeName, methodName);
-        var def = (InterfaceDefinition) doParseDefinition(code);
+        var def = (InterfaceDefinition) doParseFirstDef(code);
         Assertions.assertEquals(typeName, def.name());
         Assertions.assertEquals(1, def.methods().size());
         var method = def.methods().get(methodName);
@@ -37,7 +37,7 @@ public class InterfaceParseTest extends BaseParseTest {
         var typeName = randTypeName(32);
         var methodName = randVarName(12);
         var code = "interface %s { %s()int;}".formatted(typeName, methodName);
-        var def = (InterfaceDefinition) doParseDefinition(code);
+        var def = (InterfaceDefinition) doParseFirstDef(code);
         Assertions.assertEquals(typeName, def.name());
         Assertions.assertEquals(1, def.methods().size());
         var method = def.methods().get(methodName);
@@ -49,7 +49,7 @@ public class InterfaceParseTest extends BaseParseTest {
         var typeName = randTypeName(32);
         var partName = symbol(randVarName(12));
         var code = "interface %s { %s;}".formatted(typeName, partName);
-        var def = (InterfaceDefinition) doParseDefinition(code);
+        var def = (InterfaceDefinition) doParseFirstDef(code);
         Assertions.assertEquals(typeName, def.name());
         Assertions.assertEquals(1, def.parts().size());
         var part = def.parts().getValue(0);

@@ -1,12 +1,7 @@
 package org.cossbow.feng.analysis;
 
-import org.cossbow.feng.ast.Definition;
 import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.ast.dcl.*;
-import org.cossbow.feng.ast.mod.GlobalDeclaration;
-import org.cossbow.feng.ast.mod.GlobalDefinition;
-import org.cossbow.feng.ast.oop.ClassDefinition;
-import org.cossbow.feng.ast.stmt.ArrayTuple;
 import org.cossbow.feng.ast.stmt.DeclarationStatement;
 import org.cossbow.feng.parser.BaseParseTest;
 import org.cossbow.feng.parser.SampleParseTest;
@@ -40,7 +35,6 @@ public class TestTypeDeducer {
     @Test
     public void testDefinedType() {
         var src = parseFile("define_type.feng");
-        System.out.println(src);
         var gd = src.declarations().getFirst();
         var tpd = (TupleTypeDeclarer) deducer.visit(gd.init().must());
         Assertions.assertEquals(1, tpd.tuple().size());
@@ -55,19 +49,26 @@ public class TestTypeDeducer {
         Assertions.assertFalse(dtd.reference().must().immutable());
     }
 
+    @Test
+    public void testReturnType() {
+        var src = parseFile("return_type.feng");
+        var f=src.table();
+    }
+
     //
 
     Source parseFile(String name) {
         try (var is = getFile(name)) {
             Assertions.assertNotNull(is);
-            return BaseParseTest.doParseFile(is, name);
+            return BaseParseTest.doParseFile(is);
         } catch (IOException e) {
             return ErrorUtil.io(e);
         }
     }
 
     InputStream getFile(String name) {
-        return SampleParseTest.class.getResourceAsStream("/analysis/" + name);
+        return SampleParseTest.class.getResourceAsStream(
+                "/analysis/deduce/" + name);
     }
 
 }

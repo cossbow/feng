@@ -1,6 +1,6 @@
 package org.cossbow.feng.ast.stmt;
 
-import org.cossbow.feng.ast.Optional;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 

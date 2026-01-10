@@ -36,7 +36,7 @@ public class SampleParseTest extends BaseParseTest {
     static Source parseSample(String name) throws IOException {
         try (var is = getSample(name)) {
             Assertions.assertNotNull(is);
-            return doParseFile(is, name);
+            return doParseFile(is);
         }
     }
 

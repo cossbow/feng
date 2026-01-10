@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.attr;
 
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.util.Optional;
 
 public class AttributeDefinition extends TypeDefinition {
     private IdentifierTable<AttributeField> fields;

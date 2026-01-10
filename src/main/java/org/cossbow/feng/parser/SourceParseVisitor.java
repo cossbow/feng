@@ -25,6 +25,8 @@ import org.cossbow.feng.ast.var.IndexAssignableOperand;
 import org.cossbow.feng.ast.var.MemberAssignableOperand;
 import org.cossbow.feng.ast.var.VariableAssignableOperand;
 import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.Optional;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -150,7 +152,8 @@ final class SourceParseVisitor
             else if (g instanceof GlobalDeclaration dcl)
                 declarations.add(dcl.statement());
         };
-        return new Source(posOf(ctx), imports, definitions, declarations);
+        return new Source(posOf(ctx), imports, definitions,
+                declarations, gst);
     }
 
     @Override

@@ -4,7 +4,7 @@ package org.cossbow.feng.parser;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.cossbow.feng.ast.*;
-import org.cossbow.feng.ast.Optional;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.expr.Expression;
@@ -13,8 +13,6 @@ import org.cossbow.feng.ast.expr.ReferExpression;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.lit.Literal;
 import org.cossbow.feng.ast.lit.StringLiteral;
-import org.cossbow.feng.ast.mod.Global;
-import org.cossbow.feng.ast.mod.GlobalDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.stmt.*;
 import org.junit.jupiter.api.Assertions;
@@ -56,37 +54,50 @@ public class BaseParseTest {
         return new SourceParser("", new ParseSymbolTable()).parse(cs);
     }
 
-    public static Source doParseFile(String code, String name) {
-        var r = doParse(CharStreams.fromString(code, name));
+    public static Source doParseFile(String code) {
+        var r = doParse(CharStreams.fromString(code, "test"));
         Assertions.assertTrue(r.errors().isEmpty(),
-                "parse %s error: %s".formatted(name, code));
+                "parse error: %s".formatted(code));
         return r.root();
     }
 
-    public static Source doParseFile(String code) {
-        return doParseFile(code, "unknow");
-    }
-
-    public static Source doParseFile(InputStream is, String name) {
+    public static Source doParseFile(InputStream is) {
         try {
             var r = doParse(CharStreams.fromStream(is));
             Assertions.assertTrue(r.errors().isEmpty(),
-                    "parse %s error: %s".formatted(name, r.errors()));
+                    "parse error: %s".formatted(r.errors()));
             return r.root();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    public static Global doParseGlobal(String def) {
-        var sf = doParseFile(def, "global");
-        Assertions.assertEquals(1, sf.globals().size());
-        return sf.globals().getFirst();
+    public static Definition doParseFirstDef(String def) {
+        var src = doParseFile(def);
+        return src.definitions().getFirst();
     }
 
-    public static Definition doParseDefinition(String def) {
-        var gd = (GlobalDefinition) doParseGlobal(def);
-        return gd.definition();
+    public static TypeDefinition doParseType(String def, Identifier name) {
+        var src = doParseFile(def);
+        return src.table().namedTypes.get(name);
+    }
+
+    public static TypeDefinition doParseType(String def, String name) {
+        return doParseType(def, identifier(name));
+    }
+
+    public static FunctionDefinition doParseFunc(String def, Identifier name) {
+        var src = doParseFile(def);
+        return src.table().namedFunctions.get(name);
+    }
+
+    public static FunctionDefinition doParseFunc(String def, String name) {
+        return doParseFunc(def, identifier(name));
+    }
+
+    public static DeclarationStatement doParseDeclaration(String def) {
+        var src = doParseFile(def);
+        return src.declarations().getFirst();
     }
 
     public static final Map<Enum<?>, String> operatorSymbols = Map.ofEntries(
@@ -126,7 +137,7 @@ public class BaseParseTest {
     //
 
     public static FunctionDefinition doParseProc(String def) {
-        return (FunctionDefinition) doParseDefinition(def);
+        return (FunctionDefinition) doParseFirstDef(def);
     }
 
     public static Statement doParseLocal(String stmt) {

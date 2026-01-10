@@ -1,5 +1,7 @@
 package org.cossbow.feng.ast;
 
+import org.cossbow.feng.util.Optional;
+
 import java.util.Objects;
 
 public class Symbol extends Entity {

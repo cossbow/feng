@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
+import org.cossbow.feng.util.Optional;
 
 public class InterfaceDefinition extends TypeDefinition {
     private IdentifierTable<InterfaceMethod> methods;

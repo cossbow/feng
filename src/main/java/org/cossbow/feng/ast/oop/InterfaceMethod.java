@@ -1,7 +1,7 @@
 package org.cossbow.feng.ast.oop;
 
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Optional;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;

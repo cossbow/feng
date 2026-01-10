@@ -2,7 +2,7 @@ package org.cossbow.feng.ast.mod;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Optional;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 
 import java.util.List;

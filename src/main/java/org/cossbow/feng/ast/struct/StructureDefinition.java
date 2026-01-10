@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.struct;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.util.Optional;
 
 public class StructureDefinition extends TypeDefinition {
     private boolean union;

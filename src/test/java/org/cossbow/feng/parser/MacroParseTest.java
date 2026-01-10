@@ -24,13 +24,13 @@ public class MacroParseTest extends BaseParseTest {
 
     private MacroTable interfaceMacro(String c) {
         var code = "interface A{macro %s}".formatted(c);
-        var def = (InterfaceDefinition) doParseDefinition(code);
+        var def = (InterfaceDefinition) doParseFirstDef(code);
         return (def.macros());
     }
 
     private MacroTable classMacro(String c) {
         var code = "class A{macro %s}".formatted(c);
-        var def = (ClassDefinition) doParseDefinition(code);
+        var def = (ClassDefinition) doParseFirstDef(code);
         return (def.macros());
     }
 

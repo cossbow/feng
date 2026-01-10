@@ -32,7 +32,7 @@ public class StatementParseTest extends BaseParseTest {
     }
 
     Statement parseStmt(String code) {
-        var f = (FunctionDefinition) doParseDefinition("func main() {" + code + " }");
+        var f = (FunctionDefinition) doParseFirstDef("func main() {" + code + " }");
         return f.procedure().body().list().getFirst();
     }
 

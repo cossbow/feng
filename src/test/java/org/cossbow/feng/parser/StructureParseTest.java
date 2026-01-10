@@ -17,7 +17,7 @@ public class StructureParseTest extends BaseParseTest {
         for (var domain : Domain.values()) {
             var name = randTypeName(32);
             var code = "%s %s{}".formatted(domain, name);
-            var def = (StructureDefinition) doParseDefinition(code);
+            var def = (StructureDefinition) doParseFirstDef(code);
             Assertions.assertEquals(name, def.name());
             Assertions.assertEquals(domain == Domain.union, def.union());
             Assertions.assertTrue(def.fields().isEmpty());
@@ -27,7 +27,7 @@ public class StructureParseTest extends BaseParseTest {
 
     IdentifierTable<StructureField> parseFields(String names) {
         var code = "struct Foo { %s }".formatted(names);
-        var def = (StructureDefinition) doParseDefinition(code);
+        var def = (StructureDefinition) doParseFirstDef(code);
         return def.fields();
     }
 

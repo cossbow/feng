@@ -18,7 +18,7 @@ public class ProcedureParseTest extends BaseParseTest {
 
     Procedure parseProcedure(String procedure) {
         var code = "func test" + procedure;
-        var func = (FunctionDefinition) doParseDefinition(code);
+        var func = (FunctionDefinition) doParseFirstDef(code);
         return func.procedure();
     }
 
