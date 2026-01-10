@@ -4,6 +4,7 @@ import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
 
 import java.util.*;
+import java.util.function.BiConsumer;
 
 public class UniqueTable<K extends Entity, V> {
     private final HashMap<K, Node<K, V>> table;
@@ -66,6 +67,11 @@ public class UniqueTable<K extends Entity, V> {
 
     public boolean isEmpty() {
         return table.isEmpty();
+    }
+
+    public void foreach(BiConsumer<K, V> c) {
+        for (var n : nodes)
+            c.accept(n.id, n.value);
     }
 
     //
