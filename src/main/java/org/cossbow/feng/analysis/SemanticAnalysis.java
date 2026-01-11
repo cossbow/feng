@@ -1,6 +1,7 @@
 package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.Entity;
+import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
@@ -16,6 +17,7 @@ import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.ast.var.IndexAssignableOperand;
 import org.cossbow.feng.ast.var.FieldAssignableOperand;
 import org.cossbow.feng.ast.var.VariableAssignableOperand;
+import org.cossbow.feng.util.Stack;
 import org.cossbow.feng.visit.EntityVisitor;
 import org.cossbow.feng.visit.SymbolContext;
 
@@ -363,18 +365,42 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     @Override
-    public Entity visit(BreakStatement e) {
-        return EntityVisitor.super.visit(e);
+    public Entity visit(CallStatement e) {
+        visit(e.call());
+        return e;
     }
 
     @Override
-    public Entity visit(CallStatement e) {
-        return EntityVisitor.super.visit(e);
+    public Entity visit(LabeledStatement e) {
+        return visit(e.statement());
+    }
+
+    private Stack<ForStatement> loopStack = new Stack<>();
+
+    @Override
+    public Entity visit(BreakStatement e) {
+        assert enterFunc != null;
+        if (e.label().has()) {
+            if (enterFunc.procedure().labels()
+                    .contains(e.label().get()))
+                return semantic("label not found: %s",
+                        e.label().get());
+        }
+        // TODO: 检查是否在循环中
+        return e;
     }
 
     @Override
     public Entity visit(ContinueStatement e) {
-        return EntityVisitor.super.visit(e);
+        assert enterFunc != null;
+        if (e.label().has()) {
+            if (enterFunc.procedure().labels()
+                    .contains(e.label().get()))
+                return semantic("label not found: %s",
+                        e.label().get());
+        }
+        // TODO: 检查是否在循环中
+        return e;
     }
 
     @Override
@@ -399,11 +425,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(IfStatement e) {
-        return EntityVisitor.super.visit(e);
-    }
-
-    @Override
-    public Entity visit(LabeledStatement e) {
         return EntityVisitor.super.visit(e);
     }
 

@@ -35,9 +35,7 @@ import org.cossbow.feng.util.UnamedUtil;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 import java.util.function.Function;
 
 import static org.cossbow.feng.ast.dcl.ReferenceType.*;
@@ -1200,6 +1198,11 @@ final class SourceParseVisitor
     @Override
     public Entity visitLabeledStatement(FengParser.LabeledStatementContext ctx) {
         var label = identifier(ctx.label);
+        var ol = labels.put(label, label);
+        if (ol != null)
+            return ErrorUtil.semantic("label %s duplicate: %s <==> %s",
+                    label, label.pos(), ol.pos());
+
         var stmt = (Statement) visit(ctx.statement());
         return new LabeledStatement(posOf(ctx), label, stmt);
     }
@@ -1258,11 +1261,16 @@ final class SourceParseVisitor
         return new Prototype(posOf(ctx), parameters, returnSet);
     }
 
+    private volatile Map<Identifier, Identifier> labels;
+
     @Override
     public Entity visitProcedure(FengParser.ProcedureContext ctx) {
         var prototype = (Prototype) visit(ctx.prototype());
+        this.labels = new HashMap<>();
         var body = (BlockStatement) visit(ctx.blockStatement());
-        return new Procedure(posOf(ctx), prototype, body);
+        var labels = Set.copyOf(this.labels.keySet());
+        this.labels = null;
+        return new Procedure(posOf(ctx), prototype, body, labels);
     }
 
 
