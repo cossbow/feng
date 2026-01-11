@@ -22,6 +22,10 @@ public class Reference extends Entity {
         return type;
     }
 
+    public boolean checkType(ReferenceType t) {
+        return type == t;
+    }
+
     public boolean required() {
         return required;
     }

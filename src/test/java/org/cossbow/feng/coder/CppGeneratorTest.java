@@ -1,23 +1,24 @@
 package org.cossbow.feng.coder;
 
-import org.cossbow.feng.ast.Entity;
+import org.cossbow.feng.analysis.SemanticAnalysis;
+import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.parser.BaseParseTest;
-import org.cossbow.feng.visit.SymbolContext;
+import org.cossbow.feng.visit.GlobalSymbolContext;
 import org.junit.jupiter.api.Test;
-
-import static org.cossbow.feng.analysis.EmptySymbolContext.EMPTY;
 
 public class CppGeneratorTest {
 
-    private void gen(SymbolContext ctx, Entity root) {
-        var sb = new StringBuilder("/* -------------------- */\n");
-        new CppGenerator(ctx, sb).visit(root);
-        System.out.println(sb);
+    private void gen(Source src) {
+
     }
 
     private void trans(String code) {
         var src = BaseParseTest.doParseFile(code);
-        gen(EMPTY, src);
+        var sb = new StringBuilder("/* -------------------- */\n");
+        var ctx = new GlobalSymbolContext(src.table());
+        new SemanticAnalysis(ctx).visit(src);
+        new CppGenerator(ctx, sb).visit(src);
+        System.out.println(sb);
     }
 
     //
@@ -35,25 +36,25 @@ public class CppGeneratorTest {
     }
 
     @Test
-    public void testClass1() {
+    public void testClassMember1() {
         var code = "class A { var id int; }";
         trans(code);
     }
 
     @Test
-    public void testClass2() {
-        var code = "class A { var id int; func getId() int { return id; }}";
+    public void testClassMember2() {
+        var code = "class A { var id int; func getId() int { return id + this.id; }}";
         trans(code);
     }
 
     @Test
-    public void testClass3() {
-        var code = "class A { var id int; func getId() int { return this.id; }}";
+    public void testClassMember3() {
+        var code = "class A { func a() { } func b() { a(); this.a(); }}";
         trans(code);
     }
 
     @Test
-    public void testClass4() {
+    public void testClassExtend1() {
         var code = "class A {}\nclass B : A {}";
         trans(code);
     }

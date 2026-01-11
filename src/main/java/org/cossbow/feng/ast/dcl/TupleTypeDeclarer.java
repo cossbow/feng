@@ -5,6 +5,9 @@ import org.cossbow.feng.ast.Position;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * 非用于创建AST，仅用于语义分析
+ */
 public class TupleTypeDeclarer extends TypeDeclarer {
     private List<TypeDeclarer> tuple;
 

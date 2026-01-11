@@ -34,6 +34,11 @@ public class GlobalSymbolContext implements SymbolContext {
         return gst.variables.tryGet(symbol.name());
     }
 
+    @Override
+    public void putVar(Variable variable) {
+        ErrorUtil.semantic("can't add global var");
+    }
+
     private void checkModule(Symbol symbol) {
         if (symbol.module().none()) return;
         ErrorUtil.unsupported(

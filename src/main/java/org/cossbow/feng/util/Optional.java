@@ -2,7 +2,9 @@ package org.cossbow.feng.util;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 public class Optional<T> {
     private T value;
@@ -27,8 +29,12 @@ public class Optional<T> {
         return value == null;
     }
 
-    public boolean was(T v) {
-        return value == v;
+    public boolean match(Predicate<T> matcher) {
+        return has() && matcher.test(value);
+    }
+
+    public void use(Consumer<T> user) {
+        if (has()) user.accept(value);
     }
 
     public T must() {

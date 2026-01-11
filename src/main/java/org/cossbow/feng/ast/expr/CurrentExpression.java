@@ -6,18 +6,25 @@ import org.cossbow.feng.ast.Symbol;
 
 public class CurrentExpression extends PrimaryExpression {
     private final Symbol className;
+    private final Identifier method;
     private boolean isSelf;
 
     public CurrentExpression(Position pos,
                              Identifier className,
+                             Identifier method,
                              boolean isSelf) {
         super(pos);
         this.className = new Symbol(className.pos(), className);
+        this.method = method;
         this.isSelf = isSelf;
     }
 
     public Symbol type() {
         return className;
+    }
+
+    public Identifier method() {
+        return method;
     }
 
     public boolean isSelf() {

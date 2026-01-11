@@ -2,6 +2,9 @@ package org.cossbow.feng.ast.var;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
+import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.expr.ReferExpression;
+import org.cossbow.feng.ast.gen.TypeArguments;
 
 public class VariableAssignableOperand extends AssignableOperand {
     private Symbol symbol;
@@ -14,5 +17,10 @@ public class VariableAssignableOperand extends AssignableOperand {
 
     public Symbol symbol() {
         return symbol;
+    }
+
+    @Override
+    public Expression rhs() {
+        return new ReferExpression(pos(), symbol, TypeArguments.EMPTY);
     }
 }

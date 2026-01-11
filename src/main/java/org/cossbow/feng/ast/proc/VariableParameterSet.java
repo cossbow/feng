@@ -2,7 +2,11 @@ package org.cossbow.feng.ast.proc;
 
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.dcl.Variable;
+
+import java.util.AbstractList;
+import java.util.List;
 
 public class VariableParameterSet extends ParameterSet {
     private IdentifierTable<Variable> variables;
@@ -16,6 +20,11 @@ public class VariableParameterSet extends ParameterSet {
     }
 
     @Override
+    public List<TypeDeclarer> types() {
+        return new PhantomList();
+    }
+
+    @Override
     public int size() {
         return variables.size();
     }
@@ -25,4 +34,16 @@ public class VariableParameterSet extends ParameterSet {
     }
 
 
+    class PhantomList extends AbstractList<TypeDeclarer> {
+
+        @Override
+        public TypeDeclarer get(int index) {
+            return variables.getValue(index).type().must();
+        }
+
+        @Override
+        public int size() {
+            return variables.size();
+        }
+    }
 }

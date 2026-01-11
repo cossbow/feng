@@ -1,20 +1,18 @@
 package org.cossbow.feng.ast.oop;
 
-import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Exportable;
+import org.cossbow.feng.ast.Field;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
-public class ClassField extends Entity
+public class ClassField extends Field
         implements Exportable {
     private Modifier modifier;
     private boolean export;
     private Declare declare;
-    private Identifier name;
-    private TypeDeclarer type;
 
     public ClassField(Position pos,
                       Modifier modifier,
@@ -22,20 +20,14 @@ public class ClassField extends Entity
                       Declare declare,
                       Identifier name,
                       TypeDeclarer type) {
-        super(pos);
+        super(pos, name, type);
         this.export = export;
         this.declare = declare;
-        this.type = type;
         this.modifier = modifier;
-        this.name = name;
     }
 
     public Declare declare() {
         return declare;
-    }
-
-    public TypeDeclarer type() {
-        return type;
     }
 
     public Modifier modifier() {
@@ -47,7 +39,4 @@ public class ClassField extends Entity
         return export;
     }
 
-    public Identifier name() {
-        return name;
-    }
 }

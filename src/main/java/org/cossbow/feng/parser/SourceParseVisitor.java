@@ -15,18 +15,23 @@ import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.micro.*;
-import org.cossbow.feng.ast.mod.*;
+import org.cossbow.feng.ast.mod.Global;
+import org.cossbow.feng.ast.mod.GlobalDeclaration;
+import org.cossbow.feng.ast.mod.GlobalDefinition;
+import org.cossbow.feng.ast.mod.Import;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
-import org.cossbow.feng.ast.struct.*;
+import org.cossbow.feng.ast.struct.StructureDefinition;
+import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.ast.var.AssignableOperand;
+import org.cossbow.feng.ast.var.FieldAssignableOperand;
 import org.cossbow.feng.ast.var.IndexAssignableOperand;
-import org.cossbow.feng.ast.var.MemberAssignableOperand;
 import org.cossbow.feng.ast.var.VariableAssignableOperand;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
+import org.cossbow.feng.util.UnamedUtil;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -504,9 +509,10 @@ final class SourceParseVisitor
         var pos = posOf(ctx);
         var union = isUnion(ctx.domain);
         var fields = parseStructureMembers(ctx.structureFieldsDef());
-        var def = new StructureDefinition(pos, Modifier.empty(), Optional.empty(),
-                TypeParameters.empty(), union, fields);
-        gst.unnamedTypes.add(def);
+        var name = UnamedUtil.rand(union ? "union" : "struct");
+        var def = new StructureDefinition(pos, Modifier.empty(),
+                Optional.of(name), TypeParameters.empty(), union, fields);
+        gst.unnamedTypes.add(name, def);
         return def;
     }
 
@@ -518,7 +524,7 @@ final class SourceParseVisitor
             List<FengParser.StructureFieldsDefContext> membersCtx) {
         var fields = new IdentifierTable<StructureField>();
         for (var ctx : membersCtx) {
-            var type = (StructureType) visit(ctx.type);
+            var type = (TypeDeclarer) visit(ctx.type);
             for (var fc : ctx.fields.structureField()) {
                 var field = new StructureField(posOf(fc),
                         identifier(fc.Identifier()),
@@ -535,22 +541,25 @@ final class SourceParseVisitor
     public Entity visitDefinedStructureFieldType(
             FengParser.DefinedStructureFieldTypeContext ctx) {
         var type = (DefinedType) visit(ctx.definedType());
-        return new DefinedStructureType(posOf(ctx), type);
+        return new DefinedTypeDeclarer(posOf(ctx), type, Optional.empty());
     }
 
     @Override
     public Entity visitArrayStructureFieldType(
             FengParser.ArrayStructureFieldTypeContext ctx) {
-        var et = (StructureType) visit(ctx.element);
+        var et = (TypeDeclarer) visit(ctx.element);
         var len = this.<Expression>visitOptional(ctx.len);
-        return new ArrayStructureType(posOf(ctx), et, len);
+        return new ArrayTypeDeclarer(posOf(ctx), et, len, false);
     }
 
     @Override
     public Entity visitUnnamedStructureFieldType(
             FengParser.UnnamedStructureFieldTypeContext ctx) {
-        var definition = (StructureDefinition) visit(ctx.unnamedStructureDefinition());
-        return new UnnamedStructureType(posOf(ctx), definition);
+        var def = (StructureDefinition) visit(ctx.unnamedStructureDefinition());
+        var dt = new DefinedType(def.pos(),
+                new Symbol(Position.ZERO, def.name()),
+                TypeArguments.EMPTY);
+        return new DefinedTypeDeclarer(posOf(ctx), dt, Optional.empty());
     }
 
 
@@ -641,12 +650,14 @@ final class SourceParseVisitor
     }
 
     private volatile Identifier enterClassName;
+    private volatile Identifier enterMethodName;
 
     @Override
     public Entity visitClassDefinition(FengParser.ClassDefinitionContext ctx) {
-        assert enterClassName != null;
         var modifier = parseModifier(ctx.modifier());
         var name = identifier(ctx.name);
+        if (enterClassName != null)
+            ErrorUtil.semantic("nested define class: %s", name);
         enterClassName = name;
         var generic = typeParameters(ctx.typeParameters());
         var parent = this.<DefinedType>visitOptional(ctx.classInherit());
@@ -662,11 +673,15 @@ final class SourceParseVisitor
 
             if (mi.method != null) {
                 var mName = identifier(mi.method.name);
+                if (enterMethodName != null)
+                    ErrorUtil.semantic("nested define method: %s", name);
+                enterMethodName = name;
                 var mGeneric = typeParameters(mi.method.typeParameters());
                 var procedure = (Procedure) visit(mi.method.procedure());
                 var method = new ClassMethod(posOf(mi), mModifier, mName,
                         mGeneric, mExport, procedure);
                 methods.add(mName, method);
+                enterMethodName = null;
             } else if (mi.fields != null) {
                 var dcl = parseDeclare(mi.fields.declare);
                 var td = (TypeDeclarer) visit(mi.fields.typeDeclarer());
@@ -732,6 +747,7 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitLambdaExpression(FengParser.LambdaExpressionContext ctx) {
+        ErrorUtil.unsupported("lambda");
         var procedure = (Procedure) visit(ctx.procedure());
         gst.lambdas.add(procedure);
         return new LambdaExpression(posOf(ctx), procedure);
@@ -768,14 +784,20 @@ final class SourceParseVisitor
     @Override
     public Entity visitReferExpr(FengParser.ReferExprContext ctx) {
         var pos = posOf(ctx);
-        var current = switch (ctx.current.getType()) {
-            case FengParser.THIS -> new CurrentExpression(
-                    pos, enterClassName, true);
-            case FengParser.SUPER -> new CurrentExpression(
-                    pos, enterClassName, false);
-            default -> null;
-        };
-        if (current != null) return current;
+        if (ctx.current != null) {
+            var cn = enterClassName;
+            var mn = enterMethodName;
+            if (cn == null || mn == null)
+                return ErrorUtil.semantic(
+                        "%s must use in method", ctx.current);
+            var type = ctx.current.getType();
+            if (type == FengParser.THIS)
+                return new CurrentExpression(pos, cn, mn, true);
+            else if (type == FengParser.SUPER)
+                return new CurrentExpression(pos, cn, mn, false);
+            else
+                return ErrorUtil.unreachable();
+        }
 
         var symbol = parseSymbol(ctx.symbol());
         var generic = typeArguments(ctx.typeArguments());
@@ -950,8 +972,8 @@ final class SourceParseVisitor
     public Entity visitMemberAssignableOperand(
             FengParser.MemberAssignableOperandContext ctx) {
         var subject = (PrimaryExpression) visit(ctx.primaryExpr());
-        var member = identifier(ctx.memberOf().member);
-        return new MemberAssignableOperand(posOf(ctx), subject, member);
+        var field = identifier(ctx.memberOf().member);
+        return new FieldAssignableOperand(posOf(ctx), subject, field);
     }
 
     @Override
@@ -989,7 +1011,9 @@ final class SourceParseVisitor
         };
         var operand = (AssignableOperand) visit(ctx.assignableOperand());
         var value = (Expression) visit(ctx.expression());
-        return new AssignmentOperateStatement(posOf(ctx), operand, binOp, value);
+        var rhs = new BinaryExpression(posOf(opCtx), binOp, operand.rhs(), value);
+        return new AssignmentsStatement(posOf(ctx), List.of(operand),
+                new ArrayTuple(value.pos(), List.of(rhs)), false);
     }
 
     @Override
@@ -1214,8 +1238,10 @@ final class SourceParseVisitor
 
     private List<TypeDeclarer> parseReturnSet(FengParser.ReturnSetContext ctx) {
         if (ctx == null) return List.of();
-        if (ctx.current != null)
+        if (ctx.current != null) {
+            ErrorUtil.unsupported("return this");
             return List.of(new ThisTypeDeclarer(posOf(ctx)));
+        }
 
         var tdCtx = ctx.typeDeclarer();
         if (tdCtx != null) {

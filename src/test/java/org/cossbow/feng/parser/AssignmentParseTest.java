@@ -2,11 +2,11 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.expr.*;
-import org.cossbow.feng.ast.stmt.AssignmentOperateStatement;
+import org.cossbow.feng.ast.stmt.ArrayTuple;
 import org.cossbow.feng.ast.stmt.AssignmentsStatement;
 import org.cossbow.feng.ast.var.AssignableOperand;
+import org.cossbow.feng.ast.var.FieldAssignableOperand;
 import org.cossbow.feng.ast.var.IndexAssignableOperand;
-import org.cossbow.feng.ast.var.MemberAssignableOperand;
 import org.cossbow.feng.ast.var.VariableAssignableOperand;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -37,10 +37,12 @@ public class AssignmentParseTest extends BaseParseTest {
         for (var op : assignableOperators) {
             var b = randVarSymbol(8);
             var code = "%s%s=%s;".formatted(lhs, operator(op), b);
-            var operation = (AssignmentOperateStatement) doParseLocal(code);
-            lhsTest.accept((H) operation.operand());
-            Assertions.assertEquals(b, varName(operation.value()));
-            Assertions.assertSame(op, operation.operator());
+            var stmt = (AssignmentsStatement) doParseLocal(code);
+            lhsTest.accept((H) stmt.operands().getFirst());
+            var v = (BinaryExpression) ((ArrayTuple) stmt.tuple())
+                    .values().getFirst();
+            Assertions.assertEquals(b, varName(v.right()));
+            Assertions.assertSame(op, v.operator());
         }
     }
 
@@ -64,9 +66,9 @@ public class AssignmentParseTest extends BaseParseTest {
         Assertions.assertEquals(b, varName(ihls.subject()));
         Assertions.assertEquals(i, varName(ihls.index()));
 
-        var mhls = (MemberAssignableOperand) list.get(2);
+        var mhls = (FieldAssignableOperand) list.get(2);
         Assertions.assertEquals(c, varName(mhls.subject()));
-        Assertions.assertEquals(m, mhls.member());
+        Assertions.assertEquals(m, mhls.field());
     }
 
     @Test
@@ -103,9 +105,9 @@ public class AssignmentParseTest extends BaseParseTest {
 
         var f = randVarName(5);
         assignmentOperationTester(v + "." + f, lhs -> {
-            var fieldLeft = (MemberAssignableOperand) lhs;
+            var fieldLeft = (FieldAssignableOperand) lhs;
             Assertions.assertEquals(v, varName(fieldLeft.subject()));
-            Assertions.assertEquals(f, fieldLeft.member());
+            Assertions.assertEquals(f, fieldLeft.field());
         });
 
         var i = randVarSymbol(4);

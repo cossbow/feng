@@ -6,7 +6,6 @@ import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.lit.*;
-import org.cossbow.feng.ast.mod.Global;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassField;
 import org.cossbow.feng.ast.oop.ClassMethod;
@@ -136,8 +135,13 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
 
     // class definition
 
+    private volatile ClassDefinition enterClass;
+    private volatile ClassMethod enterMethod;
+
     @Override
     public CppGenerator visit(ClassDefinition cd) {
+        assert enterClass == null;
+        enterClass = cd;
         write("class ");
         visit(cd.name());
         write(' ');
@@ -168,12 +172,18 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
             visit(m);
 
         write("};\n");
+        enterClass = null;
         return this;
     }
 
     @Override
     public CppGenerator visit(ClassMethod cm) {
-        return visit((FunctionDefinition) cm);
+        assert enterClass != null;
+        assert enterMethod == null;
+        enterMethod = cm;
+        visit((FunctionDefinition) cm);
+        enterMethod = null;
+        return this;
     }
 
     @Override
@@ -211,6 +221,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
 
     @Override
     public CppGenerator visit(ClassField cf) {
+        assert enterClass != null;
         visit(cf.type());
         write(' ');
         visit(cf.name());
@@ -218,9 +229,12 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
+    private volatile FunctionDefinition enterFunc;
 
     @Override
     public CppGenerator visit(FunctionDefinition fd) {
+        assert enterFunc == null;
+        enterFunc = fd;
         var proc = fd.procedure();
         var ps = proc.prototype().parameterSet();
         var rs = proc.prototype().returnSet();
@@ -245,6 +259,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         }
         write(")\n");
         visit(proc.body());
+        enterFunc = null;
         return this;
     }
 
@@ -257,23 +272,137 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
-    public CppGenerator visit(ReturnStatement rs) {
-        write("return ");
-        if (rs.result().has())
-            visit(rs.result().get());
+    private CppGenerator endStmt() {
         write(";\n");
         return this;
     }
 
     @Override
+    public CppGenerator visit(ReturnStatement rs) {
+        write("return ");
+        rs.result().use(this::visit);
+        return endStmt();
+    }
+
+    @Override
     public CppGenerator visit(DeclarationStatement ds) {
-        var size = ds.variables().size();
-        for (int i = 0; i < size; i++) {
-            var v = ds.variables().get(i);
-            var e = ds.init();  // TODO: tuple怎么处理
+        if (ds.init().none()) {
+            ds.variables().forEach(this::visit);
+            return this;
         }
+
+        // with init
+
         return this;
+    }
+
+    @Override
+    public CppGenerator visit(AssignmentsStatement e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public CppGenerator visit(BreakStatement e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public CppGenerator visit(CallStatement e) {
+        visit(e.call());
+        return endStmt();
+    }
+
+    @Override
+    public CppGenerator visit(ConditionalForStatement s) {
+        write("for(");
+        s.initializer().use(this::visit);
+        visit(s.condition());
+        endStmt();
+        s.updater().use(this::visit);
+        write(')');
+        return visit(s.body());
+    }
+
+    @Override
+    public CppGenerator visit(IterableForStatement s) {
+        return unsupported("iterable for");
+    }
+
+    @Override
+    public CppGenerator visit(ContinueStatement s) {
+        write("continue ");
+        s.label().use(this::visit);
+        return endStmt();
+    }
+
+    @Override
+    public CppGenerator visit(GotoStatement e) {
+        return unsupported("goto");
+    }
+
+    @Override
+    public CppGenerator visit(IfStatement s) {
+        if (s.init().has()) {
+            write('{');
+            visit(s.init().get());
+        }
+        write("if(");
+        visit(s.condition());
+        write(')');
+        visit(s.yes());
+        if (s.not().has()) {
+            write("else ");
+            visit(s.not().get());
+        }
+        if (s.init().has()) write('}');
+        return this;
+    }
+
+    @Override
+    public CppGenerator visit(LabeledStatement s) {
+        visit(s.label());
+        write(':');
+        return visit(s.statement());
+    }
+
+    @Override
+    public CppGenerator visit(LocalDefineStatement s) {
+        return unsupported("local define (func/type)");
+    }
+
+    @Override
+    public CppGenerator visit(SwitchStatement ss) {
+        if (ss.init().has()) {
+            write('{');
+            visit(ss.init().get());
+        }
+        write("switch(");
+        visit(ss.value());
+        write("){");
+        for (var br : ss.branches()) {
+            for (var cs : br.constants()) {
+                write("case ");
+                visit(cs);
+                write(":\n");
+            }
+            for (var s : br.statements())
+                visit(s);
+            if (!br.fallthrough())
+                write("break;\n");
+        }
+        write("}\n");
+        if (ss.init().has()) write('}');
+        return this;
+    }
+
+    @Override
+    public CppGenerator visit(ThrowStatement e) {
+        return unsupported("throw");
+    }
+
+    @Override
+    public CppGenerator visit(TryStatement e) {
+        return unsupported("try..catch");
     }
 
     // expression
@@ -286,12 +415,12 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
 
     @Override
     public CppGenerator visit(IfTuple e) {
-        return unsupported("");
+        return unsupported("if-tuple");
     }
 
     @Override
     public CppGenerator visit(SwitchTuple e) {
-        return unsupported("");
+        return unsupported("switch-tuple");
     }
 
     @Override
@@ -421,24 +550,35 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
     }
 
     @Override
+    public CppGenerator visit(CurrentExpression e) {
+        if (e.isSelf()) return write("this->");
+        return unsupported("super");
+    }
+
+    @Override
     public CppGenerator visit(MemberOfExpression e) {
+        if (e.subject() instanceof CurrentExpression ce) {
+            visit(ce);
+            return write(e.member().value());
+        }
+
         var td = deducer.visit(e.subject());
         if (td instanceof MemTypeDeclarer mtd) {
             if (mtd.mapped().none())
                 return semantic("未映射类型");
             td = mtd.mapped().get();
         }
+        visit(e.subject());
         if (td instanceof DefinedTypeDeclarer dtd) {
             if (dtd.reference().has())
                 write("->");
             else
                 write('.');
         }
-        visit(e.subject());
         if (!e.generic().isEmpty())
             return unsupported("泛型");
         write(e.member().value());
-        return EntityVisitor.super.visit(e);
+        return this;
     }
 
     @Override
@@ -449,7 +589,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
     @Override
     public CppGenerator visit(ObjectExpression e) {
         write('{');
-        e.entries().foreach((name, expr) -> {
+        e.entries().each((name, expr) -> {
             write('.').write(name.value()).write('=');
             visit(expr);
         });

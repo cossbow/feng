@@ -1,19 +1,33 @@
 package org.cossbow.feng.visit;
 
-import org.cossbow.feng.ast.micro.*;
-import org.cossbow.feng.ast.mod.*;
-import org.cossbow.feng.ast.var.*;
-import org.cossbow.feng.ast.proc.*;
-import org.cossbow.feng.ast.expr.*;
-import org.cossbow.feng.ast.struct.*;
-import org.cossbow.feng.ast.stmt.*;
-import org.cossbow.feng.ast.attr.*;
 import org.cossbow.feng.ast.*;
-import org.cossbow.feng.ast.oop.*;
+import org.cossbow.feng.ast.attr.Attribute;
+import org.cossbow.feng.ast.attr.AttributeDefinition;
+import org.cossbow.feng.ast.attr.AttributeField;
+import org.cossbow.feng.ast.attr.Modifier;
+import org.cossbow.feng.ast.dcl.*;
+import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
-import org.cossbow.feng.ast.dcl.*;
-import static org.cossbow.feng.util.ErrorUtil.*;
+import org.cossbow.feng.ast.micro.*;
+import org.cossbow.feng.ast.mod.Global;
+import org.cossbow.feng.ast.mod.GlobalDeclaration;
+import org.cossbow.feng.ast.mod.GlobalDefinition;
+import org.cossbow.feng.ast.mod.Import;
+import org.cossbow.feng.ast.oop.*;
+import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.ast.proc.Procedure;
+import org.cossbow.feng.ast.proc.Prototype;
+import org.cossbow.feng.ast.proc.PrototypeDefinition;
+import org.cossbow.feng.ast.stmt.*;
+import org.cossbow.feng.ast.struct.StructureDefinition;
+import org.cossbow.feng.ast.struct.StructureField;
+import org.cossbow.feng.ast.var.AssignableOperand;
+import org.cossbow.feng.ast.var.FieldAssignableOperand;
+import org.cossbow.feng.ast.var.IndexAssignableOperand;
+import org.cossbow.feng.ast.var.VariableAssignableOperand;
+
+import static org.cossbow.feng.util.ErrorUtil.unreachable;
 
 public interface EntityVisitor<R> {
 
@@ -51,7 +65,6 @@ public interface EntityVisitor<R> {
 			case SwitchBranch ee -> visit(ee);
 			case Tuple ee -> visit(ee);
 			case StructureField ee -> visit(ee);
-			case StructureType ee -> visit(ee);
 			case AssignableOperand ee -> visit(ee);
 			case null, default -> unreachable();
 		};
@@ -158,7 +171,6 @@ public interface EntityVisitor<R> {
 	default R visit(Expression e) {
 		return switch (e) {
 			case BinaryExpression ee -> visit(ee);
-			case CurrentExpression ee -> visit(ee);
 			case PrimaryExpression ee -> visit(ee);
 			case UnaryExpression ee -> visit(ee);
 			case null, default -> unreachable();
@@ -167,13 +179,12 @@ public interface EntityVisitor<R> {
 
 	default R visit(BinaryExpression e) { return unreachable(); }
 
-	default R visit(CurrentExpression e) { return unreachable(); }
-
 	default R visit(PrimaryExpression e) {
 		return switch (e) {
 			case ArrayExpression ee -> visit(ee);
 			case AssertExpression ee -> visit(ee);
 			case CallExpression ee -> visit(ee);
+			case CurrentExpression ee -> visit(ee);
 			case IndexOfExpression ee -> visit(ee);
 			case LambdaExpression ee -> visit(ee);
 			case LiteralExpression ee -> visit(ee);
@@ -192,6 +203,8 @@ public interface EntityVisitor<R> {
 	default R visit(AssertExpression e) { return unreachable(); }
 
 	default R visit(CallExpression e) { return unreachable(); }
+
+	default R visit(CurrentExpression e) { return unreachable(); }
 
 	default R visit(IndexOfExpression e) { return unreachable(); }
 
@@ -297,7 +310,6 @@ public interface EntityVisitor<R> {
 
 	default R visit(Statement e) {
 		return switch (e) {
-			case AssignmentOperateStatement ee -> visit(ee);
 			case AssignmentsStatement ee -> visit(ee);
 			case BlockStatement ee -> visit(ee);
 			case BreakStatement ee -> visit(ee);
@@ -316,8 +328,6 @@ public interface EntityVisitor<R> {
 			case null, default -> unreachable();
 		};
 	}
-
-	default R visit(AssignmentOperateStatement e) { return unreachable(); }
 
 	default R visit(AssignmentsStatement e) { return unreachable(); }
 
@@ -381,25 +391,10 @@ public interface EntityVisitor<R> {
 
 	default R visit(StructureField e) { return unreachable(); }
 
-	default R visit(StructureType e) {
-		return switch (e) {
-			case ArrayStructureType ee -> visit(ee);
-			case DefinedStructureType ee -> visit(ee);
-			case UnnamedStructureType ee -> visit(ee);
-			case null, default -> unreachable();
-		};
-	}
-
-	default R visit(ArrayStructureType e) { return unreachable(); }
-
-	default R visit(DefinedStructureType e) { return unreachable(); }
-
-	default R visit(UnnamedStructureType e) { return unreachable(); }
-
 	default R visit(AssignableOperand e) {
 		return switch (e) {
 			case IndexAssignableOperand ee -> visit(ee);
-			case MemberAssignableOperand ee -> visit(ee);
+			case FieldAssignableOperand ee -> visit(ee);
 			case VariableAssignableOperand ee -> visit(ee);
 			case null, default -> unreachable();
 		};
@@ -407,7 +402,7 @@ public interface EntityVisitor<R> {
 
 	default R visit(IndexAssignableOperand e) { return unreachable(); }
 
-	default R visit(MemberAssignableOperand e) { return unreachable(); }
+	default R visit(FieldAssignableOperand e) { return unreachable(); }
 
 	default R visit(VariableAssignableOperand e) { return unreachable(); }
 

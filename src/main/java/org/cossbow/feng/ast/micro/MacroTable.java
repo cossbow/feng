@@ -34,4 +34,7 @@ public class MacroTable {
         return table != null && table.exists(id);
     }
 
+    public boolean isEmpty() {
+        return tables.isEmpty();
+    }
 }

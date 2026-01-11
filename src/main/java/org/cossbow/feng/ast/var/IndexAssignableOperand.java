@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.var;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.expr.IndexOfExpression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 
 public class IndexAssignableOperand extends AssignableOperand {
@@ -22,5 +23,10 @@ public class IndexAssignableOperand extends AssignableOperand {
 
     public Expression index() {
         return index;
+    }
+
+    @Override
+    public Expression rhs() {
+        return new IndexOfExpression(pos(), subject, index);
     }
 }

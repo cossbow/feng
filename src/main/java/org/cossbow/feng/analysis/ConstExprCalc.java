@@ -101,9 +101,7 @@ public class ConstExprCalc implements EntityVisitor<Expression> {
 
     @Override
     public Expression visit(MemberOfExpression e) {
-        var subject = (PrimaryExpression) visit(e.subject());
-        return new MemberOfExpression(e.pos(), subject,
-                e.member(), e.generic());
+        return e;
     }
 
     @Override

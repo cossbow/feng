@@ -8,7 +8,7 @@ import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
 import org.cossbow.feng.ast.stmt.AssignmentsStatement;
-import org.cossbow.feng.ast.var.MemberAssignableOperand;
+import org.cossbow.feng.ast.var.FieldAssignableOperand;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -50,7 +50,7 @@ public class MacroParseTest extends BaseParseTest {
             Assertions.assertEquals(name, proc.name());
             checkIds(List.of(left, right, result), proc.params());
             var stmt = (AssignmentsStatement) proc.body().getFirst();
-            var operand = (MemberAssignableOperand) stmt.operands().getFirst();
+            var operand = (FieldAssignableOperand) stmt.operands().getFirst();
             Assertions.assertEquals(symbol(result), varName(operand.subject()));
             var bin = (BinaryExpression) first(stmt.tuple());
             Assertions.assertEquals(symbol(left),

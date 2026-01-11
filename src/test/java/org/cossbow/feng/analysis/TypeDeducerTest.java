@@ -15,7 +15,7 @@ import java.util.List;
 
 import static org.cossbow.feng.ast.dcl.Primitive.*;
 
-public class TestTypeDeducer {
+public class TypeDeducerTest {
 
     final TypeDeducer deducer = new TypeDeducer(EmptySymbolContext.EMPTY);
 

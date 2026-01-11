@@ -1,6 +1,7 @@
 package org.cossbow.feng.analysis;
 
-import org.cossbow.feng.util.Optional;
+import org.cossbow.feng.ast.Entity;
+import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
@@ -10,20 +11,26 @@ import org.cossbow.feng.ast.lit.BoolLiteral;
 import org.cossbow.feng.ast.lit.FloatLiteral;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.lit.StringLiteral;
-import org.cossbow.feng.ast.mod.Global;
 import org.cossbow.feng.ast.oop.ClassDefinition;
+import org.cossbow.feng.ast.oop.ClassField;
+import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.stmt.ArrayTuple;
 import org.cossbow.feng.ast.stmt.IfTuple;
 import org.cossbow.feng.ast.stmt.ReturnTuple;
 import org.cossbow.feng.ast.stmt.SwitchTuple;
-import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.ast.struct.StructureDefinition;
+import org.cossbow.feng.ast.struct.StructureField;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.visit.EntityVisitor;
 import org.cossbow.feng.visit.SymbolContext;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+
+import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
@@ -57,7 +64,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     public TypeDeclarer visit(BinaryExpression e) {
         var lt = visit(e.left());
         var rt = visit(e.right());
-        if (!lt.equals(rt)) return ErrorUtil.semantic(
+        if (!lt.equals(rt)) return semantic(
                 "type of tow operands must same: %s", e.pos());
 
         switch (e.operator()) {
@@ -74,7 +81,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                 if (isBool(lt) && isBool(rt)) return lt;
             }
         }
-        return ErrorUtil.unsupported("binary-operation: %s %s %s",
+        return unsupported("binary-operation: %s %s %s",
                 lt, e.operator(), rt);
     }
 
@@ -101,7 +108,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                 if (isNumber(t)) return t;
             }
         }
-        return ErrorUtil.unsupported("unary-operation: %s %s %s",
+        return unsupported("unary-operation: %s %s %s",
                 e.operator(), t);
     }
 
@@ -128,9 +135,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             return visit(ftd);
         if (td instanceof PrimitiveTypeDeclarer ptd)
             return visit(ptd);
-
-
-        return ErrorUtil.semantic(
+        return semantic(
                 "callee not callable: %s", e.pos());
     }
 
@@ -140,7 +145,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (td instanceof ArrayTypeDeclarer atd) {
             return atd.element();
         }
-        return ErrorUtil.unsupported(
+        return unsupported(
                 "index required array");
     }
 
@@ -162,14 +167,62 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                     Primitive.BOOL);
             case StringLiteral ee -> new MemTypeDeclarer(ee.pos(),
                     true, Optional.empty());
-            case null, default -> ErrorUtil.semantic(
+            case null, default -> semantic(
                     "can'nt infer the type by: %s", e.literal());
         };
     }
 
+    public Entity getMember(PrimaryExpression subject,
+                            Identifier member) {
+        var td = visit(subject);
+        if (td instanceof MemTypeDeclarer mtd) {
+            if (mtd.mapped().none())
+                return semantic("unmaped: %s", subject.pos());
+            td = mtd.mapped().get();
+        }
+        if (!(td instanceof DefinedTypeDeclarer dtd))
+            return semantic("required user-defined-type: %s", td);
+
+        var dt = dtd.definedType();
+        var o = context.findType(dt.symbol());
+        if (o.none()) return semantic(
+                "undefined type: %s", dt.symbol());
+        var type = o.get();
+        if (type instanceof StructureDefinition sd) {
+            var sf = sd.fields().tryGet(member);
+            if (sf.has()) return sf.get();
+
+            return semantic("%s %s has no member %s",
+                    sd.union() ? "union" : "struct",
+                    type.name(), member);
+        }
+        if (type instanceof ClassDefinition cd) {
+            var cf = cd.fields().tryGet(member);
+            if (cf.has()) return cf.get();
+            var cm = cd.methods().tryGet(member);
+            if (cm.has()) return cm.get();
+            return semantic("class %s has no field %s",
+                    type.name(), member);
+        }
+
+        return semantic("%s can't have member", type.name());
+    }
+
     @Override
-    public TypeDeclarer visit(MemberOfExpression e) {
-        return ErrorUtil.unsupported("未完待续：查询字段的类型");
+    public TypeDeclarer visit(MemberOfExpression mo) {
+        if (!mo.generic().isEmpty()) return unsupported("generic");
+
+        var m = getMember(mo.subject(), mo.member());
+
+        if (m instanceof StructureField sf) return sf.type();
+
+        if (m instanceof ClassField cf) return cf.type();
+
+        if (m instanceof ClassMethod cm)
+            return new FuncTypeDeclarer(cm.pos(),
+                    cm.procedure().prototype(), mo.generic());
+
+        return unreachable();
     }
 
     @Override
@@ -180,7 +233,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                     ReferenceType.STRONG, false, false)));
             case NewArrayType dt -> new ArrayTypeDeclarer(e.pos(),
                     dt.element(), Optional.empty(), false);
-            case null, default -> ErrorUtil.unreachable();
+            case null, default -> unreachable();
         };
     }
 
@@ -211,7 +264,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
         var v = context.findVar(s);
         if (v.has()) {
-            if (!symbolSet.add(s)) return ErrorUtil.semantic(
+            if (!symbolSet.add(s)) return semantic(
                     "deduce type cycle for %s", s);
             return v.get().type().must();
         }
@@ -222,7 +275,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                 return new PrimitiveTypeDeclarer(e.pos(), pri.get());
         }
 
-        return ErrorUtil.semantic("这是什么？%s", s);
+        return semantic("这是什么？%s", s);
     }
 
     //
@@ -246,32 +299,36 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     //
 
     @Override
-    public TypeDeclarer visit(ArrayTuple e) {
+    public TupleTypeDeclarer visit(ArrayTuple e) {
         var list = new ArrayList<TypeDeclarer>(e.size());
         for (var v : e.values()) {
             var td = visit(v);
             list.add(td);
             if (!(td instanceof TupleTypeDeclarer))
                 continue;
-            ErrorUtil.semantic(
-                    "tuple can't spread: %s",
-                    v.toString());
+            return semantic("nested tuple: %s", v.pos());
         }
         return new TupleTypeDeclarer(e.pos(), list);
     }
 
     public TypeDeclarer visit(IfTuple e) {
-        var y = visit(e.yes());
-        var n = visit(e.not());
-        return null;
+        return unsupported("if-tuple");
     }
 
     public TypeDeclarer visit(SwitchTuple e) {
-        return null;
+        return unsupported("switch-tuple");
     }
 
     @Override
-    public TypeDeclarer visit(ReturnTuple e) {
-        return null;
+    public TupleTypeDeclarer visit(ReturnTuple e) {
+        var td = visit(e.call());
+        if (td instanceof FuncTypeDeclarer ftd)
+            return new TupleTypeDeclarer(e.pos(),
+                    ftd.prototype().returnSet());
+        if (td instanceof PrimitiveTypeDeclarer ptd) {
+            return new TupleTypeDeclarer(e.pos(),
+                    List.of(ptd));
+        }
+        return unreachable();
     }
 }

@@ -5,6 +5,7 @@ import org.cossbow.feng.util.Optional;
 
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public class UniqueTable<K extends Entity, V> {
     private final HashMap<K, Node<K, V>> table;
@@ -37,10 +38,10 @@ public class UniqueTable<K extends Entity, V> {
         throw new NoSuchElementException("not exists '" + id + "'");
     }
 
-    public org.cossbow.feng.util.Optional<V> tryGet(K id) {
+    public Optional<V> tryGet(K id) {
         var node = table.get(id);
         if (node != null) {
-            return org.cossbow.feng.util.Optional.of(node.value);
+            return Optional.of(node.value);
         }
         return Optional.empty();
     }
@@ -69,10 +70,16 @@ public class UniqueTable<K extends Entity, V> {
         return table.isEmpty();
     }
 
-    public void foreach(BiConsumer<K, V> c) {
+    public void each(BiConsumer<K, V> c) {
         for (var n : nodes)
             c.accept(n.id, n.value);
     }
+
+    public void each(Consumer<V> c) {
+        for (var n : nodes)
+            c.accept(n.value);
+    }
+
 
     //
 

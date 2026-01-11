@@ -55,11 +55,13 @@ public class StatementParseTest extends BaseParseTest {
             var a = symbol(randVarName(8));
             var b = symbol(randVarName(8));
             var code = a + operator(op) + "=" + b + ";";
-            var stmt = (AssignmentOperateStatement) parseStmt(code);
-            var lhs = (VariableAssignableOperand) stmt.operand();
-            Assertions.assertEquals(a, lhs.symbol());
-            Assertions.assertEquals(b, varName(stmt.value()));
-            Assertions.assertSame(op, stmt.operator());
+            var stmt = (AssignmentsStatement) parseStmt(code);
+            var operand = (VariableAssignableOperand) stmt.operands().getFirst();
+            Assertions.assertEquals(a, operand.symbol());
+            var value = (BinaryExpression) ((ArrayTuple) stmt.tuple())
+                    .values().getFirst();
+            Assertions.assertEquals(b, varName(value.right()));
+            Assertions.assertSame(op, value.operator());
         }
     }
 
@@ -217,8 +219,8 @@ public class StatementParseTest extends BaseParseTest {
         Assertions.assertSame(BinaryOperator.LT, cond.operator());
         Assertions.assertEquals(i, varName(cond.left()));
         Assertions.assertEquals(n, varName(cond.right()));
-        var assign = (AssignmentOperateStatement) stmt.body();
-        var lhs = (VariableAssignableOperand) assign.operand();
+        var assign = (AssignmentsStatement) stmt.body();
+        var lhs = (VariableAssignableOperand) assign.operands().getFirst();
         Assertions.assertEquals(i, lhs.symbol());
     }
 
@@ -241,8 +243,9 @@ public class StatementParseTest extends BaseParseTest {
         Assertions.assertEquals(c, varName(call.callee()));
         Assertions.assertEquals(symbol(i), varName(call.arguments().getFirst()));
 
-        var aop = ((AssignmentOperateStatement) stmt.updater().must());
-        Assertions.assertEquals(symbol(i), ((VariableAssignableOperand) aop.operand()).symbol());
+        var aop = ((AssignmentsStatement) stmt.updater().must());
+        var left = ((VariableAssignableOperand) aop.operands().getFirst());
+        Assertions.assertEquals(symbol(i), left.symbol());
     }
 
     @Test
@@ -367,7 +370,7 @@ public class StatementParseTest extends BaseParseTest {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":a+=3;");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(AssignmentOperateStatement.class, stmt.statement());
+        Assertions.assertInstanceOf(AssignmentsStatement.class, stmt.statement());
     }
 
     @Test

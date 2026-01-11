@@ -23,5 +23,9 @@ public class EmptySymbolContext implements SymbolContext {
         return Optional.empty();
     }
 
+    @Override
+    public void putVar(Variable variable) {
+    }
+
     public static final EmptySymbolContext EMPTY = new EmptySymbolContext();
 }

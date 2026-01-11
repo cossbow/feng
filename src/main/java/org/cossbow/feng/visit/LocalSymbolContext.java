@@ -8,32 +8,35 @@ import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 
 public class LocalSymbolContext implements SymbolContext {
+    private final SymbolContext parent;
 
-    private final SymbolContext outer;
-    private final IdentifierTable<Variable> variables;
-
-    public LocalSymbolContext(SymbolContext outer,
-                              IdentifierTable<Variable> variables) {
-        this.outer = outer;
-        this.variables = variables;
+    public LocalSymbolContext(SymbolContext parent) {
+        this.parent = parent;
     }
+
+    private final IdentifierTable<Variable> variables = new IdentifierTable<>();
 
     @Override
     public Optional<TypeDefinition> findType(Symbol symbol) {
-        return outer.findType(symbol);
+        return parent.findType(symbol);
     }
 
     @Override
     public Optional<FunctionDefinition> findFunc(Symbol symbol) {
-        return outer.findFunc(symbol);
+        return parent.findFunc(symbol);
     }
 
     @Override
     public Optional<Variable> findVar(Symbol symbol) {
-        if (symbol.module().has()) return outer.findVar(symbol);
-        var v = variables.tryGet(symbol.name());
-        if (v.has()) return v;
-        return outer.findVar(symbol);
+        if (symbol.module().none()) {
+            var v = variables.tryGet(symbol.name());
+            if (v.has()) return v;
+        }
+        return parent.findVar(symbol);
     }
 
+    @Override
+    public void putVar(Variable variable) {
+        variables.add(variable.name(), variable);
+    }
 }

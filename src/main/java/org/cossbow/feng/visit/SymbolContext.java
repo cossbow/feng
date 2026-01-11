@@ -1,5 +1,6 @@
 package org.cossbow.feng.visit;
 
+import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
@@ -13,5 +14,7 @@ public interface SymbolContext {
     Optional<FunctionDefinition> findFunc(Symbol symbol);
 
     Optional<Variable> findVar(Symbol symbol);
+
+    void putVar(Variable variable);
 
 }
