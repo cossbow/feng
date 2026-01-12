@@ -6,19 +6,20 @@ import org.cossbow.feng.ast.expr.Expression;
 
 import java.util.Objects;
 
-public class ArrayTypeDeclarer extends TypeDeclarer {
+public class ArrayTypeDeclarer extends TypeDeclarer
+        implements Referable {
     private TypeDeclarer element;
     private Optional<Expression> length;
-    private Optional<Reference> reference;
+    private Optional<Refer> refer;
 
     public ArrayTypeDeclarer(Position pos,
                              TypeDeclarer element,
                              Optional<Expression> length,
-                             Optional<Reference> reference) {
+                             Optional<Refer> refer) {
         super(pos);
         this.element = element;
         this.length = length;
-        this.reference = reference;
+        this.refer = refer;
     }
 
     public TypeDeclarer element() {
@@ -29,8 +30,8 @@ public class ArrayTypeDeclarer extends TypeDeclarer {
         return length;
     }
 
-    public Optional<Reference> reference() {
-        return reference;
+    public Optional<Refer> refer() {
+        return refer;
     }
 
     @Override
@@ -38,7 +39,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer {
         if (!(o instanceof ArrayTypeDeclarer td)) return false;
         return Objects.equals(element, td.element) &&
                 Objects.equals(length, td.length) &&
-                Objects.equals(reference, td.reference);
+                Objects.equals(refer, td.refer);
     }
 
 }

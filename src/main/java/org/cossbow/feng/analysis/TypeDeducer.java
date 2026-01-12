@@ -14,10 +14,7 @@ import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassField;
 import org.cossbow.feng.ast.oop.ClassMethod;
-import org.cossbow.feng.ast.stmt.ArrayTuple;
-import org.cossbow.feng.ast.stmt.IfTuple;
-import org.cossbow.feng.ast.stmt.ReturnTuple;
-import org.cossbow.feng.ast.stmt.SwitchTuple;
+import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.util.Optional;
@@ -30,17 +27,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static org.cossbow.feng.ast.dcl.ReferenceType.STRONG;
+import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     private final SymbolContext context;
-    private final ConstExprCalc calc;
 
     public TypeDeducer(SymbolContext context) {
         this.context = context;
-        calc = new ConstExprCalc(context);
     }
 
     boolean isPrimitive(TypeDeclarer td) {
@@ -138,8 +133,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             return visit(ftd);
         if (td instanceof PrimitiveTypeDeclarer ptd)
             return visit(ptd);
-        return semantic(
-                "callee not callable: %s", e.pos());
+        return semantic("callee not callable: %s", e.pos());
     }
 
     @Override
@@ -148,8 +142,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (td instanceof ArrayTypeDeclarer atd) {
             return atd.element();
         }
-        return unsupported(
-                "index required array");
+        return unsupported("index required array");
     }
 
     @Override
@@ -169,7 +162,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             case BoolLiteral ee -> new PrimitiveTypeDeclarer(ee.pos(),
                     Primitive.BOOL);
             case StringLiteral ee -> new MemTypeDeclarer(ee.pos(),
-                    true, Optional.empty());
+                    true, Optional.empty(), Optional.empty());
             case null, default -> semantic(
                     "can'nt infer the type by: %s", e.literal());
         };
@@ -232,11 +225,11 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     public TypeDeclarer visit(NewExpression e) {
         return switch (e.type()) {
             case NewDefinedType dt -> new DefinedTypeDeclarer(e.pos(),
-                    dt.type(), Optional.of(new Reference(e.pos(),
+                    dt.type(), Optional.of(new Refer(e.pos(),
                     STRONG, false, false)));
             case NewArrayType dt -> new ArrayTypeDeclarer(e.pos(),
                     dt.element(), Optional.empty(), Optional.of(
-                    new Reference(dt.pos(), STRONG, true, dt.immutable())));
+                    new Refer(dt.pos(), STRONG, true, dt.immutable())));
             case null, default -> unreachable();
         };
     }
@@ -303,6 +296,16 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     }
 
     //
+
+
+    @Override
+    public TupleTypeDeclarer visit(Tuple e) {
+        var td = EntityVisitor.super.visit(e);
+        if (td instanceof TupleTypeDeclarer ttd)
+            return ttd;
+
+        return unreachable();
+    }
 
     @Override
     public TupleTypeDeclarer visit(ArrayTuple e) {

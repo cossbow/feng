@@ -1,6 +1,6 @@
 package org.cossbow.feng.ast.dcl;
 
-public enum ReferenceType {
+public enum ReferKind {
     STRONG,
     PHANTOM,
     WEAK,

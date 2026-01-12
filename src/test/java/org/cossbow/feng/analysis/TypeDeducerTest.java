@@ -27,7 +27,7 @@ public class TypeDeducerTest {
     public void testPrimitive() {
         var code = "var i, j, ok = uint32(1), float64(1), true;";
         var stmt = (DeclarationStatement) BaseParseTest.doParseLocal(code);
-        var td = (TupleTypeDeclarer) deducer.visit(stmt.init().must());
+        var td = deducer.visit(stmt.init().must());
         var ps = td.tuple().stream().map(this::getPri).toList();
         Assertions.assertEquals(List.of(UINT32, FLOAT64, BOOL), ps);
     }
@@ -36,23 +36,23 @@ public class TypeDeducerTest {
     public void testDefinedType() {
         var src = parseFile("define_type.feng");
         var gd = src.declarations().getFirst();
-        var tpd = (TupleTypeDeclarer) deducer.visit(gd.init().must());
+        var tpd = deducer.visit(gd.init().must());
         Assertions.assertEquals(1, tpd.tuple().size());
         var dtd = ((DefinedTypeDeclarer) tpd.tuple().getFirst());
         var def = src.definitions().getFirst();
         Assertions.assertEquals(dtd.definedType().symbol().name(), def.name());
         Assertions.assertTrue(dtd.definedType().symbol().module().none());
         Assertions.assertTrue(dtd.definedType().generic().isEmpty());
-        Assertions.assertTrue(dtd.reference().has());
-        Assertions.assertEquals(ReferenceType.STRONG, dtd.reference().must().type());
-        Assertions.assertFalse(dtd.reference().must().required());
-        Assertions.assertFalse(dtd.reference().must().immutable());
+        Assertions.assertTrue(dtd.refer().has());
+        Assertions.assertEquals(ReferKind.STRONG, dtd.refer().must().kind());
+        Assertions.assertFalse(dtd.refer().must().required());
+        Assertions.assertFalse(dtd.refer().must().immutable());
     }
 
     @Test
     public void testReturnType() {
         var src = parseFile("return_type.feng");
-        var f=src.table();
+        var f = src.table();
     }
 
     //

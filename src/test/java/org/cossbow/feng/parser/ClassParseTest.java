@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static org.cossbow.feng.ast.dcl.ReferenceType.STRONG;
+import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 
 public class ClassParseTest extends BaseParseTest {
 
@@ -85,7 +85,7 @@ public class ClassParseTest extends BaseParseTest {
                     var t = (DefinedTypeDeclarer) f.type();
                     Assertions.assertEquals(type, t.definedType().symbol());
                     Assertions.assertTrue(t.definedType().generic().isEmpty());
-                    Assertions.assertTrue(t.reference().none());
+                    Assertions.assertTrue(t.refer().none());
                 }
             }
         }
@@ -107,8 +107,8 @@ public class ClassParseTest extends BaseParseTest {
                     var t = (DefinedTypeDeclarer) f.type();
                     Assertions.assertEquals(type, t.definedType().symbol());
                     Assertions.assertTrue(t.definedType().generic().isEmpty());
-                    var ref = t.reference().get();
-                    Assertions.assertSame(STRONG, ref.type());
+                    var ref = t.refer().get();
+                    Assertions.assertSame(STRONG, ref.kind());
                     Assertions.assertFalse(ref.required());
                 }
             }

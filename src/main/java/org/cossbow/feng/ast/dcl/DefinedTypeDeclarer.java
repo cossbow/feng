@@ -6,31 +6,32 @@ import org.cossbow.feng.ast.gen.DefinedType;
 
 import java.util.Objects;
 
-public class DefinedTypeDeclarer extends TypeDeclarer {
+public class DefinedTypeDeclarer extends TypeDeclarer
+        implements Referable {
     private DefinedType definedType;
-    private Optional<Reference> reference;
+    private Optional<Refer> refer;
 
     public DefinedTypeDeclarer(Position pos,
                                DefinedType definedType,
-                               Optional<Reference> reference) {
+                               Optional<Refer> refer) {
         super(pos);
         this.definedType = definedType;
-        this.reference = reference;
+        this.refer = refer;
     }
 
     public DefinedType definedType() {
         return definedType;
     }
 
-    public Optional<Reference> reference() {
-        return reference;
+    public Optional<Refer> refer() {
+        return refer;
     }
 
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof DefinedTypeDeclarer that)) return false;
         return Objects.equals(definedType, that.definedType)
-                && Objects.equals(reference, that.reference);
+                && Objects.equals(refer, that.refer);
     }
 
 }

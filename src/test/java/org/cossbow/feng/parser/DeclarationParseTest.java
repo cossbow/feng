@@ -2,14 +2,13 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.Utils;
 import org.cossbow.feng.ast.dcl.*;
-import org.cossbow.feng.ast.mod.GlobalDeclaration;
 import org.cossbow.feng.ast.stmt.DeclarationStatement;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static org.cossbow.feng.ast.dcl.ReferenceType.*;
+import static org.cossbow.feng.ast.dcl.ReferKind.*;
 
 public class DeclarationParseTest extends BaseParseTest {
 
@@ -82,40 +81,40 @@ public class DeclarationParseTest extends BaseParseTest {
             var dcl = parseLocalDecl("var u *User");
             var v = dcl.variables().getFirst();
             var td = (DefinedTypeDeclarer) v.type().must();
-            var ref = td.reference().get();
-            Assertions.assertSame(STRONG, ref.type());
+            var ref = td.refer().get();
+            Assertions.assertSame(STRONG, ref.kind());
             Assertions.assertFalse(ref.required());
         }
         {
             var dcl = parseLocalDecl("var u *!User");
             var v = dcl.variables().getFirst();
             var td = (DefinedTypeDeclarer) v.type().must();
-            var ref = td.reference().get();
-            Assertions.assertSame(STRONG, ref.type());
+            var ref = td.refer().get();
+            Assertions.assertSame(STRONG, ref.kind());
             Assertions.assertTrue(ref.required());
         }
         {
             var dcl = parseLocalDecl("var u &User");
             var v = dcl.variables().getFirst();
             var td = (DefinedTypeDeclarer) v.type().must();
-            var ref = td.reference().get();
-            Assertions.assertSame(PHANTOM, ref.type());
+            var ref = td.refer().get();
+            Assertions.assertSame(PHANTOM, ref.kind());
             Assertions.assertFalse(ref.required());
         }
         {
             var dcl = parseLocalDecl("var u &!User");
             var v = dcl.variables().getFirst();
             var td = (DefinedTypeDeclarer) v.type().must();
-            var ref = td.reference().get();
-            Assertions.assertSame(PHANTOM, ref.type());
+            var ref = td.refer().get();
+            Assertions.assertSame(PHANTOM, ref.kind());
             Assertions.assertTrue(ref.required());
         }
         {
             var dcl = parseLocalDecl("var u ~User");
             var v = dcl.variables().getFirst();
             var td = (DefinedTypeDeclarer) v.type().must();
-            var ref = td.reference().get();
-            Assertions.assertSame(WEAK, ref.type());
+            var ref = td.refer().get();
+            Assertions.assertSame(WEAK, ref.kind());
             Assertions.assertFalse(ref.required());
         }
     }
@@ -167,9 +166,9 @@ public class DeclarationParseTest extends BaseParseTest {
             var td = (ArrayTypeDeclarer) v.type().must();
             Assertions.assertEquals(symbol("Host"), typeName(td.element()));
             Assertions.assertTrue(td.length().none());
-            Assertions.assertTrue(td.reference().must().checkType(STRONG));
-            Assertions.assertFalse(td.reference().must().immutable());
-            Assertions.assertFalse(td.reference().must().required());
+            Assertions.assertTrue(td.refer().must().checkType(STRONG));
+            Assertions.assertFalse(td.refer().must().immutable());
+            Assertions.assertFalse(td.refer().must().required());
         }
         {
             var len = randInt(1, 16);
@@ -181,9 +180,9 @@ public class DeclarationParseTest extends BaseParseTest {
             var td2 = (ArrayTypeDeclarer) td.element();
             Assertions.assertEquals(symbol("Host"), typeName(td2.element()));
             Assertions.assertTrue(td2.length().none());
-            Assertions.assertTrue(td2.reference().must().checkType(PHANTOM));
-            Assertions.assertFalse(td2.reference().must().immutable());
-            Assertions.assertTrue(td2.reference().must().required());
+            Assertions.assertTrue(td2.refer().must().checkType(PHANTOM));
+            Assertions.assertFalse(td2.refer().must().immutable());
+            Assertions.assertTrue(td2.refer().must().required());
         }
     }
 

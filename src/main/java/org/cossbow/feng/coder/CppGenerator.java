@@ -94,9 +94,9 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
     @Override
     public CppGenerator visit(DefinedTypeDeclarer td) {
         visit(td.definedType());
-        if (td.reference().has()) {
-            var ref = td.reference().get();
-            switch (ref.type()) {
+        if (td.refer().has()) {
+            var ref = td.refer().get();
+            switch (ref.kind()) {
                 case STRONG:
                     write('*');
                     break;
@@ -565,7 +565,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         }
         visit(e.subject());
         if (td instanceof DefinedTypeDeclarer dtd) {
-            if (dtd.reference().has())
+            if (dtd.refer().has())
                 write("->");
             else
                 write('.');

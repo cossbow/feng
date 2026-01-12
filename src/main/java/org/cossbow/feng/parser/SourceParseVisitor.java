@@ -38,7 +38,7 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.function.Function;
 
-import static org.cossbow.feng.ast.dcl.ReferenceType.*;
+import static org.cossbow.feng.ast.dcl.ReferKind.*;
 
 final class SourceParseVisitor
         extends FengBaseVisitor<Entity>
@@ -280,9 +280,9 @@ final class SourceParseVisitor
             FengParser.ArrayTypeDeclarerContext ctx) {
         var type = ctx.arrayType();
         var len = this.<Expression>visitOptional(type.len);
-        var ref = Optional.<Reference>empty();
+        var ref = Optional.<Refer>empty();
         if (len.none()) {
-            ReferenceType rt = switch (type.kind.getType()) {
+            ReferKind rt = switch (type.kind.getType()) {
                 case FengParser.MUL -> STRONG;
                 case FengParser.BITAND -> PHANTOM;
                 default -> ErrorUtil.unreachable();
@@ -290,7 +290,7 @@ final class SourceParseVisitor
             var required = type.required != null;
             var immutable = type.immutable != null;
             if (immutable) ErrorUtil.unsupported("immutable");
-            ref = Optional.of(new Reference(posOf(type.kind), rt,
+            ref = Optional.of(new Refer(posOf(type.kind), rt,
                     required, immutable));
         }
         var typeDcl = (TypeDeclarer) visit(ctx.typeDeclarer());
@@ -298,10 +298,10 @@ final class SourceParseVisitor
                 typeDcl, len, ref);
     }
 
-    private Optional<Reference> parseReference(
-            FengParser.ReferenceContext ctx) {
+    private Optional<Refer> parseRefer(
+            FengParser.ReferContext ctx) {
         if (ctx == null) return Optional.empty();
-        ReferenceType type = switch (ctx.kind.getType()) {
+        ReferKind type = switch (ctx.kind.getType()) {
             case FengParser.MUL -> STRONG;
             case FengParser.BITAND -> PHANTOM;
             case FengParser.BITXOR -> WEAK;
@@ -310,7 +310,7 @@ final class SourceParseVisitor
         var required = ctx.required != null;
         var immutable = ctx.immutable != null;
         if (immutable) ErrorUtil.unsupported("immutable");
-        return Optional.of(new Reference(posOf(ctx),
+        return Optional.of(new Refer(posOf(ctx),
                 type, required, immutable));
     }
 
@@ -330,12 +330,13 @@ final class SourceParseVisitor
                 if (args.size() > 1) {
                     ErrorUtil.semantic("at most, %s can only map one type", name);
                 }
-                var mapped = args.isEmpty() ? null : args.getFirst();
-                return new MemTypeDeclarer(posOf(ctx), mt, Optional.of(mapped));
+                var mapped = !args.isEmpty() ? args.getFirst() : null;
+                var refer = parseRefer(ctx.refer());
+                return new MemTypeDeclarer(posOf(ctx), mt, refer, Optional.of(mapped));
             }
         }
-        var reference = parseReference(ctx.reference());
-        return new DefinedTypeDeclarer(posOf(ctx), dt, reference);
+        var refer = parseRefer(ctx.refer());
+        return new DefinedTypeDeclarer(posOf(ctx), dt, refer);
     }
 
     @Override

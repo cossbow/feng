@@ -18,7 +18,7 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import static org.cossbow.feng.ast.BinaryOperator.*;
-import static org.cossbow.feng.ast.dcl.ReferenceType.STRONG;
+import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 
 public class ExpressionParseTest extends BaseParseTest {
 
@@ -99,8 +99,8 @@ public class ExpressionParseTest extends BaseParseTest {
         var type = (DefinedTypeDeclarer) expr.type();
         Assertions.assertEquals(typeName, type.definedType().symbol());
         Assertions.assertTrue(type.definedType().generic().isEmpty());
-        var ref = type.reference().get();
-        Assertions.assertSame(STRONG, ref.type());
+        var ref = type.refer().get();
+        Assertions.assertSame(STRONG, ref.kind());
         Assertions.assertFalse(ref.required());
     }
 

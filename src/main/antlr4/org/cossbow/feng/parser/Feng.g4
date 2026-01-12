@@ -319,9 +319,9 @@ primaryTypeDeclarer
     | funcTypeDeclarer
     ;
 definedTypeDeclarer
-    : reference? definedType
+    : refer? definedType
     ;
-reference
+refer
     : kind=(MUL|BITAND|BITXOR) required=NOT? immutable=HASH?
     ;
 funcTypeDeclarer
@@ -337,7 +337,7 @@ typeDeclarerList
 // generic
 //
 
-// generic: reference
+// generic: use
 typeArguments
     : BACKTICK typeDeclarerList BACKTICK
     ;

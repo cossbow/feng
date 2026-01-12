@@ -5,6 +5,7 @@ import io.github.classgraph.ClassInfo;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.expr.PrimaryExpression;
 import org.cossbow.feng.ast.lit.Literal;
 import org.cossbow.feng.ast.micro.Macro;
 import org.cossbow.feng.ast.stmt.Statement;
@@ -27,27 +28,32 @@ public class VisitorGenerator {
         }
     }
 
-    static void genVisitor(ClassInfo root) throws IOException {
+    static void genVisitor(ClassInfo root, String rootName, String returnType, boolean makeDef)
+            throws IOException {
         var pkgs = new HashSet<String>();
         visitClass(root, ci -> pkgs.add(ci.getPackageName()));
         var sb = new StringBuilder("package org.cossbow.feng.visit;\n\n");
         for (var p : pkgs) sb.append("import ").append(p).append(".*;\n");
         sb.append("import static org.cossbow.feng.util.ErrorUtil.*;\n");
-        var rootName = root.getSimpleName();
-        sb.append("\npublic interface ").append(rootName).append("Visitor<R> {\n\n");
+        sb.append("\npublic class ").append(rootName).append(" {\n\n");
         visitClass(root, ci -> {
             var name = ci.getSimpleName();
             if (!ci.isAbstract()) {
-                sb.append("\tdefault R visit(").append(name).append(" e) { return unreachable(); }\n\n");
+                if (makeDef)
+                    sb.append("\tpublic ").append(returnType).append(" visit(")
+                            .append(name).append(" e) { return unreachable(); }\n\n");
+                else
+                    sb.append("\tpublic ").append(returnType).append(" visit(")
+                            .append(name).append(" e);\n\n");
                 return;
             }
-            sb.append("\tdefault R visit(").append(name).append(" e) {\n");
 
+            sb.append("\tpublic ").append(returnType).append(" visit(").
+                    append(name).append(" e) {\n");
             sb.append("\t\treturn switch (e) {\n");
-
             for (var ch : ci.getSubclasses().directOnly()) {
-                sb.append("\t\t\tcase ").append(ch.getSimpleName()).append(" ee -> ");
-                sb.append("visit(ee);\n");
+                sb.append("\t\t\tcase ").append(ch.getSimpleName())
+                        .append(" ee -> visit(ee);\n");
             }
             sb.append("\t\t\tcase null, default -> ");
             sb.append("unreachable();\n");
@@ -58,20 +64,22 @@ public class VisitorGenerator {
         });
         sb.append("}\n");
 
-        Files.write(Path.of(rootName + "Visitor.java"), List.of(sb),
+        Files.write(Path.of(rootName + ".java"), List.of(sb),
                 StandardCharsets.UTF_8);
     }
 
-    static <T> void genForType(Class<T> type) throws IOException {
+    static <T> void genForType(Class<T> type, String rootName,
+                               String returnType, boolean makeDef)
+            throws IOException {
         try (var cg = new ClassGraph().enableAllInfo()
                 .acceptPackages(Entity.class.getPackageName()).scan()) {
             var root = cg.getAllClasses().get(type.getName());
-            genVisitor(root);
+            genVisitor(root, rootName, returnType, makeDef);
         }
     }
 
     public static void main(String[] args) throws IOException {
-        genForType(Entity.class);
+        genForType(PrimaryExpression.class, "ImmutableChecker", "boolean", true);
     }
 
 }

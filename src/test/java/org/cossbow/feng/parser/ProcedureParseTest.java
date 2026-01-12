@@ -86,7 +86,7 @@ public class ProcedureParseTest extends BaseParseTest {
                 Assertions.assertEquals(expect.a(), variable.name());
                 var vtd = (DefinedTypeDeclarer) variable.type().must();
                 Assertions.assertEquals(expect.b(), vtd.definedType().symbol());
-                Assertions.assertTrue(vtd.reference().none());
+                Assertions.assertTrue(vtd.refer().none());
             }
             Assertions.assertTrue(prototype.returnSet().isEmpty());
         }

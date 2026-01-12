@@ -42,7 +42,7 @@ public interface EntityVisitor<R> {
 			case Modifier ee -> visit(ee);
 			case Declaration ee -> visit(ee);
 			case NewType ee -> visit(ee);
-			case Reference ee -> visit(ee);
+			case Refer ee -> visit(ee);
 			case TypeDeclarer ee -> visit(ee);
 			case Variable ee -> visit(ee);
 			case Expression ee -> visit(ee);
@@ -134,7 +134,7 @@ public interface EntityVisitor<R> {
 
 	default R visit(NewDefinedType e) { return unreachable(); }
 
-	default R visit(Reference e) { return unreachable(); }
+	default R visit(Refer e) { return unreachable(); }
 
 	default R visit(TypeDeclarer e) {
 		return switch (e) {

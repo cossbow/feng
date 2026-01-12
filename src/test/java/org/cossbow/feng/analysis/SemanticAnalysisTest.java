@@ -54,4 +54,10 @@ public class SemanticAnalysisTest {
         parseAndCheck("class ID{} class A { var id int; func set(id ID)  { this.id = id; } }");
     }
 
+
+    @Test
+    public void testVar1() {
+        parseAndCheck("func f() { var i int; i = 1; }");
+    }
+
 }
