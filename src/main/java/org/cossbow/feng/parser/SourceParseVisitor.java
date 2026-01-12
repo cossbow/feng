@@ -278,26 +278,38 @@ final class SourceParseVisitor
     @Override
     public Entity visitArrayTypeDeclarer(
             FengParser.ArrayTypeDeclarerContext ctx) {
-        var immutable = ctx.immutable != null;
-        var len = this.<Expression>visitOptional(ctx.len);
+        var type = ctx.arrayType();
+        var len = this.<Expression>visitOptional(type.len);
+        var ref = Optional.<Reference>empty();
+        if (len.none()) {
+            ReferenceType rt = switch (type.kind.getType()) {
+                case FengParser.MUL -> STRONG;
+                case FengParser.BITAND -> PHANTOM;
+                default -> ErrorUtil.unreachable();
+            };
+            var required = type.required != null;
+            var immutable = type.immutable != null;
+            if (immutable) ErrorUtil.unsupported("immutable");
+            ref = Optional.of(new Reference(posOf(type.kind), rt,
+                    required, immutable));
+        }
         var typeDcl = (TypeDeclarer) visit(ctx.typeDeclarer());
         return new ArrayTypeDeclarer(posOf(ctx),
-                typeDcl, len, immutable);
+                typeDcl, len, ref);
     }
 
     private Optional<Reference> parseReference(
             FengParser.ReferenceContext ctx) {
         if (ctx == null) return Optional.empty();
-        var type = switch (ctx.kind.getType()) {
+        ReferenceType type = switch (ctx.kind.getType()) {
             case FengParser.MUL -> STRONG;
             case FengParser.BITAND -> PHANTOM;
             case FengParser.BITXOR -> WEAK;
-            default -> throw
-                    new UnsupportedOperationException(
-                            "unreachable branch");
+            default -> ErrorUtil.unreachable();
         };
         var required = ctx.required != null;
         var immutable = ctx.immutable != null;
+        if (immutable) ErrorUtil.unsupported("immutable");
         return Optional.of(new Reference(posOf(ctx),
                 type, required, immutable));
     }
@@ -349,6 +361,7 @@ final class SourceParseVisitor
         var element = (TypeDeclarer) visit(at.typeDeclarer());
         var length = (Expression) visit(at.expression());
         var immutable = at.immutable != null;
+        if (immutable) ErrorUtil.unsupported("immutable");
         return new NewArrayType(pos, element, length, immutable);
     }
 
@@ -547,7 +560,7 @@ final class SourceParseVisitor
             FengParser.ArrayStructureFieldTypeContext ctx) {
         var et = (TypeDeclarer) visit(ctx.element);
         var len = this.<Expression>visitOptional(ctx.len);
-        return new ArrayTypeDeclarer(posOf(ctx), et, len, false);
+        return new ArrayTypeDeclarer(posOf(ctx), et, len, Optional.empty());
     }
 
     @Override
@@ -1165,13 +1178,6 @@ final class SourceParseVisitor
         var catchClause = this.<CatchClause>visitList(preCtx.catchClause());
         var finalBody = this.<BlockStatement>visitOptional(ctx.finallyClause().blockStatement());
         return new TryStatement(posOf(ctx), tryBody, catchClause, finalBody);
-    }
-
-    @Override
-    public Entity visitLocalDefineStatement(
-            FengParser.LocalDefineStatementContext ctx) {
-        var definition = (Definition) visit(ctx.localDefinition());
-        return new LocalDefineStatement(posOf(ctx), definition);
     }
 
     @Override

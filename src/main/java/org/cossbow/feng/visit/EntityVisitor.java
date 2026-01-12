@@ -320,7 +320,6 @@ public interface EntityVisitor<R> {
 			case GotoStatement ee -> visit(ee);
 			case IfStatement ee -> visit(ee);
 			case LabeledStatement ee -> visit(ee);
-			case LocalDefineStatement ee -> visit(ee);
 			case ReturnStatement ee -> visit(ee);
 			case SwitchStatement ee -> visit(ee);
 			case ThrowStatement ee -> visit(ee);
@@ -358,8 +357,6 @@ public interface EntityVisitor<R> {
 	default R visit(IfStatement e) { return unreachable(); }
 
 	default R visit(LabeledStatement e) { return unreachable(); }
-
-	default R visit(LocalDefineStatement e) { return unreachable(); }
 
 	default R visit(ReturnStatement e) { return unreachable(); }
 

@@ -9,16 +9,16 @@ import java.util.Objects;
 public class ArrayTypeDeclarer extends TypeDeclarer {
     private TypeDeclarer element;
     private Optional<Expression> length;
-    private boolean immutable;
+    private Optional<Reference> reference;
 
     public ArrayTypeDeclarer(Position pos,
                              TypeDeclarer element,
                              Optional<Expression> length,
-                             boolean immutable) {
+                             Optional<Reference> reference) {
         super(pos);
         this.element = element;
         this.length = length;
-        this.immutable = immutable;
+        this.reference = reference;
     }
 
     public TypeDeclarer element() {
@@ -29,16 +29,16 @@ public class ArrayTypeDeclarer extends TypeDeclarer {
         return length;
     }
 
-    public boolean immutable() {
-        return immutable;
+    public Optional<Reference> reference() {
+        return reference;
     }
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof ArrayTypeDeclarer atd)) return false;
-        return immutable == atd.immutable &&
-                Objects.equals(element, atd.element) &&
-                Objects.equals(length, atd.length);
+        if (!(o instanceof ArrayTypeDeclarer td)) return false;
+        return Objects.equals(element, td.element) &&
+                Objects.equals(length, td.length) &&
+                Objects.equals(reference, td.reference);
     }
 
 }

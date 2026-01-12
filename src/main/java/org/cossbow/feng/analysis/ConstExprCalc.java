@@ -17,8 +17,6 @@ import java.util.function.BiFunction;
 
 public class ConstExprCalc implements EntityVisitor<Expression> {
 
-    //
-
     private final SymbolContext context;
 
     public ConstExprCalc(SymbolContext context) {

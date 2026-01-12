@@ -366,11 +366,6 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
     }
 
     @Override
-    public CppGenerator visit(LocalDefineStatement s) {
-        return unsupported("local define (func/type)");
-    }
-
-    @Override
     public CppGenerator visit(SwitchStatement ss) {
         if (ss.init().has()) {
             write('{');

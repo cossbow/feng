@@ -421,46 +421,6 @@ public class StatementParseTest extends BaseParseTest {
         Assertions.assertInstanceOf(TryStatement.class, stmt.statement());
     }
 
-    @Test
-    public void testLabelDefineFunc() {
-        var name = randVarName(32);
-        var stmt = (LabeledStatement) parseStmt(name + ":func done() {}");
-        Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(LocalDefineStatement.class, stmt.statement());
-    }
-
-    @Test
-    public void testLabelDefineStruct() {
-        var name = randVarName(32);
-        var stmt = (LabeledStatement) parseStmt(name + ":struct G{}");
-        Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(LocalDefineStatement.class, stmt.statement());
-    }
-
-    @Test
-    public void testLabelDefineClass() {
-        var name = randVarName(32);
-        var stmt = (LabeledStatement) parseStmt(name + ":class G{}");
-        Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(LocalDefineStatement.class, stmt.statement());
-    }
-
-    @Test
-    public void testLabelDefineInterface() {
-        var name = randVarName(32);
-        var stmt = (LabeledStatement) parseStmt(name + ":interface G{}");
-        Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(LocalDefineStatement.class, stmt.statement());
-    }
-
-    @Test
-    public void testLabelDefinePrototype() {
-        var name = randVarName(32);
-        var stmt = (LabeledStatement) parseStmt(name + ":func g();");
-        Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(LocalDefineStatement.class, stmt.statement());
-    }
-
 
     // tuple
 

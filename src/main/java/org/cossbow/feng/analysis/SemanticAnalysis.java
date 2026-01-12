@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
+import org.cossbow.feng.ast.expr.LiteralExpression;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.oop.ClassDefinition;
@@ -96,8 +97,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     @Override
     public Entity visit(ArrayTypeDeclarer td) {
         visit(td.element());
-        if (td.immutable()) unsupported("array immutable");
         td.length().use(this::visit);
+        td.reference().use(this::visit);
         return td;
     }
 
@@ -116,8 +117,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     private boolean checkMappable(ArrayTypeDeclarer td) {
-        if (td.length().none()) return false;
-        if (td.immutable()) unsupported("array immutable");
+        if (td.reference().has()) return false;
         return checkMappable(td.element());
     }
 
@@ -314,8 +314,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
         if (l instanceof ArrayTypeDeclarer al &&
                 r instanceof ArrayTypeDeclarer ar) {
-            if (al.immutable() != ar.immutable())
-                return false;
             if (!al.element().equals(ar.element()))
                 return false;
             if (al.length().none() && ar.length().none())
@@ -429,11 +427,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     @Override
-    public Entity visit(LocalDefineStatement e) {
-        return EntityVisitor.super.visit(e);
-    }
-
-    @Override
     public Entity visit(ReturnStatement e) {
         return EntityVisitor.super.visit(e);
     }
@@ -461,14 +454,19 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     //
 
+
+
     @Override
     public Entity visit(IndexAssignableOperand io) {
         var td = deducer.visit(io.subject());
         if (!(td instanceof ArrayTypeDeclarer atd))
             return semantic("reqired array: %s", io.pos());
-
-        if (atd.immutable())
-            return unsupported("array immutable");
+        if (atd.reference().has()) {
+            if (atd.reference().get().immutable())
+                return semantic("immutable array: %s", io.pos());
+        } else {
+            // TODO: 值类型检查
+        }
 
         var it = deducer.visit(io.index());
         if (it instanceof PrimitiveTypeDeclarer ptd) {
@@ -477,7 +475,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 return atd.element();
             }
         }
-
         return semantic("index required integer");
     }
 

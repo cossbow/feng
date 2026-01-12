@@ -91,19 +91,6 @@ public class ExpressionParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testNewArrayImmutable() {
-        var typeName = randTypeSymbol(32);
-        var len = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
-        var code = "new([%d#]%s)".formatted(len, typeName);
-        var expr = this.<NewExpression>parseExpr(code);
-        var arr = (NewArrayType) expr.type();
-        Assertions.assertEquals(typeName, typeName(arr.element()));
-        Assertions.assertEquals(BigInteger.valueOf(len), integer(arr.length()).value());
-        Assertions.assertTrue(arr.immutable());
-        Assertions.assertTrue(expr.init().none());
-    }
-
-    @Test
     public void testAssert() {
         var name = randVarSymbol(8);
         var typeName = randTypeSymbol(16);
@@ -115,21 +102,6 @@ public class ExpressionParseTest extends BaseParseTest {
         var ref = type.reference().get();
         Assertions.assertSame(STRONG, ref.type());
         Assertions.assertFalse(ref.required());
-    }
-
-    //
-    // lambda
-
-    @Test
-    public void testLambda() {
-        {
-            var expr = parseExpr("func(){}");
-            Assertions.assertInstanceOf(LambdaExpression.class, expr);
-        }
-        {
-            var expr = parseExpr("func(int, s float){ var a bool; }");
-            Assertions.assertInstanceOf(LambdaExpression.class, expr);
-        }
     }
 
     //
@@ -349,13 +321,6 @@ public class ExpressionParseTest extends BaseParseTest {
         var expr = (CallExpression) parseExpr(name + "()()");
         var left = (CallExpression) expr.callee();
         Assertions.assertEquals(name, varName(left.callee()));
-    }
-
-    @Test
-    public void testArgSetLambda() {
-        var expr = (CallExpression) parseExpr("func(){}()");
-        var procedure = ((LambdaExpression) expr.callee()).procedure();
-        Assertions.assertTrue(procedure.prototype().parameterSet().isEmpty());
     }
 
     //

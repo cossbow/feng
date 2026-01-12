@@ -107,7 +107,9 @@ public class StructureParseTest extends BaseParseTest {
         var f = foo.fields().get(a);
         Assertions.assertEquals(a, f.name());
 
-        var def = (StructureDefinition) src.table().unnamedTypes.get(f.name());
+        var dt = ((DefinedTypeDeclarer) f.type()).definedType();
+        Assertions.assertTrue(dt.symbol().module().none());
+        var def = (StructureDefinition) src.table().unnamedTypes.get(dt.symbol().name());
         Assertions.assertEquals(1, def.fields().size());
         var bf = def.fields().get(b);
         Assertions.assertEquals(b, bf.name());

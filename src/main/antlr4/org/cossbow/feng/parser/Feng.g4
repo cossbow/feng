@@ -308,7 +308,11 @@ typeDeclarer
     | arrayTypeDeclarer
     ;
 arrayTypeDeclarer
-    : '[' len=expression? immutable=HASH? ']' typeDeclarer
+    : '[' arrayType ']' typeDeclarer
+    ;
+arrayType
+    : len=expression
+    | kind=(MUL|BITAND) required=NOT? immutable=HASH?
     ;
 primaryTypeDeclarer
     : definedTypeDeclarer
@@ -375,7 +379,6 @@ statement
     | forStatement
     | throwStatement
     | tryStatement
-    | localDefineStatement
     | returnStatement
     | continueStatement
     | breakStatement
@@ -491,14 +494,6 @@ declarationStatement
     : declaration SEMI
     ;
 
-
-localDefineStatement
-    : localDefinition
-    ;
-localDefinition
-    : typeDefinition
-    | functionDefinition
-    ;
 
 
 // statement: return

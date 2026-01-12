@@ -30,14 +30,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static org.cossbow.feng.ast.dcl.ReferenceType.STRONG;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     private final SymbolContext context;
+    private final ConstExprCalc calc;
 
     public TypeDeducer(SymbolContext context) {
         this.context = context;
+        calc = new ConstExprCalc(context);
     }
 
     boolean isPrimitive(TypeDeclarer td) {
@@ -120,7 +123,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                         BigInteger.valueOf(e.elements().size()),
                         10));
         return new ArrayTypeDeclarer(e.pos(),
-                td, Optional.of(le), false);
+                td, Optional.of(le), Optional.empty());
     }
 
     @Override
@@ -230,9 +233,10 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         return switch (e.type()) {
             case NewDefinedType dt -> new DefinedTypeDeclarer(e.pos(),
                     dt.type(), Optional.of(new Reference(e.pos(),
-                    ReferenceType.STRONG, false, false)));
+                    STRONG, false, false)));
             case NewArrayType dt -> new ArrayTypeDeclarer(e.pos(),
-                    dt.element(), Optional.empty(), false);
+                    dt.element(), Optional.empty(), Optional.of(
+                    new Reference(dt.pos(), STRONG, true, dt.immutable())));
             case null, default -> unreachable();
         };
     }
@@ -266,6 +270,8 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (v.has()) {
             if (!symbolSet.add(s)) return semantic(
                     "deduce type cycle for %s", s);
+            var td = v.get().type().must();
+            visit(td);
             return v.get().type().must();
         }
 

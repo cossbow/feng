@@ -36,7 +36,7 @@ func checkForStatement(max int,
         i += 1;
     }
     // iterable
-    var src []int = [1,2,3,4,5,6,7,8,9];
+    var src [16]int = [1,2,3,4,5,6,7,8,9];
     for ( j : src ) {
         handle(j, max);
     }
