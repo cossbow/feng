@@ -33,4 +33,9 @@ public class DefinedType extends Entity {
                 Objects.equals(generic, that.generic);
     }
 
+    @Override
+    public String toString() {
+        if (generic.isEmpty()) return symbol.toString();
+        return symbol.toString() + '`' + generic + '`';
+    }
 }

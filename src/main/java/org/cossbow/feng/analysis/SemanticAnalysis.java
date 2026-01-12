@@ -181,6 +181,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     @Override
     public Entity visit(ClassField cf) {
         assert enterClass != null;
+        context.putVar(cf.variable());
         if (cf.type() instanceof DefinedTypeDeclarer ctd) {
             var isPhantom = ctd.refer().match(
                     r -> r.checkType(ReferKind.PHANTOM));
@@ -231,22 +232,22 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(Prototype prot) {
-        checkParams(prot.parameterSet());
+        visit(prot.parameterSet());
         prot.returnSet().forEach(this::visit);
         return prot;
     }
 
-    private void checkParams(ParameterSet ps) {
+    private void visit(ParameterSet ps) {
         switch (ps) {
-            case UnnamedParameterSet ups -> checkParams(ups);
-            case VariableParameterSet vps -> checkParams(vps);
+            case UnnamedParameterSet ups -> visit(ups);
+            case VariableParameterSet vps -> visit(vps);
             case null -> unreachable();
             default -> {
             }
         }
     }
 
-    private void checkParams(UnnamedParameterSet ps) {
+    private void visit(UnnamedParameterSet ps) {
         for (var td : ps.types()) {
             if (td instanceof DefinedTypeDeclarer dtd) {
                 var isWeak = dtd.refer().match(
@@ -260,8 +261,11 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
     }
 
-    private void checkParams(VariableParameterSet ps) {
-        ps.variables().each(this::visit);
+    private void visit(VariableParameterSet ps) {
+        ps.variables().each(v -> {
+            visit(v);
+            context.putVar(v);
+        });
     }
 
     //
@@ -349,8 +353,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             var l = left.get(i);
             var r = right.get(i);
             if (!assignable(l, r))
-                semantic("unassignable: %s = %s",
-                        l, r);
+                semantic("unassignable: %s = %s", l, r);
         }
     }
 
@@ -362,6 +365,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             left.add(typeDeducer.visit(ao.rhs()));
         }
 
+        visit(as.tuple());
         var right = typeDeducer.visit(as.tuple()).tuple();
         assignable(left, right, as.pos());
         return as;
@@ -378,7 +382,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return visit(e.statement());
     }
 
-    private Stack<ForStatement> loopStack = new Stack<>();
+    private final Stack<ForStatement> loopStack = new Stack<>();
 
     @Override
     public Entity visit(BreakStatement e) {
@@ -501,10 +505,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     //
 
-    private boolean immutableArray(PrimaryExpression subject) {
-        return false;
-    }
-
     @Override
     public Entity visit(IndexAssignableOperand io) {
         var td = typeDeducer.visit(io.subject());
@@ -568,4 +568,125 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return v;
     }
 
+    //
+
+
+    @Override
+    public Entity visit(ArrayTuple e) {
+        for (var v : e.values()) visit(v);
+        return e;
+    }
+
+    @Override
+    public Entity visit(IfTuple e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(ReturnTuple e) {
+        visit(e.call());
+        return e;
+    }
+
+    @Override
+    public Entity visit(SwitchTuple e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(BinaryExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(PrimaryExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(ArrayExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(AssertExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(CallExpression e) {
+        // explicit convert
+        if (e.arguments().size() != 1)
+            return semantic("can only be one argument: %s", e.pos());
+        var ctd = typeDeducer.visit(e);
+        if (ctd instanceof PrimitiveTypeDeclarer ptd) {
+            var a = e.arguments().getFirst();
+            var td = typeDeducer.visit(a);
+            if (!(td instanceof PrimitiveTypeDeclarer atd))
+                return semantic("can't convert: %s", a.pos());
+            var rej = (ptd.primitive() == Primitive.BOOL) ^
+                    (atd.primitive() == Primitive.BOOL);
+            if (rej) return semantic("can't convert: %s", a.pos());
+            return e;
+        }
+        return unreachable();
+    }
+
+    @Override
+    public Entity visit(CurrentExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(IndexOfExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(LambdaExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(LiteralExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(MemberOfExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(NewExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(ObjectExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(PairsExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(ParenExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
+
+    @Override
+    public Entity visit(ReferExpression e) {
+        if (!e.generic().isEmpty())
+            return unsupported("generic");
+
+        return typeDeducer.visit(e);
+    }
+
+    @Override
+    public Entity visit(UnaryExpression e) {
+        return EntityVisitor.super.visit(e);
+    }
 }

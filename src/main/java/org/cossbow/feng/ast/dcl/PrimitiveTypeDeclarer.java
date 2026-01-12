@@ -22,4 +22,9 @@ public class PrimitiveTypeDeclarer extends TypeDeclarer {
         }
         return false;
     }
+
+    @Override
+    public String toString() {
+        return primitive.code;
+    }
 }

@@ -249,8 +249,6 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         return visit(e.child());
     }
 
-    private final Set<Symbol> symbolSet = new HashSet<>();
-
     @Override
     public TypeDeclarer visit(ReferExpression e) {
         var s = e.symbol();
@@ -260,13 +258,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                     fd.get().procedure().prototype(), e.generic());
 
         var v = context.findVar(s);
-        if (v.has()) {
-            if (!symbolSet.add(s)) return semantic(
-                    "deduce type cycle for %s", s);
-            var td = v.get().type().must();
-            visit(td);
-            return v.get().type().must();
-        }
+        if (v.has()) return v.get().type().must();
 
         if (s.module().none()) {
             var pri = Primitive.ofCode(s.name().value());

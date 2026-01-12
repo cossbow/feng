@@ -34,4 +34,14 @@ public class DefinedTypeDeclarer extends TypeDeclarer
                 && Objects.equals(refer, that.refer);
     }
 
+    @Override
+    public String toString() {
+        if (refer.none()) return definedType.toString();
+        var sb = new StringBuilder(16);
+        sb.append(refer.get().kind().symbol);
+        if (refer.get().required()) sb.append('!');
+        if (refer.get().immutable()) sb.append('#');
+        sb.append(definedType.toString());
+        return sb.toString();
+    }
 }

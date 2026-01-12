@@ -7,6 +7,9 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.dcl.Variable;
+import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.Optional;
 
 public class ClassField extends Field
         implements Exportable {
@@ -37,6 +40,12 @@ public class ClassField extends Field
     @Override
     public boolean export() {
         return export;
+    }
+
+    public Variable variable() {
+        return new Variable(pos(), modifier, declare,
+                name(), Lazy.of(type()),
+                Optional.of(this));
     }
 
 }

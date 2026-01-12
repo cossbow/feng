@@ -6,6 +6,7 @@ import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class TypeArguments extends Entity {
     private final List<TypeDeclarer> arguments;
@@ -28,6 +29,12 @@ public class TypeArguments extends Entity {
     public boolean equals(Object o) {
         if (!(o instanceof TypeArguments that)) return false;
         return Objects.equals(arguments, that.arguments);
+    }
+
+    @Override
+    public String toString() {
+        return arguments.stream().map(Object::toString)
+                .collect(Collectors.joining(", "));
     }
 
     //

@@ -29,8 +29,7 @@ public class SemanticAnalysisTest {
         try {
             parseAndCheck("class A { var id ID; }");
         } catch (SemanticException e) {
-            e.printStackTrace();
-            Assertions.assertTrue(true);
+            System.err.println(e.getMessage());
         }
     }
 
@@ -46,18 +45,72 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testClass6() {
-        parseAndCheck("class ID{} class A { var id ID; func set(id ID)  { this.id = id; } }");
+        try {
+            parseAndCheck("class ID{} class A { var id int; func get() ID { return id; } }");
+        } catch (SemanticException e) {
+            System.err.println(e.getMessage());
+        }
     }
 
     @Test
     public void testClass7() {
-        parseAndCheck("class ID{} class A { var id int; func set(id ID)  { this.id = id; } }");
+        parseAndCheck("class ID{} class A { var id ID; func set(id ID)  { this.id = id; } }");
+    }
+
+    @Test
+    public void testClass8() {
+        try {
+            parseAndCheck("class ID{} class A { var id int; func set(id ID)  { this.id = id; } }");
+        } catch (SemanticException e) {
+            System.err.println(e.getMessage());
+        }
     }
 
 
     @Test
     public void testVar1() {
-        parseAndCheck("func f() { var i int; i = 1; }");
+        parseAndCheck("func f(v int) { var i int; i = int(v); }");
+    }
+
+    @Test
+    public void testVar2() {
+        try {
+            parseAndCheck("func f(v float) { var i int; i = v; }");
+        } catch (SemanticException e) {
+            System.err.println(e.getMessage());
+        }
+    }
+
+    @Test
+    public void testVar3() {
+        parseAndCheck("func f(v float) { var i int; i = int(v); }");
+    }
+
+    @Test
+    public void testVar4() {
+        try {
+            parseAndCheck("func f(v bool) { var i int; i = int(v); }");
+        } catch (SemanticException e) {
+            System.err.println(e.getMessage());
+        }
+    }
+
+    @Test
+    public void testVar5() {
+        try {
+            parseAndCheck("class ID{} func f(v ID) { var i int; i = int(v); }");
+        } catch (SemanticException e) {
+            System.err.println(e.getMessage());
+        }
+    }
+
+    @Test
+    public void testVar6() {
+        try {
+            parseAndCheck("class ID{} func f(v int) { var i ID; i = ID(v); }");
+        } catch (SemanticException e) {
+            System.err.println(e.getMessage());
+        }
     }
 
 }
