@@ -291,7 +291,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             var td = typeDeducer.visit(ds.init().get());
             var types = td.tuple();
             if (types.size() != ds.variables().size())
-                return semantic("unalign declarion: %s", ds.pos());
+                return semantic("unaligned declaration: %s", ds.pos());
             var i = 0;
             for (var v : ds.variables())
                 v.type().set(types.get(i++));
@@ -619,7 +619,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         visit(e.callee());
         e.arguments().forEach(this::visit);
 
-        var rtd = typeDeducer.visit(e);
+        var ctd = typeDeducer.visit(e.callee());
+        if (!(ctd instanceof PrimitiveTypeDeclarer ||
+                ctd instanceof FuncTypeDeclarer)) {
+            return semantic("require callable: %s", e.pos());
+        }
+        var rtd = typeDeducer.visit(ctd);
         if (rtd instanceof VoidTypeDeclarer)
             return e;
 
@@ -652,7 +657,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(CurrentExpression e) {
-        return EntityVisitor.super.visit(e);
+        assert enterMethod != null;
+        return e;
     }
 
     @Override
@@ -672,7 +678,13 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(MemberOfExpression e) {
-        return EntityVisitor.super.visit(e);
+        if (!e.generic().isEmpty()) return unsupported("generic");
+
+        visit(e.subject());
+
+        var m = typeDeducer.getMember(e.subject(), e.member());
+
+        return m;
     }
 
     @Override
@@ -701,11 +713,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return unsupported("generic");
 
         var t = context.findType(e.symbol());
-//        var td = t.map(d -> {
-//            if (d instanceof PrimitiveDefinition pd)
-//                return pd;
-//            return semantic("can't refer a type");
-//        });
         if (t.has()) return e;
 
         var f = context.findFunc(e.symbol());

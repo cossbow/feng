@@ -2,6 +2,7 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.ast.TypeDomain;
 import org.cossbow.feng.ast.dcl.ArrayTypeDeclarer;
 import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
@@ -16,13 +17,13 @@ public class StructureParseTest extends BaseParseTest {
 
     @Test
     public void testTypeDefine() {
-        enum Domain {struct, union}
-        for (var domain : Domain.values()) {
+        TypeDomain[] domains = {TypeDomain.STRUCT, TypeDomain.UNION};
+        for (var domain : domains) {
             var name = randTypeName(32);
             var code = "%s %s{}".formatted(domain, name);
             var def = (StructureDefinition) doParseFirstDef(code);
             Assertions.assertEquals(name, def.name());
-            Assertions.assertEquals(domain == Domain.union, def.union());
+            Assertions.assertSame(domain, def.domain());
             Assertions.assertTrue(def.fields().isEmpty());
             Assertions.assertTrue(def.generic().isEmpty());
         }

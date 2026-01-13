@@ -2,17 +2,16 @@ package org.cossbow.feng.ast;
 
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.util.Optional;
 
 abstract
 public class Definition extends Entity {
     private Modifier modifier;
-    private Optional<Identifier> name;
+    private Identifier name;
     private TypeParameters generic;
 
     public Definition(Position pos,
                       Modifier modifier,
-                      Optional<Identifier> name,
+                      Identifier name,
                       TypeParameters generic) {
         super(pos);
         this.modifier = modifier;
@@ -25,15 +24,7 @@ public class Definition extends Entity {
     }
 
     public Identifier name() {
-        return name.must();
-    }
-
-    public boolean named() {
-        return name.has();
-    }
-
-    public boolean unnamed() {
-        return name.none();
+        return name;
     }
 
     public TypeParameters generic() {

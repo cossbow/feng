@@ -1,16 +1,17 @@
 package org.cossbow.feng.ast.proc;
 
-import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.Definition;
+import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.util.Optional;
 
 public class FunctionDefinition extends Definition {
     private Procedure procedure;
 
     public FunctionDefinition(Position pos,
                               Modifier modifier,
-                              Optional<Identifier> name,
+                              Identifier name,
                               TypeParameters generic,
                               Procedure procedure) {
         super(pos, modifier, name, generic);

@@ -505,12 +505,12 @@ final class SourceParseVisitor
     @Override
     public Entity visitStructureDefinition(FengParser.StructureDefinitionContext ctx) {
         var modifier = parseModifier(ctx.modifier());
-        var union = isUnion(ctx.domain);
+        var domain = parseDomain(ctx.domain);
         var name = identifier(ctx.name);
         var generic = typeParameters(ctx.typeParameters());
         var fields = parseStructureMembers(ctx.structureFieldsDef());
-        var def = new StructureDefinition(posOf(ctx), modifier,
-                Optional.of(name), generic, union, fields);
+        var def = new StructureDefinition(posOf(ctx), modifier, name,
+                generic, domain, fields);
         gst.namedTypes.add(name, def);
         return def;
     }
@@ -519,17 +519,21 @@ final class SourceParseVisitor
     public Entity visitUnnamedStructureDefinition(
             FengParser.UnnamedStructureDefinitionContext ctx) {
         var pos = posOf(ctx);
-        var union = isUnion(ctx.domain);
+        var domain = parseDomain(ctx.domain);
         var fields = parseStructureMembers(ctx.structureFieldsDef());
-        var name = UnamedUtil.rand(union ? "union" : "struct");
+        var name = UnamedUtil.rand(domain.name);
         var def = new StructureDefinition(pos, Modifier.empty(),
-                Optional.of(name), TypeParameters.empty(), union, fields);
+                name, TypeParameters.empty(), domain, fields);
         gst.unnamedTypes.add(name, def);
         return def;
     }
 
-    private boolean isUnion(Token domain) {
-        return domain.getType() == FengParser.UNION;
+    private TypeDomain parseDomain(Token domain) {
+        return switch (domain.getType()) {
+            case FengParser.STRUCT -> TypeDomain.STRUCT;
+            case FengParser.UNION -> TypeDomain.UNION;
+            default -> ErrorUtil.unreachable();
+        };
     }
 
     private IdentifierTable<StructureField> parseStructureMembers(
@@ -709,9 +713,8 @@ final class SourceParseVisitor
             }
         }
 
-        var def = new ClassDefinition(posOf(ctx), modifier,
-                Optional.of(name), generic,
-                parent, impl, fields, methods, macros);
+        var def = new ClassDefinition(posOf(ctx), modifier, name,
+                generic, parent, impl, fields, methods, macros);
         gst.namedTypes.add(name, def);
         enterClassName = null;
         return def;
@@ -1352,7 +1355,7 @@ final class SourceParseVisitor
         var prototype = (Prototype) visit(ctx.prototype());
         var generic = typeParameters(ctx.typeParameters());
         var def = new PrototypeDefinition(posOf(ctx), modifier,
-                Optional.of(name), generic, prototype);
+                name, generic, prototype);
         gst.namedTypes.add(name, def);
         return def;
     }
@@ -1365,7 +1368,7 @@ final class SourceParseVisitor
         var generic = typeParameters(ctx.typeParameters());
         var procedure = (Procedure) visit(ctx.procedure());
         var def = new FunctionDefinition(posOf(ctx), modifier,
-                Optional.of(name), generic, procedure);
+                name, generic, procedure);
         gst.namedFunctions.add(name, def);
         return def;
     }

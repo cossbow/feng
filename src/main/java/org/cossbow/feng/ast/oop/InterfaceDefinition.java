@@ -5,7 +5,6 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
-import org.cossbow.feng.util.Optional;
 
 public class InterfaceDefinition extends TypeDefinition {
     private IdentifierTable<InterfaceMethod> methods;
@@ -19,7 +18,7 @@ public class InterfaceDefinition extends TypeDefinition {
                                IdentifierTable<InterfaceMethod> methods,
                                SymbolTable<DefinedType> parts,
                                MacroTable macros) {
-        super(pos, modifier, Optional.of(name), generic);
+        super(pos, modifier, name, generic, TypeDomain.INTERFACE);
         this.methods = methods;
         this.parts = parts;
         this.macros = macros;

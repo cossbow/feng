@@ -1,7 +1,6 @@
 package org.cossbow.feng.ast.oop;
 
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
@@ -17,8 +16,7 @@ public class ClassMethod extends FunctionDefinition {
                        TypeParameters generic,
                        boolean export,
                        Procedure procedure) {
-        super(pos, modifier, Optional.of(name),
-                generic, procedure);
+        super(pos, modifier, name, generic, procedure);
         this.export = export;
     }
 

@@ -3,7 +3,6 @@ package org.cossbow.feng.ast.oop;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.DefinedType;
-import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.util.Optional;
@@ -17,14 +16,14 @@ public class ClassDefinition extends TypeDefinition {
 
     public ClassDefinition(Position pos,
                            Modifier modifier,
-                           Optional<Identifier> name,
+                           Identifier name,
                            TypeParameters generic,
                            Optional<DefinedType> parent,
                            SymbolTable<DefinedType> impl,
                            IdentifierTable<ClassField> fields,
                            IdentifierTable<ClassMethod> methods,
                            MacroTable macros) {
-        super(pos, modifier, name, generic);
+        super(pos, modifier, name, generic, TypeDomain.CLASS);
         this.parent = parent;
         this.impl = impl;
         this.fields = fields;
@@ -60,7 +59,7 @@ public class ClassDefinition extends TypeDefinition {
 
     public static final ClassDefinition Object =
             new ClassDefinition(Position.ZERO, Modifier.empty(),
-                    Optional.of(new Identifier(Position.ZERO, "Object")),
+                    new Identifier(Position.ZERO, "Object"),
                     TypeParameters.empty(), Optional.empty(),
                     new SymbolTable<>(), new IdentifierTable<>(),
                     new IdentifierTable<>(), new MacroTable());

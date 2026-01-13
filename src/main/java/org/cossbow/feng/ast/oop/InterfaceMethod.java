@@ -14,7 +14,6 @@ public class InterfaceMethod extends PrototypeDefinition {
                            Identifier name,
                            TypeParameters generic,
                            Prototype prototype) {
-        super(pos, modifier, Optional.of(name),
-                generic, prototype);
+        super(pos, modifier, name, generic, prototype);
     }
 }

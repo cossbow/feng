@@ -41,7 +41,6 @@ public class GlobalSymbolContext implements SymbolContext {
 
     @Override
     public void putVar(Variable variable) {
-        ErrorUtil.semantic("can't add global var");
     }
 
     private void checkModule(Symbol symbol) {

@@ -192,8 +192,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             if (sf.has()) return sf.get();
 
             return semantic("%s %s has no member %s",
-                    sd.union() ? "union" : "struct",
-                    type.name(), member);
+                    sd.domain(), type.name(), member);
         }
         if (type instanceof ClassDefinition cd) {
             var cf = cd.fields().tryGet(member);

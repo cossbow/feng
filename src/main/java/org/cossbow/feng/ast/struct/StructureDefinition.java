@@ -3,25 +3,18 @@ package org.cossbow.feng.ast.struct;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.util.Optional;
 
 public class StructureDefinition extends TypeDefinition {
-    private boolean union;
     private IdentifierTable<StructureField> fields;
 
     public StructureDefinition(Position pos,
                                Modifier modifier,
-                               Optional<Identifier> name,
+                               Identifier name,
                                TypeParameters generic,
-                               boolean union,
+                               TypeDomain domain,
                                IdentifierTable<StructureField> fields) {
-        super(pos, modifier, name, generic);
-        this.union = union;
+        super(pos, modifier, name, generic, domain);
         this.fields = fields;
-    }
-
-    public boolean union() {
-        return union;
     }
 
     public IdentifierTable<StructureField> fields() {

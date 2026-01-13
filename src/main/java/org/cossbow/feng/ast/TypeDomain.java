@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public enum TypeDomain {
+    PRIMITIVE("primitive"),
     STRUCT("struct"),
     UNION("union"),
     ENUM("enum"),
@@ -18,6 +19,13 @@ public enum TypeDomain {
     TypeDomain(String name) {
         this.name = name;
     }
+
+    @Override
+    public String toString() {
+        return name;
+    }
+
+    //
 
     private static final Map<String, TypeDomain> nameMap;
 

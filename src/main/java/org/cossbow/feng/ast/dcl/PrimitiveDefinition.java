@@ -3,9 +3,9 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.TypeDefinition;
+import org.cossbow.feng.ast.TypeDomain;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.util.Optional;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -18,9 +18,8 @@ public class PrimitiveDefinition extends TypeDefinition {
 
     public PrimitiveDefinition(Primitive primitive) {
         super(Position.ZERO, Modifier.empty(),
-                Optional.of(
-                        new Identifier(Position.ZERO, primitive.code)),
-                TypeParameters.empty());
+                new Identifier(Position.ZERO, primitive.code),
+                TypeParameters.empty(), TypeDomain.PRIMITIVE);
         this.primitive = primitive;
     }
 

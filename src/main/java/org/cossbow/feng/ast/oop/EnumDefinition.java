@@ -13,7 +13,8 @@ public class EnumDefinition extends TypeDefinition {
                           Modifier modifier,
                           Identifier name,
                           IdentifierTable<Value> values) {
-        super(pos, modifier, Optional.of(name), TypeParameters.empty());
+        super(pos, modifier, name, TypeParameters.empty(),
+                TypeDomain.ENUM);
         this.values = values;
     }
 

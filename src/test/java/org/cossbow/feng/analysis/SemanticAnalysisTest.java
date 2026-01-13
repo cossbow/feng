@@ -53,6 +53,11 @@ public class SemanticAnalysisTest {
         checkFalse("class A (I) {}");
     }
 
+    @Test
+    public void testClassImpl3() {
+        checkTrue("struct I {} class A (I) {}");
+    }
+
 
     @Test
     public void testClassField1() {
@@ -70,38 +75,48 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testClassMethod1() {
+    public void testClassField4() {
         checkTrue("class ID{} class A { var id ID; func get() ID { return id; } }");
     }
 
     @Test
-    public void testClassMethod2() {
+    public void testClassField5() {
         checkFalse("class ID{} class A { var id int; func get() ID { return id; } }");
     }
 
     @Test
-    public void testClassMethod3() {
+    public void testClassField6() {
         checkTrue("class ID{} class A { var id ID; func set(id ID)  { this.id = id; } }");
     }
 
     @Test
-    public void testClassMethod4() {
+    public void testClassField7() {
         checkFalse("class ID{} class A { var id int; func set(id ID)  { this.id = id; } }");
     }
 
     @Test
-    public void testClassMethod5() {
+    public void testClassField8() {
+        checkTrue("var id int = 10; class A { var id int; func get() int { return id; } }");
+    }
+
+    @Test
+    public void testClassMethod1() {
         checkTrue("class A { func at() {} func test() { at(); } }");
     }
 
     @Test
-    public void testClassMethod6() {
+    public void testClassMethod2() {
         checkFalse("class A { func test() { at(); } }");
     }
 
     @Test
-    public void testClassMethod7() {
-        checkTrue("func at() {} class A { func test() { at(); } }");
+    public void testClassMethod3() {
+        checkTrue("func at() {} \n class A { func at() {} \n func test() { at(); } }");
+    }
+
+    @Test
+    public void testClassMethod4() {
+        checkTrue("func at() {} \n class A { func at() {} \n func test() { this.at(); } }");
     }
 
     //
