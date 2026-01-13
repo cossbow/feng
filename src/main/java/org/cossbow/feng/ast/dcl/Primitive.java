@@ -1,5 +1,6 @@
 package org.cossbow.feng.ast.dcl;
 
+import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.util.Optional;
 
 import java.util.Arrays;
@@ -38,6 +39,12 @@ public enum Primitive {
 
     public static Optional<Primitive> ofCode(String code) {
         return Optional.of(CodeMap.get(code));
+    }
+
+    public static Optional<PrimitiveDefinition> findType(Identifier name) {
+        var p = CodeMap.get(name.value());
+        if (p == null) return Optional.empty();
+        return Optional.of(PrimitiveDefinition.cache.get(p));
     }
 
     static {

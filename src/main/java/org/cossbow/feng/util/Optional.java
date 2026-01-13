@@ -49,6 +49,11 @@ public class Optional<T> {
         return of(f.apply(value));
     }
 
+    public <R> Optional<R> flat(Function<T, Optional<R>> f) {
+        if (none()) return empty();
+        return f.apply(value);
+    }
+
     //
 
     public static <T> Optional<T> of(T value) {

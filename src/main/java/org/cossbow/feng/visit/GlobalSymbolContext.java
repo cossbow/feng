@@ -1,5 +1,6 @@
 package org.cossbow.feng.visit;
 
+import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
@@ -19,6 +20,10 @@ public class GlobalSymbolContext implements SymbolContext {
     @Override
     public Optional<TypeDefinition> findType(Symbol symbol) {
         checkModule(symbol);
+
+        var def = Primitive.findType(symbol.name());
+        if (def.has()) return def.map(d -> d);
+
         return gst.namedTypes.tryGet(symbol.name());
     }
 

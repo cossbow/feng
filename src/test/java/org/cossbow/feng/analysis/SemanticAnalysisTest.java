@@ -8,109 +8,132 @@ import org.junit.jupiter.api.Test;
 
 public class SemanticAnalysisTest {
 
-    void parseAndCheck(String code) {
+    void checkTrue(String code) {
         var src = BaseParseTest.doParseFile(code);
         var ctx = new GlobalSymbolContext(src.table());
         new SemanticAnalysis(ctx).visit(src);
     }
 
-    @Test
-    public void testClass1() {
-        parseAndCheck("class A {}");
-    }
-
-    @Test
-    public void testClass2() {
-        parseAndCheck("class A { var id int; }");
-    }
-
-    @Test
-    public void testClass3() {
+    void checkFalse(String code) {
         try {
-            parseAndCheck("class A { var id ID; }");
+            checkTrue(code);
+            Assertions.fail("Failed to check for errors");
         } catch (SemanticException e) {
-            System.err.println(e.getMessage());
+            System.out.println("checked error: " + e.getMessage());
         }
     }
 
     @Test
-    public void testClass4() {
-        parseAndCheck("class ID{} class A { var id ID; }");
+    public void testClass0() {
+        checkTrue("class A {}");
     }
 
     @Test
-    public void testClass5() {
-        parseAndCheck("class ID{} class A { var id ID; func get() ID { return id; } }");
+    public void testClassInherit1() {
+        checkTrue("class B {} class A : B {}");
     }
 
     @Test
-    public void testClass6() {
-        try {
-            parseAndCheck("class ID{} class A { var id int; func get() ID { return id; } }");
-        } catch (SemanticException e) {
-            System.err.println(e.getMessage());
-        }
+    public void testClassInherit2() {
+        checkFalse("class A : B {}");
     }
 
     @Test
-    public void testClass7() {
-        parseAndCheck("class ID{} class A { var id ID; func set(id ID)  { this.id = id; } }");
+    public void testClassInherit3() {
+        checkTrue("struct B {} class A : B {}");
     }
 
     @Test
-    public void testClass8() {
-        try {
-            parseAndCheck("class ID{} class A { var id int; func set(id ID)  { this.id = id; } }");
-        } catch (SemanticException e) {
-            System.err.println(e.getMessage());
-        }
+    public void testClassImpl1() {
+        checkTrue("class I {} class A (I) {}");
     }
 
+    @Test
+    public void testClassImpl2() {
+        checkFalse("class A (I) {}");
+    }
+
+
+    @Test
+    public void testClassField1() {
+        checkTrue("class A { var id int; }");
+    }
+
+    @Test
+    public void testClassField2() {
+        checkFalse("class A { var id ID; }");
+    }
+
+    @Test
+    public void testClassField3() {
+        checkTrue("class ID{} class A { var id ID; }");
+    }
+
+    @Test
+    public void testClassMethod1() {
+        checkTrue("class ID{} class A { var id ID; func get() ID { return id; } }");
+    }
+
+    @Test
+    public void testClassMethod2() {
+        checkFalse("class ID{} class A { var id int; func get() ID { return id; } }");
+    }
+
+    @Test
+    public void testClassMethod3() {
+        checkTrue("class ID{} class A { var id ID; func set(id ID)  { this.id = id; } }");
+    }
+
+    @Test
+    public void testClassMethod4() {
+        checkFalse("class ID{} class A { var id int; func set(id ID)  { this.id = id; } }");
+    }
+
+    @Test
+    public void testClassMethod5() {
+        checkTrue("class A { func at() {} func test() { at(); } }");
+    }
+
+    @Test
+    public void testClassMethod6() {
+        checkFalse("class A { func test() { at(); } }");
+    }
+
+    @Test
+    public void testClassMethod7() {
+        checkTrue("func at() {} class A { func test() { at(); } }");
+    }
+
+    //
 
     @Test
     public void testVar1() {
-        parseAndCheck("func f(v int) { var i int; i = int(v); }");
+        checkTrue("func f(v int) { var i int; i = int(v); }");
     }
 
     @Test
     public void testVar2() {
-        try {
-            parseAndCheck("func f(v float) { var i int; i = v; }");
-        } catch (SemanticException e) {
-            System.err.println(e.getMessage());
-        }
+        checkFalse("func f(v float) { var i int; i = v; }");
     }
 
     @Test
     public void testVar3() {
-        parseAndCheck("func f(v float) { var i int; i = int(v); }");
+        checkTrue("func f(v float) { var i int; i = int(v); }");
     }
 
     @Test
     public void testVar4() {
-        try {
-            parseAndCheck("func f(v bool) { var i int; i = int(v); }");
-        } catch (SemanticException e) {
-            System.err.println(e.getMessage());
-        }
+        checkFalse("func f(v bool) { var i int; i = int(v); }");
     }
 
     @Test
     public void testVar5() {
-        try {
-            parseAndCheck("class ID{} func f(v ID) { var i int; i = int(v); }");
-        } catch (SemanticException e) {
-            System.err.println(e.getMessage());
-        }
+        checkFalse("class ID{} func f(v ID) { var i int; i = int(v); }");
     }
 
     @Test
     public void testVar6() {
-        try {
-            parseAndCheck("class ID{} func f(v int) { var i ID; i = ID(v); }");
-        } catch (SemanticException e) {
-            System.err.println(e.getMessage());
-        }
+        checkFalse("class ID{} func f(v int) { var i ID; i = ID(v); }");
     }
 
 }

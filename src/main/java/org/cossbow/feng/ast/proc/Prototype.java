@@ -30,8 +30,8 @@ public class Prototype extends Entity {
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof Prototype p)) return false;
-        return Objects.equals(parameterSet.types(), p.parameterSet.types())
-                && Objects.equals(returnSet, p.returnSet);
+        return parameterSet.types().equals(p.parameterSet.types())
+                && returnSet.equals(p.returnSet);
     }
 
 }

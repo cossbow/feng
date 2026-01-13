@@ -3,6 +3,7 @@ package org.cossbow.feng.analysis;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Source;
+import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
@@ -11,6 +12,7 @@ import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassField;
 import org.cossbow.feng.ast.oop.ClassMethod;
+import org.cossbow.feng.ast.oop.InterfaceDefinition;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
@@ -24,6 +26,7 @@ import org.cossbow.feng.visit.SymbolContext;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.cossbow.feng.util.ErrorUtil.*;
 
@@ -76,7 +79,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     @Override
-    public Entity visit(DefinedType dt) {
+    public TypeDefinition visit(DefinedType dt) {
         var type = context.findType(dt.symbol());
         if (type.none())
             return semantic("%s not define", dt.symbol());
@@ -167,12 +170,15 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     public Entity visit(ClassDefinition cd) {
         assert enterClass == null;
         enterClass = cd;
-        context.enterScope();
+        context.enterScope(cd);
+        if (!cd.generic().isEmpty())
+            return unsupported("generic");
         cd.parent().use(this::visit);
         cd.impl().each(this::visit);
         cd.fields().each(this::visit);
         cd.methods().each(this::visit);
-        if (!cd.macros().isEmpty()) unsupported("macro");
+        if (!cd.macros().isEmpty())
+            unsupported("macro");
         context.exitScope();
         enterClass = null;
         return cd;
@@ -599,11 +605,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     @Override
-    public Entity visit(PrimaryExpression e) {
-        return EntityVisitor.super.visit(e);
-    }
-
-    @Override
     public Entity visit(ArrayExpression e) {
         return EntityVisitor.super.visit(e);
     }
@@ -615,11 +616,27 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(CallExpression e) {
-        // explicit convert
-        if (e.arguments().size() != 1)
-            return semantic("can only be one argument: %s", e.pos());
-        var ctd = typeDeducer.visit(e);
-        if (ctd instanceof PrimitiveTypeDeclarer ptd) {
+        visit(e.callee());
+        e.arguments().forEach(this::visit);
+
+        var rtd = typeDeducer.visit(e);
+        if (rtd instanceof VoidTypeDeclarer)
+            return e;
+
+        if (rtd instanceof FuncTypeDeclarer ftd) {
+            if (!ftd.generic().isEmpty())
+                return unsupported("generic");
+
+            var left = ftd.prototype().parameterSet().types();
+            var right = typeDeducer.visit(e.arguments());
+            assignable(left, right, e.pos());
+            return e;
+        }
+
+        if (rtd instanceof PrimitiveTypeDeclarer ptd) {
+            // explicit convert
+            if (e.arguments().size() != 1)
+                return semantic("can only be one argument: %s", e.pos());
             var a = e.arguments().getFirst();
             var td = typeDeducer.visit(a);
             if (!(td instanceof PrimitiveTypeDeclarer atd))
@@ -629,7 +646,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             if (rej) return semantic("can't convert: %s", a.pos());
             return e;
         }
-        return unreachable();
+
+        return semantic("%s is callee or convertor", e.pos());
     }
 
     @Override
@@ -682,7 +700,21 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (!e.generic().isEmpty())
             return unsupported("generic");
 
-        return typeDeducer.visit(e);
+        var t = context.findType(e.symbol());
+//        var td = t.map(d -> {
+//            if (d instanceof PrimitiveDefinition pd)
+//                return pd;
+//            return semantic("can't refer a type");
+//        });
+        if (t.has()) return e;
+
+        var f = context.findFunc(e.symbol());
+        if (f.has()) return e;
+
+        var v = context.findVar(e.symbol());
+        if (v.has()) return e;
+
+        return semantic("undefined symbol: %s", e.symbol());
     }
 
     @Override

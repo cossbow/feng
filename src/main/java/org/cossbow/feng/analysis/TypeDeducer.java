@@ -58,6 +58,10 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                 && ptd.primitive().integer;
     }
 
+    public List<TypeDeclarer> visit(List<Expression> args) {
+        return args.stream().map(this::visit).toList();
+    }
+
     @Override
     public TypeDeclarer visit(BinaryExpression e) {
         var lt = visit(e.left());
@@ -131,9 +135,8 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         var td = visit(e.callee());
         if (td instanceof FuncTypeDeclarer ftd)
             return visit(ftd);
-        if (td instanceof PrimitiveTypeDeclarer ptd)
-            return visit(ptd);
-        return semantic("callee not callable: %s", e.pos());
+
+        return td;
     }
 
     @Override
@@ -252,21 +255,25 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     @Override
     public TypeDeclarer visit(ReferExpression e) {
         var s = e.symbol();
-        var fd = context.findFunc(s);
-        if (fd.has())
+        var f = context.findFunc(s);
+        if (f.has())
             return new FuncTypeDeclarer(e.pos(),
-                    fd.get().procedure().prototype(), e.generic());
+                    f.get().procedure().prototype(), e.generic());
 
         var v = context.findVar(s);
         if (v.has()) return v.get().type().must();
 
-        if (s.module().none()) {
-            var pri = Primitive.ofCode(s.name().value());
-            if (pri.has())
-                return new PrimitiveTypeDeclarer(e.pos(), pri.get());
-        }
+        var t = context.findType(s);
+        if (t.none())
+            return semantic("unknown symbol '%s' ?", s);
 
-        return semantic("这是什么？%s", s);
+        if (t.get() instanceof PrimitiveDefinition pd)
+            return new PrimitiveTypeDeclarer(e.pos(), pd.primitive());
+
+        return new DefinedTypeDeclarer(e.pos(),
+                new DefinedType(e.pos(), new Symbol(e.pos(),
+                        Optional.empty(), t.get().name()),
+                        TypeArguments.EMPTY), Optional.empty());
     }
 
     //

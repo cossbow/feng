@@ -14,4 +14,8 @@ public class TypeDefinition extends Definition {
         super(pos, modifier, name, generic);
     }
 
+    @Override
+    public String toString() {
+        return name().value();
+    }
 }
