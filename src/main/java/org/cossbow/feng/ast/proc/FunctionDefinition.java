@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.proc;
 import org.cossbow.feng.ast.Definition;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
@@ -11,15 +12,19 @@ public class FunctionDefinition extends Definition {
 
     public FunctionDefinition(Position pos,
                               Modifier modifier,
-                              Identifier name,
+                              Symbol symbol,
                               TypeParameters generic,
                               Procedure procedure) {
-        super(pos, modifier, name, generic);
+        super(pos, modifier, symbol, generic);
 
         this.procedure = procedure;
     }
 
     public Procedure procedure() {
         return procedure;
+    }
+
+    public Prototype prototype() {
+        return procedure.prototype();
     }
 }

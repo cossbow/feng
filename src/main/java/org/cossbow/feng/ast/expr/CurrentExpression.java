@@ -10,11 +10,11 @@ public class CurrentExpression extends PrimaryExpression {
     private boolean isSelf;
 
     public CurrentExpression(Position pos,
-                             Identifier className,
+                             Symbol className,
                              Identifier method,
                              boolean isSelf) {
         super(pos);
-        this.className = new Symbol(className.pos(), className);
+        this.className = className;
         this.method = method;
         this.isSelf = isSelf;
     }

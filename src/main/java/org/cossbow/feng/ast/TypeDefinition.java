@@ -9,10 +9,10 @@ public class TypeDefinition extends Definition {
 
     public TypeDefinition(Position pos,
                           Modifier modifier,
-                          Identifier name,
+                          Symbol symbol,
                           TypeParameters generic,
                           TypeDomain domain) {
-        super(pos, modifier, name, generic);
+        super(pos, modifier, symbol, generic);
         this.domain = domain;
     }
 
@@ -22,6 +22,6 @@ public class TypeDefinition extends Definition {
 
     @Override
     public String toString() {
-        return name().value();
+        return domain.name + ' ' + symbol();
     }
 }

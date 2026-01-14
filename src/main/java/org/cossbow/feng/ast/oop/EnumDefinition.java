@@ -11,7 +11,7 @@ public class EnumDefinition extends TypeDefinition {
 
     public EnumDefinition(Position pos,
                           Modifier modifier,
-                          Identifier name,
+                          Symbol name,
                           IdentifierTable<Value> values) {
         super(pos, modifier, name, TypeParameters.empty(),
                 TypeDomain.ENUM);

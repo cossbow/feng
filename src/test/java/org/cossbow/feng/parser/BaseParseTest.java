@@ -4,6 +4,7 @@ package org.cossbow.feng.parser;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.cossbow.feng.ast.*;
+import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
@@ -74,12 +75,24 @@ public class BaseParseTest {
 
     public static Definition doParseFirstDef(String def) {
         var src = doParseFile(def);
-        return src.definitions().getFirst();
+        return firstDef(src);
+    }
+
+    public static Definition firstDef(Source src) {
+        var types = src.types();
+        if (!types.isEmpty()) return types.getFirst();
+        var functions = src.functions();
+        if (!functions.isEmpty()) return functions.getFirst();
+        return ErrorUtil.syntax("parse fail");
     }
 
     public static TypeDefinition doParseType(String def, Identifier name) {
         var src = doParseFile(def);
         return src.table().namedTypes.get(name);
+    }
+
+    public static TypeDefinition doParseType(String def, Symbol name) {
+        return doParseType(def, name.name());
     }
 
     public static TypeDefinition doParseType(String def, String name) {
@@ -95,9 +108,9 @@ public class BaseParseTest {
         return doParseFunc(def, identifier(name));
     }
 
-    public static DeclarationStatement doParseDeclaration(String def) {
+    public static GlobalVariable doParseDeclaration(String def) {
         var src = doParseFile(def);
-        return src.declarations().getFirst();
+        return src.variables().getFirst();
     }
 
     public static final Map<Enum<?>, String> operatorSymbols = Map.ofEntries(
@@ -137,7 +150,8 @@ public class BaseParseTest {
     //
 
     public static FunctionDefinition doParseProc(String def) {
-        return (FunctionDefinition) doParseFirstDef(def);
+        var src = doParseFile(def);
+        return src.functions().getFirst();
     }
 
     public static Statement doParseLocal(String stmt) {

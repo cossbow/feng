@@ -1,9 +1,6 @@
 package org.cossbow.feng.ast.dcl;
 
-import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.TypeDefinition;
-import org.cossbow.feng.ast.TypeDomain;
+import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
@@ -18,7 +15,8 @@ public class PrimitiveDefinition extends TypeDefinition {
 
     public PrimitiveDefinition(Primitive primitive) {
         super(Position.ZERO, Modifier.empty(),
-                new Identifier(Position.ZERO, primitive.code),
+                new Symbol(Position.ZERO,
+                        new Identifier(Position.ZERO, primitive.code)),
                 TypeParameters.empty(), TypeDomain.PRIMITIVE);
         this.primitive = primitive;
     }

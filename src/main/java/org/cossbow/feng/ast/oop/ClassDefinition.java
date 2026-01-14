@@ -16,14 +16,14 @@ public class ClassDefinition extends TypeDefinition {
 
     public ClassDefinition(Position pos,
                            Modifier modifier,
-                           Identifier name,
+                           Symbol symbol,
                            TypeParameters generic,
                            Optional<DefinedType> parent,
                            SymbolTable<DefinedType> impl,
                            IdentifierTable<ClassField> fields,
                            IdentifierTable<ClassMethod> methods,
                            MacroTable macros) {
-        super(pos, modifier, name, generic, TypeDomain.CLASS);
+        super(pos, modifier, symbol, generic, TypeDomain.CLASS);
         this.parent = parent;
         this.impl = impl;
         this.fields = fields;
@@ -59,7 +59,8 @@ public class ClassDefinition extends TypeDefinition {
 
     public static final ClassDefinition Object =
             new ClassDefinition(Position.ZERO, Modifier.empty(),
-                    new Identifier(Position.ZERO, "Object"),
+                    new Symbol(Position.ZERO, new Identifier(
+                            Position.ZERO, "Object")),
                     TypeParameters.empty(), Optional.empty(),
                     new SymbolTable<>(), new IdentifierTable<>(),
                     new IdentifierTable<>(), new MacroTable());

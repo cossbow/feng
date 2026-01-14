@@ -23,7 +23,7 @@ public class EnumParseTest extends BaseParseTest {
                 }
                 """;
         var et = (EnumDefinition) doParseType(code, "TaskStatus");
-        Assertions.assertEquals(identifier("TaskStatus"), et.name());
+        Assertions.assertEquals(symbol("TaskStatus"), et.symbol());
 
         var expect = List.of(Pair.<String, Integer>of("INIT", null),
                 Pair.of("WAIT", 1001),

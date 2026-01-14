@@ -1,19 +1,44 @@
 package org.cossbow.feng.ast.oop;
 
+import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.proc.Prototype;
-import org.cossbow.feng.ast.proc.PrototypeDefinition;
 
-public class InterfaceMethod extends PrototypeDefinition {
+public class InterfaceMethod extends Entity {
+    private Modifier modifier;
+    private Identifier name;
+    private TypeParameters generic;
+    private Prototype prototype;
+
     public InterfaceMethod(Position pos,
                            Modifier modifier,
                            Identifier name,
                            TypeParameters generic,
                            Prototype prototype) {
-        super(pos, modifier, name, generic, prototype);
+        super(pos);
+        this.modifier = modifier;
+        this.name = name;
+        this.generic = generic;
+        this.prototype = prototype;
     }
+
+    public Modifier modifier() {
+        return modifier;
+    }
+
+    public Identifier name() {
+        return name;
+    }
+
+    public TypeParameters generic() {
+        return generic;
+    }
+
+    public Prototype prototype() {
+        return prototype;
+    }
+
 }

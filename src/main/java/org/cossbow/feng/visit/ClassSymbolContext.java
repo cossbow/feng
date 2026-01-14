@@ -52,7 +52,8 @@ public class ClassSymbolContext extends LocalSymbolContext {
         if (f.has()) return f;
         if (symbol.module().has())
             return semantic("func %s not defined", symbol);
-        return findMethod(definition, symbol.name()).map(m -> m);
+        return findMethod(definition, symbol.name())
+                .map(ClassMethod::func);
     }
 
     @Override
@@ -62,7 +63,8 @@ public class ClassSymbolContext extends LocalSymbolContext {
         if (symbol.module().has())
             return semantic("var %s not declared", symbol);
 
-        return findField(definition, symbol.name()).map(ClassField::variable);
+        return findField(definition, symbol.name())
+                .map(ClassField::variable);
     }
 
 }

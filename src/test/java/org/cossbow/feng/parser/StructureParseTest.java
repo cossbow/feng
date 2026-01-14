@@ -19,10 +19,10 @@ public class StructureParseTest extends BaseParseTest {
     public void testTypeDefine() {
         TypeDomain[] domains = {TypeDomain.STRUCT, TypeDomain.UNION};
         for (var domain : domains) {
-            var name = randTypeName(32);
+            var name = randTypeSymbol(32);
             var code = "%s %s{}".formatted(domain, name);
             var def = (StructureDefinition) doParseFirstDef(code);
-            Assertions.assertEquals(name, def.name());
+            Assertions.assertEquals(name, def.symbol());
             Assertions.assertSame(domain, def.domain());
             Assertions.assertTrue(def.fields().isEmpty());
             Assertions.assertTrue(def.generic().isEmpty());
@@ -103,7 +103,7 @@ public class StructureParseTest extends BaseParseTest {
         var bt = randTypeSymbol(12);
         var code = "struct Foo { %s struct{%s %s;}; }".formatted(a, b, bt);
         var src = doParseFile(code);
-        var foo = (StructureDefinition) src.definitions().getFirst();
+        var foo = (StructureDefinition) src.types().getFirst();
         Assertions.assertEquals(1, foo.fields().size());
         var f = foo.fields().get(a);
         Assertions.assertEquals(a, f.name());

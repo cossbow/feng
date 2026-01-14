@@ -70,8 +70,8 @@ public class Optional<T> {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof Optional<?> optional)) return false;
-        return Objects.equals(value, optional.value);
+        return o instanceof Optional<?> optional &&
+                Objects.equals(value, optional.value);
     }
 
     @Override

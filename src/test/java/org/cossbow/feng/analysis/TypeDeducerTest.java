@@ -35,12 +35,10 @@ public class TypeDeducerTest {
     @Test
     public void testDefinedType() {
         var src = parseFile("define_type.feng");
-        var gd = src.declarations().getFirst();
-        var tpd = deducer.visit(gd.init().must());
-        Assertions.assertEquals(1, tpd.tuple().size());
-        var dtd = ((DefinedTypeDeclarer) tpd.tuple().getFirst());
-        var def = src.definitions().getFirst();
-        Assertions.assertEquals(dtd.definedType().symbol().name(), def.name());
+        var gd = src.variables().getFirst();
+        var dtd = (DefinedTypeDeclarer) deducer.visit(gd.init().must());
+        var def = src.types().getFirst();
+        Assertions.assertEquals(dtd.definedType().symbol(), def.symbol());
         Assertions.assertTrue(dtd.definedType().symbol().module().none());
         Assertions.assertTrue(dtd.definedType().generic().isEmpty());
         Assertions.assertTrue(dtd.refer().has());

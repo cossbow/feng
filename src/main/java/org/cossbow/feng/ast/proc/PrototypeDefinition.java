@@ -1,10 +1,7 @@
 package org.cossbow.feng.ast.proc;
 
-import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.TypeDomain;
+import org.cossbow.feng.ast.*;
 import org.cossbow.feng.util.Optional;
-import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
@@ -13,10 +10,10 @@ public class PrototypeDefinition extends TypeDefinition {
 
     public PrototypeDefinition(Position pos,
                                Modifier modifier,
-                               Identifier name,
+                               Symbol symbol,
                                TypeParameters generic,
                                Prototype prototype) {
-        super(pos, modifier, name, generic, TypeDomain.FUNC);
+        super(pos, modifier, symbol, generic, TypeDomain.FUNC);
         this.prototype = prototype;
     }
 

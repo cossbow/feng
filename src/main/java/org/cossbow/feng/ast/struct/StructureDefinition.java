@@ -9,11 +9,11 @@ public class StructureDefinition extends TypeDefinition {
 
     public StructureDefinition(Position pos,
                                Modifier modifier,
-                               Identifier name,
+                               Symbol symbol,
                                TypeParameters generic,
                                TypeDomain domain,
                                IdentifierTable<StructureField> fields) {
-        super(pos, modifier, name, generic, domain);
+        super(pos, modifier, symbol, generic, domain);
         this.fields = fields;
     }
 

@@ -19,9 +19,9 @@ public class ClassParseTest extends BaseParseTest {
 
     @Test
     public void testDefine() {
-        var name = randTypeName(32);
+        var name = randTypeSymbol(32);
         var def = (ClassDefinition) doParseType("class " + name + " {}", name);
-        Assertions.assertEquals(name, def.name());
+        Assertions.assertEquals(name, def.symbol());
         Assertions.assertTrue(def.parent().none());
         Assertions.assertTrue(def.impl().isEmpty());
         Assertions.assertTrue(def.generic().isEmpty());
@@ -31,11 +31,11 @@ public class ClassParseTest extends BaseParseTest {
 
     @Test
     public void testInherit() {
-        var name = randTypeName(32);
+        var name = randTypeSymbol(32);
         var parent = randTypeSymbol(32);
         var def = (ClassDefinition) doParseType(
                 "class %s : %s {}".formatted(name, parent), name);
-        Assertions.assertEquals(name, def.name());
+        Assertions.assertEquals(name, def.symbol());
         var ref = def.parent().must();
         Assertions.assertEquals(parent, ref.symbol());
     }
@@ -43,11 +43,11 @@ public class ClassParseTest extends BaseParseTest {
     @Test
     public void testImpls() {
         for (int size = 1; size <= 8; size++) {
-            var name = randTypeName(16);
+            var name = randTypeSymbol(16);
             var types = anyNames(RandTypeSymbol, 8, size);
             var code = "class %s (%s) {}".formatted(name, idList(types));
             var def = (ClassDefinition) doParseType(code, name);
-            Assertions.assertEquals(name, def.name());
+            Assertions.assertEquals(name, def.symbol());
             Assertions.assertEquals(types.size(), def.impl().size());
             for (int i = 0; i < types.size(); i++) {
                 var type = types.get(i);
@@ -120,9 +120,9 @@ public class ClassParseTest extends BaseParseTest {
         var name = randVarName(16);
         var code = "class A { func %s() {} }".formatted(name);
         var def = (ClassDefinition) doParseType(code, "A");
-        var method = def.methods().get(name);
-        Assertions.assertEquals(name, method.name());
-        Assertions.assertFalse(method.export());
+        var m = def.methods().get(name);
+        Assertions.assertEquals(name, m.name());
+        Assertions.assertFalse(m.export());
     }
 
     @Test

@@ -70,9 +70,11 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
     @Override
     public CppGenerator visit(Source e) {
         if (!e.imports().isEmpty()) return unsupported("import");
-        for (var def : e.definitions())
+        for (var def : e.types())
             visit(def);
-        for (var dcl : e.declarations())
+        for (var def : e.functions())
+            visit(def);
+        for (var dcl : e.variables())
             visit(dcl);
         return this;
     }
@@ -143,7 +145,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         assert enterClass == null;
         enterClass = cd;
         write("class ");
-        visit(cd.name());
+        visit(cd.symbol());
         write(' ');
         if (cd.parent().has() || !cd.impl().isEmpty()) {
             write(": public ");
@@ -181,7 +183,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         assert enterClass != null;
         assert enterMethod == null;
         enterMethod = cm;
-        visit((FunctionDefinition) cm);
+        visit(cm.func());
         enterMethod = null;
         return this;
     }
@@ -246,7 +248,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
             write("void");
         }
         write(' ');
-        visit(fd.name());
+        visit(fd.symbol());
         write('(');
         switch (ps) {
             case VariableParameterSet vps:

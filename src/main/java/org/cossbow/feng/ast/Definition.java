@@ -6,16 +6,16 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 abstract
 public class Definition extends Entity {
     private Modifier modifier;
-    private Identifier name;
+    private Symbol symbol;
     private TypeParameters generic;
 
     public Definition(Position pos,
                       Modifier modifier,
-                      Identifier name,
+                      Symbol symbol,
                       TypeParameters generic) {
         super(pos);
         this.modifier = modifier;
-        this.name = name;
+        this.symbol = symbol;
         this.generic = generic;
     }
 
@@ -23,8 +23,8 @@ public class Definition extends Entity {
         return modifier;
     }
 
-    public Identifier name() {
-        return name;
+    public Symbol symbol() {
+        return symbol;
     }
 
     public TypeParameters generic() {

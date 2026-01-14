@@ -212,16 +212,16 @@ public class ExportImportTest extends BaseParseTest {
                 "enum Status{A,}",
                 "struct Block{}",
                 "union Result{}",
-                "attribute Test{}"
+                "attribute Section{}"
         );
         for (int i = 0; i <= 1; i++) {
             for (var gc : globalCodes) {
                 var code = (i > 0 ? "export " : "") + gc;
                 var src = doParseFile(code);
-                var def = src.definitions().getFirst();
+                var def = firstDef(src);
                 var exported = def instanceof FunctionDefinition ?
-                        src.table().exportedFunctions.exists(def.name()) :
-                        src.table().exportedTypes.exists(def.name());
+                        src.table().exportedFunctions.exists(def.symbol()) :
+                        src.table().exportedTypes.exists(def.symbol());
                 Assertions.assertEquals(i > 0, exported);
             }
         }
@@ -237,9 +237,9 @@ public class ExportImportTest extends BaseParseTest {
             for (var gc : globalCodes) {
                 var code = (i > 0 ? "export " : "") + gc;
                 var src = doParseFile(code);
-                var v = src.declarations().getFirst().variables().getFirst();
+                var v = src.variables().getFirst();
                 var tab = src.table().exportedVariables;
-                Assertions.assertEquals(i > 0, tab.exists(v.name()));
+                Assertions.assertEquals(i > 0, tab.exists(symbol(v.name())));
             }
         }
     }

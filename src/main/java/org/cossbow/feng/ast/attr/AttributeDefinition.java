@@ -8,9 +8,9 @@ public class AttributeDefinition extends TypeDefinition {
 
     public AttributeDefinition(Position pos,
                                Modifier modifier,
-                               Identifier name,
+                               Symbol symbol,
                                IdentifierTable<AttributeField> fields) {
-        super(pos, modifier, name, TypeParameters.empty(),
+        super(pos, modifier, symbol, TypeParameters.empty(),
                 TypeDomain.ATTRIBUTE);
         this.fields = fields;
     }

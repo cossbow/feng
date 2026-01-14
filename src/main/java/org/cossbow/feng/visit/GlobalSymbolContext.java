@@ -36,7 +36,8 @@ public class GlobalSymbolContext implements SymbolContext {
     @Override
     public Optional<Variable> findVar(Symbol symbol) {
         checkModule(symbol);
-        return gst.variables.tryGet(symbol.name());
+        return gst.variables.tryGet(symbol.name())
+                .map(gv -> gv);
     }
 
     @Override

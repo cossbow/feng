@@ -10,11 +10,11 @@ public class InterfaceParseTest extends BaseParseTest {
 
     @Test
     public void testMethod1() {
-        var typeName = randTypeName(32);
+        var typeName = randTypeSymbol(32);
         var methodName = randVarName(12);
         var code = "interface %s { %s();}".formatted(typeName, methodName);
         var def = (InterfaceDefinition) doParseFirstDef(code);
-        Assertions.assertEquals(typeName, def.name());
+        Assertions.assertEquals(typeName, def.symbol());
         Assertions.assertEquals(1, def.methods().size());
         var method = def.methods().get(methodName);
         Assertions.assertEquals(methodName, method.name());
@@ -22,11 +22,11 @@ public class InterfaceParseTest extends BaseParseTest {
 
     @Test
     public void testMethod2() {
-        var typeName = randTypeName(32);
+        var typeName = randTypeSymbol(32);
         var methodName = randVarName(12);
         var code = "interface %s { %s(int);}".formatted(typeName, methodName);
         var def = (InterfaceDefinition) doParseFirstDef(code);
-        Assertions.assertEquals(typeName, def.name());
+        Assertions.assertEquals(typeName, def.symbol());
         Assertions.assertEquals(1, def.methods().size());
         var method = def.methods().get(methodName);
         Assertions.assertEquals(methodName, method.name());
@@ -34,11 +34,11 @@ public class InterfaceParseTest extends BaseParseTest {
 
     @Test
     public void testMethod3() {
-        var typeName = randTypeName(32);
+        var typeName = randTypeSymbol(32);
         var methodName = randVarName(12);
         var code = "interface %s { %s()int;}".formatted(typeName, methodName);
         var def = (InterfaceDefinition) doParseFirstDef(code);
-        Assertions.assertEquals(typeName, def.name());
+        Assertions.assertEquals(typeName, def.symbol());
         Assertions.assertEquals(1, def.methods().size());
         var method = def.methods().get(methodName);
         Assertions.assertEquals(methodName, method.name());
@@ -46,11 +46,11 @@ public class InterfaceParseTest extends BaseParseTest {
 
     @Test
     public void testPart1() {
-        var typeName = randTypeName(32);
-        var partName = symbol(randVarName(12));
+        var typeName = randTypeSymbol(32);
+        var partName = randVarSymbol(12);
         var code = "interface %s { %s;}".formatted(typeName, partName);
         var def = (InterfaceDefinition) doParseFirstDef(code);
-        Assertions.assertEquals(typeName, def.name());
+        Assertions.assertEquals(typeName, def.symbol());
         Assertions.assertEquals(1, def.parts().size());
         var part = def.parts().getValue(0);
         Assertions.assertEquals(partName, part.symbol());

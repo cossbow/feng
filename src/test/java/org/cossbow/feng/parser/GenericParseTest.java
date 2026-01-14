@@ -15,7 +15,7 @@ public class GenericParseTest extends BaseParseTest {
 
     static final List<String> simpleGlobalDefineFmt = List.of(
             "func foo`%s`(){}",
-            "func foo`%s`();",
+            "func Foo`%s`();",
             "class Foo`%s`{}",
             "interface Foo`%s`{}",
             "struct Foo`%s`{}",
@@ -44,8 +44,8 @@ public class GenericParseTest extends BaseParseTest {
             var params = anyNames(RandTypeName, 8, size);
             var code = "class A{func foo`%s`(){}}".formatted(idList(params));
             var def = (ClassDefinition) doParseType(code, "A");
-            var method = def.methods().get(identifier("foo"));
-            checkIds(params, method.generic().params());
+            var m = def.methods().get(identifier("foo"));
+            checkIds(params, m.func().generic().params());
         }
     }
 
@@ -76,6 +76,7 @@ public class GenericParseTest extends BaseParseTest {
     public void testTypeConstraint2() {
         for (var fmt : simpleGlobalDefineFmt) {
             for (var d : TypeDomain.values()) {
+                if (d == TypeDomain.PRIMITIVE) continue;
                 var type = randTypeName(2);
                 var code = fmt.formatted(type + " " + d.name);
                 var param = doParseFirstDef(code)

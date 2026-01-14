@@ -25,4 +25,8 @@ public class DeclarationStatement extends Statement {
     public Optional<Tuple> init() {
         return init;
     }
+
+    public int size() {
+        return variables.size();
+    }
 }

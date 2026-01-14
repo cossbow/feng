@@ -21,25 +21,23 @@ public class DeclarationParseTest extends BaseParseTest {
     public void testGlobalVar() {
         var src = doParseFile("var a,b = 1,2;");
         var tab = src.table().exportedVariables;
-        Assertions.assertFalse(tab.exists(identifier("a")));
-        Assertions.assertFalse(tab.exists(identifier("b")));
+        Assertions.assertFalse(tab.exists(symbol("a")));
+        Assertions.assertFalse(tab.exists(symbol("b")));
     }
 
     @Test
     public void testGlobal2() {
         var src = doParseFile("export var a UserServer = 1;");
         var tab = src.table().exportedVariables;
-        Assertions.assertTrue(tab.exists(identifier("a")));
+        Assertions.assertTrue(tab.exists(symbol("a")));
     }
 
     @Test
     public void testGlobal3() {
-        var dcl = doParseDeclaration("@Foo@Boo var a UserServer = 1;");
-        for (var v : dcl.variables()) {
-            var attrs = v.modifier().attributes();
-            Assertions.assertEquals(identifier("Foo"), attrs.getValue(0).type());
-            Assertions.assertEquals(identifier("Boo"), attrs.getValue(1).type());
-        }
+        var v = doParseDeclaration("@Foo@Boo var a UserServer = 1;");
+        var attrs = v.modifier().attributes();
+        Assertions.assertEquals(identifier("Foo"), attrs.getValue(0).type());
+        Assertions.assertEquals(identifier("Boo"), attrs.getValue(1).type());
     }
 
     DeclarationStatement parseLocalDecl(String code) {

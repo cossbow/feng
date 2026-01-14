@@ -1,29 +1,39 @@
 package org.cossbow.feng.ast.oop;
 
+import org.cossbow.feng.ast.Entity;
+import org.cossbow.feng.ast.Exportable;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.ast.proc.Procedure;
 
-public class ClassMethod extends FunctionDefinition {
+public class ClassMethod extends Entity implements Exportable {
     private boolean export;
-    private volatile boolean updater;
+    private Identifier name;
+    private FunctionDefinition func;
 
     public ClassMethod(Position pos,
-                       Modifier modifier,
-                       Identifier name,
-                       TypeParameters generic,
                        boolean export,
-                       Procedure procedure) {
-        super(pos, modifier, name, generic, procedure);
+                       Identifier name,
+                       FunctionDefinition func) {
+        super(pos);
         this.export = export;
+        this.name = name;
+        this.func = func;
     }
 
     public boolean export() {
         return export;
     }
+
+    public Identifier name() {
+        return name;
+    }
+
+    public FunctionDefinition func() {
+        return func;
+    }
+
+    private volatile boolean updater;
 
     public boolean updater() {
         return updater;

@@ -30,9 +30,9 @@ public class Symbol extends Entity {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof Symbol symbol)) return false;
-        return Objects.equals(module, symbol.module) &&
-                Objects.equals(name, symbol.name);
+        return o instanceof Symbol s &&
+                module.equals(s.module) &&
+                name.equals(s.name);
     }
 
     @Override

@@ -47,14 +47,14 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(Source s) {
-        for (var ds : s.declarations())
+        for (var ds : s.variables())
             visit(ds);
 
         var tab = s.table();
         for (var t : tab.namedTypes.values()) visit(t);
         for (var t : tab.unnamedTypes.values()) visit(t);
         for (var f : tab.namedFunctions.values()) visit(f);
-        for (var l : tab.lambdas) visit(l);
+
         return s;
     }
 
@@ -271,7 +271,10 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         assert enterClass != null;
         assert enterMethod == null;
         enterMethod = cm;
-        visit((FunctionDefinition) cm);
+        if (!cm.func().generic().isEmpty())
+            unsupported("generic");
+        visit(cm.func().modifier());
+        visit(cm.func().procedure());
         enterMethod = null;
         return cm;
     }
@@ -293,41 +296,39 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(InterfaceMethod m) {
-        visit((PrototypeDefinition) m);
+        visit(m.generic());
+        visit(m.prototype());
         return m;
     }
 
     @Override
     public Entity visit(PrototypeDefinition pd) {
+        visit(pd.generic());
         visit(pd.prototype(), false);
         return pd;
     }
 
     //
 
-    private volatile FunctionDefinition enterFunc;
-
     @Override
     public Entity visit(FunctionDefinition fd) {
-        assert enterFunc == null;
-        enterFunc = fd;
-        context.enterScope();
-
-        if (!fd.generic().isEmpty())
-            unsupported("generic");
+        visit(fd.generic());
         visit(fd.modifier());
-
         visit(fd.procedure());
-
-        context.exitScope();
-        enterFunc = null;
         return fd;
     }
 
+    private volatile Procedure enterProc;
+
     @Override
     public Entity visit(Procedure proc) {
+        assert enterProc == null;
+        enterProc = proc;
+        context.enterScope();
         visit(proc.prototype(), true);
         visit(proc.body());
+        context.exitScope();
+        enterProc = null;
         return proc;
     }
 
@@ -539,9 +540,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(BreakStatement e) {
-        assert enterFunc != null;
+        assert enterProc != null;
         if (e.label().has()) {
-            if (enterFunc.procedure().labels()
+            if (enterProc.labels()
                     .contains(e.label().get()))
                 return semantic("label not found: %s",
                         e.label().get());
@@ -555,9 +556,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(ContinueStatement e) {
-        assert enterFunc != null;
+        assert enterProc != null;
         if (e.label().has()) {
-            if (enterFunc.procedure().labels()
+            if (enterProc.labels()
                     .contains(e.label().get()))
                 return semantic("label not found: %s",
                         e.label().get());
@@ -620,8 +621,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(ReturnStatement e) {
-        assert enterFunc != null;
-        var rs = enterFunc.procedure().prototype().returnSet();
+        assert enterProc != null;
+        var rs = enterProc.prototype().returnSet();
         if (rs.isEmpty()) {
             if (e.result().none()) return e;
             return semantic("function no return");

@@ -13,12 +13,12 @@ public class InterfaceDefinition extends TypeDefinition {
 
     public InterfaceDefinition(Position pos,
                                Modifier modifier,
-                               Identifier name,
+                               Symbol symbol,
                                TypeParameters generic,
                                IdentifierTable<InterfaceMethod> methods,
                                SymbolTable<DefinedType> parts,
                                MacroTable macros) {
-        super(pos, modifier, name, generic, TypeDomain.INTERFACE);
+        super(pos, modifier, symbol, generic, TypeDomain.INTERFACE);
         this.methods = methods;
         this.parts = parts;
         this.macros = macros;

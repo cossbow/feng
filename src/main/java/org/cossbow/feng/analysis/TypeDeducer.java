@@ -2,7 +2,6 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.DefinedType;
@@ -23,9 +22,7 @@ import org.cossbow.feng.visit.SymbolContext;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.ErrorUtil.*;
@@ -188,7 +185,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             if (sf.has()) return sf.get();
 
             return semantic("%s %s has no member %s",
-                    sd.domain(), type.name(), member);
+                    sd.domain(), type.symbol(), member);
         }
         if (type instanceof ClassDefinition cd) {
             var cf = cd.fields().tryGet(member);
@@ -196,10 +193,10 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             var cm = cd.methods().tryGet(member);
             if (cm.has()) return cm.get();
             return semantic("class %s has no field %s",
-                    type.name(), member);
+                    type.symbol(), member);
         }
 
-        return semantic("%s can't have member", type.name());
+        return semantic("%s can't have member", type.symbol());
     }
 
     @Override
@@ -214,7 +211,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
         if (m instanceof ClassMethod cm)
             return new FuncTypeDeclarer(cm.pos(),
-                    cm.procedure().prototype(), mo.generic());
+                    cm.func().prototype(), mo.generic());
 
         return unreachable();
     }
@@ -266,6 +263,11 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     @Override
     public TypeDeclarer visit(ReferExpression e) {
         var s = e.symbol();
+        if (s.module().none()) {
+            var p = Primitive.ofCode(s.name().value());
+            if (p.has())
+                return new PrimitiveTypeDeclarer(e.pos(), p.get());
+        }
         var f = context.findFunc(s);
         if (f.has())
             return new FuncTypeDeclarer(e.pos(),
@@ -282,8 +284,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             return new PrimitiveTypeDeclarer(e.pos(), pd.primitive());
 
         return new DefinedTypeDeclarer(e.pos(),
-                new DefinedType(e.pos(), new Symbol(e.pos(),
-                        Optional.empty(), t.get().name()),
+                new DefinedType(e.pos(), t.get().symbol(),
                         TypeArguments.EMPTY), Optional.empty());
     }
 

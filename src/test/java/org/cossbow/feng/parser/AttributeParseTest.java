@@ -8,7 +8,6 @@ import org.cossbow.feng.ast.expr.ArrayExpression;
 import org.cossbow.feng.ast.expr.ObjectExpression;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
-import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.proc.VariableParameterSet;
 import org.cossbow.feng.ast.stmt.DeclarationStatement;
 import org.cossbow.feng.ast.stmt.TryStatement;
@@ -44,10 +43,10 @@ public class AttributeParseTest extends BaseParseTest {
 
     @Test
     public void testDefine() {
-        var name = randTypeName(16);
+        var name = randTypeSymbol(16);
         var code = "attribute %s {}".formatted(name);
         var def = (AttributeDefinition) doParseType(code, name);
-        Assertions.assertEquals(name, def.name());
+        Assertions.assertEquals(name, def.symbol());
         Assertions.assertTrue(def.fields().isEmpty());
     }
 
@@ -111,7 +110,8 @@ public class AttributeParseTest extends BaseParseTest {
     }
 
     private IdentifierTable<Attribute> atDefine(String code) {
-        var def = doParseFirstDef(code);
+        var src = doParseFile(code);
+        var def = firstDef(src);
         return def.modifier().attributes();
     }
 
@@ -156,7 +156,7 @@ public class AttributeParseTest extends BaseParseTest {
     private IdentifierTable<Attribute> atClassMethod(CharSequence attr) {
         var code = "class A{%s func get(){}}".formatted(attr);
         var def = (ClassDefinition) doParseType(code, "A");
-        return def.methods().get(identifier("get")).modifier().attributes();
+        return def.methods().get(identifier("get")).func().modifier().attributes();
     }
 
     private IdentifierTable<Attribute> atInterfaceMethod(CharSequence attr) {

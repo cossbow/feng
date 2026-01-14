@@ -11,8 +11,7 @@ import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
-public class ClassField extends Field
-        implements Exportable {
+public class ClassField extends Field implements Exportable {
     private Modifier modifier;
     private boolean export;
     private Declare declare;
