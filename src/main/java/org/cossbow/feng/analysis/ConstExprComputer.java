@@ -15,11 +15,11 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.function.BiFunction;
 
-public class ConstExprCalc implements EntityVisitor<Expression> {
+public class ConstExprComputer implements EntityVisitor<Expression> {
 
     private final SymbolContext context;
 
-    public ConstExprCalc(SymbolContext context) {
+    public ConstExprComputer(SymbolContext context) {
         this.context = context;
     }
 
@@ -51,14 +51,6 @@ public class ConstExprCalc implements EntityVisitor<Expression> {
         }
 
         return new BinaryExpression(e.pos(), op, le, re);
-    }
-
-    private List<Expression> visit(List<Expression> origin) {
-        var result = new ArrayList<Expression>(origin.size());
-        for (Expression el : origin) {
-            result.add(visit(el));
-        }
-        return result;
     }
 
     @Override
@@ -214,7 +206,7 @@ public class ConstExprCalc implements EntityVisitor<Expression> {
             Map.entry(BinaryOperator.MUL, BigInteger::multiply),
             Map.entry(BinaryOperator.DIV, BigInteger::divide),
             Map.entry(BinaryOperator.MOD, BigInteger::mod),
-            Map.entry(BinaryOperator.POW, ConstExprCalc::pow));
+            Map.entry(BinaryOperator.POW, ConstExprComputer::pow));
     static final Map<BinaryOperator, BiFunction<BigInteger, BigInteger, BigInteger>>
             intgerBit = Map.ofEntries(
             Map.entry(BinaryOperator.BITAND, BigInteger::and),
@@ -295,7 +287,7 @@ public class ConstExprCalc implements EntityVisitor<Expression> {
             Map.entry(BinaryOperator.MUL, BigDecimal::multiply),
             Map.entry(BinaryOperator.DIV, BigDecimal::divide),
             Map.entry(BinaryOperator.MOD, BigDecimal::remainder),
-            Map.entry(BinaryOperator.POW, ConstExprCalc::pow));
+            Map.entry(BinaryOperator.POW, ConstExprComputer::pow));
 
     static final Map<BinaryOperator, BiFunction<BigDecimal, BigDecimal, Boolean>>
             floatRel = Map.ofEntries(

@@ -31,4 +31,7 @@ public class CurrentExpression extends PrimaryExpression {
         return isSelf;
     }
 
+    public String name() {
+        return isSelf ? "this" : "super";
+    }
 }

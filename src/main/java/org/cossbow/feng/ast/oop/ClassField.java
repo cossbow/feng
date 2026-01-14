@@ -44,8 +44,7 @@ public class ClassField extends Field
 
     public Variable variable() {
         return new Variable(pos(), modifier, declare,
-                name(), Lazy.of(type()),
-                Optional.of(this));
+                name(), Lazy.of(type()));
     }
 
 }

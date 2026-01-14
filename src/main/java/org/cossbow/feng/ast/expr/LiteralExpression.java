@@ -14,4 +14,10 @@ public class LiteralExpression extends PrimaryExpression {
     public Literal literal() {
         return literal;
     }
+
+    @Override
+    public String toString() {
+        return literal.toString();
+    }
+
 }

@@ -319,11 +319,13 @@ final class SourceParseVisitor
         var dt = (DefinedType) visit(ctx.definedType());
         if (dt.symbol().module().none()) {
             var name = dt.symbol().name().value();
-            if (dt.generic().isEmpty()) {
-                var pri = Primitive.ofCode(name);
-                if (pri.has())
-                    return new PrimitiveTypeDeclarer(posOf(ctx), pri.get());
+            var pri = Primitive.ofCode(name);
+            if (pri.has()) {
+                if (!dt.generic().isEmpty())
+                    return ErrorUtil.semantic("primitive with generic");
+                return new PrimitiveTypeDeclarer(posOf(ctx), pri.get());
             }
+
             var mt = MemTypeDeclarer.TYPES.get(name);
             if (mt != null) {
                 var args = dt.generic().arguments();
@@ -445,6 +447,7 @@ final class SourceParseVisitor
                 ctx.attributeMember(), AttributeField::name);
         var def = new AttributeDefinition(posOf(ctx), modifier, name, fields);
         gst.namedTypes.add(name, def);
+        ErrorUtil.unsupported(TypeDomain.ATTRIBUTE.name);
         return def;
     }
 
@@ -745,10 +748,37 @@ final class SourceParseVisitor
         return new LiteralExpression(posOf(ctx), literal);
     }
 
+    private NewType parseNewType(NewDefinedType type) {
+        var dt = type.type();
+        if (!dt.symbol().module().none())
+            return type;
+
+        var name = dt.symbol().name().value();
+        var pri = Primitive.ofCode(name);
+        if (pri.has())
+            return ErrorUtil.semantic("can't new primitive");
+
+        var mt = MemTypeDeclarer.TYPES.get(name);
+        if (mt == null) return type;
+        if (mt) return ErrorUtil.semantic("can't new rom");
+
+        var args = dt.generic().arguments();
+        if (args.size() > 1)
+            ErrorUtil.semantic("at most, %s can only map one type", name);
+
+        var mapped = !args.isEmpty() ? args.getFirst() : null;
+        return new NewMemType(type.pos(), Optional.of(mapped));
+    }
+
     @Override
     public Entity visitNewExpression(FengParser.NewExpressionContext ctx) {
         var new_ = ctx.new_();
         var type = (NewType) visit(new_.newType());
+        type = switch (type) {
+            case NewDefinedType dt -> parseNewType(dt);
+            case NewArrayType at -> at;
+            case null, default -> ErrorUtil.unreachable();
+        };
         var init = this.<Expression>visitOptional(new_.expression());
         return new NewExpression(posOf(ctx), type, init);
     }

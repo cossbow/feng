@@ -64,7 +64,7 @@ public class ConstChecker implements EntityVisitor<Boolean> {
 
     @Override
     public Boolean visit(CurrentExpression e) {
-        return true;
+        return false;
     }
 
     @Override

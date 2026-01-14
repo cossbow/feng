@@ -25,6 +25,11 @@ public class VariableParameterSet extends ParameterSet {
     }
 
     @Override
+    public TypeDeclarer getType(int i) {
+        return variables.getValue(i).type().must();
+    }
+
+    @Override
     public int size() {
         return variables.size();
     }

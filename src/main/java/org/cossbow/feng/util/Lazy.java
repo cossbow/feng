@@ -1,6 +1,7 @@
 package org.cossbow.feng.util;
 
 import java.util.NoSuchElementException;
+import java.util.function.Predicate;
 
 public class Lazy<T> {
     private T value;
@@ -21,6 +22,10 @@ public class Lazy<T> {
         return new Lazy<>(null);
     }
 
+    public T get() {
+        return value;
+    }
+
     public T must() {
         if (value == null) {
             throw new NoSuchElementException("No value present");
@@ -38,6 +43,10 @@ public class Lazy<T> {
 
     public boolean has() {
         return value != null;
+    }
+
+    public boolean match(Predicate<T> matcher) {
+        return has() && matcher.test(value);
     }
 
 }

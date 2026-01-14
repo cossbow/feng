@@ -27,7 +27,7 @@ public class MemTypeDeclarer extends TypeDeclarer
 
     @Override
     public Optional<Refer> refer() {
-        return Optional.empty();
+        return refer;
     }
 
     public Optional<TypeDeclarer> mapped() {

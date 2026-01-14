@@ -22,4 +22,9 @@ public class BoolLiteral extends Literal {
     public String type() {
         return "bool";
     }
+
+    @Override
+    public String toString() {
+        return Boolean.toString(value);
+    }
 }

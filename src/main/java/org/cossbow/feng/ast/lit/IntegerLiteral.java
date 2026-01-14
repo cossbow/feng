@@ -29,4 +29,8 @@ public class IntegerLiteral extends Literal {
         return "integer";
     }
 
+    @Override
+    public String toString() {
+        return value.toString(radix);
+    }
 }

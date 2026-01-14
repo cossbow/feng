@@ -20,7 +20,7 @@ public class UnnamedParameterSet extends ParameterSet {
         return types.size();
     }
 
-    public TypeDeclarer get(int index) {
+    public TypeDeclarer getType(int index) {
         return types.get(index);
     }
 

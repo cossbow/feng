@@ -21,4 +21,8 @@ public class FloatLiteral extends Literal {
         return "float";
     }
 
+    @Override
+    public String toString() {
+        return value.toPlainString();
+    }
 }

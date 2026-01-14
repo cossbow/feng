@@ -4,37 +4,24 @@ import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.oop.ClassField;
 import org.cossbow.feng.util.Lazy;
-import org.cossbow.feng.util.Optional;
 
 public class Variable extends Entity {
     private Modifier modifier;
     private Declare declare;
     private Identifier name;
     private Lazy<TypeDeclarer> type;
-    private Optional<ClassField> context;
-
-    public Variable(Position pos,
-                    Modifier modifier,
-                    Declare declare,
-                    Identifier name,
-                    Lazy<TypeDeclarer> type,
-                    Optional<ClassField> context) {
-        super(pos);
-        this.modifier = modifier;
-        this.declare = declare;
-        this.name = name;
-        this.type = type;
-        this.context = context;
-    }
 
     public Variable(Position pos,
                     Modifier modifier,
                     Declare declare,
                     Identifier name,
                     Lazy<TypeDeclarer> type) {
-        this(pos, modifier, declare, name, type, Optional.empty());
+        super(pos);
+        this.modifier = modifier;
+        this.declare = declare;
+        this.name = name;
+        this.type = type;
     }
 
     public Variable(Position pos,
@@ -60,7 +47,4 @@ public class Variable extends Entity {
         return type;
     }
 
-    public Optional<ClassField> context() {
-        return context;
-    }
 }

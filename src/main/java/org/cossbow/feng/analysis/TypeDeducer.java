@@ -38,28 +38,24 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         this.context = context;
     }
 
-    boolean isPrimitive(TypeDeclarer td) {
+    public boolean isPrimitive(TypeDeclarer td) {
         return td instanceof PrimitiveTypeDeclarer;
     }
 
-    boolean isBool(TypeDeclarer td) {
+    public boolean isBool(TypeDeclarer td) {
         return td instanceof PrimitiveTypeDeclarer ptd
                 && ptd.primitive() == Primitive.BOOL;
     }
 
-    boolean isNumber(TypeDeclarer td) {
+    public boolean isNumber(TypeDeclarer td) {
         return td instanceof PrimitiveTypeDeclarer ptd
                 && ptd.primitive() != Primitive.BOOL;
     }
 
-    boolean isInteger(TypeDeclarer td) {
+    public boolean isInteger(TypeDeclarer td) {
         return td instanceof PrimitiveTypeDeclarer ptd
                 && ptd.primitive() != Primitive.BOOL
                 && ptd.primitive().integer;
-    }
-
-    public List<TypeDeclarer> visit(List<Expression> args) {
-        return args.stream().map(this::visit).toList();
     }
 
     @Override
@@ -121,8 +117,8 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                 new IntegerLiteral(e.pos(),
                         BigInteger.valueOf(e.elements().size()),
                         10));
-        return new ArrayTypeDeclarer(e.pos(),
-                td, Optional.of(le), Optional.empty());
+        return new ArrayTypeDeclarer(e.pos(), td,
+                Optional.of(le), Optional.empty(), true);
     }
 
     @Override
@@ -224,16 +220,32 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     }
 
     @Override
+    public TypeDeclarer visit(NewDefinedType dt) {
+        return new DefinedTypeDeclarer(dt.pos(),
+                dt.type(), Optional.of(new Refer(dt.pos(),
+                STRONG, false, false)));
+    }
+
+    @Override
+    public TypeDeclarer visit(NewArrayType dt) {
+        return new ArrayTypeDeclarer(dt.pos(),
+                dt.element(), Optional.empty(),
+                Optional.of(new Refer(dt.pos(), STRONG,
+                        true, dt.immutable())));
+    }
+
+    @Override
+    public TypeDeclarer visit(NewMemType e) {
+        return new MemTypeDeclarer(e.pos(),
+                false,
+                Optional.of(new Refer(e.pos(), STRONG,
+                        true, false)),
+                e.mapped());
+    }
+
+    @Override
     public TypeDeclarer visit(NewExpression e) {
-        return switch (e.type()) {
-            case NewDefinedType dt -> new DefinedTypeDeclarer(e.pos(),
-                    dt.type(), Optional.of(new Refer(e.pos(),
-                    STRONG, false, false)));
-            case NewArrayType dt -> new ArrayTypeDeclarer(e.pos(),
-                    dt.element(), Optional.empty(), Optional.of(
-                    new Refer(dt.pos(), STRONG, true, dt.immutable())));
-            case null, default -> unreachable();
-        };
+        return visit(e.type());
     }
 
     @Override

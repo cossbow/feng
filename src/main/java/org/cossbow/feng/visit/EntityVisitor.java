@@ -26,10 +26,21 @@ import org.cossbow.feng.ast.var.AssignableOperand;
 import org.cossbow.feng.ast.var.FieldAssignableOperand;
 import org.cossbow.feng.ast.var.IndexAssignableOperand;
 import org.cossbow.feng.ast.var.VariableAssignableOperand;
+import org.cossbow.feng.util.Optional;
+
+import java.util.List;
 
 import static org.cossbow.feng.util.ErrorUtil.unreachable;
 
 public interface EntityVisitor<R> {
+
+	default <T extends Entity> Optional<R> visit(Optional<T> e) {
+		return e.map(this::visit);
+	}
+
+	default <T extends Entity> List<R> visit(List<T> e) {
+		return e.stream().map(this::visit).toList();
+	}
 
 	default R visit(Entity e) {
 		return switch (e) {
@@ -86,6 +97,7 @@ public interface EntityVisitor<R> {
 			case InterfaceDefinition ee -> visit(ee);
 			case PrototypeDefinition ee -> visit(ee);
 			case StructureDefinition ee -> visit(ee);
+			case PrimitiveDefinition ee -> visit(ee);
 			case null, default -> unreachable();
 		};
 	}
@@ -103,6 +115,8 @@ public interface EntityVisitor<R> {
 	default R visit(InterfaceMethod e) { return unreachable(); }
 
 	default R visit(StructureDefinition e) { return unreachable(); }
+
+	default R visit(PrimitiveDefinition e) { return unreachable(); }
 
 	default R visit(FunctionDefinition e) { return unreachable(); }
 
@@ -126,6 +140,7 @@ public interface EntityVisitor<R> {
 		return switch (e) {
 			case NewArrayType ee -> visit(ee);
 			case NewDefinedType ee -> visit(ee);
+			case NewMemType ee -> visit(ee);
 			case null, default -> unreachable();
 		};
 	}
@@ -133,6 +148,8 @@ public interface EntityVisitor<R> {
 	default R visit(NewArrayType e) { return unreachable(); }
 
 	default R visit(NewDefinedType e) { return unreachable(); }
+
+	default R visit(NewMemType e) { return unreachable(); }
 
 	default R visit(Refer e) { return unreachable(); }
 

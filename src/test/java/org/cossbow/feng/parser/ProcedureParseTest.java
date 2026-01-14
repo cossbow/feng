@@ -100,7 +100,8 @@ public class ProcedureParseTest extends BaseParseTest {
             var params = (UnnamedParameterSet) prototype.parameterSet();
             Assertions.assertEquals(expectTypes.size(), params.size());
             for (int i = 0; i < size; i++) {
-                Assertions.assertEquals(expectTypes.get(i), typeName(params.get(i)));
+                Assertions.assertEquals(expectTypes.get(i),
+                        typeName(params.getType(i)));
             }
         }
     }

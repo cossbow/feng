@@ -3,12 +3,18 @@ package org.cossbow.feng.ast.proc;
 
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 public class ParameterSet {
 
     public List<TypeDeclarer> types() {
         return List.of();
+    }
+
+    public TypeDeclarer getType(int i) {
+        throw new NoSuchElementException();
     }
 
     public int size() {
@@ -17,5 +23,21 @@ public class ParameterSet {
 
     public boolean isEmpty() {
         return size() == 0;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof ParameterSet ps))
+            return false;
+
+        var size = size();
+        if (size != ps.size())
+            return false;
+
+        for (int i = 0; i < size; i++)
+            if (!getType(i).equals(ps.getType(i)))
+                return false;
+
+        return true;
     }
 }

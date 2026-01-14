@@ -11,4 +11,9 @@ public class NilLiteral extends Literal {
     public String type() {
         return "nil";
     }
+
+    @Override
+    public String toString() {
+        return "nil";
+    }
 }

@@ -9,6 +9,7 @@ import org.cossbow.feng.ast.proc.Procedure;
 
 public class ClassMethod extends FunctionDefinition {
     private boolean export;
+    private volatile boolean updater;
 
     public ClassMethod(Position pos,
                        Modifier modifier,
@@ -22,6 +23,14 @@ public class ClassMethod extends FunctionDefinition {
 
     public boolean export() {
         return export;
+    }
+
+    public boolean updater() {
+        return updater;
+    }
+
+    public void updater(boolean updater) {
+        this.updater = updater;
     }
 
 }
