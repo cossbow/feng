@@ -55,9 +55,16 @@ public class ClassDefinition extends TypeDefinition {
         return macros;
     }
 
+    public boolean same(ClassDefinition o) {
+        return symbol().equals(o.symbol());
+    }
+
     //
 
-    public static final ClassDefinition Object =
+    public static final Identifier ObjectName = new Identifier(Position.ZERO, "Object");
+    public static final Symbol ObjectSymbol = new Symbol(Position.ZERO, ObjectName);
+
+    public static final ClassDefinition ObjectClass =
             new ClassDefinition(Position.ZERO, Modifier.empty(),
                     new Symbol(Position.ZERO, new Identifier(
                             Position.ZERO, "Object")),

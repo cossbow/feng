@@ -625,7 +625,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
             if (op != UnaryOperator.INVERT)
                 return unreachable();
             write('!');
-        } else if (p.integer) {
+        } else if (p.isInteger()) {
             if (op == UnaryOperator.NEGATIVE)
                 write('-');
             else if (op == UnaryOperator.INVERT)

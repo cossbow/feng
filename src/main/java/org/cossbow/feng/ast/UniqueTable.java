@@ -6,10 +6,11 @@ import org.cossbow.feng.util.Optional;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class UniqueTable<K extends Entity, V> {
     private final HashMap<K, Node<K, V>> table;
-    private final ArrayList<Node<K, V>> nodes;
+    private final List<Node<K, V>> nodes;
 
     public UniqueTable() {
         table = new HashMap<>();
@@ -21,12 +22,23 @@ public class UniqueTable<K extends Entity, V> {
         nodes = new ArrayList<>(initCapacity);
     }
 
+    public UniqueTable(List<Node<K, V>> nodes) {
+        this.nodes = List.copyOf(nodes);
+        table = new HashMap<>();
+        for (Node<K, V> n : nodes)
+            addIndex(n);
+
+    }
+
+    private void addIndex(Node<K, V> node) {
+        var old = table.putIfAbsent(node.id, node);
+        if (old != null)
+            ErrorUtil.duplicate(node.id, old.id);
+    }
+
     public void add(K id, V value) {
         var node = new Node<>(id, value);
-        var old = table.putIfAbsent(id, node);
-        if (old != null) {
-            ErrorUtil.duplicate(id, old.id);
-        }
+        addIndex(node);
         nodes.add(node);
     }
 
@@ -80,10 +92,15 @@ public class UniqueTable<K extends Entity, V> {
             c.accept(n.value);
     }
 
+    public List<Node<K, V>> map(Function<V, V> f) {
+        return nodes.stream()
+                .map(n -> new Node<>(n.id, f.apply(n.value)))
+                .toList();
+    }
 
     //
 
-    record Node<K, T>(K id, T value) {
+    public record Node<K, V>(K id, V value) {
     }
 
     class PhantomList extends AbstractList<V> {

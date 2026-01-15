@@ -35,4 +35,9 @@ public class InterfaceDefinition extends TypeDefinition {
     public MacroTable macros() {
         return macros;
     }
+
+    public boolean same(InterfaceDefinition o) {
+        return symbol().equals(o.symbol());
+    }
+
 }

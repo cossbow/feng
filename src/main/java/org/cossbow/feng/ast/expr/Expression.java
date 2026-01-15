@@ -10,4 +10,7 @@ public class Expression extends Entity {
         super(pos);
     }
 
+    public boolean isFinal() {
+        return false;
+    }
 }

@@ -1,14 +1,13 @@
 package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.attr.AttributeDefinition;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.ast.lit.IntegerLiteral;
-import org.cossbow.feng.ast.mod.Global;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
@@ -22,9 +21,9 @@ import org.cossbow.feng.util.Stack;
 import org.cossbow.feng.visit.EntityVisitor;
 import org.cossbow.feng.visit.SymbolContext;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.cossbow.feng.util.ErrorUtil.*;
 
@@ -33,29 +32,63 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     private final StackedContext context;
     private final TypeDeducer typeDeducer;
     private final ConstChecker constChecker;
-    private final ConstExprComputer computer;
 
     public SemanticAnalysis(SymbolContext parent) {
         context = new StackedContext(parent);
         typeDeducer = new TypeDeducer(context);
         constChecker = new ConstChecker(context);
-        computer = new ConstExprComputer(context);
     }
 
     //
 
+    private Expression compute(Expression e) {
+        return new ConstExprComputer(context).visit(e);
+    }
+
+    private LiteralExpression computeConst(Expression e) {
+        var res = compute(e);
+        if (res instanceof LiteralExpression le)
+            return le;
+
+        return semantic("require const value: %s", e.pos());
+    }
 
     @Override
     public Entity visit(Source s) {
-        for (var ds : s.variables())
-            visit(ds);
-
         var tab = s.table();
+        for (var f : tab.variables.values()) {
+            visit(f);
+        }
         for (var t : tab.namedTypes.values()) visit(t);
         for (var t : tab.unnamedTypes.values()) visit(t);
         for (var f : tab.namedFunctions.values()) visit(f);
 
         return s;
+    }
+
+    @Override
+    public Entity visit(GlobalVariable gv) {
+        if (gv.init().none()) {
+            if (gv.declare() == Declare.CONST) {
+                return semantic("const must init: %s", gv.pos());
+            }
+            // TODO: 值默认值
+            return gv;
+        }
+
+        var et = typeDeducer.visit(gv.init().get());
+        gv.type().set(et);
+
+        var e = compute(gv.init().get());
+        if (!e.isFinal()) {
+            return semantic("require final value: %s%s",
+                    gv.name(), gv.pos());
+        }
+        gv.init().set(e);
+
+        visit((Variable) gv);
+        visit(gv.init().must());
+        return gv;
     }
 
     @Override
@@ -76,15 +109,15 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(TypeArguments ta) {
-        if (!ta.isEmpty()) unsupported("generic");
-        return ta;
+        if (ta.isEmpty()) return ta;
+        return unsupported("generic");
     }
 
     @Override
     public TypeDefinition visit(DefinedType dt) {
         var type = context.findType(dt.symbol());
         if (type.none())
-            return semantic("%s not define", dt.symbol());
+            return semantic("%s not defined", dt.symbol());
         if (!type.get().generic().isEmpty())
             return unsupported("generic");
         if (!dt.generic().isEmpty())
@@ -201,11 +234,84 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return def;
     }
 
+    private void structFieldType(TypeDeclarer td) {
+        if (td instanceof PrimitiveTypeDeclarer ptd) {
+            if (ptd.primitive().isBool()) {
+                semantic("require integer or float: %s", ptd.pos());
+            }
+            return;
+        }
+
+        if (td instanceof DefinedTypeDeclarer dtd) {
+            if (dtd.refer().has()) {
+                semantic("can't be reference");
+                return;
+            }
+            if (!dtd.definedType().generic().isEmpty()) {
+                unsupported("generic");
+                return;
+            }
+            var def = context.findType(dtd.definedType().symbol());
+            if (def.none()) {
+                semantic("not define: %s", dtd.definedType().pos());
+                return;
+            }
+            if (def.get() instanceof StructureDefinition)
+                return;
+
+            semantic("require structure type: %s", dtd.definedType().pos());
+            return;
+        }
+
+        if (td instanceof ArrayTypeDeclarer atd) {
+            if (atd.refer().has()) {
+                semantic("can't be reference");
+                return;
+            }
+            var len = computeConst(atd.length().must());
+            var i = len.asInteger();
+            if (i.none()) {
+                semantic("require integer");
+                return;
+            }
+            if (i.get().value().compareTo(BigInteger.ZERO) < 0) {
+                semantic("can't be negative: %s", atd.length().get().pos());
+            }
+            structFieldType(atd.element());
+            return;
+        }
+
+        semantic("illegal type: %s%s", td, td.pos());
+    }
+
+    private void structBitfield(Expression bf) {
+        var bv = compute(bf);
+        if (!(bv instanceof LiteralExpression le)) {
+            semantic("require const value: %s", bf.pos());
+            return;
+        }
+
+        var il = le.asInteger();
+        if (!il.has()) {
+            semantic("require integer: %s", bf.pos());
+            return;
+        }
+
+        var v = il.get().value().intValue();
+        if (0 < v && v <= 64)
+            return;
+
+        semantic("bitfield must >0 and <=64 ");
+    }
+
     @Override
     public Entity visit(StructureField sf) {
         visit(sf.type());
-        sf.bitfield().use(this::visit);
-        // const expression
+        structFieldType(sf.type());
+
+        if (sf.bitfield().has())
+            structBitfield(sf.bitfield().get());
+
         return sf;
     }
 
@@ -416,31 +522,86 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return false;
         if (l.refer().has() && r.refer().has())
             return true;
-        var ls = computer.visit(l.length().must());
-        var rs = computer.visit(r.length().must());
+        var ls = compute(l.length().must());
+        var rs = compute(r.length().must());
         if (ls instanceof LiteralExpression le &&
                 rs instanceof LiteralExpression re) {
-            var ll = le.literal();
-            var rl = re.literal();
-            if (ll instanceof IntegerLiteral li &&
-                    rl instanceof IntegerLiteral ri) {
+            var ll = le.asInteger();
+            var rl = re.asInteger();
+            if (ll.has() && rl.has()) {
                 return r.literal() ?
-                        li.value().compareTo(ri.value()) >= 0
-                        : li.value().equals(ri.value());
+                        ll.get().compareTo(rl.get()) >= 0
+                        : ll.equals(rl);
             }
         }
         return false;
     }
 
     private boolean referable(ClassDefinition l, ClassDefinition r) {
+        visit(l.generic());
+        visit(r.generic());
+
+        if (r.same(l)) return true;
+        if (r.parent().none()) return false;
+
+        var pt = context.findType(r.parent().get().symbol());
+        assert pt.has();
+        if (pt.get() instanceof ClassDefinition pc)
+            return referable(l, pc);
+
         return false;
     }
 
     private boolean referable(InterfaceDefinition l, ClassDefinition r) {
+        visit(l.generic());
+        visit(r.generic());
+
+        if (r.impl().exists(l.symbol())) return true;
+
+        for (var dt : r.impl().values()) {
+            visit(dt.generic());
+            var def = context.findType(dt.symbol());
+            assert def.has();
+            if (def.get() instanceof InterfaceDefinition id)
+                if (referable(l, id)) return true;
+        }
+
         return false;
     }
 
     private boolean referable(InterfaceDefinition l, InterfaceDefinition r) {
+        visit(l.generic());
+        visit(r.generic());
+
+        if (l.same(r)) return true;
+
+        for (var dt : r.parts().values()) {
+            visit(dt.generic());
+            var def = context.findType(dt.symbol());
+            assert def.has();
+            if (def.get() instanceof InterfaceDefinition id)
+                if (referable(l, id)) return true;
+        }
+
+        return false;
+    }
+
+    private boolean referable(TypeDefinition l, TypeDefinition r) {
+        if (l instanceof ClassDefinition lc) {
+            if (r instanceof ClassDefinition rc)
+                return referable(lc, rc);
+            return false;
+        }
+
+        if (l instanceof InterfaceDefinition li) {
+            if (r instanceof ClassDefinition rc) {
+                return referable(li, rc);
+            }
+            if (r instanceof InterfaceDefinition ri) {
+                return referable(li, ri);
+            }
+        }
+
         return false;
     }
 
@@ -454,12 +615,23 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         var lt = context.findType(l.definedType().symbol()).must();
         var rt = context.findType(r.definedType().symbol()).must();
-        if (lt.domain() == rt.domain()) return true;    // 相同类型
-        if (l.refer().none()) {
-            return lt.equals(rt);
+        if (l.refer().none())
+            return lt.equals(rt);   // 变量为值类型就要求全相同
+
+        if (r.refer().none()) {
+            // 引用一个值类型
+            return unsupported("refer a value: %s", r.pos());
         }
 
-        // TODO: 这里比较复杂！
+        var lr = l.refer().get();
+        var rr = r.refer().get();
+        if (lr.kind() == ReferKind.STRONG) {
+            if (rr.kind() == ReferKind.STRONG) {
+                return referable(lt, rt);
+            }
+        }
+
+        // TODO: 这里很复杂！
 
         return l.definedType().equals(r.definedType());
     }
@@ -676,8 +848,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         var it = typeDeducer.visit(io.index());
         if (it instanceof PrimitiveTypeDeclarer ptd) {
-            if (ptd.primitive().integer ||
-                    ptd.primitive() == Primitive.BOOL) {
+            if (ptd.primitive().isInteger()) {
                 return atd.element();
             }
         }
@@ -713,7 +884,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         var var = v.get();
         if (var.declare() == Declare.CONST)
-            return semantic("%s is constant", s);
+            return semantic("%s is const operand", s);
 
         visit(var);
         return var.type().must();
@@ -753,18 +924,26 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(BinaryExpression e) {
-        return EntityVisitor.super.visit(e);
+        visit(e.left());
+        visit(e.right());
+        return typeDeducer.visit(e);
     }
 
     @Override
-    public Entity visit(ArrayExpression e) {
-        visit(e.elements());
-        return e;
+    public Entity visit(UnaryExpression e) {
+        visit(e.operand());
+        return typeDeducer.visit(e);
     }
 
     @Override
     public Entity visit(AssertExpression e) {
-        return EntityVisitor.super.visit(e);
+        visit(e.subject());
+        visit(e.type());
+        var type = typeDeducer.visit(e.subject());
+        if (assignable(e.type(), type))
+            return e;
+
+        return semantic("unassignable: %s", e.pos());
     }
 
     @Override
@@ -810,9 +989,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(CurrentExpression e) {
-        if (enterMethod == null)
-            return semantic("%s only enable in method", e.name());
-        return e;
+        if (enterMethod != null)
+            return e;
+        return semantic("use %s outof method", e.name());
     }
 
     @Override
@@ -888,18 +1067,37 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     @Override
-    public Entity visit(ObjectExpression e) {
-        return EntityVisitor.super.visit(e);
+    public Entity visit(ArrayExpression ae) {
+        visit(ae.elements());
+        TypeDeclarer first = null;
+        for (var el : ae.elements()) {
+            var t = typeDeducer.visit(el);
+            if (first == null) {
+                first = t;
+                continue;
+            }
+            if (!assignable(first, t))
+                return semantic("array type mismatch: %s",
+                        el.pos());
+        }
+        return ae;
+    }
+
+    @Override
+    public Entity visit(ObjectExpression obj) {
+        for (var e : obj.entries().values())
+            visit(e);
+        return obj;
     }
 
     @Override
     public Entity visit(PairsExpression e) {
-        return EntityVisitor.super.visit(e);
+        return unsupported("pairs");
     }
 
     @Override
     public Entity visit(ParenExpression e) {
-        return EntityVisitor.super.visit(e);
+        return visit(e.child());
     }
 
     @Override
@@ -919,8 +1117,11 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("undefined symbol: %s", e.symbol());
     }
 
+    // attribute
+
+
     @Override
-    public Entity visit(UnaryExpression e) {
-        return EntityVisitor.super.visit(e);
+    public Entity visit(AttributeDefinition ad) {
+        return ad;
     }
 }

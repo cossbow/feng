@@ -16,4 +16,8 @@ public class ObjectExpression extends PrimaryExpression {
         return entries;
     }
 
+    @Override
+    public boolean isFinal() {
+        return entries.values().stream().allMatch(Expression::isFinal);
+    }
 }

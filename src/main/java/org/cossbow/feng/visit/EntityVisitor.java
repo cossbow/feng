@@ -34,9 +34,10 @@ import static org.cossbow.feng.util.ErrorUtil.unreachable;
 
 public interface EntityVisitor<R> {
 
-	default <T extends Entity> Optional<R> visit(Optional<T> e) {
-		return e.map(this::visit);
-	}
+    default <T extends Entity> Optional<R> visit(Optional<T> e) {
+        if (e.none()) return Optional.empty();
+        return Optional.of(visit(e.get()));
+    }
 
 	default <T extends Entity> List<R> visit(List<T> e) {
 		return e.stream().map(this::visit).toList();
@@ -182,6 +183,8 @@ public interface EntityVisitor<R> {
 	default R visit(TupleTypeDeclarer e) { return unreachable(); }
 
 	default R visit(VoidTypeDeclarer e) { return unreachable(); }
+
+	default R visit(GlobalVariable e) { return unreachable(); }
 
 	default R visit(Variable e) { return unreachable(); }
 

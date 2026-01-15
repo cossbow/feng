@@ -54,8 +54,12 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
     }
 
     @Override
-    public Expression visit(ArrayExpression e) {
-        return new ArrayExpression(e.pos(), visit(e.elements()));
+    public Expression visit(ArrayExpression ae) {
+        var res = ae.elements().stream()
+                .map(this::visit).toList();
+        if (!res.stream().allMatch(Expression::isFinal))
+            return ae;
+        return new ArrayExpression(ae.pos(), res);
     }
 
     @Override
@@ -91,23 +95,24 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
 
     @Override
     public Expression visit(MemberOfExpression e) {
+        if (!e.generic().isEmpty())
+            return ErrorUtil.unsupported("generic");
+
+        var v = visit(e.subject());
         return e;
     }
 
     @Override
     public Expression visit(NewExpression e) {
-        var init = e.init().map(this::visit);
+        var init = visit(e.init());
         return new NewExpression(e.pos(), e.type(), init);
     }
 
     @Override
     public Expression visit(ObjectExpression e) {
-        var entries = new IdentifierTable<Expression>();
-        for (int i = 0; i < e.entries().size(); i++) {
-            var v = visit(e.entries().getValue(i));
-            entries.add(e.entries().getKey(i), v);
-        }
-        return new ObjectExpression(e.pos(), entries);
+        var res = e.entries().map(this::visit);
+        return new ObjectExpression(e.pos(),
+                new IdentifierTable<>(res));
     }
 
     @Override

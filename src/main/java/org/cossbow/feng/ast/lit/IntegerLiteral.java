@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Position;
 
 import java.math.BigInteger;
 
-public class IntegerLiteral extends Literal {
+public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral> {
     private final BigInteger value;
     private final int radix;
 
@@ -22,6 +22,11 @@ public class IntegerLiteral extends Literal {
 
     public int radix() {
         return radix;
+    }
+
+    @Override
+    public int compareTo(IntegerLiteral o) {
+        return value.compareTo(o.value);
     }
 
     @Override

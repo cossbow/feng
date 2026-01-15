@@ -3,8 +3,6 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 
-import java.util.Map;
-
 public class MemTypeDeclarer extends TypeDeclarer
         implements Referable {
     private boolean readonly;
@@ -42,8 +40,4 @@ public class MemTypeDeclarer extends TypeDeclarer
         return false;
     }
 
-    public static final Map<String, Boolean> TYPES = Map.of(
-            "ram", false,
-            "rom", true
-    );
 }

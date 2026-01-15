@@ -76,7 +76,7 @@ public class GenericParseTest extends BaseParseTest {
     public void testTypeConstraint2() {
         for (var fmt : simpleGlobalDefineFmt) {
             for (var d : TypeDomain.values()) {
-                if (d == TypeDomain.PRIMITIVE) continue;
+                if (!d.derived) continue;
                 var type = randTypeName(2);
                 var code = fmt.formatted(type + " " + d.name);
                 var param = doParseFirstDef(code)

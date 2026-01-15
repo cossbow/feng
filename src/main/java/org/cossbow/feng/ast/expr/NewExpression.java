@@ -23,4 +23,9 @@ public class NewExpression extends PrimaryExpression {
     public Optional<Expression> init() {
         return init;
     }
+
+    @Override
+    public boolean isFinal() {
+        return true;
+    }
 }

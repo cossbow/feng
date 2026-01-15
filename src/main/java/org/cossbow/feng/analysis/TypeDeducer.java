@@ -41,18 +41,17 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     public boolean isBool(TypeDeclarer td) {
         return td instanceof PrimitiveTypeDeclarer ptd
-                && ptd.primitive() == Primitive.BOOL;
+                && ptd.primitive().isBool();
     }
 
     public boolean isNumber(TypeDeclarer td) {
         return td instanceof PrimitiveTypeDeclarer ptd
-                && ptd.primitive() != Primitive.BOOL;
+                && !ptd.primitive().isBool();
     }
 
     public boolean isInteger(TypeDeclarer td) {
         return td instanceof PrimitiveTypeDeclarer ptd
-                && ptd.primitive() != Primitive.BOOL
-                && ptd.primitive().integer;
+                && ptd.primitive().isInteger();
     }
 
     @Override
@@ -61,23 +60,47 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         var rt = visit(e.right());
         if (!lt.equals(rt)) return semantic(
                 "type of tow operands must same: %s", e.pos());
+        if (!(lt instanceof PrimitiveTypeDeclarer lpt &&
+                rt instanceof PrimitiveTypeDeclarer rpt))
+            return unsupported("binary-operation: %s", e.pos());
 
+        Primitive lp = lpt.primitive(), rp = rpt.primitive();
         switch (e.operator()) {
-            case POW, MUL, DIV, MOD, ADD, SUB, GT, LT, LE, GE -> {
-                if (isNumber(lt) && isNumber(rt)) return lt;
+            case POW, MUL, DIV, MOD, ADD, SUB -> {
+                if (!lp.isBool() && !rp.isBool()) return lt;
             }
             case LSHIFT, RSHIFT, BITAND, BITXOR, BITOR -> {
-                if (isInteger(lt) && isInteger(rt)) return lt;
+                if (lp.isInteger() && rp.isInteger()) return lt;
+                if (lp.isBool() && rp.isBool()) return lt;
+            }
+            case GT, LT, LE, GE -> {
+                if (!lp.isBool() && !rp.isBool())
+                    return Primitive.BOOL.declarer(lt.pos());
             }
             case EQ, NE -> {
-                if (isPrimitive(lt) && isPrimitive(rt)) return lt;
+                return Primitive.BOOL.declarer(lt.pos());
             }
             case AND, OR -> {
-                if (isBool(lt) && isBool(rt)) return lt;
+                if (lp.isBool() && rp.isBool()) return lt;
             }
         }
-        return unsupported("binary-operation: %s %s %s",
+        return semantic("binary-operation: %s %s %s",
                 lt, e.operator(), rt);
+    }
+
+    @Override
+    public TypeDeclarer visit(UnaryExpression e) {
+        var t = visit(e.operand());
+        switch (e.operator()) {
+            case INVERT -> {
+                if (isInteger(t) || isBool(t)) return t;
+            }
+            case POSITIVE, NEGATIVE -> {
+                if (isNumber(t)) return t;
+            }
+        }
+        return unsupported("unary-operation: %s %s",
+                e.operator(), t);
     }
 
     @Override
@@ -90,21 +113,6 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             dt = type.parent().must();
         }
         return new DefinedTypeDeclarer(e.pos(), dt, Optional.empty());
-    }
-
-    @Override
-    public TypeDeclarer visit(UnaryExpression e) {
-        var t = visit(e.operand());
-        switch (e.operator()) {
-            case INVERT -> {
-                if (isInteger(t) && isBool(t)) return t;
-            }
-            case POSITIVE, NEGATIVE -> {
-                if (isNumber(t)) return t;
-            }
-        }
-        return unsupported("unary-operation: %s %s %s",
-                e.operator(), t);
     }
 
     @Override
@@ -151,12 +159,9 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     @Override
     public TypeDeclarer visit(LiteralExpression e) {
         return switch (e.literal()) {
-            case IntegerLiteral ee -> new PrimitiveTypeDeclarer(ee.pos(),
-                    Primitive.INT);
-            case FloatLiteral ee -> new PrimitiveTypeDeclarer(ee.pos(),
-                    Primitive.FLOAT);
-            case BoolLiteral ee -> new PrimitiveTypeDeclarer(ee.pos(),
-                    Primitive.BOOL);
+            case IntegerLiteral ee -> Primitive.INT.declarer(ee.pos());
+            case FloatLiteral ee -> Primitive.FLOAT.declarer(ee.pos());
+            case BoolLiteral ee -> Primitive.BOOL.declarer(ee.pos());
             case StringLiteral ee -> new MemTypeDeclarer(ee.pos(),
                     true, Optional.empty(), Optional.empty());
             case null, default -> semantic(
@@ -252,7 +257,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     @Override
     public TypeDeclarer visit(PairsExpression e) {
-        return null;
+        return unsupported("pairs");
     }
 
     @Override
@@ -266,7 +271,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (s.module().none()) {
             var p = Primitive.ofCode(s.name().value());
             if (p.has())
-                return new PrimitiveTypeDeclarer(e.pos(), p.get());
+                return p.get().declarer(e.pos());
         }
         var f = context.findFunc(s);
         if (f.has())
@@ -281,7 +286,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             return semantic("unknown symbol '%s' ?", s);
 
         if (t.get() instanceof PrimitiveDefinition pd)
-            return new PrimitiveTypeDeclarer(e.pos(), pd.primitive());
+            return pd.primitive().declarer(e.pos());
 
         return new DefinedTypeDeclarer(e.pos(),
                 new DefinedType(e.pos(), t.get().symbol(),

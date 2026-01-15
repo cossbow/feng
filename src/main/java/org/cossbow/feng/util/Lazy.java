@@ -4,22 +4,10 @@ import java.util.NoSuchElementException;
 import java.util.function.Predicate;
 
 public class Lazy<T> {
-    private T value;
+    private volatile T value;
 
     private Lazy(T value) {
         this.value = value;
-    }
-
-    public static <T> Lazy<T> of(T v) {
-        return new Lazy<>(v);
-    }
-
-    public static <T> Lazy<T> of(Optional<T> o) {
-        return new Lazy<>(o.get());
-    }
-
-    public static <T> Lazy<T> nil() {
-        return new Lazy<>(null);
     }
 
     public T get() {
@@ -47,6 +35,20 @@ public class Lazy<T> {
 
     public boolean match(Predicate<T> matcher) {
         return has() && matcher.test(value);
+    }
+
+    //
+
+    public static <T> Lazy<T> of(T v) {
+        return new Lazy<>(v);
+    }
+
+    public static <T> Lazy<T> of(Optional<T> o) {
+        return new Lazy<>(o.get());
+    }
+
+    public static <T> Lazy<T> nil() {
+        return new Lazy<>(null);
     }
 
 }

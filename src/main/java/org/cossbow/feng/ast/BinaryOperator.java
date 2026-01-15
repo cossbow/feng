@@ -3,25 +3,39 @@ package org.cossbow.feng.ast;
 public enum BinaryOperator {
 
     // arithmetic
-    POW,
-    MUL, DIV, MOD,
-    ADD, SUB,
+    POW(Kind.MATH),
+    MUL(Kind.MATH), DIV(Kind.MATH), MOD(Kind.MATH),
+    ADD(Kind.MATH), SUB(Kind.MATH),
 
     // bit
-    LSHIFT, RSHIFT,
-    BITAND,
-    BITXOR,
-    BITOR,
+    LSHIFT(Kind.BIT), RSHIFT(Kind.BIT),
+    BITAND(Kind.BIT),
+    BITXOR(Kind.BIT),
+    BITOR(Kind.BIT),
 
     // relation
-    EQ, NE,
-    GT, LT,
-    LE, GE,
+    EQ(Kind.REL), NE(Kind.REL),
+    GT(Kind.REL), LT(Kind.REL),
+    LE(Kind.REL), GE(Kind.REL),
 
     // bool
-    AND,
-    OR,
+    AND(Kind.BOOL),
+    OR(Kind.BOOL),
 
     ;
 
+    public final Kind kind;
+
+    BinaryOperator(Kind kind) {
+        this.kind = kind;
+    }
+
+    //
+
+    public enum Kind {
+        MATH,
+        BIT,
+        REL,
+        BOOL,
+    }
 }

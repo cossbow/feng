@@ -5,6 +5,7 @@ import java.util.Map;
 
 public enum TypeDomain {
     PRIMITIVE("primitive", false),
+    MEM("mem", false),
     STRUCT("struct", true),
     UNION("union", true),
     ENUM("enum", true),

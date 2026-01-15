@@ -16,4 +16,9 @@ public class ArrayExpression extends PrimaryExpression {
     public List<Expression> elements() {
         return elements;
     }
+
+    @Override
+    public boolean isFinal() {
+        return elements.stream().allMatch(Expression::isFinal);
+    }
 }

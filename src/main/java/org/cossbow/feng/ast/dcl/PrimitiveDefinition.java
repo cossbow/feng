@@ -13,7 +13,7 @@ final
 public class PrimitiveDefinition extends TypeDefinition {
     private final Primitive primitive;
 
-    public PrimitiveDefinition(Primitive primitive) {
+    private PrimitiveDefinition(Primitive primitive) {
         super(Position.ZERO, Modifier.empty(),
                 new Symbol(Position.ZERO,
                         new Identifier(Position.ZERO, primitive.code)),

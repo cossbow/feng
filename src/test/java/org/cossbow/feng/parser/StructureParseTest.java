@@ -3,9 +3,7 @@ package org.cossbow.feng.parser;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.TypeDomain;
-import org.cossbow.feng.ast.dcl.ArrayTypeDeclarer;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
-import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.struct.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -36,8 +34,16 @@ public class StructureParseTest extends BaseParseTest {
     }
 
     public static void checkTypeName(TypeDeclarer type, Symbol name) {
-        var dst = (DefinedTypeDeclarer) type;
-        Assertions.assertEquals(name, dst.definedType().symbol());
+        if (type instanceof PrimitiveTypeDeclarer pt) {
+            Assertions.assertSame(pt.primitive(),
+                    Primitive.ofCode(name.name().value()).get());
+            return;
+        }
+        if (type instanceof DefinedTypeDeclarer dt) {
+            Assertions.assertEquals(name, dt.definedType().symbol());
+            return;
+        }
+        Assertions.fail("invalid type: %s".formatted(type));
     }
 
     @Test
