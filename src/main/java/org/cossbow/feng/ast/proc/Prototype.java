@@ -5,7 +5,6 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 import java.util.List;
-import java.util.Objects;
 
 public class Prototype extends Entity {
     private ParameterSet parameterSet;
@@ -25,13 +24,6 @@ public class Prototype extends Entity {
 
     public List<TypeDeclarer> returnSet() {
         return returnSet;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (!(o instanceof Prototype p)) return false;
-        return parameterSet.types().equals(p.parameterSet.types())
-                && returnSet.equals(p.returnSet);
     }
 
 }

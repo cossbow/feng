@@ -7,8 +7,10 @@ import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
-public class UniqueTable<K extends Entity, V> {
+public class UniqueTable<K extends Entity, V> implements Iterable<V> {
     private final HashMap<K, Node<K, V>> table;
     private final List<Node<K, V>> nodes;
 
@@ -104,6 +106,15 @@ public class UniqueTable<K extends Entity, V> {
         return nodes.stream()
                 .map(n -> new Node<>(n.key, f.apply(n.value)))
                 .toList();
+    }
+
+    public Stream<V> stream() {
+        return StreamSupport.stream(spliterator(), false);
+    }
+
+    @Override
+    public Iterator<V> iterator() {
+        return values().iterator();
     }
 
     @Override

@@ -75,16 +75,6 @@ public class SemanticAnalysisTest {
 
     //
 
-    @Test
-    public void testClassInherit1() {
-        checkTrue("class B {} class A : B {}");
-    }
-
-    @Test
-    public void testClassInherit2() {
-        checkFalse("class A : B {}");
-    }
-
     List<TypeDomain> getDomains(TypeDomain exclude) {
         return Arrays.stream(TypeDomain.values())
                 .filter(d -> d.derived)
@@ -95,11 +85,49 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testClassInherit3() {
+    public void testClassInherit1() {
+        checkTrue("class B {} class A : B {}");
+        checkFalse("class A : B {}");
         for (var domain : getDomains(TypeDomain.CLASS))
             checkFalse(domain + " B {} class A : B {}");
         checkFalse("enum B {WAIT,} class A : B {}");
     }
+
+    @Test
+    public void testClassInherit2() {
+        checkTrue("class A{ var id int; } class B:A{ var cn int; }");
+        checkFalse("class A{ var id int; } class B:A{ var id int; }");
+        checkFalse("class A{ var id int; } class B:A{ var id float; }");
+    }
+
+    @Test
+    public void testClassInherit3() {
+        checkTrue("class A{ var id int; } class B:A{} func f(b *B) { b.id = 0; }");
+        checkTrue("class A{ func go() {} } class B:A{} func f(b *B) { b.go(); }");
+    }
+
+    @Test
+    public void testClassOverride1() {
+        var def = "class A{ func f() int { return 0; } } ";
+        checkTrue(def + "class B:A{ func f() int { return 0; } }");
+        checkFalse(def + "class B:A{ func f() int8 { return 0; } }");
+    }
+
+    @Test
+    public void testClassOverride2() {
+        var def = "class A{ func f() *A { return nil; } } ";
+        checkTrue(def + "class B:A{ func f() *A { return nil; } }");
+        checkTrue(def + "class B:A{ func f() *B { return nil; } }");
+        checkFalse(def + "class B:A{ func f() int { return 0; } }");
+    }
+
+    @Test
+    public void testClassOverride3() {
+        var def = "class A{ func f(s int) {} } ";
+        checkTrue(def + "class B:A{ func f(s int) {} }");
+        checkFalse(def + "class B:A{ func f(s int8) {} }");
+    }
+
 
     @Test
     public void testClassImpl1() {

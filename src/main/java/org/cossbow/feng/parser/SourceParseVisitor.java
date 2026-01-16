@@ -726,15 +726,19 @@ final class SourceParseVisitor
                         new Symbol(mName.pos(), mName), mGeneric, procedure);
                 var method = new ClassMethod(posOf(mi), mExport, mName, func);
                 methods.add(mName, method);
+                var o = fields.tryGet(mName);
+                if (o.has()) duplicate(mName, o.get().name());
                 enterMethodName = null;
             } else if (mi.fields != null) {
                 var dcl = parseDeclare(mi.fields.declare);
                 var td = (TypeDeclarer) visit(mi.fields.typeDeclarer());
                 var fNames = identifiers(mi.fields.identifierList());
-                for (var fn : fNames) {
-                    var field = new ClassField(fn.pos(), mModifier,
-                            mExport, dcl, fn, td);
-                    fields.add(fn, field);
+                for (var fName : fNames) {
+                    var field = new ClassField(fName.pos(), mModifier,
+                            mExport, dcl, fName, td);
+                    fields.add(fName, field);
+                    var o = methods.tryGet(fName);
+                    if (o.has()) duplicate(fName, o.get().name());
                 }
             } else {
                 var macro = (Macro) visit(mi.macro());

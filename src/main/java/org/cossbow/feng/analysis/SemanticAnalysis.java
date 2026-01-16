@@ -34,11 +34,13 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     private final StackedContext context;
     private final TypeDeducer typeDeducer;
     private final ConstChecker constChecker;
+    private final TypeTool typeTool;
 
     public SemanticAnalysis(SymbolContext parent) {
         context = new StackedContext(parent);
         typeDeducer = new TypeDeducer(context);
         constChecker = new ConstChecker(context);
+        typeTool = new TypeTool(context);
     }
 
     //
@@ -55,20 +57,18 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("require const value: %s", e.pos());
     }
 
-    @Override
     public Entity visit(Source s) {
         var tab = s.table();
-        for (var f : tab.variables.values())
+        for (var f : tab.variables)
             visit(f);
 
-        for (var t : tab.namedTypes.values()) visit(t);
-        for (var t : tab.unnamedTypes.values()) visit(t);
-        for (var f : tab.namedFunctions.values()) visit(f);
+        for (var t : tab.namedTypes) visit(t);
+        for (var t : tab.unnamedTypes) visit(t);
+        for (var f : tab.namedFunctions) visit(f);
 
         return s;
     }
 
-    @Override
     public Entity visit(GlobalVariable gv) {
         if (gv.init().none()) {
             if (gv.declare() == Declare.CONST) {
@@ -99,14 +99,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return gv;
     }
 
-    @Override
     public Entity visit(Modifier m) {
         if (!m.attributes().isEmpty())
             unsupported("attribute");
         return m;
     }
 
-    @Override
     public Entity visit(Refer e) {
         if (e.kind() == ReferKind.WEAK)
             unsupported("weak-reference");
@@ -117,13 +115,11 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    @Override
     public Entity visit(TypeArguments ta) {
         if (ta.isEmpty()) return ta;
         return unsupported("generic");
     }
 
-    @Override
     public TypeDefinition visit(DefinedType dt) {
         var type = context.findType(dt.symbol());
         if (type.none())
@@ -135,7 +131,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return type.get();
     }
 
-    @Override
     public Entity visit(DefinedTypeDeclarer td) {
         var dt = visit(td.definedType());
         if (td.refer().none()) return td;
@@ -148,7 +143,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("can't refer %s", dt.domain());
     }
 
-    @Override
     public Entity visit(ArrayTypeDeclarer td) {
         visit(td.element());
         td.length().use(this::visit);
@@ -156,7 +150,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return td;
     }
 
-    @Override
     public Entity visit(FuncTypeDeclarer td) {
         visit(td.prototype());
         visit(td.generic());
@@ -185,7 +178,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         };
     }
 
-    @Override
     public Entity visit(MemTypeDeclarer mtd) {
         if (mtd.mapped().none()) return mtd;
         var map = mtd.mapped().get();
@@ -194,36 +186,30 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("can't map type %s", map.pos());
     }
 
-    @Override
     public Entity visit(PrimitiveTypeDeclarer ptd) {
         return ptd;
     }
 
-    @Override
     public Entity visit(LiteralTypeDeclarer ltd) {
         return ltd;
     }
 
-    @Override
     public Entity visit(ThisTypeDeclarer ctd) {
         if (enterClass == null)
             semantic("this only use in class");
         return ctd;
     }
 
-    @Override
     public Entity visit(TupleTypeDeclarer ttd) {
         ttd.tuple().forEach(this::visit);
         return ttd;
     }
 
-    @Override
     public Entity visit(TypeParameters e) {
         if (e.isEmpty()) return e;
         return unsupported("generic");
     }
 
-    @Override
     public Entity visit(TypeDefinition def) {
         visit(def.modifier());
         visit(def.generic());
@@ -231,19 +217,17 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return def;
     }
 
-    @Override
     public Entity visit(PrimitiveDefinition e) {
         return e;
     }
 
     // structure define
 
-    @Override
     public Entity visit(StructureDefinition def) {
         if (!def.generic().isEmpty())
             return unsupported("generic");
 
-        for (var f : def.fields().values())
+        for (var f : def.fields())
             visit(f);
 
         return def;
@@ -319,7 +303,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         semantic("bitfield must >0 and <=64 ");
     }
 
-    @Override
     public Entity visit(StructureField sf) {
         visit(sf.type());
         structFieldType(sf.type());
@@ -332,9 +315,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     // enum
 
-    @Override
     public Entity visit(EnumDefinition def) {
-        for (var v : def.values().values()) {
+        for (var v : def.values()) {
             if (v.init().none()) continue;
             var le = computeConst(v.init().must());
 
@@ -350,12 +332,47 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
 
+    private void compatible(Prototype l, Prototype r, Position p) {
+        if (!l.parameterSet().equals(r.parameterSet())) {
+            semantic("prototype not compatible: %s", p);
+            return;
+        }
+        if (assignable(l.returnSet(), r.returnSet())) return;
+        semantic("prototype not compatible: %s", p);
+    }
+
     // class define
+
+    private void checkInherit(
+            ClassDefinition parent, ClassDefinition child) {
+        // 检查同名属性
+        for (var pf : parent.fields()) {
+            var cf = child.fields().tryGet(pf.name());
+            if (cf.none()) continue;
+            semantic("can't hide parent field: %s%s",
+                    pf.name(), cf.get().pos());
+            return;
+        }
+
+        // 检查方法覆盖是否兼容
+        for (var pm : parent.methods()) {
+            var o = child.methods().tryGet(pm.name());
+            if (o.none()) continue;
+            var cm = o.must();
+            if (pm.export() != cm.export()) {
+                semantic("override require same export: ",
+                        cm.pos());
+                return;
+            }
+            compatible(pm.func().prototype(),
+                    cm.func().prototype(), cm.pos());
+        }
+
+    }
 
     private volatile ClassDefinition enterClass;
     private volatile ClassMethod enterMethod;
 
-    @Override
     public Entity visit(ClassDefinition cd) {
         assert enterClass == null;
         enterClass = cd;
@@ -363,18 +380,21 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (!cd.generic().isEmpty())
             return unsupported("generic");
 
-        cd.parent().use(p -> {
-            var t = visit(p);
-            if (!(t instanceof ClassDefinition))
-                semantic("require class: %s", p.pos());
-        });
-        for (var i : cd.impl().values()) {
+        if (cd.parent().has()) {
+            var t = visit(cd.parent().must());
+            if (!(t instanceof ClassDefinition p))
+                return semantic("require class: %s",
+                        cd.parent().must().pos());
+            checkInherit(p, cd);
+        }
+        for (var i : cd.impl()) {
             var t = visit(i);
             if (!(t instanceof InterfaceDefinition))
-                semantic("require interface: %s", i.pos());
+                return semantic("require interface: %s", i.pos());
+            // TODO: 检查方法实现情况：1、接口方法是否存在 2、同名方法签名一致
         }
-        for (var f : cd.fields().values()) visit(f);
-        for (var m : cd.methods().values()) visit(m);
+        for (var f : cd.fields()) visit(f);
+        for (var m : cd.methods()) visit(m);
 
         if (!cd.macros().isEmpty())
             unsupported("macro");
@@ -383,7 +403,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return cd;
     }
 
-    @Override
     public Entity visit(ClassField cf) {
         assert enterClass != null;
         if (cf.type() instanceof DefinedTypeDeclarer ctd) {
@@ -396,7 +415,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return cf;
     }
 
-    @Override
     public Entity visit(ClassMethod cm) {
         assert enterClass != null;
         assert enterMethod == null;
@@ -409,29 +427,26 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return cm;
     }
 
-    @Override
     public Entity visit(InterfaceDefinition def) {
-        for (DefinedType p : def.parts().values()) {
+        for (DefinedType p : def.parts()) {
             var t = visit(p);
             if (t instanceof InterfaceDefinition)
                 continue;
             return semantic("require interface: %s");
         }
 
-        for (var m : def.methods().values())
+        for (var m : def.methods())
             visit(m);
 
         return def;
     }
 
-    @Override
     public Entity visit(InterfaceMethod m) {
         visit(m.generic());
         visit(m.prototype());
         return m;
     }
 
-    @Override
     public Entity visit(PrototypeDefinition pd) {
         visit(pd.generic());
         visit(pd.prototype(), false);
@@ -440,7 +455,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     //
 
-    @Override
     public Entity visit(FunctionDefinition fd) {
         visit(fd.generic());
         visit(fd.modifier());
@@ -450,7 +464,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     private volatile Procedure enterProc;
 
-    @Override
     public Entity visit(Procedure proc) {
         assert enterProc == null;
         enterProc = proc;
@@ -494,7 +507,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     private void visit(VariableParameterSet ps, boolean addVar) {
-        for (Variable v : ps.variables().values()) {
+        for (Variable v : ps.variables()) {
             visit(v);
             if (addVar) context.putVar(v);
         }
@@ -502,7 +515,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     //
 
-    @Override
     public Entity visit(BlockStatement bs) {
         context.enterScope();
         for (var s : bs.list())
@@ -511,7 +523,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return bs;
     }
 
-    @Override
     public Entity visit(DeclarationStatement ds) {
         if (ds.init().has()) {
             visit(ds.init().get());
@@ -554,7 +565,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             if (!able) return false;
         }
 
-        for (F f : ld.fields().values()) {
+        for (F f : ld.fields()) {
             if (f.immutable() && !obj.exists(f.name()))
                 return semantic("const field must init: %s",
                         od.pos());
@@ -637,7 +648,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         if (r.impl().exists(l.symbol())) return true;
 
-        for (var dt : r.impl().values()) {
+        for (var dt : r.impl()) {
             visit(dt.generic());
             var def = context.findType(dt.symbol());
             assert def.has();
@@ -654,7 +665,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         if (l.same(r)) return true;
 
-        for (var dt : r.parts().values()) {
+        for (var dt : r.parts()) {
             visit(dt.generic());
             var def = context.findType(dt.symbol());
             assert def.has();
@@ -795,48 +806,46 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return false;
     }
 
-    private void assignable(List<TypeDeclarer> left,
-                            List<TypeDeclarer> right,
-                            Position pos) {
+    private boolean assignable(List<TypeDeclarer> left,
+                               List<TypeDeclarer> right) {
         if (left.size() != right.size())
-            semantic("unaligned assignment: %s", pos);
+            return false;
 
         for (int i = 0; i < left.size(); i++) {
             var l = left.get(i);
             var r = right.get(i);
             if (!assignable(l, r))
-                semantic("unassignable: %s = %s", l, r);
+                return false;
         }
+
+        return true;
     }
 
-    @Override
     public Entity visit(AssignmentsStatement as) {
         var left = new ArrayList<TypeDeclarer>(as.operands().size());
         for (var ao : as.operands()) {
-            visit(ao);
-            left.add(typeDeducer.visit(ao.rhs()));
+            var td = (TypeDeclarer) visit(ao);
+            left.add(td);
         }
 
         visit(as.tuple());
         var right = typeDeducer.visit(as.tuple()).tuple();
-        assignable(left, right, as.pos());
-        return as;
+        if (assignable(left, right)) return as;
+
+        return semantic("prototype not compatible: %s", as.pos());
     }
 
-    @Override
     public Entity visit(CallStatement e) {
         visit(e.call());
         return e;
     }
 
-    @Override
     public Entity visit(LabeledStatement e) {
         return visit(e.statement());
     }
 
     private final Stack<ForStatement> loopStack = new Stack<>();
 
-    @Override
     public Entity visit(BreakStatement e) {
         assert enterProc != null;
         if (e.label().has()) {
@@ -852,7 +861,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    @Override
     public Entity visit(ContinueStatement e) {
         assert enterProc != null;
         if (e.label().has()) {
@@ -868,7 +876,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    @Override
     public Entity visit(ForStatement e) {
         context.enterScope();
         loopStack.push(e);
@@ -885,7 +892,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             semantic("condition must be bool");
     }
 
-    @Override
     public Entity visit(ConditionalForStatement e) {
         e.initializer().use(this::visit);
         requireBool(e.condition());
@@ -895,17 +901,14 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    @Override
     public Entity visit(IterableForStatement e) {
         return unsupported("iterable loop");
     }
 
-    @Override
     public Entity visit(GotoStatement e) {
         return unsupported("goto");
     }
 
-    @Override
     public Entity visit(IfStatement e) {
         context.enterScope();
         e.init().use(this::visit);
@@ -917,39 +920,33 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    @Override
     public Entity visit(ReturnStatement e) {
         assert enterProc != null;
         var rs = enterProc.prototype().returnSet();
         if (rs.isEmpty()) {
             if (e.result().none()) return e;
-            return semantic("function no return");
+            return semantic("no return");
         }
         if (e.result().none())
-            return semantic("function has return");
+            return semantic("has return");
 
         var tp = typeDeducer.visit(e.result().get()).tuple();
-        assignable(rs, tp, e.pos());
-
-        return e;
+        if (assignable(rs, tp)) return e;
+        return semantic("return not compatible: %s", e.pos());
     }
 
-    @Override
     public Entity visit(SwitchBranch e) {
         return EntityVisitor.super.visit(e);
     }
 
-    @Override
     public Entity visit(SwitchStatement e) {
         return EntityVisitor.super.visit(e);
     }
 
-    @Override
     public Entity visit(ThrowStatement e) {
         return EntityVisitor.super.visit(e);
     }
 
-    @Override
     public Entity visit(TryStatement e) {
         return EntityVisitor.super.visit(e);
     }
@@ -957,7 +954,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     //
 
-    @Override
     public Entity visit(IndexAssignableOperand io) {
         var td = typeDeducer.visit(io.subject());
         if (!(td instanceof ArrayTypeDeclarer atd))
@@ -981,39 +977,36 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("index require integer");
     }
 
-    @Override
-    public Entity visit(FieldAssignableOperand mo) {
-        var td = typeDeducer.visit(mo.subject());
-        var g2 = typeDeducer.getMember(mo.subject(), mo.field());
-        var refer = g2.a().maybeRefer();
-        var m = g2.b();
-        if (m instanceof StructureField sf) {
+    public Entity visit(FieldAssignableOperand e) {
+        var g2 = typeTool.getField(e.subject(), e.field());
+        if (g2.none()) return semantic("field not defined: %s",
+                e.field().pos());
+
+        var refer = g2.must().a().maybeRefer();
+        var f = g2.must().b();
+        if (f instanceof StructureField sf) {
             if (refer.has()) return sf.type();
 
-            var im = constChecker.visit(mo.subject());
-            if (im) return semantic("const variable: %s", mo.pos());
+            var im = constChecker.visit(e.subject());
+            if (im) return semantic("const variable: %s", e.pos());
             return sf.type();
         }
 
-        if (m instanceof ClassField cf) {
+        if (f instanceof ClassField cf) {
             if (cf.declare() != Declare.VAR)
-                return semantic("const field: %s", mo.field().pos());
+                return semantic("const field: %s", e.field().pos());
 
             if (refer.has()) return cf.type();
 
-            var im = constChecker.visit(mo.subject());
-            if (im) return semantic("const variable: %s", mo.pos());
+            var im = constChecker.visit(e.subject());
+            if (im) return semantic("const variable: %s", e.pos());
 
             return cf.type();
         }
 
-        if (m instanceof ClassMethod)
-            return semantic("can't modify method");
-
-        return semantic("can't modify: %s", mo.field());
+        return unreachable();
     }
 
-    @Override
     public Entity visit(VariableAssignableOperand vo) {
         var s = vo.symbol();
         var v = context.findVar(s);
@@ -1028,7 +1021,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return var.type().must();
     }
 
-    @Override
     public Entity visit(Variable v) {
         visit(v.type().must());
         visit(v.modifier());
@@ -1038,42 +1030,35 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     //
 
 
-    @Override
     public Entity visit(ArrayTuple e) {
         for (var v : e.values()) visit(v);
         return e;
     }
 
-    @Override
     public Entity visit(IfTuple e) {
         return EntityVisitor.super.visit(e);
     }
 
-    @Override
     public Entity visit(ReturnTuple e) {
         visit(e.call());
         return e;
     }
 
-    @Override
     public Entity visit(SwitchTuple e) {
         return EntityVisitor.super.visit(e);
     }
 
-    @Override
     public Entity visit(BinaryExpression e) {
         visit(e.left());
         visit(e.right());
         return typeDeducer.visit(e);
     }
 
-    @Override
     public Entity visit(UnaryExpression e) {
         visit(e.operand());
         return typeDeducer.visit(e);
     }
 
-    @Override
     public Entity visit(AssertExpression e) {
         visit(e.subject());
         visit(e.type());
@@ -1084,7 +1069,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("unassignable: %s", e.pos());
     }
 
-    @Override
     public Entity visit(CallExpression e) {
         visit(e.callee());
         e.arguments().forEach(this::visit);
@@ -1104,8 +1088,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
             var left = ftd.prototype().parameterSet().types();
             var right = typeDeducer.visit(e.arguments());
-            assignable(left, right, e.pos());
-            return e;
+            if (assignable(left, right)) return e;
+            return semantic("arguments not compatible");
         }
 
         if (rtd instanceof PrimitiveTypeDeclarer ptd) {
@@ -1138,14 +1122,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("%s is callee or convertor", e.pos());
     }
 
-    @Override
     public Entity visit(CurrentExpression e) {
         if (enterMethod != null)
             return e;
         return semantic("use %s outof method", e.name());
     }
 
-    @Override
     public Entity visit(IndexOfExpression e) {
         visit(e.subject());
         visit(e.index());
@@ -1160,34 +1142,36 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     }
 
-    @Override
     public Entity visit(LambdaExpression e) {
         return unsupported("lambda");
     }
 
-    @Override
     public Entity visit(LiteralExpression e) {
         return e;
     }
 
-    @Override
     public Entity visit(MemberOfExpression e) {
         if (!e.generic().isEmpty()) return unsupported("generic");
-
         visit(e.subject());
 
-        var g2 = typeDeducer.getMember(e.subject(), e.member());
-        return g2.b();
+        var ev = typeTool.getEnum(e.subject(), e.member());
+        if (ev.has()) return ev.must().b();
+
+        var f = typeTool.getField(e.subject(), e.member());
+        if (f.has()) return f.must().b();
+
+        var m = typeTool.getMethod(e.subject(), e.member());
+        if (m.has()) return m.must();
+
+        return unreachable();
     }
 
-    @Override
     public Entity visit(NewArrayType e) {
         visit(e.element());
         visit(e.length());
         return e;
     }
 
-    @Override
     public Entity visit(NewDefinedType e) {
         var def = visit(e.type());
         if (def instanceof ClassDefinition)
@@ -1195,13 +1179,11 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("require class: %s", e.type().pos());
     }
 
-    @Override
     public Entity visit(NewMemType e) {
         visit(e.mapped());
         return e;
     }
 
-    @Override
     public Entity visit(NewExpression e) {
         visit(e.type());
         e.init().use(this::visit);
@@ -1218,30 +1200,25 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("new type and init type not match");
     }
 
-    @Override
     public Entity visit(ArrayExpression ae) {
         visit(ae.elements());
         return ae;
     }
 
-    @Override
     public Entity visit(ObjectExpression obj) {
-        for (var e : obj.entries().values())
+        for (var e : obj.entries())
             visit(e);
         return obj;
     }
 
-    @Override
     public Entity visit(PairsExpression e) {
         return unsupported("pairs");
     }
 
-    @Override
     public Entity visit(ParenExpression e) {
         return visit(e.child());
     }
 
-    @Override
     public Entity visit(ReferExpression e) {
         if (!e.generic().isEmpty())
             return unsupported("generic");
@@ -1261,7 +1238,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     // attribute
 
 
-    @Override
     public Entity visit(AttributeDefinition ad) {
         return ad;
     }

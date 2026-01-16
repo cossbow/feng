@@ -4,15 +4,15 @@ import java.util.ArrayList;
 
 public class Stack<E> extends ArrayList<E> {
 
-    public E pop() {
+    public synchronized E pop() {
         return remove(size() - 1);
     }
 
-    public void push(E e) {
+    public synchronized void push(E e) {
         add(e);
     }
 
-    public E peek() {
+    public synchronized E peek() {
         return getLast();
     }
 

@@ -3,7 +3,6 @@ package org.cossbow.feng.ast.proc;
 
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
 

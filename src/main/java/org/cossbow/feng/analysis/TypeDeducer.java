@@ -33,9 +33,11 @@ import static org.cossbow.feng.util.ErrorUtil.*;
 public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     private final SymbolContext context;
+    private final TypeTool typeTool;
 
     public TypeDeducer(SymbolContext context) {
         this.context = context;
+        typeTool = new TypeTool(context);
     }
 
     public boolean isPrimitive(TypeDeclarer td) {
@@ -230,21 +232,19 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     }
 
     @Override
-    public TypeDeclarer visit(MemberOfExpression mo) {
-        if (!mo.generic().isEmpty()) return unsupported("generic");
+    public TypeDeclarer visit(MemberOfExpression e) {
+        if (!e.generic().isEmpty()) return unsupported("generic");
 
-        var g2 = getMember(mo.subject(), mo.member());
 
-        if (g2.b() instanceof StructureField sf) return sf.type();
+        var ev = typeTool.getEnum(e.subject(), e.member());
+        if (ev.has()) return ev.must().a();
 
-        if (g2.b() instanceof ClassField cf) return cf.type();
+        var f = typeTool.getField(e.subject(), e.member());
+        if (f.has()) return f.must().a();
 
-        if (g2.b() instanceof ClassMethod cm)
-            return new FuncTypeDeclarer(cm.pos(),
-                    cm.func().prototype(), mo.generic());
-
-        if (g2.b() instanceof EnumDefinition.Value)
-            return g2.a();
+        var m = typeTool.getMethod(e.subject(), e.member());
+        if (m.has()) return new FuncTypeDeclarer(m.must().pos(),
+                m.must().func().prototype(), e.generic());
 
         return unreachable();
     }
