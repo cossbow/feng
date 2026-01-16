@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.lit;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.dcl.Primitive;
 
 import java.math.BigDecimal;
 
@@ -19,6 +20,11 @@ public class FloatLiteral extends Literal {
     @Override
     public String type() {
         return "float";
+    }
+
+    @Override
+    public boolean compatible(Primitive primitive) {
+        return primitive.isFloat();
     }
 
     @Override

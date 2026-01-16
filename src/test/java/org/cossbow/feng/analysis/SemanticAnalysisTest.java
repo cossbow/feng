@@ -526,9 +526,18 @@ public class SemanticAnalysisTest {
     public void testArray7() {
         checkTrue("func t(s int) { var a [*]int = new([s]int); }");
         checkTrue("func t(s int) { var l = s; var a [*]int = new([l]int); }");
-//        checkFalse("func t() { var a [*]int = [1,2,3]; }");
-//        checkFalse("func t() { var a [4]int; a = new([4]int); }");
-//        checkFalse("func t() { var a [*]int; a = [1,2,3]; }");
+        checkFalse("func t() { var a [*]int = [1,2,3]; }");
+        checkFalse("func t() { var a [4]int; a = new([4]int); }");
+        checkFalse("func t() { var a [*]int; a = [1,2,3]; }");
+    }
+
+    @Test
+    public void testArray8() {
+        checkTrue("func t(s [*]int) { s[0] = s[1]; }");
+        checkTrue("func t(s [*]int, i int) { s[i] = s[1]; }");
+        checkFalse("func t(s int) { s[0] = s[1]; }");
+        checkFalse("func t(s [4]int) { s[0] = s[1]; }");
+        checkFalse("func t(s [*]int) { s[true] = 1; }");
     }
 
     @Test
@@ -686,6 +695,7 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testStructField6() {
+        checkTrue("struct R{ id int; } func f() { var r R; r.id = 1; }");
         checkFalse("struct R{ id int; } func f(r R) { r.id = 1; }");
     }
 

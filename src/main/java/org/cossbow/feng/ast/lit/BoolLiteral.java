@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.lit;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.dcl.Primitive;
 
 public class BoolLiteral extends Literal {
     private final boolean value;
@@ -21,6 +22,11 @@ public class BoolLiteral extends Literal {
     @Override
     public String type() {
         return "bool";
+    }
+
+    @Override
+    public boolean compatible(Primitive primitive) {
+        return primitive.isBool();
     }
 
     @Override

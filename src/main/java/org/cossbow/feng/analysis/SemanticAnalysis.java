@@ -23,9 +23,7 @@ import org.cossbow.feng.visit.EntityVisitor;
 import org.cossbow.feng.visit.SymbolContext;
 
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 import static org.cossbow.feng.util.ErrorUtil.*;
 
@@ -370,6 +368,28 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     }
 
+    private void checkAcyclicInherit(ClassDefinition cd) {
+        var set = new HashSet<Symbol>();
+        Symbol s = null;
+        var c = cd;
+        while (c.parent().has()) {
+            if (!set.add(c.symbol()))
+                semantic("inherit in cyclic: %s%s", c.symbol(), c.pos());
+
+            var dt = context.findType(c.parent().must().symbol());
+            if (dt.none()) {
+                semantic("%s not defined", c.parent().must().symbol());
+                break;
+            }
+            if (dt.get() instanceof ClassDefinition pcd) {
+                checkInherit(pcd, cd);
+                c = pcd;
+                continue;
+            }
+            semantic("inherit must class: %s", cd.parent().must().pos());
+        }
+    }
+
     private volatile ClassDefinition enterClass;
     private volatile ClassMethod enterMethod;
 
@@ -380,13 +400,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (!cd.generic().isEmpty())
             return unsupported("generic");
 
-        if (cd.parent().has()) {
-            var t = visit(cd.parent().must());
-            if (!(t instanceof ClassDefinition p))
-                return semantic("require class: %s",
-                        cd.parent().must().pos());
-            checkInherit(p, cd);
-        }
+        checkAcyclicInherit(cd);
+
         for (var i : cd.impl()) {
             var t = visit(i);
             if (!(t instanceof InterfaceDefinition))
@@ -428,7 +443,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(InterfaceDefinition def) {
-        for (DefinedType p : def.parts()) {
+        for (var p : def.parts()) {
             var t = visit(p);
             if (t instanceof InterfaceDefinition)
                 continue;
@@ -970,11 +985,15 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         var it = typeDeducer.visit(io.index());
         if (it instanceof PrimitiveTypeDeclarer ptd) {
-            if (ptd.primitive().isInteger()) {
+            if (ptd.primitive().isInteger())
+                return atd.element();
+        } else if (it instanceof LiteralTypeDeclarer ltd) {
+            if (ltd.literal() instanceof IntegerLiteral) {
                 return atd.element();
             }
         }
-        return semantic("index require integer");
+
+        return semantic("forbidden index operate: %s", io.pos());
     }
 
     public Entity visit(FieldAssignableOperand e) {
@@ -1138,7 +1157,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         var it = typeDeducer.visit(e.index());
         if (typeDeducer.isInteger(it)) return e;
 
-        return semantic("index reqiure integer: %s", e.pos());
+        return semantic("index require integer: %s", e.pos());
 
     }
 

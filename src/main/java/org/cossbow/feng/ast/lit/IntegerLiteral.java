@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.lit;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.dcl.Primitive;
 
 import java.math.BigInteger;
 
@@ -32,6 +33,11 @@ public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral
     @Override
     public String type() {
         return "integer";
+    }
+
+    @Override
+    public boolean compatible(Primitive primitive) {
+        return primitive.isInteger();
     }
 
     @Override
