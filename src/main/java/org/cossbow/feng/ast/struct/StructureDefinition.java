@@ -4,7 +4,8 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
-public class StructureDefinition extends TypeDefinition {
+public class StructureDefinition extends TypeDefinition
+        implements HaveFields<StructureField> {
     private IdentifierTable<StructureField> fields;
 
     public StructureDefinition(Position pos,

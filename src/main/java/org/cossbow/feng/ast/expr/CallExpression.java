@@ -8,7 +8,6 @@ public class CallExpression extends PrimaryExpression {
     private PrimaryExpression callee;
     private List<Expression> arguments;
 
-
     public CallExpression(Position pos,
                           PrimaryExpression callee,
                           List<Expression> arguments) {

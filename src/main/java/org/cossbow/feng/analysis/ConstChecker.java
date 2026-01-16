@@ -79,7 +79,10 @@ public class ConstChecker implements EntityVisitor<Boolean> {
 
     @Override
     public Boolean visit(MemberOfExpression e) {
-        var m = deducer.getMember(e.subject(), e.member());
+        var g2 = deducer.getMember(e.subject(), e.member());
+        var s = g2.a();
+        var isRef = s instanceof Referable ref && ref.refer().has();
+        var m = g2.b();
 
         if (m instanceof ClassMethod) return true;
 

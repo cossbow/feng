@@ -10,8 +10,8 @@ public class Lazy<T> {
         this.value = value;
     }
 
-    public T get() {
-        return value;
+    public Optional<T> get() {
+        return Optional.of(value);
     }
 
     public T must() {

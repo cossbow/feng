@@ -21,10 +21,13 @@ public class GlobalSymbolContext implements SymbolContext {
     public Optional<TypeDefinition> findType(Symbol symbol) {
         checkModule(symbol);
 
-        var def = Primitive.findType(symbol.name());
-        if (def.has()) return def.map(d -> d);
+        var pd = Primitive.findType(symbol.name());
+        if (pd.has()) return Optional.of(pd.get());
 
-        return gst.namedTypes.tryGet(symbol.name());
+        var td = gst.namedTypes.tryGet(symbol.name());
+        if (td.has()) return td;
+
+        return gst.unnamedTypes.tryGet(symbol.name());
     }
 
     @Override

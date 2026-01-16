@@ -161,6 +161,7 @@ public interface EntityVisitor<R> {
 			case FuncTypeDeclarer ee -> visit(ee);
 			case MemTypeDeclarer ee -> visit(ee);
 			case PrimitiveTypeDeclarer ee -> visit(ee);
+			case LiteralTypeDeclarer ee -> visit(ee);
 			case ThisTypeDeclarer ee -> visit(ee);
 			case TupleTypeDeclarer ee -> visit(ee);
 			case VoidTypeDeclarer ee -> visit(ee);
@@ -177,6 +178,8 @@ public interface EntityVisitor<R> {
 	default R visit(MemTypeDeclarer e) { return unreachable(); }
 
 	default R visit(PrimitiveTypeDeclarer e) { return unreachable(); }
+
+	default R visit(LiteralTypeDeclarer e) { return unreachable(); }
 
 	default R visit(ThisTypeDeclarer e) { return unreachable(); }
 

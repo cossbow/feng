@@ -22,6 +22,12 @@ public class FloatLiteral extends Literal {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof FloatLiteral f)) return false;
+        return value.equals(f.value);
+    }
+
+    @Override
     public String toString() {
         return value.toPlainString();
     }

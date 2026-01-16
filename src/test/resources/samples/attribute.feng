@@ -1,8 +1,8 @@
 attribute Document {}
 
 attribute Proxy {
-    name rom;
-    code rom = "feng";
+    name uint8;
+    code int = 0;
     tags []int;
     props []Property = [Property.ID];
 }

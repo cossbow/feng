@@ -2,6 +2,7 @@ package org.cossbow.feng.ast;
 
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.ast.oop.ClassDefinition;
 
 abstract
 public class TypeDefinition extends Definition {
@@ -18,6 +19,10 @@ public class TypeDefinition extends Definition {
 
     public TypeDomain domain() {
         return domain;
+    }
+
+    public <D extends TypeDefinition> boolean same(D o) {
+        return symbol().equals(o.symbol());
     }
 
     @Override

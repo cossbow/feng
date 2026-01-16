@@ -12,6 +12,6 @@ public class VoidTypeDeclarer extends TypeDeclarer {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof VoidTypeDeclarer;
+        return false;
     }
 }

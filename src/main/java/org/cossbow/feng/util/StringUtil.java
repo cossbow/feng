@@ -6,7 +6,7 @@ import org.cossbow.feng.ast.Position;
 import java.util.HexFormat;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class UnamedUtil {
+public class StringUtil {
 
     public static Identifier rand(String prefix) {
         var rand = ThreadLocalRandom.current();

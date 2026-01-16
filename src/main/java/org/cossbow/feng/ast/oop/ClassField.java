@@ -46,4 +46,9 @@ public class ClassField extends Field implements Exportable {
                 name(), Lazy.of(type()));
     }
 
+    @Override
+    public boolean immutable() {
+        return declare == Declare.CONST;
+    }
+
 }

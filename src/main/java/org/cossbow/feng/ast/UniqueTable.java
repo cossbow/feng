@@ -31,27 +31,27 @@ public class UniqueTable<K extends Entity, V> {
     }
 
     private void addIndex(Node<K, V> node) {
-        var old = table.putIfAbsent(node.id, node);
+        var old = table.putIfAbsent(node.key, node);
         if (old != null)
-            ErrorUtil.duplicate(node.id, old.id);
+            ErrorUtil.duplicate(node.key, old.key);
     }
 
-    public void add(K id, V value) {
-        var node = new Node<>(id, value);
+    public void add(K key, V value) {
+        var node = new Node<>(key, value);
         addIndex(node);
         nodes.add(node);
     }
 
-    public V get(K id) {
-        var node = table.get(id);
+    public V get(K key) {
+        var node = table.get(key);
         if (node != null) {
             return node.value;
         }
-        throw new NoSuchElementException("not exists '" + id + "'");
+        throw new NoSuchElementException("not exists '" + key + "'");
     }
 
-    public Optional<V> tryGet(K id) {
-        var node = table.get(id);
+    public Optional<V> tryGet(K key) {
+        var node = table.get(key);
         if (node != null) {
             return Optional.of(node.value);
         }
@@ -59,19 +59,27 @@ public class UniqueTable<K extends Entity, V> {
     }
 
     public K getKey(int i) {
-        return nodes.get(i).id;
+        return nodes.get(i).key;
     }
 
     public V getValue(int i) {
         return nodes.get(i).value;
     }
 
-    public boolean exists(K id) {
-        return table.containsKey(id);
+    public boolean exists(K key) {
+        return table.containsKey(key);
+    }
+
+    public List<Node<K, V>> nodes() {
+        return Collections.unmodifiableList(nodes);
+    }
+
+    public List<K> keys() {
+        return new PhantomKeyList();
     }
 
     public List<V> values() {
-        return new PhantomList();
+        return new PhantomValueList();
     }
 
     public int size() {
@@ -84,7 +92,7 @@ public class UniqueTable<K extends Entity, V> {
 
     public void each(BiConsumer<K, V> c) {
         for (var n : nodes)
-            c.accept(n.id, n.value);
+            c.accept(n.key, n.value);
     }
 
     public void each(Consumer<V> c) {
@@ -92,18 +100,24 @@ public class UniqueTable<K extends Entity, V> {
             c.accept(n.value);
     }
 
-    public List<Node<K, V>> map(Function<V, V> f) {
+    public <R> List<Node<K, R>> map(Function<V, R> f) {
         return nodes.stream()
-                .map(n -> new Node<>(n.id, f.apply(n.value)))
+                .map(n -> new Node<>(n.key, f.apply(n.value)))
                 .toList();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof UniqueTable<?, ?> t)) return false;
+        return nodes.equals(t.nodes);
     }
 
     //
 
-    public record Node<K, V>(K id, V value) {
+    public record Node<K, V>(K key, V value) {
     }
 
-    class PhantomList extends AbstractList<V> {
+    class PhantomValueList extends AbstractList<V> {
 
         @Override
         public V get(int index) {
@@ -115,4 +129,18 @@ public class UniqueTable<K extends Entity, V> {
             return nodes.size();
         }
     }
+
+    class PhantomKeyList extends AbstractList<K> {
+
+        @Override
+        public K get(int index) {
+            return nodes.get(index).key;
+        }
+
+        @Override
+        public int size() {
+            return nodes.size();
+        }
+    }
+
 }

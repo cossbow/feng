@@ -11,4 +11,8 @@ public class Literal extends Entity {
 
     abstract
     public String type();
+
+    abstract
+    public boolean equals(Object o);
+
 }

@@ -23,4 +23,7 @@ public class Field extends Entity {
         return type;
     }
 
+    public boolean immutable() {
+        return false;
+    }
 }

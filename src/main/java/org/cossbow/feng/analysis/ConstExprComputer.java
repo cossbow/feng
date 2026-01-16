@@ -1,9 +1,7 @@
 package org.cossbow.feng.analysis;
 
-import org.cossbow.feng.ast.BinaryOperator;
-import org.cossbow.feng.ast.IdentifierTable;
-import org.cossbow.feng.ast.Symbol;
-import org.cossbow.feng.ast.UnaryOperator;
+import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.util.ErrorUtil;
@@ -95,10 +93,6 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
 
     @Override
     public Expression visit(MemberOfExpression e) {
-        if (!e.generic().isEmpty())
-            return ErrorUtil.unsupported("generic");
-
-        var v = visit(e.subject());
         return e;
     }
 
@@ -141,6 +135,11 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
 
         var v = context.findVar(s);
         if (v.none()) return e;
+        if (v.get() instanceof GlobalVariable gv) {
+            if (gv.declare() == Declare.CONST && gv.init().has())
+                return gv.init().must();
+        }
+
         return e;
     }
 

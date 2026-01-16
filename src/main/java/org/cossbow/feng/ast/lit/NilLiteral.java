@@ -13,7 +13,12 @@ public class NilLiteral extends Literal {
     }
 
     @Override
+    public boolean equals(Object o) {
+        return o instanceof IntegerLiteral;
+    }
+
+    @Override
     public String toString() {
-        return "nil";
+        return type();
     }
 }

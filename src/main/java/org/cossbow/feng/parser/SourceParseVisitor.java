@@ -27,7 +27,7 @@ import org.cossbow.feng.ast.var.IndexAssignableOperand;
 import org.cossbow.feng.ast.var.VariableAssignableOperand;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
-import org.cossbow.feng.util.UnamedUtil;
+import org.cossbow.feng.util.StringUtil;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -348,12 +348,15 @@ final class SourceParseVisitor
             if (mt != null) {
                 var args = dt.generic().arguments();
                 if (args.size() > 1) {
-                    return semantic("can't multi map: %s",
-                            args.getFirst().pos());
+                    return semantic("%s can't multi map: %s",
+                            mt.symbol(), args.getFirst().pos());
                 }
                 var mapped = !args.isEmpty() ?
                         args.getFirst() : null;
                 var refer = parseRefer(ctx.refer());
+                if (refer.none())
+                    return semantic("%s only for reference: %s",
+                            mt.symbol(), dt.pos());
                 return new MemTypeDeclarer(posOf(ctx), mt.readonly(),
                         refer, Optional.of(mapped));
             }
@@ -540,7 +543,7 @@ final class SourceParseVisitor
         var pos = posOf(ctx);
         var domain = parseDomain(ctx.domain);
         var fields = parseStructureMembers(ctx.structureFieldsDef());
-        var symbol = defineSymbol(UnamedUtil.rand(domain.name));
+        var symbol = defineSymbol(StringUtil.rand(domain.name));
         var def = new StructureDefinition(pos, Modifier.empty(),
                 symbol, TypeParameters.empty(), domain, fields);
         gst.unnamedTypes.add(symbol.name(), def);
@@ -624,7 +627,7 @@ final class SourceParseVisitor
         var symbol = defineSymbol(ctx.name);
         var values = new IdentifierTable<EnumDefinition.Value>();
         for (var vc : ctx.enumValue()) {
-            var v = new EnumDefinition.Value(
+            var v = new EnumDefinition.Value(posOf(vc),
                     identifier(vc.name), visitOptional(vc.value));
             values.add(v.name(), v);
         }

@@ -24,6 +24,12 @@ public class BoolLiteral extends Literal {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof BoolLiteral t)) return false;
+        return value == t.value;
+    }
+
+    @Override
     public String toString() {
         return Boolean.toString(value);
     }

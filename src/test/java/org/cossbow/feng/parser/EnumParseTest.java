@@ -38,7 +38,7 @@ public class EnumParseTest extends BaseParseTest {
                 Assertions.assertTrue(v.init().none());
             } else {
                 Assertions.assertEquals(BigInteger.valueOf(pair.b()),
-                        integer(v.init().get()).value());
+                        integer(v.init().must()).value());
             }
         }
     }

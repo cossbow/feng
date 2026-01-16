@@ -21,4 +21,9 @@ public class ArrayExpression extends PrimaryExpression {
     public boolean isFinal() {
         return elements.stream().allMatch(Expression::isFinal);
     }
+
+    @Override
+    public String toString() {
+        return elements.toString();
+    }
 }

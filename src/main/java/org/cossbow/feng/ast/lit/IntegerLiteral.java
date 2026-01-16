@@ -35,6 +35,12 @@ public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof IntegerLiteral f)) return false;
+        return value.equals(f.value);
+    }
+
+    @Override
     public String toString() {
         return value.toString(radix);
     }

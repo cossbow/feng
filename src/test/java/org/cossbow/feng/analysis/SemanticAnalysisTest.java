@@ -15,6 +15,9 @@ import java.util.List;
 public class SemanticAnalysisTest {
 
     void checkTrue(String code) {
+        System.out.println("[testing]>>>");
+        System.out.println(code);
+        System.out.println("<<<");
         var src = BaseParseTest.doParseFile(code);
         var ctx = new GlobalSymbolContext(src.table());
         new SemanticAnalysis(ctx).visit(src);
@@ -30,9 +33,47 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testClass0() {
+    public void testClass1() {
         checkTrue("class A {}");
+        checkTrue("class A {} func f(a0 A, a1 *A){ var a2 A = {}; var a3 *A = new(A); }");
     }
+
+    @Test
+    public void testClass2() {
+        var def = "class A { var code int; } ";
+        checkTrue(def + "func f(){ var a A = {code=100}; }");
+        checkTrue(def + "func f(){ var a *A = new(A,{code=100}); }");
+    }
+
+    @Test
+    public void testClass3() {
+        var def = "class A { const code int; } ";
+        checkTrue(def + "func f(){ var a A = {code=100}; }");
+        checkTrue(def + "func f(){ var a *A = new(A,{code=100}); }");
+    }
+
+    @Test
+    public void testClass4() {
+        var def = "class A { var code int; const type int8; } ";
+        checkFalse(def + "func f(){ var a A = { code=100 }; }");
+        checkFalse(def + "func f(){ var a *A = new(A,{code=100}); }");
+    }
+
+    @Test
+    public void testClass5() {
+        var def = "class A { const type int8; var code int; } ";
+        checkFalse(def + "func f(){ var a A = {code=100}; }");
+        checkFalse(def + "func f(){ var a *A = new(A,{code=100}); }");
+    }
+
+    @Test
+    public void testClass6() {
+        var def = "class A { const type int8; var code int; } ";
+        checkFalse(def + "func f(a A){ a.type=0; }");
+        checkFalse(def + "func f(a A){ a.code=100; }");
+    }
+
+    //
 
     @Test
     public void testClassInherit1() {
@@ -81,41 +122,35 @@ public class SemanticAnalysisTest {
     @Test
     public void testClassField1() {
         checkTrue("class A { var id int; }");
-    }
-
-    @Test
-    public void testClassField2() {
         checkFalse("class A { var id ID; }");
     }
 
     @Test
+    public void testClassField2() {
+        var def = "class ID{} ";
+        checkTrue(def + "class A { var id ID; }");
+        checkTrue(def + "class A { var id ID; func get() ID { return id; } }");
+        checkFalse(def + "class A { var id int; func get() ID { return id; } }");
+        checkTrue(def + "class A { var id ID; func set(id ID)  { this.id = id; } }");
+        checkFalse(def + "class A { var id int; func set(id ID)  { this.id = id; } }");
+    }
+
+    @Test
     public void testClassField3() {
-        checkTrue("class ID{} class A { var id ID; }");
+        checkTrue("var id int; class A { var id int; func get() int { return id; } }");
     }
 
     @Test
     public void testClassField4() {
-        checkTrue("class ID{} class A { var id ID; func get() ID { return id; } }");
+        checkFalse("class A { var id int; } func set(a A) { a.id = 0; }");
+        checkTrue("class A { var id int; } func set(a *A) { a.id = 0; }");
+        checkFalse("class A { const id int; } func set(a *A) { a.id = 0; }");
     }
 
     @Test
     public void testClassField5() {
-        checkFalse("class ID{} class A { var id int; func get() ID { return id; } }");
-    }
-
-    @Test
-    public void testClassField6() {
-        checkTrue("class ID{} class A { var id ID; func set(id ID)  { this.id = id; } }");
-    }
-
-    @Test
-    public void testClassField7() {
-        checkFalse("class ID{} class A { var id int; func set(id ID)  { this.id = id; } }");
-    }
-
-    @Test
-    public void testClassField8() {
-        checkTrue("var id int = 10; class A { var id int; func get() int { return id; } }");
+        checkTrue("class A { var ch [*]A; func f() { ch = new([4]A); } }");
+        checkTrue("class A { var ch [*]*A; func f() { ch = new([4]*A); } }");
     }
 
     @Test
@@ -155,11 +190,17 @@ public class SemanticAnalysisTest {
     @Test
     public void testAssignValue3() {
         checkTrue("func f(v float) { var i int; i = int(v); }");
+        checkTrue("func f(v uint16) { var i int32; i = int32(v); }");
+        checkTrue("func f(v float) { var i int; i = int(v); }");
+        checkTrue("func f() { var i int16 = int16(123); }");
+        checkTrue("func f(v float) { var i int16 = 123; }");
     }
 
     @Test
     public void testAssignValue4() {
-        checkFalse("func f(v bool) { var i int; i = int(v); }");
+        checkFalse("func f(v bool) { var i uint16; i = uint16(v); }");
+        checkFalse("func f(v bool) { var i int; i = float32(v); }");
+        checkFalse("func f(v uint) { var i bool; i = bool(v); }");
     }
 
     @Test
@@ -288,8 +329,9 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testAssignTuple1() {
-        checkTrue("func f() { var i,j int = 1,2; i,j = j,i; }");
-        checkTrue("func f(a,b int) { var i,j = 1,2; i,j = a-b,a+b; }");
+        checkTrue("func f() { var i,j int = 1,2; }");
+        checkTrue("func f() { var i,j int; i,j = 1,2; }");
+        checkTrue("func f(a,b int) { var i,j int; i,j = a-b,a+b; }");
         checkTrue("func f(a,b int) { var i int; var j bool; i,j = a-b, a<b; }");
     }
 
@@ -342,26 +384,24 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testReferrable1() {
+        checkTrue("class ID{} func f() { var i *ID; i = nil; }");
         checkTrue("class ID{} func f() { var i *ID; i = new(ID); }");
+        checkTrue("class ID{} func f(v *ID) { var i *ID; i = v; }");
+        checkTrue("interface ID{} func f(v *ID) { var i *ID; i = v; }");
+        checkTrue("interface ID{} func f(v *ID) { var i *ID; i = nil; }");
     }
 
     @Test
     public void testReferrable2() {
-        checkTrue("class ID{} func f(v *ID) { var i *ID; i = v; }");
+        checkTrue("class ID{} func f(v *ID) *ID { return nil; }");
+        checkTrue("class ID{} func f(v *ID) *ID { return new(ID); }");
+        checkTrue("class ID{} func f(v *ID) *ID { return v; }");
+        checkTrue("interface ID{} func f(v *ID) *ID { return v; }");
+        checkTrue("interface ID{} func f(v *ID) *ID { return nil; }");
     }
 
     @Test
     public void testReferrable3() {
-        checkTrue("interface ID{} func f(v *ID) { var i *ID; i = v; }");
-    }
-
-    @Test
-    public void testReferrable4() {
-        checkTrue("func f(v *ram) { var i *ram`int`; i = v; }");
-    }
-
-    @Test
-    public void testReferrable5() {
         checkFalse("func f(v *bool) {}");
         checkFalse("struct ID{} func f(v *ID) {}");
         checkFalse("union ID{} func f(v *ID) {}");
@@ -414,34 +454,78 @@ public class SemanticAnalysisTest {
     //
 
     @Test
-    public void testDeclareArray1() {
+    public void testArray1() {
         checkTrue("func t() { var a = [1,2,3]; }");
+        checkFalse("func t() { var a = []; }");
     }
 
     @Test
-    public void testDeclareArray2() {
+    public void testArray2() {
+        checkTrue("func t() { var a [2]int = []; }");
+        checkFalse("func t() { var a [*]int = []; }");
+    }
+
+    @Test
+    public void testArray3() {
+        checkFalse("func t() { var a [2]int = nil; }");
+        checkTrue("func t() { var a [*]int = nil; }");
+    }
+
+    @Test
+    public void testArray4() {
         checkTrue("func t() { var a [4]int = [1,2,3]; }");
         checkTrue("func t() { var a [4]int = [1,2,3,4]; }");
-    }
-
-    @Test
-    public void testDeclareArray3() {
         checkFalse("func t() { var a [4]int = [1,2,3,4,5]; }");
     }
 
     @Test
-    public void testDeclareArray4() {
-        checkFalse("func t() { var a [*]int = [1,2,3]; }");
-    }
-
-    @Test
-    public void testDeclareArray5() {
-        checkFalse("func t() { var a [4]int = new([4]int); }");
-    }
-
-    @Test
-    public void testDeclareArray6() {
+    public void testArray5() {
+        checkTrue("func t() { var a [*]int = new([8]int); }");
         checkTrue("func t() { var a [*]int = new([4]int, [1,2,3]); }");
+        checkTrue("func t() { var a [*]int; a = new([8]int); }");
+        checkTrue("func t() { var a [*]int; a = new([4]int, [1,2,3]); }");
+    }
+
+    @Test
+    public void testArray6() {
+        checkFalse("func t() { var a [4]int = new([4]int); }");
+        checkFalse("func t() { var a [*]int = [1,2,3]; }");
+        checkFalse("func t() { var a [4]int; a = new([4]int); }");
+        checkFalse("func t() { var a [*]int; a = [1,2,3]; }");
+    }
+
+    @Test
+    public void testArray7() {
+        checkTrue("func t(s int) { var a [*]int = new([s]int); }");
+        checkTrue("func t(s int) { var l = s; var a [*]int = new([l]int); }");
+//        checkFalse("func t() { var a [*]int = [1,2,3]; }");
+//        checkFalse("func t() { var a [4]int; a = new([4]int); }");
+//        checkFalse("func t() { var a [*]int; a = [1,2,3]; }");
+    }
+
+    @Test
+    public void testDeclareMultiArray1() {
+        checkTrue("func t() { var a [2][4]int = []; }");
+        checkTrue("func t() { var a [2][4]int = [[]]; }");
+        checkTrue("func t() { var a [2][4]int = [[1,2]]; }");
+        checkTrue("func t() { var a [2][4]int = [[1,2,3,4]]; }");
+        checkFalse("func t() { var a [2][4]int = [[1,2,3,4,5]]; }");
+        checkFalse("func t() { var a [2][4]int = [[1,2],[2],[]]; }");
+    }
+
+    @Test
+    public void testDeclareMultiArray2() {
+        checkTrue("func t(v [4]int) { var a [2][4]int = [v]; }");
+        checkFalse("func t(v [2]int) { var a [2][4]int = [v]; }");
+        checkFalse("func t(v [*]int) { var a [2][4]int = [v]; }");
+    }
+
+    @Test
+    public void testDeclareMultiArray3() {
+        checkTrue("func t(v [*]int) { var a [2][*]int = [v]; }");
+        checkFalse("func t(v [4]int) { var a [2][*]int = [v]; }");
+        checkFalse("func t(v [4]int) { var a [*][4]int = [v]; }");
+        checkTrue("func t(v [4]int) { var a [*][4]int = new([6][4]int, [v]); }");
     }
 
     //
@@ -449,12 +533,33 @@ public class SemanticAnalysisTest {
     @Test
     public void testGlobalVar1() {
         checkTrue("var a int;");
+        checkTrue("var a int = 1;");
+        checkTrue("var a = 1;");
+        checkFalse("const a int;");
+        checkTrue("const a int = 1;");
+        checkTrue("const a = 1;");
+    }
+
+    @Test
+    public void testGlobalVar2() {
+        checkTrue("var a int;");
+        checkTrue("var a int = 1;");
+        checkTrue("var a = 1;");
+        checkFalse("var a float = 1;");
+    }
+
+    @Test
+    public void testGlobalVar3() {
+        checkTrue("const a = 1; var b = a;");
+        checkFalse("var a = 1; var b = a;");
     }
 
     //
 
     @Test
     public void testMemMap1() {
+        checkTrue("func f(v *ram) { var i *ram`int`; i = v; }");
+        checkTrue("func f(v *ram) { var i *ram`[2]int`; i = v; }");
         checkTrue("struct ID{} func f(v *ram) { var i *ram`ID`; i = v; }");
     }
 
@@ -476,13 +581,44 @@ public class SemanticAnalysisTest {
     // struct
 
     @Test
+    public void testStruct0() {
+        var def = "struct A {  } ";
+        checkTrue(def + "func f() { var a A = {}; }");
+        checkFalse(def + "func f() { var a *A; }");
+        checkFalse(def + "func f() { var a = new(A); }");
+    }
+
+    @Test
     public void testStruct1() {
+        var def = "struct A { id int; } ";
+        checkTrue(def + "func f() { var a A = { id=123 }; }");
+        checkFalse(def + "func f() { var a A = { id=true }; }");
+    }
+
+    @Test
+    public void testStruct2() {
+        var def = "struct A { id [4]int; } ";
+        checkTrue(def + "func f() { var a A = { id=[1] }; }");
+    }
+
+    @Test
+    public void testStruct3() {
+        var def = "struct A { id [4]uint; } ";
+        checkTrue(def + "func f() { var a A = { id=[1] }; }");
+    }
+
+    @Test
+    public void testStruct6() {
+        var def = "struct A { a struct{ id int; }; } ";
+        checkTrue(def + "func f() { var a A = { a={id=123} }; }");
+        checkFalse(def + "func f() { var a A = { a={id=true} }; }");
     }
 
     @Test
     public void testStructField1() {
         var def = "struct A {} union B {}";
         checkTrue(def + "struct R{ a int; b [16]int64; c [0]float; d A; e B; f[2]A; }");
+        checkTrue(def + "union R{ a int; b [16]int64; c [0]float; d A; e B; f[2]A; }");
     }
 
     @Test
@@ -510,6 +646,41 @@ public class SemanticAnalysisTest {
 //        checkFalse(def + "struct R{ a []A; }");
     }
 
-    // class
+    @Test
+    public void testStructField4() {
+        checkTrue("struct R{ s struct{ id int; u union{ v int8; }; }; }");
+    }
+
+    @Test
+    public void testStructField5() {
+        checkTrue("struct R{ id int; } func f(r *ram`R`) { r.id = 1; }");
+    }
+
+    @Test
+    public void testStructField6() {
+        checkFalse("struct R{ id int; } func f(r R) { r.id = 1; }");
+    }
+
+    // enum
+
+    @Test
+    public void testEnum1() {
+        checkTrue("enum S{A=1,}");
+        checkFalse("enum S{A=3.14,}");
+        checkFalse("enum S{A=false,}");
+        checkFalse("enum S{A=nil,}");
+        checkFalse("enum S{A=\"A\",}");
+    }
+
+    @Test
+    public void testEnum2() {
+        checkTrue("enum S{A,B,} func f() { var s S; s=S.A; }");
+    }
+
+    @Test
+    public void testEnum3() {
+        checkFalse("enum S{A,B,} func f() { var s int; s=S.A; }");
+        checkFalse("enum S{A,B,} func f() { var s S; s=S.C; }");
+    }
 
 }

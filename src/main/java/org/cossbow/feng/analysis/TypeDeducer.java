@@ -2,6 +2,7 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.DefinedType;
@@ -13,9 +14,11 @@ import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassField;
 import org.cossbow.feng.ast.oop.ClassMethod;
+import org.cossbow.feng.ast.oop.EnumDefinition;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
+import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.visit.EntityVisitor;
 import org.cossbow.feng.visit.SymbolContext;
@@ -40,18 +43,34 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     }
 
     public boolean isBool(TypeDeclarer td) {
-        return td instanceof PrimitiveTypeDeclarer ptd
-                && ptd.primitive().isBool();
+        if (td instanceof PrimitiveTypeDeclarer ptd)
+            return ptd.primitive().isBool();
+
+        if (td instanceof LiteralTypeDeclarer ltd)
+            return ltd.literal() instanceof BoolLiteral;
+
+        return false;
     }
 
     public boolean isNumber(TypeDeclarer td) {
-        return td instanceof PrimitiveTypeDeclarer ptd
-                && !ptd.primitive().isBool();
+        if (td instanceof PrimitiveTypeDeclarer ptd)
+            return !ptd.primitive().isBool();
+
+        if (td instanceof LiteralTypeDeclarer ltd)
+            return ltd.literal() instanceof IntegerLiteral ||
+                    ltd.literal() instanceof FloatLiteral;
+
+        return false;
     }
 
     public boolean isInteger(TypeDeclarer td) {
-        return td instanceof PrimitiveTypeDeclarer ptd
-                && ptd.primitive().isInteger();
+        if (td instanceof PrimitiveTypeDeclarer ptd)
+            return ptd.primitive().isInteger();
+
+        if (td instanceof LiteralTypeDeclarer ltd)
+            return ltd.literal() instanceof IntegerLiteral;
+
+        return false;
     }
 
     @Override
@@ -117,6 +136,9 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     @Override
     public TypeDeclarer visit(ArrayExpression e) {
+        if (e.elements().isEmpty())
+            return new VoidTypeDeclarer(e.pos());
+
         var td = visit(e.elements().getFirst());
         var le = new LiteralExpression(e.pos(),
                 new IntegerLiteral(e.pos(),
@@ -158,47 +180,50 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     @Override
     public TypeDeclarer visit(LiteralExpression e) {
-        return switch (e.literal()) {
-            case IntegerLiteral ee -> Primitive.INT.declarer(ee.pos());
-            case FloatLiteral ee -> Primitive.FLOAT.declarer(ee.pos());
-            case BoolLiteral ee -> Primitive.BOOL.declarer(ee.pos());
-            case StringLiteral ee -> new MemTypeDeclarer(ee.pos(),
-                    true, Optional.empty(), Optional.empty());
-            case null, default -> semantic(
-                    "can'nt infer the type by: %s", e.literal());
-        };
+        return new LiteralTypeDeclarer(e.pos(), e.literal());
     }
 
-    public Entity getMember(PrimaryExpression subject,
-                            Identifier member) {
-        var td = visit(subject);
-        if (td instanceof MemTypeDeclarer mtd) {
-            if (mtd.mapped().none())
+    public Groups.G2<TypeDeclarer, Entity>
+    getMember(PrimaryExpression subject,
+              Identifier member) {
+        var std = visit(subject);
+        var mtd = std;
+        if (mtd instanceof MemTypeDeclarer mem) {
+            if (mem.mapped().none())
                 return semantic("unmaped: %s", subject.pos());
-            td = mtd.mapped().get();
+            mtd = mem.mapped().get();
         }
-        if (!(td instanceof DefinedTypeDeclarer dtd))
-            return semantic("required user-defined-type: %s", td);
+        if (!(mtd instanceof DefinedTypeDeclarer dtd))
+            return semantic("required user-defined-type: %s", mtd);
 
         var dt = dtd.definedType();
         var o = context.findType(dt.symbol());
         if (o.none()) return semantic(
                 "undefined type: %s", dt.symbol());
         var type = o.get();
+
         if (type instanceof StructureDefinition sd) {
             var sf = sd.fields().tryGet(member);
-            if (sf.has()) return sf.get();
+            if (sf.has()) return Groups.g2(std, sf.get());
 
             return semantic("%s %s has no member %s",
                     sd.domain(), type.symbol(), member);
         }
+
         if (type instanceof ClassDefinition cd) {
             var cf = cd.fields().tryGet(member);
-            if (cf.has()) return cf.get();
+            if (cf.has()) return Groups.g2(std, cf.get());
             var cm = cd.methods().tryGet(member);
-            if (cm.has()) return cm.get();
+            if (cm.has()) return Groups.g2(std, cm.get());
             return semantic("class %s has no field %s",
                     type.symbol(), member);
+        }
+
+        if (type instanceof EnumDefinition ed) {
+            var ev = ed.values().tryGet(member);
+            if (ev.has()) return Groups.g2(std, ev.get());
+            return semantic("enum %s.%s not define: %s",
+                    type.symbol(), member, member.pos());
         }
 
         return semantic("%s can't have member", type.symbol());
@@ -208,15 +233,18 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     public TypeDeclarer visit(MemberOfExpression mo) {
         if (!mo.generic().isEmpty()) return unsupported("generic");
 
-        var m = getMember(mo.subject(), mo.member());
+        var g2 = getMember(mo.subject(), mo.member());
 
-        if (m instanceof StructureField sf) return sf.type();
+        if (g2.b() instanceof StructureField sf) return sf.type();
 
-        if (m instanceof ClassField cf) return cf.type();
+        if (g2.b() instanceof ClassField cf) return cf.type();
 
-        if (m instanceof ClassMethod cm)
+        if (g2.b() instanceof ClassMethod cm)
             return new FuncTypeDeclarer(cm.pos(),
                     cm.func().prototype(), mo.generic());
+
+        if (g2.b() instanceof EnumDefinition.Value)
+            return g2.a();
 
         return unreachable();
     }
@@ -251,8 +279,9 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     }
 
     @Override
-    public TypeDeclarer visit(ObjectExpression e) {
-        return null;
+    public TypeDeclarer visit(ObjectExpression oe) {
+        var entries = oe.entries().map(this::visit);
+        return new ObjectTypeDeclarer(oe.pos(), new IdentifierTable<>(entries));
     }
 
     @Override
@@ -308,6 +337,11 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     @Override
     public TypeDeclarer visit(PrimitiveTypeDeclarer e) {
+        return e;
+    }
+
+    @Override
+    public TypeDeclarer visit(LiteralTypeDeclarer e) {
         return e;
     }
 

@@ -7,7 +7,8 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.util.Optional;
 
-public class ClassDefinition extends TypeDefinition {
+public class ClassDefinition extends TypeDefinition
+        implements HaveFields<ClassField> {
     private Optional<DefinedType> parent;
     private SymbolTable<DefinedType> impl;
     private IdentifierTable<ClassField> fields;
@@ -53,10 +54,6 @@ public class ClassDefinition extends TypeDefinition {
 
     public MacroTable macros() {
         return macros;
-    }
-
-    public boolean same(ClassDefinition o) {
-        return symbol().equals(o.symbol());
     }
 
     //
