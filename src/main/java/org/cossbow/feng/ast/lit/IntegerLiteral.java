@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.lit;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Primitive;
+import org.cossbow.feng.util.Optional;
 
 import java.math.BigInteger;
 
@@ -36,8 +37,8 @@ public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral
     }
 
     @Override
-    public boolean compatible(Primitive primitive) {
-        return primitive.isInteger();
+    public Optional<Primitive.Kind> compatible() {
+        return Optional.of(Primitive.Kind.INTEGER);
     }
 
     @Override

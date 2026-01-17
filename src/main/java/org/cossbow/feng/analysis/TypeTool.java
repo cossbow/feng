@@ -2,9 +2,7 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.Field;
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
-import org.cossbow.feng.ast.dcl.MemTypeDeclarer;
-import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 import org.cossbow.feng.ast.oop.ClassDefinition;
@@ -138,5 +136,14 @@ public class TypeTool {
         return getMethod(cd, name);
     }
 
+    //
+
+    public static Optional<Primitive.Kind> primitiveKind(TypeDeclarer td) {
+        if (td instanceof PrimitiveTypeDeclarer ptd)
+            return Optional.of(ptd.primitive().kind);
+        if (td instanceof LiteralTypeDeclarer ltd)
+            return ltd.literal().compatible();
+        return Optional.empty();
+    }
 
 }

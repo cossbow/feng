@@ -1,41 +1,36 @@
 package org.cossbow.feng.ast;
 
+import java.util.Set;
+
 public enum BinaryOperator {
 
     // arithmetic
-    POW(Kind.MATH),
-    MUL(Kind.MATH), DIV(Kind.MATH), MOD(Kind.MATH),
-    ADD(Kind.MATH), SUB(Kind.MATH),
+    POW,
+    MUL, DIV, MOD,
+    ADD, SUB,
 
     // bit
-    LSHIFT(Kind.BIT), RSHIFT(Kind.BIT),
-    BITAND(Kind.BIT),
-    BITXOR(Kind.BIT),
-    BITOR(Kind.BIT),
+    LSHIFT, RSHIFT,
+    BITAND,
+    BITXOR,
+    BITOR,
 
     // relation
-    EQ(Kind.REL), NE(Kind.REL),
-    GT(Kind.REL), LT(Kind.REL),
-    LE(Kind.REL), GE(Kind.REL),
+    EQ, NE,
+    GT, LT,
+    LE, GE,
 
     // bool
-    AND(Kind.BOOL),
-    OR(Kind.BOOL),
+    AND,
+    OR,
 
     ;
 
-    public final Kind kind;
-
-    BinaryOperator(Kind kind) {
-        this.kind = kind;
-    }
-
     //
 
-    public enum Kind {
-        MATH,
-        BIT,
-        REL,
-        BOOL,
-    }
+    public static final Set<BinaryOperator> SetMath = Set.of(POW, MUL, DIV, MOD, ADD, SUB);
+    public static final Set<BinaryOperator> SetBits = Set.of(LSHIFT, RSHIFT, BITAND, BITXOR, BITOR);
+    public static final Set<BinaryOperator> SetRel = Set.of(EQ, NE, GT, LT, LE, GE);
+    public static final Set<BinaryOperator> SetLogic = Set.of(EQ, NE, AND, OR, BITAND, BITOR);
+
 }

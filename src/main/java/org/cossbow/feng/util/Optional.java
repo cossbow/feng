@@ -7,7 +7,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 public class Optional<T> {
-    private T value;
+    private final T value;
 
     private Optional(T value) {
         this.value = value;

@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.lit;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Primitive;
+import org.cossbow.feng.util.Optional;
 
 public class BoolLiteral extends Literal {
     private final boolean value;
@@ -25,8 +26,8 @@ public class BoolLiteral extends Literal {
     }
 
     @Override
-    public boolean compatible(Primitive primitive) {
-        return primitive.isBool();
+    public Optional<Primitive.Kind> compatible() {
+        return Optional.of(Primitive.Kind.BOOL);
     }
 
     @Override

@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.lit;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Primitive;
+import org.cossbow.feng.util.Optional;
 
 import java.math.BigDecimal;
 
@@ -23,8 +24,8 @@ public class FloatLiteral extends Literal {
     }
 
     @Override
-    public boolean compatible(Primitive primitive) {
-        return primitive.isFloat();
+    public Optional<Primitive.Kind> compatible() {
+        return Optional.of(Primitive.Kind.FLOAT);
     }
 
     @Override

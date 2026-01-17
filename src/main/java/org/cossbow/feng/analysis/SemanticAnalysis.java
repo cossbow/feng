@@ -23,7 +23,10 @@ import org.cossbow.feng.visit.EntityVisitor;
 import org.cossbow.feng.visit.SymbolContext;
 
 import java.math.BigInteger;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
 
 import static org.cossbow.feng.util.ErrorUtil.*;
 
@@ -847,7 +850,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         var right = typeDeducer.visit(as.tuple()).tuple();
         if (assignable(left, right)) return as;
 
-        return semantic("prototype not compatible: %s", as.pos());
+        return semantic("type not compatible: %s", as.pos());
     }
 
     public Entity visit(CallStatement e) {

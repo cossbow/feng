@@ -1,5 +1,6 @@
 package org.cossbow.feng.analysis;
 
+import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.IdentifierTable;
@@ -77,36 +78,39 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     @Override
     public TypeDeclarer visit(BinaryExpression e) {
-        var lt = visit(e.left());
-        var rt = visit(e.right());
-        if (!lt.equals(rt)) return semantic(
-                "type of tow operands must same: %s", e.pos());
-        if (!(lt instanceof PrimitiveTypeDeclarer lpt &&
-                rt instanceof PrimitiveTypeDeclarer rpt))
-            return unsupported("binary-operation: %s", e.pos());
+        var l = visit(e.left());
+        var r = visit(e.left());
 
-        Primitive lp = lpt.primitive(), rp = rpt.primitive();
-        switch (e.operator()) {
-            case POW, MUL, DIV, MOD, ADD, SUB -> {
-                if (!lp.isBool() && !rp.isBool()) return lt;
+        var lk = TypeTool.primitiveKind(l);
+        var rk = TypeTool.primitiveKind(r);
+        if (lk.none() || rk.none())
+            return semantic("require primitive: %s", e.left().pos());
+
+        Primitive.Kind lp = lk.must(), rp = rk.must();
+        if (lp != rp)
+            return semantic("require same type: %s", e.pos());
+
+        var op = e.operator();
+        switch (lp){
+            case INTEGER -> {
+                if (BinaryOperator.SetMath.contains(op) ||
+                        BinaryOperator.SetBits.contains(op))
+                    return l;
+                if (BinaryOperator.SetRel.contains(op))
+                    return Primitive.BOOL.declarer(e.pos());
             }
-            case LSHIFT, RSHIFT, BITAND, BITXOR, BITOR -> {
-                if (lp.isInteger() && rp.isInteger()) return lt;
-                if (lp.isBool() && rp.isBool()) return lt;
+            case FLOAT -> {
+                if (BinaryOperator.SetMath.contains(op))
+                    return l;
+                if (BinaryOperator.SetRel.contains(op))
+                    return Primitive.BOOL.declarer(e.pos());
             }
-            case GT, LT, LE, GE -> {
-                if (!lp.isBool() && !rp.isBool())
-                    return Primitive.BOOL.declarer(lt.pos());
-            }
-            case EQ, NE -> {
-                return Primitive.BOOL.declarer(lt.pos());
-            }
-            case AND, OR -> {
-                if (lp.isBool() && rp.isBool()) return lt;
+            case BOOL -> {
+                if (BinaryOperator.SetLogic.contains(op))
+                    return l;
             }
         }
-        return semantic("binary-operation: %s %s %s",
-                lt, e.operator(), rt);
+        return semantic("binary-operate not for: %s", l);
     }
 
     @Override

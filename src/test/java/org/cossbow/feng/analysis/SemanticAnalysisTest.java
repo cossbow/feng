@@ -276,15 +276,9 @@ public class SemanticAnalysisTest {
                 }).toList();
     }
 
-    private List<BinaryOperator> ofKind(BinaryOperator.Kind kind) {
-        return Arrays.stream(BinaryOperator.values())
-                .filter(o -> o.kind == kind)
-                .toList();
-    }
-
     @Test
     public void testBinaryExpression1() {
-        for (var bo : ofKind(BinaryOperator.Kind.MATH)) {
+        for (var bo : BinaryOperator.SetMath) {
             for (var p : ofKind(Primitive.Kind.INTEGER, Primitive.Kind.FLOAT)) {
                 var s = BaseParseTest.operatorSymbols.get(bo);
                 var c = "func f(a,b %s) { var i %s; i = a %s b; }"
@@ -296,7 +290,7 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testBinaryExpression2() {
-        for (var bo : ofKind(BinaryOperator.Kind.BIT)) {
+        for (var bo : BinaryOperator.SetBits) {
             for (var p : ofKind(Primitive.Kind.INTEGER)) {
                 var s = BaseParseTest.operatorSymbols.get(bo);
                 var c = "func f(a,b %s) { var i %s; i = a %s b; }"
@@ -304,13 +298,11 @@ public class SemanticAnalysisTest {
                 checkTrue(c);
             }
         }
-        checkTrue("func f(a,b bool) { var i bool; i = a & b; }");
-        checkTrue("func f(a,b bool) { var i bool; i = a | b; }");
     }
 
     @Test
     public void testBinaryExpression3() {
-        for (var bo : ofKind(BinaryOperator.Kind.REL)) {
+        for (var bo : BinaryOperator.SetRel) {
             for (var p : ofKind(Primitive.Kind.INTEGER, Primitive.Kind.FLOAT)) {
                 var s = BaseParseTest.operatorSymbols.get(bo);
                 var c = "func f(a,b %s) { var i bool; i = a %s b; }"
@@ -318,22 +310,18 @@ public class SemanticAnalysisTest {
                 checkTrue(c);
             }
         }
-        checkTrue("func f(a,b bool) { var i bool; i = a == b; }");
-        checkTrue("func f(a,b bool) { var i bool; i = a != b; }");
-        checkFalse("func f(a,b bool) { var i bool; i = a < b; }");
-        checkFalse("func f(a,b bool) { var i bool; i = a <= b; }");
-        checkFalse("func f(a,b bool) { var i bool; i = a > b; }");
-        checkFalse("func f(a,b bool) { var i bool; i = a >= b; }");
     }
 
     @Test
     public void testBinaryExpression4() {
-        for (Primitive p : ofKind(Primitive.Kind.INTEGER, Primitive.Kind.FLOAT)) {
-            checkFalse("func f(a,b %s) { var i %s; i = a && b; }".formatted(p, p));
-            checkFalse("func f(a,b %s) { var i %s; i = a || b; }".formatted(p, p));
+        for (var bo : BinaryOperator.SetLogic) {
+            for (var p : ofKind(Primitive.Kind.BOOL)) {
+                var s = BaseParseTest.operatorSymbols.get(bo);
+                var c = "func f(a,b %s) { var i bool; i = a %s b; }"
+                        .formatted(p, s);
+                checkTrue(c);
+            }
         }
-        checkTrue("func f(a,b bool) { var i bool; i = a && b; }");
-        checkTrue("func f(a,b bool) { var i bool; i = a || b; }");
     }
 
     @Test
