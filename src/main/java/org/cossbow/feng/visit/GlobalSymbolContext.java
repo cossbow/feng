@@ -21,7 +21,7 @@ public class GlobalSymbolContext implements SymbolContext {
     public Optional<TypeDefinition> findType(Symbol symbol) {
         checkModule(symbol);
 
-        var pd = Primitive.findType(symbol.name());
+        var pd = Primitive.findType(symbol.name().value());
         if (pd.has()) return Optional.of(pd.get());
 
         var td = gst.namedTypes.tryGet(symbol.name());

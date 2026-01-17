@@ -194,6 +194,66 @@ public class SemanticAnalysisTest {
         checkFalse("enum I {WAIT,} class A (I) {}");
     }
 
+    @Test
+    public void testClassImpl4() {
+        var def = "interface I { get() int; } ";
+        checkFalse(def + "class F (I) {}");
+        checkTrue(def + "class F (I) { func get() int { return 0; } }");
+        checkFalse(def + "class F (I) { func get() int8 { return 0; } }");
+    }
+
+    @Test
+    public void testClassImpl5() {
+        var def = "class A{} class B:A{} interface I { get() *A; } ";
+        checkTrue(def + "class F (I) { func get() *A { return nil; } }");
+        checkTrue(def + "class F (I) { func get() *B { return nil; } }");
+    }
+
+    @Test
+    public void testClassImpl6() {
+        var def = "class A{} class B:A{} interface I { get(*A); } ";
+        checkTrue(def + "class F (I) { func get(a *A) {} }");
+        checkFalse(def + "class F (I) { func get(b *B) {} }");
+    }
+
+    @Test
+    public void testClassImpl7() {
+        var def = "class A{} class B:A{} interface I { get(*A, int) (*A, bool); } ";
+        checkTrue(def + "class F (I) { func get(a *A, i int) (*A, bool) { return a, i>0; } }");
+        checkFalse(def + "class F (I) { func get(a *A) (*A, bool) { return a, i>0; } }");
+        checkFalse(def + "class F (I) { func get(a *A, i int) (*A) { return a; } }");
+    }
+
+    @Test
+    public void testClassImpl8() {
+        var def = "interface I { get() int; set(int); } ";
+        checkTrue(def + "class F (I) { func get() int { return 0; } func set(i int) {} }");
+        checkFalse(def + "class F (I) { func get() int { return 0; } }");
+        checkFalse(def + "class F (I) { func set(i int) {} }");
+    }
+
+    @Test
+    public void testClassImpl9() {
+        var def = "interface I { get() int; } interface J { set(int); } ";
+        checkTrue(def + "class F (I,J) { func get() int { return 0; } func set(i int) {} }");
+        checkFalse(def + "class F (I,J) { func get() int { return 0; } }");
+        checkFalse(def + "class F (I,J) { func set(i int) {} }");
+    }
+
+    @Test
+    public void testClassImpl10() {
+        var def = "interface I { set(int); } class P { func set(i int) {} }";
+        checkTrue(def + "class F:P (I) {}");
+        checkFalse(def + "class F (I) {}");
+    }
+
+    @Test
+    public void testClassImpl11() {
+        var def = "interface I { get() int; } interface J { set(int); } interface IJ {I;J;} ";
+        checkTrue(def + "class F (IJ) { func get() int { return 0; } func set(i int) {} }");
+        checkFalse(def + "class F (IJ) { func get() int { return 0; } }");
+        checkFalse(def + "class F (IJ) { func set(i int) {} }");
+    }
 
     @Test
     public void testClassField1() {
@@ -741,6 +801,16 @@ public class SemanticAnalysisTest {
         checkTrue("struct R{ id int; } func f() { var r R; r.id = 1; }");
         checkFalse("struct R{ id int; } func f(r R) { r.id = 1; }");
     }
+
+    @Test
+    public void testStructField7() {
+        checkTrue("struct A{b B;} struct B{a A;}");
+
+    }
+
+    //
+
+
 
     // enum
 

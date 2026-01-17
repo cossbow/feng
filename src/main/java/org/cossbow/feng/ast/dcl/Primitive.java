@@ -63,8 +63,12 @@ public enum Primitive {
         return Optional.of(CodeMap.get(code));
     }
 
-    public static Optional<PrimitiveDefinition> findType(Identifier name) {
-        var p = CodeMap.get(name.value());
+    public static PrimitiveDefinition findType(Primitive primitive) {
+        return PrimitiveDefinition.cache.get(primitive);
+    }
+
+    public static Optional<PrimitiveDefinition> findType(String name) {
+        var p = CodeMap.get(name);
         if (p == null) return Optional.empty();
         return Optional.of(PrimitiveDefinition.cache.get(p));
     }

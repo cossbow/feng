@@ -25,7 +25,7 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
     }
 
     public UniqueTable(List<Node<K, V>> nodes) {
-        this.nodes = List.copyOf(nodes);
+        this.nodes = new ArrayList<>(nodes);
         table = new HashMap<>();
         for (Node<K, V> n : nodes)
             addIndex(n);

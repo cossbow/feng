@@ -27,8 +27,8 @@ import org.cossbow.feng.visit.SymbolContext;
 import java.math.BigInteger;
 import java.util.*;
 
-import static org.cossbow.feng.ast.TypeDomain.INTERFACE;
-import static org.cossbow.feng.util.DAGUtil.*;
+import static org.cossbow.feng.util.DAGUtil.bfsVisit;
+import static org.cossbow.feng.util.DAGUtil.checkCyclic;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class SemanticAnalysis implements EntityVisitor<Entity> {
@@ -59,13 +59,63 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("require const value: %s", e.pos());
     }
 
+    private void visitInterface(IdentifierTable<TypeDefinition> types) {
+        for (var t : types) {
+            if (t instanceof InterfaceDefinition id) visit(id);
+        }
+    }
+
+    private void visitClass(IdentifierTable<TypeDefinition> types) {
+        for (var t : types) {
+            if (t instanceof ClassDefinition cd) visit(cd);
+        }
+    }
+
+    private void visitEnum(IdentifierTable<TypeDefinition> types) {
+        for (var t : types) {
+            if (t instanceof EnumDefinition ed) visit(ed);
+        }
+    }
+
+    private void visitStructure(IdentifierTable<TypeDefinition> types) {
+        for (var t : types) {
+            if (t instanceof StructureDefinition sd) visit(sd);
+        }
+    }
+
+    private void visitFunc(IdentifierTable<TypeDefinition> types) {
+        for (var t : types) {
+            if (t instanceof PrototypeDefinition fd) visit(fd);
+        }
+    }
+
+    private void visitMem(IdentifierTable<TypeDefinition> types) {
+        for (var t : types) {
+            if (t instanceof MemDefinition md) visit(md);
+        }
+    }
+
+    private void visitAttribute(IdentifierTable<TypeDefinition> types) {
+        for (var t : types) {
+            if (t instanceof AttributeDefinition ad) visit(ad);
+        }
+    }
+
     public Entity visit(Source s) {
         var tab = s.table();
         for (var f : tab.variables)
             visit(f);
 
-        for (var t : tab.namedTypes) visit(t);
+        visitEnum(tab.namedTypes);
+        visitStructure(tab.namedTypes);
+        visitMem(tab.namedTypes);
+        visitInterface(tab.namedTypes);
+        visitClass(tab.namedTypes);
+        visitFunc(tab.namedTypes);
+        visitAttribute(tab.namedTypes);
+
         for (var t : tab.unnamedTypes) visit(t);
+
         for (var f : tab.namedFunctions) visit(f);
 
         return s;
@@ -235,6 +285,15 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (!def.generic().isEmpty())
             return unsupported("generic");
 
+        checkCyclic(def, d -> {
+            return def.fields().stream().map(StructureField::type)
+                    .filter(t -> t instanceof DefinedTypeDeclarer)
+                    .map(t -> ((DefinedTypeDeclarer) t).definedType())
+                    .map(this::visit)
+                    .filter(t -> t instanceof StructureDefinition)
+                    .map(t -> (StructureDefinition) t)
+                    .toList();
+        });
         for (var f : def.fields())
             visit(f);
 
@@ -258,12 +317,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 unsupported("generic");
                 return;
             }
-            var def = context.findType(dtd.definedType().symbol());
-            if (def.none()) {
-                semantic("not define: %s", dtd.definedType().pos());
-                return;
-            }
-            if (def.get() instanceof StructureDefinition)
+            var def = visit(dtd.definedType());
+            if (def instanceof StructureDefinition)
                 return;
 
             semantic("require structure type: %s", dtd.definedType().pos());
@@ -339,31 +394,29 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return def;
     }
 
-    private boolean checkParams(Prototype l, Prototype r) {
-        return l.parameterSet().equals(r.parameterSet());
-    }
-
-    private boolean checkReturn(Prototype l, Prototype r) {
-        return assignable(l.returnSet(), r.returnSet());
-    }
+    //
 
     private int compatible(Prototype l, Prototype r) {
-        if (!l.parameterSet().equals(r.parameterSet())) {
+        if (!l.parameterSet().equals(r.parameterSet()))
             return 1;
-        }
-        if (assignable(l.returnSet(), r.returnSet()))
-            return 0;
-        return 2;
+        if (!assignable(l.returnSet(), r.returnSet()))
+            return 2;
+        return 0;
     }
 
     // class define
 
-    private void checkInheritCompatible(
-            ClassDefinition parent, ClassDefinition child) {
+    private void checkInherit(
+            ClassDefinition parent, ClassDefinition child,
+            IdentifierTable<ClassField> allFields,
+            IdentifierTable<ClassMethod> allMethods) {
         // 检查同名属性
         for (var pf : parent.fields()) {
-            var cf = child.fields().tryGet(pf.name());
-            if (cf.none()) continue;
+            var cf = allFields.tryGet(pf.name());
+            if (cf.none()) {
+                allFields.add(pf.name(), pf);
+                continue;
+            }
             semantic("can't hide parent field: %s%s",
                     pf.name(), cf.get().pos());
             return;
@@ -371,8 +424,11 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         // 检查方法覆盖是否兼容
         for (var pm : parent.methods()) {
-            var o = child.methods().tryGet(pm.name());
-            if (o.none()) continue;
+            var o = allMethods.tryGet(pm.name());
+            if (o.none()) {
+                allMethods.add(pm.name(), pm);
+                continue;
+            }
             var cm = o.must();
             if (pm.export() != cm.export()) {
                 semantic("override require same export: ",
@@ -381,25 +437,25 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             }
             var pp = pm.func().prototype();
             var cp = cm.func().prototype();
-            if (!checkParams(pp, cp))
-                semantic("parameters not same: %s", cm.pos());
-            if (!checkReturn(pp, cp))
-                semantic("returns not compatible: %s", cm.pos());
+            var re = compatible(pp, cp);
+            switch (re) {
+                case 1 -> semantic("parameters not same: %s", cp.pos());
+                case 2 -> semantic("returns not compatible: %s", cp.pos());
+            }
         }
 
     }
 
     private Optional<ClassDefinition> findParent(ClassDefinition c) {
-        var dt = context.findType(c.inherit().must().symbol());
-        if (dt.none())
-            return semantic("%s not defined", c.inherit().must().symbol());
-
-        if (dt.get() instanceof ClassDefinition pcd)
+        var dt = visit(c.inherit().must());
+        if (dt instanceof ClassDefinition pcd)
             return Optional.of(pcd);
-        return semantic("require class: %s", dt.must().symbol());
+        return semantic("require class: %s", dt.symbol());
     }
 
     private void checkAcyclicInherit(ClassDefinition cd) {
+        var allFields = new IdentifierTable<>(cd.fields().nodes());
+        var allMethods = new IdentifierTable<>(cd.methods().nodes());
         var set = new HashSet<Symbol>();
         var c = cd;
         while (c.inherit().has()) {
@@ -408,12 +464,45 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
             var parent = findParent(c);
             if (parent.has()) {
-                checkInheritCompatible(parent.get(), cd);
+                cd.parent().setIfNone(parent.must());
+
+                checkInherit(parent.get(), cd, allFields, allMethods);
+
                 c = parent.get();
                 continue;
             }
 
             semantic("inherit must class: %s", cd.inherit().must().pos());
+        }
+        cd.allFields().set(allFields);
+        cd.allMethods().set(allMethods);
+    }
+
+    private void checkImplList(InterfaceDefinition id, ClassDefinition cd) {
+        var methods = cd.allMethods().must();
+        for (var im : id.all().must()) {
+            var cm = methods.tryGet(im.name());
+            if (cm.none()) {
+                semantic("%s unimplement method: %s%s",
+                        cd.symbol(), im.name(), im.pos());
+                return;
+            }
+            var re = compatible(im.prototype(), cm.must().prototype());
+            switch (re) {
+                case 1 -> semantic("unimplement method: %s", im.pos());
+                case 2 -> semantic("returns not consistent: %s", im.pos());
+            }
+        }
+    }
+
+    private void checkImplList(ClassDefinition cd) {
+        for (var dt : cd.impl()) {
+            var td = visit(dt);
+            if ((td instanceof InterfaceDefinition id)) {
+                checkImplList(id, cd);
+                continue;
+            }
+            semantic("require interface: %s", dt.pos());
         }
     }
 
@@ -428,12 +517,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return unsupported("generic");
 
         checkAcyclicInherit(cd);
+        checkImplList(cd);
 
-        for (var i : cd.impl()) {
-            var t = visit(i);
-            if (!(t instanceof InterfaceDefinition))
-                return semantic("require interface: %s", i.pos());
-        }
         for (var f : cd.fields()) visit(f);
         for (var m : cd.methods()) visit(m);
 
@@ -468,7 +553,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return cm;
     }
 
-    private List<InterfaceDefinition> findParts(InterfaceDefinition def) {
+    private List<InterfaceDefinition>
+    findParts(InterfaceDefinition def) {
         return def.parts().stream().map(p -> {
             var t = visit(p);
             if (t instanceof InterfaceDefinition id) return id;
@@ -488,23 +574,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return Optional.of(Groups.g2(m, a));
         }
         return Optional.empty();
-    }
-
-    private void bfsParts(InterfaceDefinition def) {
-        var visited = new HashSet<Symbol>();
-        var queue = new ArrayDeque<InterfaceDefinition>(4);
-        queue.addLast(def);
-
-        while (!queue.isEmpty()) {
-            var cur = queue.removeFirst();
-            if (!visited.add(cur.symbol()))
-                continue;
-
-            for (var part : findParts(def)) {
-                queue.addLast(part);
-            }
-        }
-
     }
 
     public Entity visit(InterfaceDefinition def) {
@@ -667,13 +736,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     private boolean initializable(
             DefinedTypeDeclarer l, ObjectTypeDeclarer o) {
-        var lt = context.findType(l.definedType().symbol());
-        assert lt.has();
+        var lt = visit(l.definedType());
 
-        if (lt.get() instanceof StructureDefinition def)
+        if (lt instanceof StructureDefinition def)
             return initializable(def, o);
 
-        if (lt.get() instanceof ClassDefinition def)
+        if (lt instanceof ClassDefinition def)
             return initializable(def, o);
 
         return false;
@@ -725,9 +793,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (r.same(l)) return true;
         if (r.inherit().none()) return false;
 
-        var pt = context.findType(r.inherit().get().symbol());
-        assert pt.has();
-        if (pt.get() instanceof ClassDefinition pc)
+        var pt = visit(r.inherit().get());
+        if (pt instanceof ClassDefinition pc)
             return referable(l, pc);
 
         return false;
@@ -741,9 +808,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         for (var dt : r.impl()) {
             visit(dt.generic());
-            var def = context.findType(dt.symbol());
-            assert def.has();
-            if (def.get() instanceof InterfaceDefinition id)
+            var def = visit(dt);
+            if (def instanceof InterfaceDefinition id)
                 if (referable(l, id)) return true;
         }
 
@@ -758,9 +824,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         for (var dt : r.parts()) {
             visit(dt.generic());
-            var def = context.findType(dt.symbol());
-            assert def.has();
-            if (def.get() instanceof InterfaceDefinition id)
+            var def = visit(dt);
+            if (def instanceof InterfaceDefinition id)
                 if (referable(l, id)) return true;
         }
 
@@ -800,8 +865,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         assert l.definedType().generic().isEmpty() : "generic";
         assert r.definedType().generic().isEmpty() : "generic";
 
-        var lt = context.findType(l.definedType().symbol()).must();
-        var rt = context.findType(r.definedType().symbol()).must();
+        var lt = visit(l.definedType());
+        var rt = visit(r.definedType());
         if (l.refer().none())
             return lt.equals(rt);   // 变量为值类型就要求全相同
 

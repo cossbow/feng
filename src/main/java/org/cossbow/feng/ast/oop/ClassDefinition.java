@@ -60,11 +60,20 @@ public class ClassDefinition extends TypeDefinition
     //
 
     private transient Lazy<ClassDefinition> parent = Lazy.nil();
+    private transient Lazy<IdentifierTable<ClassField>> allFields = Lazy.nil();
+    private transient Lazy<IdentifierTable<ClassMethod>> allMethods = Lazy.nil();
 
     public Lazy<ClassDefinition> parent() {
         return parent;
     }
 
+    public Lazy<IdentifierTable<ClassField>> allFields() {
+        return allFields;
+    }
+
+    public Lazy<IdentifierTable<ClassMethod>> allMethods() {
+        return allMethods;
+    }
     //
 
     public static final Identifier ObjectName = new Identifier(Position.ZERO, "Object");

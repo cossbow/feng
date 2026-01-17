@@ -25,6 +25,12 @@ public class Lazy<T> {
         this.value = value;
     }
 
+    public void setIfNone(T value) {
+        T v = this.value;
+        if (v != null) return;
+        this.value = value;
+    }
+
     public boolean none() {
         return value == null;
     }
