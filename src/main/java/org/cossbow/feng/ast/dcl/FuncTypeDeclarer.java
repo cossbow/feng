@@ -25,11 +25,11 @@ public class FuncTypeDeclarer extends TypeDeclarer {
     }
 
     @Override
-    public boolean equals(Object other) {
-        if (other instanceof FuncTypeDeclarer ftd) {
-            return prototype.equals(ftd.prototype)
-                    || generic.equals(ftd.generic);
-        }
-        return false;
+    public boolean equals(Object o) {
+        if (!(o instanceof FuncTypeDeclarer t))
+            return false;
+
+        return prototype.equals(t.prototype)
+                || generic.equals(t.generic);
     }
 }

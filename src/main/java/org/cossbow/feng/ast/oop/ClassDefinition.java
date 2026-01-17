@@ -5,11 +5,12 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
+import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
 public class ClassDefinition extends TypeDefinition
         implements HaveFields<ClassField> {
-    private Optional<DefinedType> parent;
+    private Optional<DefinedType> inherit;
     private SymbolTable<DefinedType> impl;
     private IdentifierTable<ClassField> fields;
     private IdentifierTable<ClassMethod> methods;
@@ -19,21 +20,21 @@ public class ClassDefinition extends TypeDefinition
                            Modifier modifier,
                            Symbol symbol,
                            TypeParameters generic,
-                           Optional<DefinedType> parent,
+                           Optional<DefinedType> inherit,
                            SymbolTable<DefinedType> impl,
                            IdentifierTable<ClassField> fields,
                            IdentifierTable<ClassMethod> methods,
                            MacroTable macros) {
         super(pos, modifier, symbol, generic, TypeDomain.CLASS);
-        this.parent = parent;
+        this.inherit = inherit;
         this.impl = impl;
         this.fields = fields;
         this.methods = methods;
         this.macros = macros;
     }
 
-    public Optional<DefinedType> parent() {
-        return parent;
+    public Optional<DefinedType> inherit() {
+        return inherit;
     }
 
     public SymbolTable<DefinedType> impl() {
@@ -54,6 +55,14 @@ public class ClassDefinition extends TypeDefinition
 
     public MacroTable macros() {
         return macros;
+    }
+
+    //
+
+    private transient Lazy<ClassDefinition> parent = Lazy.nil();
+
+    public Lazy<ClassDefinition> parent() {
+        return parent;
     }
 
     //

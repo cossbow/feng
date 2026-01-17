@@ -147,11 +147,11 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         write("class ");
         visit(cd.symbol());
         write(' ');
-        if (cd.parent().has() || !cd.impl().isEmpty()) {
+        if (cd.inherit().has() || !cd.impl().isEmpty()) {
             write(": public ");
             int i = 0;
-            if (cd.parent().has()) {
-                visit(cd.parent().get());
+            if (cd.inherit().has()) {
+                visit(cd.inherit().get());
             } else {
                 visit(cd.impl().getValue(0));
                 i = 1;

@@ -194,7 +194,7 @@ public class ExportImportTest extends BaseParseTest {
         var code = makeImports(mods) + "class Dev:%s(%s){}".formatted(parent,
                 String.join(",", impls));
         var def = (ClassDefinition) doParseType(code, "Dev");
-        Assertions.assertEquals(parent, def.parent().must().symbol());
+        Assertions.assertEquals(parent, def.inherit().must().symbol());
         for (int i = 0; i < ifs.length; i++) {
             Assertions.assertEquals(ifs[i], def.impl().getValue(i).symbol());
         }

@@ -33,11 +33,12 @@ public class MemTypeDeclarer extends TypeDeclarer
     }
 
     @Override
-    public boolean equals(Object other) {
-        if (other instanceof MemTypeDeclarer mtd) {
-            return readonly == mtd.readonly;
-        }
-        return false;
+    public boolean equals(Object o) {
+        if (!(o instanceof MemTypeDeclarer t))
+            return false;
+
+        return readonly == t.readonly &&
+                refer.equals(t.refer);
     }
 
 }

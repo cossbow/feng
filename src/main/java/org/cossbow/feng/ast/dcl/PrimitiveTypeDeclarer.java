@@ -16,11 +16,11 @@ public class PrimitiveTypeDeclarer extends TypeDeclarer {
     }
 
     @Override
-    public boolean equals(Object other) {
-        if (other instanceof PrimitiveTypeDeclarer ptd) {
-            return primitive == ptd.primitive;
-        }
-        return false;
+    public boolean equals(Object o) {
+        if (!(o instanceof PrimitiveTypeDeclarer t))
+            return false;
+
+        return primitive == t.primitive;
     }
 
     @Override

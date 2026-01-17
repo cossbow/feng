@@ -104,6 +104,14 @@ public class SemanticAnalysisTest {
     public void testClassInherit3() {
         checkTrue("class A{ var id int; } class B:A{} func f(b *B) { b.id = 0; }");
         checkTrue("class A{ func go() {} } class B:A{} func f(b *B) { b.go(); }");
+        checkTrue("class A{ var id int; } class B:A{} func f(b B) { var v = b.id; }");
+        checkTrue("class A{ func go() {} } class B:A{} func f(b B) { b.go(); }");
+    }
+
+    @Test
+    public void testClassInherit4() {
+        checkFalse("class A:B{} class B:A{}");
+        checkFalse("class A:C{} class B:A{} class C:B{}");
     }
 
     @Test
@@ -128,6 +136,46 @@ public class SemanticAnalysisTest {
         checkFalse(def + "class B:A{ func f(s int8) {} }");
     }
 
+    @Test
+    public void testInterface1() {
+        var def = new StringBuilder();
+        var parts = new StringBuilder();
+        for (char i = 'A'; i <= 'Z'; i++) {
+            def.append("interface ").append(i).append(" {}");
+            parts.append(i).append(';');
+            checkTrue(def + "interface Alpha{%s}".formatted(parts));
+        }
+    }
+
+    @Test
+    public void testInterface2() {
+        checkFalse("interface A{B;} interface B{A;}");
+        checkFalse("interface A{C;} interface B{A;} interface C{B;}");
+        checkFalse("interface A{C;} interface B{A;} interface C{B;}");
+    }
+
+    @Test
+    public void testInterfaceMethod1() {
+        checkTrue("interface A{ run(); } func f(a *A) { a.run(); }");
+        checkTrue("interface A{ run(); } interface B{A;} func f(a *B) { a.run(); }");
+        checkTrue("interface A{ run(); } interface B{A;} interface C{B;} func f(a *C) { a.run(); }");
+    }
+
+    @Test
+    public void testInterfaceMethod2() {
+        checkTrue("interface A{ f()int; } interface B{ f()int; } interface C{A;B;}");
+        checkFalse("interface A{ f()int; } interface B{ f()uint; } interface C{A;B;}");
+    }
+
+    @Test
+    public void testInterfaceMethod3() {
+        var def = "class S{} class R:S{} ";
+        checkTrue(def + "interface A{ f()S; } interface B{ f()S; } interface C{A;B;}");
+        checkFalse(def + "interface A{ f()S; } interface B{ f()R; } interface C{A;B;}");
+        checkTrue(def + "interface A{ f()*S; } interface B{ f()*S; } interface C{A;B;}");
+        checkFalse(def + "interface A{ f()*S; } interface B{ f()*R; } interface C{A;B;}");
+        checkFalse(def + "interface A{ f()*S; } interface B{ f()*R; } interface C{A;B; f()*S; }");
+    }
 
     @Test
     public void testClassImpl1() {
@@ -551,6 +599,13 @@ public class SemanticAnalysisTest {
         checkFalse("func t(v [4]int) { var a [2][*]int = [v]; }");
         checkFalse("func t(v [4]int) { var a [*][4]int = [v]; }");
         checkTrue("func t(v [4]int) { var a [*][4]int = new([6][4]int, [v]); }");
+    }
+
+    @Test
+    public void testDeclareMultiArray4() {
+        checkTrue("func t(v int) { var a [2][4]int; a[0][1] = v; }");
+        checkFalse("func t(v int8) { var a [2][4]int; a[0][1] = v; }");
+        checkTrue("func t(a [2][4]int) int { return a[0][1]; }");
     }
 
     //

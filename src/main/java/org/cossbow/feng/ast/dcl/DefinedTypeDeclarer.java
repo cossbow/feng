@@ -29,9 +29,10 @@ public class DefinedTypeDeclarer extends TypeDeclarer
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof DefinedTypeDeclarer that)) return false;
-        return Objects.equals(definedType, that.definedType)
-                && Objects.equals(refer, that.refer);
+        if (!(o instanceof DefinedTypeDeclarer t))
+            return false;
+        return definedType.equals(t.definedType)
+                && refer.equals(t.refer);
     }
 
     @Override

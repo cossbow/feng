@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
+import org.cossbow.feng.util.Lazy;
 
 public class InterfaceDefinition extends TypeDefinition {
     private IdentifierTable<InterfaceMethod> methods;
@@ -36,8 +37,11 @@ public class InterfaceDefinition extends TypeDefinition {
         return macros;
     }
 
-    public boolean same(InterfaceDefinition o) {
-        return symbol().equals(o.symbol());
-    }
+    //
 
+    private transient Lazy<IdentifierTable<InterfaceMethod>> all = Lazy.nil();
+
+    public Lazy<IdentifierTable<InterfaceMethod>> all() {
+        return all;
+    }
 }

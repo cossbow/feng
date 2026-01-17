@@ -1,6 +1,7 @@
 package org.cossbow.feng.dag;
 
 
+import org.cossbow.feng.util.Groups;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -34,13 +35,13 @@ public class DAGTaskTest {
 
     {
         var edges = List.of(
-                Map.entry(N1, N2),
-                Map.entry(N1, N3),
-                Map.entry(N2, N4),
-                Map.entry(N3, N4),
-                Map.entry(N3, N5),
-                Map.entry(N5, N6),
-                Map.entry(N1, N6)
+                Groups.g2(N1, N2),
+                Groups.g2(N1, N3),
+                Groups.g2(N2, N4),
+                Groups.g2(N3, N4),
+                Groups.g2(N3, N5),
+                Groups.g2(N5, N6),
+                Groups.g2(N1, N6)
         );
 
         graph = new DAGGraph<>(List.of(values()), edges);

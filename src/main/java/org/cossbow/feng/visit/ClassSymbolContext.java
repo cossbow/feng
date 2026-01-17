@@ -22,7 +22,7 @@ public class ClassSymbolContext extends LocalSymbolContext {
     }
 
     private Optional<ClassDefinition> findParent(ClassDefinition cd) {
-        return cd.parent().flat(dt -> {
+        return cd.inherit().flat(dt -> {
             if (!dt.generic().isEmpty())
                 return unsupported("generic");
 

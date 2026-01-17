@@ -1,9 +1,6 @@
 package org.cossbow.feng.analysis;
 
-import org.cossbow.feng.ast.BinaryOperator;
-import org.cossbow.feng.ast.Entity;
-import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.DefinedType;
@@ -11,14 +8,10 @@ import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.lit.BoolLiteral;
 import org.cossbow.feng.ast.lit.FloatLiteral;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
-import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.oop.ClassDefinition;
-import org.cossbow.feng.ast.oop.ClassField;
-import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.oop.EnumDefinition;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
-import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.visit.EntityVisitor;
@@ -91,7 +84,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             return semantic("require same type: %s", e.pos());
 
         var op = e.operator();
-        switch (lp){
+        switch (lp) {
             case INTEGER -> {
                 if (BinaryOperator.SetMath.contains(op) ||
                         BinaryOperator.SetBits.contains(op))
@@ -135,7 +128,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             dt = new DefinedType(e.pos(), e.type(), TypeArguments.EMPTY);
         } else {
             var type = (ClassDefinition) context.findType(e.type()).must();
-            dt = type.parent().must();
+            dt = type.inherit().must();
         }
         return new DefinedTypeDeclarer(e.pos(), dt, Optional.empty());
     }
@@ -246,11 +239,14 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         var f = typeTool.getField(e.subject(), e.member());
         if (f.has()) return f.must().a();
 
-        var m = typeTool.getMethod(e.subject(), e.member());
-        if (m.has()) return new FuncTypeDeclarer(m.must().pos(),
-                m.must().func().prototype(), e.generic());
+        var o = typeTool.getMethod(e.subject(), e.member());
+        if (!o.has()) return unreachable();
 
-        return unreachable();
+        if (!(o.must() instanceof Method m)) return unreachable();
+
+        return new FuncTypeDeclarer(e.member().pos(),
+                m.prototype(), e.generic());
+
     }
 
     @Override

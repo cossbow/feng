@@ -1,6 +1,7 @@
 package org.cossbow.feng.dag;
 
 
+import org.cossbow.feng.util.Groups;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -15,10 +16,10 @@ public class DAGGraphTest {
     public void testLegal() {
         var nodes = Set.of(1, 2, 3, 4);
         var edges = List.of(
-                Map.entry(1, 2),
-                Map.entry(1, 3),
-                Map.entry(2, 4),
-                Map.entry(3, 4)
+                Groups.g2(1, 2),
+                Groups.g2(1, 3),
+                Groups.g2(2, 4),
+                Groups.g2(3, 4)
         );
         new DAGGraph<>(nodes, edges);
     }
@@ -27,10 +28,10 @@ public class DAGGraphTest {
     public void testIllegal1() {
         var nodes = Set.of(1, 2, 3, 4);
         var edges = List.of(
-                Map.entry(1, 2),
-                Map.entry(2, 3),
-                Map.entry(3, 4),
-                Map.entry(4, 1)
+                Groups.g2(1, 2),
+                Groups.g2(2, 3),
+                Groups.g2(3, 4),
+                Groups.g2(4, 1)
         );
         try {
             new DAGGraph<>(nodes, edges);
@@ -47,13 +48,13 @@ public class DAGGraphTest {
             nodes.add(i);
         }
         var edges = List.of(
-                Map.entry(1, 2),
-                Map.entry(1, 3),
-                Map.entry(2, 4),
-                Map.entry(3, 4),
-                Map.entry(3, 5),
-                Map.entry(5, 6),
-                Map.entry(6, 1)
+                Groups.g2(1, 2),
+                Groups.g2(1, 3),
+                Groups.g2(2, 4),
+                Groups.g2(3, 4),
+                Groups.g2(3, 5),
+                Groups.g2(5, 6),
+                Groups.g2(6, 1)
         );
 
         try {
@@ -69,13 +70,13 @@ public class DAGGraphTest {
     public void testKeys() {
         var nodes = Set.of(1, 2, 3, 4, 5, 6);
         var edges = List.of(
-                Map.entry(1, 2),
-                Map.entry(1, 3),
-                Map.entry(2, 4),
-                Map.entry(3, 4),
-                Map.entry(1, 5),
-                Map.entry(3, 5),
-                Map.entry(6, 5)
+                Groups.g2(1, 2),
+                Groups.g2(1, 3),
+                Groups.g2(2, 4),
+                Groups.g2(3, 4),
+                Groups.g2(1, 5),
+                Groups.g2(3, 5),
+                Groups.g2(6, 5)
         );
         var graph = new DAGGraph<>(nodes, edges);
 
@@ -87,10 +88,10 @@ public class DAGGraphTest {
     public void testDependency() {
         var nodes = List.of(1, 2, 3, 4);
         var edges = List.of(
-                Map.entry(1, 2),
-                Map.entry(1, 3),
-                Map.entry(2, 4),
-                Map.entry(3, 4)
+                Groups.g2(1, 2),
+                Groups.g2(1, 3),
+                Groups.g2(2, 4),
+                Groups.g2(3, 4)
         );
         var r = new DAGGraph<>(nodes, edges);
         Assertions.assertEquals(Set.copyOf(nodes), r.all());
@@ -113,12 +114,12 @@ public class DAGGraphTest {
     public void testBFS() {
         var nodes = Set.of(1, 2, 3, 4, 5, 6);
         var edges = List.of(
-                Map.entry(1, 2),
-                Map.entry(1, 3),
-                Map.entry(2, 4),
-                Map.entry(2, 5),
-                Map.entry(3, 4),
-                Map.entry(5, 6)
+                Groups.g2(1, 2),
+                Groups.g2(1, 3),
+                Groups.g2(2, 4),
+                Groups.g2(2, 5),
+                Groups.g2(3, 4),
+                Groups.g2(5, 6)
         );
         new DAGGraph<>(nodes, edges).bfs(System.out::println);
     }
@@ -143,11 +144,11 @@ public class DAGGraphTest {
         var nodes = rand
                 .ints(1, size * 10)
                 .boxed().distinct().limit(size).sorted().map(mapper).collect(Collectors.toList());
-        var edges = new ArrayList<Map.Entry<Key, Key>>();
+        var edges = new ArrayList<Groups.G2<Key, Key>>();
         for (int i = 0; i < size; i++) {
             for (int j = i + 1; j < size; j++) {
                 if (rand.nextInt() % 2 == 0) {
-                    edges.add(Map.entry(nodes.get(i), nodes.get(j)));
+                    edges.add(Groups.g2(nodes.get(i), nodes.get(j)));
                 }
             }
         }

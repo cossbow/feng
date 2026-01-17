@@ -50,10 +50,11 @@ public class ArrayTypeDeclarer extends TypeDeclarer
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof ArrayTypeDeclarer td)) return false;
-        return Objects.equals(element, td.element) &&
-                Objects.equals(length, td.length) &&
-                Objects.equals(refer, td.refer);
+        if (!(o instanceof ArrayTypeDeclarer t))
+            return false;
+        return element.equals(t.element) &&
+                length.equals(t.length) &&
+                refer.equals(t.refer);
     }
 
 }

@@ -29,7 +29,12 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
         table = new HashMap<>();
         for (Node<K, V> n : nodes)
             addIndex(n);
+    }
 
+    public UniqueTable(Map<K, V> entries) {
+        this(entries.size());
+        for (var e : entries.entrySet())
+            add(e.getKey(), e.getValue());
     }
 
     private void addIndex(Node<K, V> node) {

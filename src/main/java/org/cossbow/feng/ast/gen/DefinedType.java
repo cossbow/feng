@@ -28,9 +28,10 @@ public class DefinedType extends Entity {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof DefinedType that)) return false;
-        return Objects.equals(symbol, that.symbol) &&
-                Objects.equals(generic, that.generic);
+        if (!(o instanceof DefinedType t))
+            return false;
+        return symbol.equals(t.symbol) &&
+                generic.equals(t.generic);
     }
 
     @Override

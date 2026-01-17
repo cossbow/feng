@@ -51,4 +51,11 @@ public class ClassField extends Field implements Exportable {
         return declare == Declare.CONST;
     }
 
+    //
+
+    private transient Lazy<ClassDefinition> master = Lazy.nil();
+
+    public Lazy<ClassDefinition> master() {
+        return master;
+    }
 }

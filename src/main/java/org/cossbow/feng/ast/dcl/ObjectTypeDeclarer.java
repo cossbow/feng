@@ -18,7 +18,8 @@ public class ObjectTypeDeclarer extends TypeDeclarer {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof ObjectTypeDeclarer t)) return false;
+        if (!(o instanceof ObjectTypeDeclarer t))
+            return false;
         return entries.equals(t.entries);
     }
 

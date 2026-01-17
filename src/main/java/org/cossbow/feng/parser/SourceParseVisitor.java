@@ -663,8 +663,11 @@ final class SourceParseVisitor
                 macros.add(macro.type(), macro.name(), macro);
             }
         }
-        return new InterfaceDefinition(posOf(ctx),
+        var def = new InterfaceDefinition(posOf(ctx),
                 modifier, symbol, generic, methods, parts, macros);
+        for (InterfaceMethod m : methods)
+            m.master().set(def);
+        return def;
     }
 
     @Override
@@ -705,7 +708,7 @@ final class SourceParseVisitor
             semantic("nested define class: %s", symbol);
         enterClassSymbol = symbol;
         var generic = typeParameters(ctx.typeParameters());
-        var parent = this.<DefinedType>visitOptional(ctx.classInherit());
+        var inherit = this.<DefinedType>visitOptional(ctx.classInherit());
         var impl = parseClassImpl(ctx.classImpl());
 
         var methods = new IdentifierTable<ClassMethod>();
@@ -747,7 +750,10 @@ final class SourceParseVisitor
         }
 
         var def = new ClassDefinition(posOf(ctx), modifier, symbol,
-                generic, parent, impl, fields, methods, macros);
+                generic, inherit, impl, fields, methods, macros);
+        for (var f : fields) f.master().set(def);
+        for (var m : methods) m.master().set(def);
+
         enterClassSymbol = null;
         return def;
     }

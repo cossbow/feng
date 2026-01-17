@@ -1,14 +1,13 @@
 package org.cossbow.feng.analysis;
 
+import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Field;
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Method;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
-import org.cossbow.feng.ast.oop.ClassDefinition;
-import org.cossbow.feng.ast.oop.ClassField;
-import org.cossbow.feng.ast.oop.ClassMethod;
-import org.cossbow.feng.ast.oop.EnumDefinition;
+import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Optional;
@@ -29,17 +28,17 @@ public class TypeTool {
     }
 
     public Optional<ClassDefinition> getParent(ClassDefinition cd) {
-        if (cd.parent().none())
+        if (cd.inherit().none())
             return Optional.empty();
 
-        var pt = context.findType(cd.parent().must().symbol());
+        var pt = context.findType(cd.inherit().must().symbol());
         if (pt.none())
-            return semantic("class %s not defined", cd.parent().must());
+            return semantic("class %s not defined", cd.inherit().must());
 
         if (pt.must() instanceof ClassDefinition pcd)
             return Optional.of(pcd);
 
-        return semantic("require class: %s", cd.parent().must());
+        return semantic("require class: %s", cd.inherit().must());
     }
 
     public Optional<ClassField> getField(ClassDefinition cd, Identifier name) {
@@ -108,7 +107,8 @@ public class TypeTool {
         return Optional.empty();
     }
 
-    public Optional<ClassMethod> getMethod(ClassDefinition cd, Identifier name) {
+    public Optional<? extends Entity>
+    getMethod(ClassDefinition cd, Identifier name) {
         var f = cd.methods().tryGet(name);
         if (f.has()) return f;
 
@@ -119,7 +119,15 @@ public class TypeTool {
                 cd.symbol(), name);
     }
 
-    public Optional<ClassMethod> getMethod(
+    public Optional<? extends Entity>
+    getMethod(InterfaceDefinition id, Identifier name) {
+        var m = id.all().must().tryGet(name);
+        if (m.has()) return m;
+        return semantic("interface %s has no method: %s",
+                id.symbol(), name);
+    }
+
+    public Optional<? extends Entity> getMethod(
             PrimaryExpression subject, Identifier name) {
         var std = deduce(subject);
         if (!(std instanceof DefinedTypeDeclarer dtd))
@@ -130,10 +138,15 @@ public class TypeTool {
         var o = context.findType(dt);
         if (o.none()) return semantic("undefined type: %s", dt);
 
-        if (!(o.must() instanceof ClassDefinition cd))
-            return semantic("require class: %s", dt);
+        if (o.must() instanceof ClassDefinition cd)
+            return getMethod(cd, name);
 
-        return getMethod(cd, name);
+        if (o.must() instanceof InterfaceDefinition id) {
+            return getMethod(id, name);
+        }
+
+        return semantic("require class: %s", dt);
+
     }
 
     //

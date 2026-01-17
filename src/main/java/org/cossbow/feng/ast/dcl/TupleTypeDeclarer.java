@@ -25,7 +25,7 @@ public class TupleTypeDeclarer extends TypeDeclarer {
     public boolean equals(Object o) {
         if (!(o instanceof TupleTypeDeclarer t))
             return false;
-        return Objects.equals(tuple, t.tuple);
+        return tuple.equals(t.tuple);
     }
 
 }

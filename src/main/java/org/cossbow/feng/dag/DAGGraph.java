@@ -1,5 +1,7 @@
 package org.cossbow.feng.dag;
 
+import org.cossbow.feng.util.Groups;
+
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -23,7 +25,7 @@ public class DAGGraph<Key> {
     private final Map<Key, Set<Key>> reverseIndex;
 
     public DAGGraph(Collection<Key> all,
-                    Iterable<Map.Entry<Key, Key>> edges) {
+                    Iterable<Groups.G2<Key, Key>> edges) {
         if (null == all || all.isEmpty()) {
             throw new IllegalArgumentException("keys empty");
         }
@@ -40,12 +42,12 @@ public class DAGGraph<Key> {
         var forward = new HashMap<Key, Set<Key>>();
         var reverse = new HashMap<Key, Set<Key>>();
         for (var edge : edges) {
-            Key from = keyMap.get(edge.getKey()), to = keyMap.get(edge.getValue());
+            Key from = keyMap.get(edge.a()), to = keyMap.get(edge.b());
             if (from == null) {
-                throw new IllegalArgumentException("Key not exists: " + edge.getKey());
+                throw new IllegalArgumentException("Key not exists: " + edge.a());
             }
             if (to == null) {
-                throw new IllegalArgumentException("Key not exists: " + edge.getValue());
+                throw new IllegalArgumentException("Key not exists: " + edge.b());
             }
 
             forward.computeIfAbsent(from, hashSet()).add(to);

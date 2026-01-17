@@ -2,12 +2,14 @@ package org.cossbow.feng.ast.oop;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Method;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.proc.Prototype;
+import org.cossbow.feng.util.Lazy;
 
-public class InterfaceMethod extends Entity {
+public class InterfaceMethod extends Entity implements Method {
     private Modifier modifier;
     private Identifier name;
     private TypeParameters generic;
@@ -41,4 +43,9 @@ public class InterfaceMethod extends Entity {
         return prototype;
     }
 
+    private transient Lazy<InterfaceDefinition> master = Lazy.nil();
+
+    public Lazy<InterfaceDefinition> master() {
+        return master;
+    }
 }

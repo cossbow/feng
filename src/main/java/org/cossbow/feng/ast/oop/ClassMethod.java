@@ -1,12 +1,12 @@
 package org.cossbow.feng.ast.oop;
 
-import org.cossbow.feng.ast.Entity;
-import org.cossbow.feng.ast.Exportable;
-import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.ast.proc.Prototype;
+import org.cossbow.feng.util.Lazy;
 
-public class ClassMethod extends Entity implements Exportable {
+public class ClassMethod extends Entity implements Method,Exportable {
     private boolean export;
     private Identifier name;
     private FunctionDefinition func;
@@ -33,14 +33,22 @@ public class ClassMethod extends Entity implements Exportable {
         return func;
     }
 
-    private volatile boolean updater;
-
-    public boolean updater() {
-        return updater;
+    @Override
+    public Prototype prototype() {
+        return func.prototype();
     }
 
-    public void updater(boolean updater) {
-        this.updater = updater;
+    @Override
+    public TypeParameters generic() {
+        return func.generic();
+    }
+
+    //
+
+    private transient Lazy<ClassDefinition> master = Lazy.nil();
+
+    public Lazy<ClassDefinition> master() {
+        return master;
     }
 
 }
