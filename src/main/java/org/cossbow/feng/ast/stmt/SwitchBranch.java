@@ -3,21 +3,20 @@ package org.cossbow.feng.ast.stmt;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.util.Lazy;
 
 import java.util.List;
 
-public class SwitchBranch extends Entity {
+public class SwitchBranch extends Branch {
     private List<Expression> constants;
-    private List<Statement> statements;
     private boolean fallthrough;
 
     public SwitchBranch(Position pos,
                         List<Expression> constants,
                         List<Statement> statements,
                         boolean fallthrough) {
-        super(pos);
+        super(pos, statements);
         this.constants = constants;
-        this.statements = statements;
         this.fallthrough = fallthrough;
     }
 
@@ -25,11 +24,10 @@ public class SwitchBranch extends Entity {
         return constants;
     }
 
-    public List<Statement> statements() {
-        return statements;
-    }
-
     public boolean fallthrough() {
         return fallthrough;
     }
+
+    //
+
 }

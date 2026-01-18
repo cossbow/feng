@@ -1,9 +1,6 @@
 package org.cossbow.feng.analysis;
 
-import org.cossbow.feng.ast.Entity;
-import org.cossbow.feng.ast.Field;
-import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Method;
+import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;

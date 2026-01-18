@@ -10,13 +10,13 @@ public class SwitchStatement extends Statement {
     private Optional<Statement> init;
     private Expression value;
     private List<SwitchBranch> branches;
-    private List<Statement> defaultBranch;
+    private Optional<Branch> defaultBranch;
 
     public SwitchStatement(Position pos,
                            Optional<Statement> init,
                            Expression value,
                            List<SwitchBranch> branches,
-                           List<Statement> defaultBranch) {
+                           Optional<Branch> defaultBranch) {
         super(pos);
         this.init = init;
         this.value = value;
@@ -36,7 +36,7 @@ public class SwitchStatement extends Statement {
         return branches;
     }
 
-    public List<Statement> defaultBranch() {
+    public Optional<Branch> defaultBranch() {
         return defaultBranch;
     }
 }

@@ -9,7 +9,7 @@ import org.cossbow.feng.ast.lit.BoolLiteral;
 import org.cossbow.feng.ast.lit.FloatLiteral;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.oop.ClassDefinition;
-import org.cossbow.feng.ast.oop.EnumDefinition;
+import org.cossbow.feng.ast.EnumDefinition;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.ast.proc.PrototypeDefinition;
 import org.cossbow.feng.ast.stmt.*;
@@ -36,8 +36,11 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         typeTool = new TypeTool(context);
     }
 
-    public boolean isPrimitive(TypeDeclarer td) {
-        return td instanceof PrimitiveTypeDeclarer;
+    public boolean isEnum(TypeDeclarer td) {
+        if (!(td instanceof DefinedTypeDeclarer dtd))
+            return false;
+
+        return dtd.definition().must().domain() == TypeDomain.ENUM;
     }
 
     public boolean isBool(TypeDeclarer td) {
@@ -348,9 +351,9 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (t.get() instanceof PrimitiveDefinition pd)
             return pd.primitive().declarer(e.pos());
 
-        return new DefinedTypeDeclarer(e.pos(),
-                new DefinedType(e.pos(), t.get().symbol(),
-                        TypeArguments.EMPTY), Optional.empty());
+        return new DefinedTypeDeclarer(e.pos(), new DefinedType(
+                e.pos(), t.get().symbol(), TypeArguments.EMPTY),
+                Optional.empty(), t);
     }
 
     //

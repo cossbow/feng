@@ -19,20 +19,15 @@ import org.cossbow.feng.ast.var.IndexAssignableOperand;
 import org.cossbow.feng.ast.var.VariableAssignableOperand;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.dag.DAGTask;
-import org.cossbow.feng.util.DAGUtil;
 import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.Stack;
 import org.cossbow.feng.visit.EntityVisitor;
 import org.cossbow.feng.visit.SymbolContext;
 
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.function.BiFunction;
 
 import static org.cossbow.feng.util.DAGUtil.bfsVisit;
 import static org.cossbow.feng.util.DAGUtil.checkCyclic;
@@ -249,21 +244,21 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return type.get();
     }
 
-    public Entity visit(DefinedTypeDeclarer td) {
+    public TypeDefinition visit(DefinedTypeDeclarer td) {
         var dt = visit(td.definedType());
         var r = td.refer();
         visit(r);
 
         if (dt instanceof ClassDefinition)
-            return td;
+            return dt;
 
         if (dt instanceof InterfaceDefinition) {
-            if (r.has()) return td;
+            if (r.has()) return dt;
             return semantic("interface must be refer: %s",
                     td.pos());
         }
 
-        if (r.none()) return td;
+        if (r.none()) return dt;
         return semantic("can't refer %s %s", dt.domain(), dt.symbol());
     }
 
@@ -438,16 +433,21 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     // enum
 
     public Entity visit(EnumDefinition def) {
+        var i = 0;
         for (var v : def.values()) {
-            if (v.init().none()) continue;
+            v.code(i++);
+            if (v.init().none()) {
+                continue;
+            }
             var le = computeConst(v.init().must());
 
-            var i = le.asInteger();
-            if (i.none()) {
+            var c = le.asInteger();
+            if (c.none()) {
                 return semantic("must const integer: %s",
                         v.pos());
             }
             v.init().set(le);
+            v.code(c.get().value().intValue());
         }
 
         return def;
@@ -770,12 +770,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     //
-
-    public Entity visitList(BlockStatement bs) {
-        for (var s : bs.list())
-            visit(s);
-        return bs;
-    }
 
     public Entity visit(BlockStatement bs) {
         if (bs.newScope()) context.enterScope();
@@ -1213,39 +1207,84 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("return not compatible: %s", e.pos());
     }
 
-    public Entity visit(SwitchBranch e) {
-        context.enterScope();
-        ;
-        for (var ce : e.constants()) {
-            var le = computeConst(ce);
-            if (le.literal() instanceof IntegerLiteral ||
-                    le.literal() instanceof BoolLiteral)
-                continue;
-            return semantic("switch case constants need intger or bool",
-                    ce.pos());
+    private void checkConstantInteger(SwitchStatement s) {
+        var set = new UniqueTable<IntegerLiteral, IntegerLiteral>();
+        for (var b : s.branches()) {
+            for (var c : b.constants()) {
+                if (c instanceof LiteralExpression le &&
+                        le.literal() instanceof IntegerLiteral il) {
+                    set.add(il, il);
+                    continue;
+                }
+                semantic("must be const intger: %s", c.pos());
+                return;
+            }
         }
+    }
 
-        for (var s : e.statements()) visit(s);
+    private void checkConstantEnum(
+            SwitchStatement s, EnumDefinition type) {
+        var set = new UniqueTable<Identifier, Identifier>();
+        for (var b : s.branches()) {
+            for (var c : b.constants()) {
+                if (c instanceof ReferExpression le) {
+                    if (!le.generic().isEmpty()) {
+                        semantic("generic");
+                        return;
+                    }
+                    if (le.symbol().module().none()) {
+                        var name = le.symbol().name();
+                        var v = type.values().tryGet(name);
+                        if (v.has()) {
+                            set.add(name, name);
+                            continue;
+                        }
+                    }
+                }
+                semantic("must be enum value: %s",
+                        c.pos());
+                return;
+            }
+        }
+        if (s.defaultBranch().has())
+            return;
 
-        context.exitScope();
-        ;
-        return e;
+        for (var ev : type.values()) {
+            if (set.exists(ev.name())) continue;
+            semantic("must cover all values or add 'default': %s",
+                    s.value().pos());
+        }
     }
 
     public Entity visit(SwitchStatement e) {
         context.enterScope();
         visit(e.init());
-        var td = typeDeducer.visit(e.value());
-        if (!typeDeducer.isInteger(td) && !typeDeducer.isBool(td)) {
-            return semantic("switch value need intger or bool",
-                    e.value().pos());
-        }
-        visit(e.value());
 
-        for (var br : e.branches()) visit(br);
+        var td = typeDeducer.visit(e.value());
+        var dt = (TypeDefinition) visit(td);
+        var isInteger = dt instanceof PrimitiveDefinition pd &&
+                pd.primitive().isInteger();
+        if (isInteger) {
+            checkConstantInteger(e);
+        } else {
+            if (!(dt instanceof EnumDefinition ed)) return semantic(
+                    "value must be intger or enum: %s",
+                    e.value().pos());
+            checkConstantEnum(e, ed);
+        }
+
+        for (var br : e.branches()) {
+            context.enterScope();
+            for (var s : br.statements()) {
+                visit(s);
+            }
+            context.exitScope();
+        }
 
         context.enterScope();
-        for (var s : e.defaultBranch()) visit(s);
+        e.defaultBranch().use(br -> {
+            for (var s : br.statements()) visit(s);
+        });
         context.exitScope();
 
         context.exitScope();

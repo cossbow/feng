@@ -45,6 +45,15 @@ public class Lazy<T> {
 
     //
 
+    @Override
+    public String toString() {
+        if (value == null) return "<>";
+        return "<" + value + ">";
+    }
+
+
+    //
+
     public static <T> Lazy<T> of(T v) {
         return new Lazy<>(v);
     }

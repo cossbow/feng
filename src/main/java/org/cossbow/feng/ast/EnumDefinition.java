@@ -1,6 +1,5 @@
-package org.cossbow.feng.ast.oop;
+package org.cossbow.feng.ast;
 
-import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.gen.TypeParameters;
@@ -43,6 +42,16 @@ public class EnumDefinition extends TypeDefinition {
 
         public Lazy<Expression> init() {
             return init;
+        }
+
+        private volatile int code;
+
+        public int code() {
+            return code;
+        }
+
+        public void code(int value) {
+            this.code = value;
         }
 
         @Override

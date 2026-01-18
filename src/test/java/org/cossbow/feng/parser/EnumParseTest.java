@@ -1,7 +1,7 @@
 package org.cossbow.feng.parser;
 
 import org.cossbow.feng.Pair;
-import org.cossbow.feng.ast.oop.EnumDefinition;
+import org.cossbow.feng.ast.EnumDefinition;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

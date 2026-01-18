@@ -2,6 +2,7 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.TypeDomain;
+import org.cossbow.feng.ast.UnaryOperator;
 import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.err.SemanticException;
 import org.cossbow.feng.parser.BaseParseTest;
@@ -882,6 +883,7 @@ public class SemanticAnalysisTest {
     @Test
     public void testEnum1() {
         checkTrue("enum S{A=1,}");
+        checkTrue("enum S{A,B=9,}");
         checkFalse("enum S{A=3.14,}");
         checkFalse("enum S{A=false,}");
         checkFalse("enum S{A=nil,}");
@@ -902,7 +904,7 @@ public class SemanticAnalysisTest {
     // statement
 
     @Test
-    public void testStatement1() {
+    public void testStatementDeclaration() {
         checkTrue("func f() { var a,b,c int; }");
         checkTrue("func f() { var a,b,c int = 1,2,3; }");
         checkFalse("func f() { var a,b,c int = 1,2; }");
@@ -912,7 +914,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testStatement2() {
+    public void testStatementAssignment() {
         var def = "class A{ var id int; }";
         checkTrue(def + "func f(a *A) { var v int; v,a.id = 1,2; }");
         checkFalse(def + "func f(a *A) { var v int; v,a.id = 1; }");
@@ -921,7 +923,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testStatment3() {
+    public void testStatmentScope() {
         checkFalse("func f(v int) { var v int; }");
         checkTrue("func f() { var v int; { var v int; } }");
         checkTrue("func f(v int) { { var v int; } }");
@@ -930,10 +932,28 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testStatment4() {
+    public void testStatmentIf() {
+        checkTrue("func f(v bool){if(v){var v int;}}");
         checkTrue("func f(v int){if(v>0){var v int;}}");
         checkFalse("func f(v int){if(var v int=0;v>0){var v int;}}");
         checkTrue("func f(v int){if(var v int=0;v>0){{var v int;}}}");
+        checkTrue("func f(v int,a func()){if(v<0)a();else a();}");
+        checkTrue("func f(v int,a func()){if(v<0){a();}else{a();}}");
+        checkFalse("func f(v int){if(v){var v int;}}");
+        checkFalse("func f(v float){if(v){var v int;}}");
+        checkFalse("func f(v *rom){if(v){var v int;}}");
+    }
+
+    @Test
+    public void testStatmentSwitch() {
+        var d = "func a(){} enum S{U,V,W,}";
+//        checkTrue(d + "func f(v int){switch(v){ case 1:a(); }}");
+//        checkFalse(d + "func f(v int, c int){switch(v){ case c:a(); }}");
+//        checkTrue(d + "func f(v int){switch(v){ case 1:a(); case 2:a(); }}");
+//        checkTrue(d + "func f(v int){switch(v){ case 1:a(); default:a(); }}");
+        checkTrue(d + "func f(v S){switch(v){ case U:a(); case V:a(); case W:a(); }}");
+        checkTrue(d + "func f(v S){switch(v){ case U:a(); default:a(); }}");
+        checkFalse(d + "func f(v S){switch(v){ case U:a(); }}");
     }
 
 }

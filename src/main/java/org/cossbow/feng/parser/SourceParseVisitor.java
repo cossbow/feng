@@ -1231,9 +1231,10 @@ final class SourceParseVisitor
         var assign = this.<Statement>visitOptional(ctx.init);
         var value = (Expression) visit(ctx.expression());
         var branches = this.<SwitchBranch>visitList(ctx.switchBranch());
-        var defBr = List.<Statement>of();
+        var defBr = Optional.<Branch>empty();
         if (ctx.def != null) {
-            defBr = parseStatements(ctx.def.statementList());
+            var list = parseStatements(ctx.def.statementList());
+            defBr = Optional.of(new Branch(posOf(ctx.def), list));
         }
         return new SwitchStatement(posOf(ctx), assign, value, branches, defBr);
     }
