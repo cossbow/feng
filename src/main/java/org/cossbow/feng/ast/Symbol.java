@@ -37,7 +37,7 @@ public class Symbol extends Entity {
 
     @Override
     public int hashCode() {
-        return Objects.hash(module, name);
+        return 31 * module.hashCode() + name.hashCode();
     }
 
     @Override

@@ -22,4 +22,16 @@ public class GlobalVariable extends Variable {
     public Lazy<Expression> init() {
         return init;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof GlobalVariable v))
+            return false;
+        return symbol.equals(v.symbol);
+    }
+
+    @Override
+    public int hashCode() {
+        return symbol.hashCode();
+    }
 }

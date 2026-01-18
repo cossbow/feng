@@ -17,6 +17,8 @@ import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.ast.var.FieldAssignableOperand;
 import org.cossbow.feng.ast.var.IndexAssignableOperand;
 import org.cossbow.feng.ast.var.VariableAssignableOperand;
+import org.cossbow.feng.dag.DAGGraph;
+import org.cossbow.feng.dag.DAGTask;
 import org.cossbow.feng.util.DAGUtil;
 import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Optional;
@@ -26,6 +28,9 @@ import org.cossbow.feng.visit.SymbolContext;
 
 import java.math.BigInteger;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.function.BiFunction;
 
 import static org.cossbow.feng.util.DAGUtil.bfsVisit;
 import static org.cossbow.feng.util.DAGUtil.checkCyclic;
@@ -101,10 +106,69 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
     }
 
+    private Set<GlobalVariable> searchDependencies(
+            IdentifierTable<GlobalVariable> global,
+            Expression expr) {
+        var deps = new HashSet<GlobalVariable>();
+        var q = new ArrayDeque<Expression>();
+        q.add(expr);
+        while (!q.isEmpty()) {
+            var c = q.poll();
+            switch (c) {
+                case ReferExpression e -> {
+                    if (e.symbol().module().has())
+                        break;
+                    var v = global.tryGet(e.symbol().name());
+                    if (v.has()) {
+                        deps.add(v.get());
+                        break;
+                    }
+                    semantic("var not declared: %s", e.symbol());
+                }
+                case BinaryExpression e -> {
+                    q.add(e.left());
+                    q.add(e.right());
+                }
+                case UnaryExpression e -> q.add(e.operand());
+                case ArrayExpression e -> q.addAll(e.elements());
+
+                case ObjectExpression e -> q.addAll(e.entries().values());
+                case LiteralExpression e -> {
+                }
+                case NewExpression e -> {
+                }
+                case ParenExpression e -> q.add(e.child());
+                case null, default -> semantic("can't use: %s", c);
+            }
+        }
+        return deps;
+    }
+
+    private void visitGlobalVariable(
+            IdentifierTable<GlobalVariable> global) {
+        if (global.isEmpty()) return;
+        var edges = new ArrayList<Groups.G2<GlobalVariable, GlobalVariable>>();
+        for (var gv : global) {
+            if (gv.init().none()) continue;
+            var cyc = checkCyclic(gv, v -> {
+                return searchDependencies(global, v.init().must());
+            });
+            if (cyc.has()) semantic("cyclic init: %s", cyc.get().symbol());
+            var deps = searchDependencies(global, gv.init().must());
+            for (var dep : deps)
+                edges.add(Groups.g2(dep, gv));
+        }
+        var dag = new DAGGraph<>(global.values(), edges);
+        new DAGTask<GlobalVariable, Boolean>(dag, (gv, args) -> {
+            visit(gv);
+            return CompletableFuture.completedFuture(true);
+        }).results();
+    }
+
     public Entity visit(Source s) {
         var tab = s.table();
-        for (var f : tab.variables)
-            visit(f);
+
+        visitGlobalVariable(tab.variables);
 
         visitEnum(tab.namedTypes);
         visitStructure(tab.namedTypes);
@@ -285,65 +349,58 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (!def.generic().isEmpty())
             return unsupported("generic");
 
-        checkCyclic(def, d -> {
-            return def.fields().stream().map(StructureField::type)
-                    .filter(t -> t instanceof DefinedTypeDeclarer)
-                    .map(t -> ((DefinedTypeDeclarer) t).definedType())
-                    .map(this::visit)
-                    .filter(t -> t instanceof StructureDefinition)
-                    .map(t -> (StructureDefinition) t)
-                    .toList();
+        var cyc = checkCyclic(def, d -> {
+            return d.fields().stream().map(StructureField::type)
+                    .map(this::structFieldType)
+                    .filter(Optional::has)
+                    .map(Optional::get).toList();
         });
+        if (cyc.has()) return semantic("%s cyclic extends: %s",
+                def.symbol(), cyc.must().symbol());
         for (var f : def.fields())
             visit(f);
 
         return def;
     }
 
-    private void structFieldType(TypeDeclarer td) {
+    private Optional<StructureDefinition> structFieldType(TypeDeclarer td) {
         if (td instanceof PrimitiveTypeDeclarer ptd) {
-            if (ptd.primitive().isBool()) {
-                semantic("require integer or float: %s", ptd.pos());
-            }
-            return;
+            if (!ptd.primitive().isBool())
+                return Optional.empty();
+            return semantic("require integer or float: %s", ptd.pos());
         }
 
         if (td instanceof DefinedTypeDeclarer dtd) {
             if (dtd.refer().has()) {
-                semantic("can't be reference");
-                return;
+                return semantic("can't be reference");
             }
             if (!dtd.definedType().generic().isEmpty()) {
-                unsupported("generic");
-                return;
+                return unsupported("generic");
             }
             var def = visit(dtd.definedType());
-            if (def instanceof StructureDefinition)
-                return;
+            if (def instanceof StructureDefinition sd)
+                return Optional.of(sd);
 
-            semantic("require structure type: %s", dtd.definedType().pos());
-            return;
+            return semantic("require structure type: %s",
+                    dtd.definedType().pos());
         }
 
         if (td instanceof ArrayTypeDeclarer atd) {
             if (atd.refer().has()) {
-                semantic("can't be reference");
-                return;
+                return semantic("can't be reference");
             }
             var len = computeConst(atd.length().must());
             var i = len.asInteger();
             if (i.none()) {
-                semantic("require integer");
-                return;
+                return semantic("require integer");
             }
             if (i.get().value().compareTo(BigInteger.ZERO) < 0) {
                 semantic("can't be negative: %s", atd.length().get().pos());
             }
-            structFieldType(atd.element());
-            return;
+            return structFieldType(atd.element());
         }
 
-        semantic("illegal type: %s%s", td, td.pos());
+        return semantic("illegal type: %s%s", td, td.pos());
     }
 
     private void structBitfield(Expression bf) {
@@ -506,6 +563,41 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
     }
 
+    public Optional<ClassDefinition> classFieldType(TypeDeclarer t) {
+        assert enterClass != null;
+
+        if (t instanceof DefinedTypeDeclarer ctd) {
+            if (ctd.refer().has())
+                return Optional.empty();
+
+            var dt = visit(ctd.definedType());
+            if (dt instanceof ClassDefinition cd)
+                return Optional.of(cd);
+            return Optional.empty();
+        }
+
+        if (t instanceof ArrayTypeDeclarer atd) {
+            if (atd.refer().has())
+                return Optional.empty();
+            return classFieldType(atd.element());
+        }
+
+        return Optional.empty();
+    }
+
+    private void checkAcyclicInit(ClassDefinition cd) {
+        var cyc = checkCyclic(cd, d -> {
+            return d.fields().stream().map(ClassField::type)
+                    .map(this::classFieldType)
+                    .filter(Optional::has)
+                    .map(Optional::get)
+                    .toList();
+        });
+        if (cyc.none()) return;
+        semantic("cyclic init: %s",
+                cyc.must().symbol());
+    }
+
     private volatile ClassDefinition enterClass;
     private volatile ClassMethod enterMethod;
 
@@ -518,6 +610,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         checkAcyclicInherit(cd);
         checkImplList(cd);
+        checkAcyclicInit(cd);
 
         for (var f : cd.fields()) visit(f);
         for (var m : cd.methods()) visit(m);
@@ -531,6 +624,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     public Entity visit(ClassField cf) {
         assert enterClass != null;
+        visit(cf.type());
         if (cf.type() instanceof DefinedTypeDeclarer ctd) {
             var isPhantom = ctd.refer().match(
                     r -> r.checkType(ReferKind.PHANTOM));
@@ -582,8 +676,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         for (var m : def.methods()) visit(m);
 
         var cyc = checkCyclic(def, this::findParts);
-        if (cyc.has()) return semantic("%s cyclic extends: %s",
-                def.symbol(), cyc.must().symbol());
+        if (cyc.has()) return semantic("cyclic init: %s",
+                cyc.must().symbol());
 
 
         var all = new HashMap<Identifier, InterfaceMethod>();
@@ -883,7 +977,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             }
         }
 
-        // TODO: 这里很复杂！
+        // TODO: 还有什么没考虑？虚引用！
 
         return l.definedType().equals(r.definedType());
     }
@@ -1118,7 +1212,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             if (atd.refer().get().immutable())
                 return semantic("immutable array: %s", io.pos());
         } else {
-            // TODO: 值类型检查const
             if (constChecker.visit(io.subject())) {
                 return semantic("immutable array");
             }

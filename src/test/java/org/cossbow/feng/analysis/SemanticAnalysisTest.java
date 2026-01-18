@@ -290,6 +290,18 @@ public class SemanticAnalysisTest {
     }
 
     @Test
+    public void testClassField6() {
+        checkTrue("class A{} class B{var a A;}");
+        checkFalse("class A{var f B;} class B{var f A;}");
+        checkFalse("class A{var f C;} class B{var f A;} class C{var f B;}");
+        checkFalse("class A{var f B;} class B{var f [2]A;}");
+        checkFalse("class A{var f B;} class B{var f [8][2]A;}");
+        checkTrue("class A{var f B;} class B{var f [*]A;}");
+        checkTrue("class A{var f B;} class B{var f [2][*]A;}");
+        checkTrue("class A{var f B;} class B{var f [*][2]A;}");
+    }
+
+    @Test
     public void testClassMethod1() {
         checkTrue("class A { func at() {} func test() { at(); } }");
     }
@@ -692,6 +704,13 @@ public class SemanticAnalysisTest {
     public void testGlobalVar3() {
         checkTrue("const a = 1; var b = a;");
         checkFalse("var a = 1; var b = a;");
+        checkFalse("var a = b; var b = 1;");
+    }
+
+    @Test
+    public void testGlobalVar4() {
+        checkFalse("var a = b; var b = a;");
+        checkFalse("var a = c; var b = a; var c = b;");
     }
 
     //
@@ -804,12 +823,14 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testStructField7() {
-        checkTrue("struct A{b B;} struct B{a A;}");
-
+        checkTrue("struct A{} struct B{a A;}");
+        checkFalse("struct A{f B;} struct B{f A;}");
+        checkFalse("struct A{f C;} struct B{f A;} struct C{f B;}");
+        checkFalse("struct A{f B;} struct B{f [2]A;}");
+        checkFalse("struct A{f B;} struct B{f [2][4]A;}");
     }
 
     //
-
 
 
     // enum

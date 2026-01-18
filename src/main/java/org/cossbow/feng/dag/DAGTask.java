@@ -143,7 +143,15 @@ public class DAGTask<Key, Result>
     }
 
     public Map<Key, Result> results() {
-        return immutableResults;
+        try {
+            run();
+            return join();
+        } catch (CompletionException e) {
+            switch (e.getCause()) {
+                case RuntimeException re -> throw re;
+                case null, default -> throw e;
+            }
+        }
     }
 
 }
