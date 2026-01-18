@@ -154,11 +154,10 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         return e.type();
     }
 
-    @Override
-    public TypeDeclarer visit(CallExpression e) {
-        var td = visit(e.callee());
+    public TypeDeclarer getCallable(PrimaryExpression e) {
+        var td = visit(e);
         if (td instanceof FuncTypeDeclarer ftd)
-            return visit(ftd);
+            return ftd;
 
         if (td instanceof DefinedTypeDeclarer dtd) {
             var dt = context.findType(dtd.definedType().symbol());
@@ -169,9 +168,22 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             if (dt.must() instanceof PrototypeDefinition pd) {
                 if (!pd.generic().isEmpty())
                     return unsupported("generic");
-                return visit(pd.prototype());
+                return new FuncTypeDeclarer(e.pos(), pd.prototype(),
+                        dtd.definedType().generic());
             }
         }
+
+        if (td instanceof ConvertorTypeDeclarer ctd)
+            return ctd;
+
+        return semantic("require a callable: %s", e.pos());
+    }
+
+    @Override
+    public TypeDeclarer visit(CallExpression e) {
+        var td = getCallable(e.callee());
+        if (td instanceof FuncTypeDeclarer ftd)
+            return visit(ftd);
 
         if (td instanceof ConvertorTypeDeclarer ctd)
             return ctd.primitive().declarer(ctd.pos());
@@ -331,7 +343,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
         var t = context.findType(s);
         if (t.none())
-            return semantic("unknown symbol %s%s", s, s.pos());
+            return semantic("undefined symbol '%s': %s", s, s.pos());
 
         if (t.get() instanceof PrimitiveDefinition pd)
             return pd.primitive().declarer(e.pos());

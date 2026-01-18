@@ -343,9 +343,16 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testPrototype3() {
-        checkTrue("func f(){} func m(f func()){ f(); }");
+        checkTrue("func f(){} func m(f func(int)){ f(1); }");
         checkTrue("func F(); func m(f F){ f(); }");
         checkFalse("func f(){} func m(f int){ f(); }");
+    }
+
+    @Test
+    public void testPrototype4() {
+        var def = "class A{} class B:A{}";
+        checkTrue(def + "func m(f func(a*A)){f(new(B));}");
+        checkTrue(def + "func F(a*A); func m(f F){ f(new(B)); }");
     }
 
     // assign
@@ -710,6 +717,11 @@ public class SemanticAnalysisTest {
     //
 
     @Test
+    public void testGlobal1() {
+        checkFalse("class A{} var A int;");
+    }
+
+    @Test
     public void testGlobalVar1() {
         checkTrue("var a int;");
         checkTrue("var a int = 1;");
@@ -752,6 +764,12 @@ public class SemanticAnalysisTest {
     @Test
     public void testMemMap2() {
         checkFalse("class ID{} func f(v *ram) { var i *ram`ID`; i = v; }");
+    }
+
+    @Test
+    public void testMemMap3() {
+        var def = "struct A{ id int; } ";
+        checkFalse(def + "func f(a *A) { a.id = 1; }");
     }
 
     @Test
@@ -839,17 +857,16 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testStructField5() {
-        checkTrue("struct R{ id int; } func f(r *ram`R`) { r.id = 1; }");
+        var def = "struct R{ id int; } ";
+        checkTrue(def + "func f(r *ram`R`) { r.id = 1; }");
+        checkFalse(def + "func f(r *rom`R`) { r.id = 1; }");
+        checkTrue(def + "func f(r *ram`R`) { var v = r.id; }");
+        checkTrue(def + "func f() { var r R; r.id = 1; }");
+        checkFalse(def + "func f(r R) { r.id = 1; }");
     }
 
     @Test
     public void testStructField6() {
-        checkTrue("struct R{ id int; } func f() { var r R; r.id = 1; }");
-        checkFalse("struct R{ id int; } func f(r R) { r.id = 1; }");
-    }
-
-    @Test
-    public void testStructField7() {
         checkTrue("struct A{} struct B{a A;}");
         checkFalse("struct A{f B;} struct B{f A;}");
         checkFalse("struct A{f C;} struct B{f A;} struct C{f B;}");
@@ -885,8 +902,38 @@ public class SemanticAnalysisTest {
     // statement
 
     @Test
-    public void testStatement() {
+    public void testStatement1() {
+        checkTrue("func f() { var a,b,c int; }");
+        checkTrue("func f() { var a,b,c int = 1,2,3; }");
+        checkFalse("func f() { var a,b,c int = 1,2; }");
+        checkFalse("func f() { var a,b,c int = 1,2,3,4; }");
+        checkFalse("func f() { var a,b,c bool = 1,2,3; }");
+        checkTrue("func f() { var a,b,c = 1,2,3; }");
+    }
 
+    @Test
+    public void testStatement2() {
+        var def = "class A{ var id int; }";
+        checkTrue(def + "func f(a *A) { var v int; v,a.id = 1,2; }");
+        checkFalse(def + "func f(a *A) { var v int; v,a.id = 1; }");
+        checkFalse(def + "func f(a *A) { var v int; v,a.id = 1,2,3; }");
+        checkTrue(def + "func f(a *A, r [*]int) { var v int; v,a.id,r[2] = 1,2,3; }");
+    }
+
+    @Test
+    public void testStatment3() {
+        checkFalse("func f(v int) { var v int; }");
+        checkTrue("func f() { var v int; { var v int; } }");
+        checkTrue("func f(v int) { { var v int; } }");
+        checkTrue("func f(v int) { {var v int;} }");
+        checkTrue("func f(v int) { {var v int; {var v int;}} }");
+    }
+
+    @Test
+    public void testStatment4() {
+        checkTrue("func f(v int){if(v>0){var v int;}}");
+        checkFalse("func f(v int){if(var v int=0;v>0){var v int;}}");
+        checkTrue("func f(v int){if(var v int=0;v>0){{var v int;}}}");
     }
 
 }

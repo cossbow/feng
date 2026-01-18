@@ -26,6 +26,8 @@ import org.cossbow.feng.util.Stack;
 import org.cossbow.feng.visit.EntityVisitor;
 import org.cossbow.feng.visit.SymbolContext;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -769,11 +771,17 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     //
 
-    public Entity visit(BlockStatement bs) {
-        context.enterScope();
+    public Entity visitList(BlockStatement bs) {
         for (var s : bs.list())
             visit(s);
-        context.exitScope();
+        return bs;
+    }
+
+    public Entity visit(BlockStatement bs) {
+        if (bs.newScope()) context.enterScope();
+        for (var s : bs.list())
+            visit(s);
+        if (bs.newScope()) context.exitScope();
         return bs;
     }
 
@@ -793,7 +801,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
                     v.type().set(t);
                 } else if (!assignable(v.type().must(), t)) {
-                    return semantic("unassignable: %s", v.pos());
+                    return semantic("value is not compatible for declare type : %s",
+                            v.pos());
                 }
             }
         }
@@ -1146,11 +1155,11 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(ForStatement e) {
-        context.enterScope();
         loopStack.push(e);
+        context.enterScope();
         EntityVisitor.super.visit(e);
-        loopStack.pop();
         context.exitScope();
+        loopStack.pop();
         return e;
     }
 
@@ -1205,6 +1214,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(SwitchBranch e) {
+        context.enterScope();
+        ;
         for (var ce : e.constants()) {
             var le = computeConst(ce);
             if (le.literal() instanceof IntegerLiteral ||
@@ -1216,10 +1227,13 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         for (var s : e.statements()) visit(s);
 
+        context.exitScope();
+        ;
         return e;
     }
 
     public Entity visit(SwitchStatement e) {
+        context.enterScope();
         visit(e.init());
         var td = typeDeducer.visit(e.value());
         if (!typeDeducer.isInteger(td) && !typeDeducer.isBool(td)) {
@@ -1230,17 +1244,34 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         for (var br : e.branches()) visit(br);
 
+        context.enterScope();
         for (var s : e.defaultBranch()) visit(s);
+        context.exitScope();
 
+        context.exitScope();
         return e;
     }
 
     public Entity visit(ThrowStatement e) {
-        return EntityVisitor.super.visit(e);
+        return visit(e.exception());
     }
 
     public Entity visit(TryStatement e) {
-        return EntityVisitor.super.visit(e);
+        context.enterScope();
+        visit(e.body());
+        context.exitScope();
+        visit(e.catchClauses());
+        visit(e.finallyClause());
+        return e;
+    }
+
+    public Entity visit(CatchClause e) {
+        context.enterScope();
+        visit(e.argument());
+        visit(e.typeSet());
+        visit(e.body());
+        context.exitScope();
+        return e;
     }
 
 
@@ -1277,10 +1308,18 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (g2.none()) return semantic("field not defined: %s",
                 e.field().pos());
 
-        var refer = g2.must().a().maybeRefer();
+        var s = g2.must().a();
         var f = g2.must().b();
         if (f instanceof StructureField sf) {
-            if (refer.has()) return sf.type();
+            if (s.maybeRefer().has()) {
+                if (s instanceof MemTypeDeclarer mtd) {
+                    if (!mtd.readonly())
+                        return sf.type();
+                    return semantic("rom can't change: %s",
+                            e.pos());
+                }
+                return unreachable();
+            }
 
             var im = constChecker.visit(e.subject());
             if (im) return semantic("const variable: %s", e.pos());
@@ -1291,7 +1330,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             if (cf.declare() != Declare.VAR)
                 return semantic("const field: %s", e.field().pos());
 
-            if (refer.has()) return cf.type();
+            if (s.maybeRefer().has()) return cf.type();
 
             var im = constChecker.visit(e.subject());
             if (im) return semantic("const variable: %s", e.pos());
@@ -1368,7 +1407,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         visit(e.callee());
         e.arguments().forEach(this::visit);
 
-        var rtd = typeDeducer.visit(e);
+        var rtd = typeDeducer.getCallable(e.callee());
 
         if (rtd instanceof FuncTypeDeclarer ftd) {
             if (!ftd.generic().isEmpty())
@@ -1380,25 +1419,25 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return semantic("arguments not compatible");
         }
 
-        if (rtd instanceof PrimitiveTypeDeclarer ptd) {
+        if (rtd instanceof ConvertorTypeDeclarer ctd) {
             // explicit convert
             if (e.arguments().size() != 1)
                 return semantic("convert : %s", e.pos());
             var a = e.arguments().getFirst();
             var td = typeDeducer.visit(a);
             if (td instanceof PrimitiveTypeDeclarer atd) {
-                if (ptd.primitive().isBool() == atd.primitive().isBool())
+                if (ctd.primitive().isBool() == atd.primitive().isBool())
                     return e;
             } else if (td instanceof LiteralTypeDeclarer lit) {
-                if (ptd.primitive().isInteger() &&
+                if (ctd.primitive().isInteger() &&
                         lit.literal() instanceof IntegerLiteral)
                     return e;
 
-                if (ptd.primitive().isFloat() &&
+                if (ctd.primitive().isFloat() &&
                         lit.literal() instanceof FloatLiteral)
                     return e;
 
-                if (ptd.primitive().isBool() &&
+                if (ctd.primitive().isBool() &&
                         lit.literal() instanceof BoolLiteral)
                     return e;
             }

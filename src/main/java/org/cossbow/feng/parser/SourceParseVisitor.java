@@ -1154,6 +1154,12 @@ final class SourceParseVisitor
 
     // statement: commons
 
+    private Statement unscope(Statement s) {
+        if (s instanceof BlockStatement bs)
+            return bs.unscope();
+        return s;
+    }
+
     @Override
     public Entity visitBlockStatement(FengParser.BlockStatementContext ctx) {
         var list = parseStatements(ctx.statementList());
@@ -1172,8 +1178,8 @@ final class SourceParseVisitor
     public Entity visitIfStatement(FengParser.IfStatementContext ctx) {
         var init = this.<Statement>visitOptional(ctx.init);
         var condition = (Expression) visit(ctx.expression());
-        var yes = (Statement) visit(ctx.yes);
-        var not = this.<Statement>visitOptional(ctx.not);
+        var yes = unscope((Statement) visit(ctx.yes));
+        var not = this.<Statement>visitOptional(ctx.not).map(this::unscope);
         return new IfStatement(posOf(ctx), init, condition, yes, not);
     }
 
@@ -1184,7 +1190,7 @@ final class SourceParseVisitor
             FengParser.UnaryForStatementContext ctx) {
         var condition = (Expression) visit(ctx.expression());
         var body = (Statement) visit(ctx.statement());
-        return new ConditionalForStatement(posOf(ctx), body,
+        return new ConditionalForStatement(posOf(ctx), unscope(body),
                 Optional.empty(), condition, Optional.empty());
     }
 
@@ -1196,7 +1202,7 @@ final class SourceParseVisitor
         var condition = (Expression) visit(clause.expression());
         var updater = (Statement) visit(clause.next);
         var body = (Statement) visit(ctx.statement());
-        return new ConditionalForStatement(posOf(ctx), body,
+        return new ConditionalForStatement(posOf(ctx), unscope(body),
                 Optional.of(initializer), condition,
                 Optional.of(updater));
     }
@@ -1208,7 +1214,8 @@ final class SourceParseVisitor
         var arguments = identifiers(iterator.identifierList());
         var source = (Expression) visit(iterator.expression());
         var body = (Statement) visit(ctx.statement());
-        return new IterableForStatement(posOf(ctx), body, arguments, source);
+        return new IterableForStatement(posOf(ctx), unscope(body),
+                arguments, source);
     }
 
     @Override
@@ -1243,7 +1250,7 @@ final class SourceParseVisitor
         var variable = new Variable(name.pos(), modifier, Declare.CONST, name);
         var typeSet = this.<TypeDeclarer>visitList(ctx.catchTypeSet().typeDeclarer());
         var body = (BlockStatement) visit(ctx.blockStatement());
-        return new CatchClause(posOf(ctx), variable, typeSet, body);
+        return new CatchClause(posOf(ctx), variable, typeSet, body.unscope());
     }
 
     @Override
@@ -1253,7 +1260,8 @@ final class SourceParseVisitor
         var tryBody = (BlockStatement) visit(preCtx.blockStatement());
         var catchClause = this.<CatchClause>visitList(preCtx.catchClause());
         catchClause.add((CatchClause) visit(ctx.catchClause()));
-        return new TryStatement(posOf(ctx), tryBody, catchClause, Optional.empty());
+        return new TryStatement(posOf(ctx), tryBody.unscope(),
+                catchClause, Optional.empty());
     }
 
     @Override
@@ -1263,7 +1271,7 @@ final class SourceParseVisitor
         var tryBody = (BlockStatement) visit(preCtx.blockStatement());
         var catchClause = this.<CatchClause>visitList(preCtx.catchClause());
         var finalBody = this.<BlockStatement>visitOptional(ctx.finallyClause().blockStatement());
-        return new TryStatement(posOf(ctx), tryBody, catchClause, finalBody);
+        return new TryStatement(posOf(ctx), tryBody.unscope(), catchClause, finalBody);
     }
 
     @Override
@@ -1362,7 +1370,8 @@ final class SourceParseVisitor
         var body = (BlockStatement) visit(ctx.blockStatement());
         var labels = Set.copyOf(this.labels.keySet());
         this.labels = null;
-        return new Procedure(posOf(ctx), prototype, body, labels);
+        return new Procedure(posOf(ctx), prototype,
+                body.unscope(), labels);
     }
 
 
