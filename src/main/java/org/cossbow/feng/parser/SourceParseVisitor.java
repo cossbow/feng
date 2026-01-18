@@ -142,6 +142,21 @@ final class SourceParseVisitor
     // module: start
     //
 
+    final Map<Identifier, Entity> globalNames = new HashMap<>();
+
+    private void checkGlobalName(Identifier name, Entity def) {
+        var old = globalNames.putIfAbsent(name, def);
+        if (old == null) return;
+        var m = switch (def) {
+            case TypeDefinition d -> d.domain();
+            case FunctionDefinition d -> "function";
+            case GlobalVariable v -> "variable";
+            case null, default -> unreachable();
+        };
+        semantic("global name %s%s used for global %s%s: ",
+                name, def.pos(), m, old.pos());
+    }
+
     @Override
     public Entity visitSource(FengParser.SourceContext ctx) {
         var imports = this.<Import>visitList(ctx.import_());
@@ -169,6 +184,7 @@ final class SourceParseVisitor
     @Override
     public Entity visitGlobalTypeDefinition(FengParser.GlobalTypeDefinitionContext ctx) {
         var def = (TypeDefinition) visit(ctx.def);
+        checkGlobalName(def.symbol().name(), def);
         gst.namedTypes.add(def.symbol().name(), def);
         if (isExport(ctx.exportable()))
             gst.exportedTypes.add(def.symbol(), def);
@@ -179,6 +195,7 @@ final class SourceParseVisitor
     public Entity visitGlobalFunctionDefinition(
             FengParser.GlobalFunctionDefinitionContext ctx) {
         var def = (FunctionDefinition) visit(ctx.def);
+        checkGlobalName(def.symbol().name(), def);
         gst.namedFunctions.add(def.symbol().name(), def);
         if (isExport(ctx.exportable()))
             gst.exportedFunctions.add(def.symbol(), def);
@@ -201,15 +218,17 @@ final class SourceParseVisitor
                         Optional.of(at.values().get(i))));
             }
         } else {
-            for (Variable v : stmt.variables())
+            for (var v : stmt.variables())
                 gvs.add(new GlobalVariable(v, defineSymbol(v.name()),
                         Optional.empty()));
         }
         if (isExport(ctx.exportable()))
             for (var v : gvs)
                 gst.exportedVariables.add(v.symbol(), v);
-        for (var v : gvs)
+        for (var v : gvs) {
+            checkGlobalName(v.symbol().name(), v);
             gst.variables.add(v.name(), v);
+        }
         return stmt;
     }
 

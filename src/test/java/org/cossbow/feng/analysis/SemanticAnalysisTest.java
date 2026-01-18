@@ -321,6 +321,33 @@ public class SemanticAnalysisTest {
         checkTrue("func at() {} \n class A { func at() {} \n func test() { this.at(); } }");
     }
 
+    // prototype
+
+    @Test
+    public void testPrototype1() {
+        checkTrue("func F(); func f(){} func m(){ var c F = f; }");
+        checkTrue("func F(int); func f(v int){} func m(){ var c F = f; }");
+        checkFalse("func F(int8); func f(v int){} func m(){ var c F = f; }");
+        checkTrue("func F()int; func f()int{} func m(){ var c F = f; }");
+        checkFalse("func F()int; func f()int8{} func m(){ var c F = f; }");
+    }
+
+    @Test
+    public void testPrototype2() {
+        var def = "class A{} class B:A{}";
+        checkTrue(def + "func F(*A); func f(*A){} func m(){ var c F = f; }");
+        checkFalse(def + "func F(*A); func f(*B){} func m(){ var c F = f; }");
+        checkTrue(def + "func F()*A; func f()*A{} func m(){ var c F = f; }");
+        checkTrue(def + "func F()*A; func f()*B{} func m(){ var c F = f; }");
+    }
+
+    @Test
+    public void testPrototype3() {
+        checkTrue("func f(){} func m(f func()){ f(); }");
+        checkTrue("func F(); func m(f F){ f(); }");
+        checkFalse("func f(){} func m(f int){ f(); }");
+    }
+
     // assign
 
     @Test
@@ -853,6 +880,13 @@ public class SemanticAnalysisTest {
     public void testEnum3() {
         checkFalse("enum S{A,B,} func f() { var s int; s=S.A; }");
         checkFalse("enum S{A,B,} func f() { var s S; s=S.C; }");
+    }
+
+    // statement
+
+    @Test
+    public void testStatement() {
+
     }
 
 }

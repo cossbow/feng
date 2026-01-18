@@ -25,10 +25,10 @@ public class PrimitiveDefinition extends TypeDefinition {
         return primitive;
     }
 
-    static final Map<Primitive, PrimitiveDefinition> cache;
+    static final Map<Primitive, PrimitiveDefinition> types;
 
     static {
-        cache = Arrays.stream(Primitive.values()).collect(
+        types = Arrays.stream(Primitive.values()).collect(
                 Collectors.toUnmodifiableMap(Function.identity(),
                         PrimitiveDefinition::new));
     }

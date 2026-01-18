@@ -273,7 +273,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(FuncTypeDeclarer td) {
-        visit(td.prototype());
+        visit(td.prototype(), false);
         visit(td.generic());
         return td;
     }
@@ -999,6 +999,24 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return false;
     }
 
+    private boolean assignable(
+            DefinedTypeDeclarer l, FuncTypeDeclarer r) {
+        visit(r.generic());
+
+        var dt = visit(l.definedType());
+        if (!(dt instanceof PrototypeDefinition pd))
+            return false;
+
+        visit(pd.generic());
+
+        var re = compatible(pd.prototype(), r.prototype());
+        return switch (re) {
+            case 1 -> semantic("parameters not match: %s", r.pos());
+            case 2 -> semantic("returns not consistent: %s", r.pos());
+            default -> true;
+        };
+    }
+
     private boolean assignable(TypeDeclarer l, TypeDeclarer r) {
         Objects.requireNonNull(l, "left");
         Objects.requireNonNull(r, "right");
@@ -1046,6 +1064,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 return assignable(dl, dr);
             if (r instanceof ObjectTypeDeclarer o)
                 return initializable(dl, o);
+            if (r instanceof FuncTypeDeclarer f)
+                return assignable(dl, f);
             if (dl.refer().has()) {
                 if (r instanceof LiteralTypeDeclarer lit) {
                     return lit.literal() instanceof NilLiteral;
@@ -1105,24 +1125,23 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                         e.label().get());
         }
 
-        if (loopStack.isEmpty()) semantic("out of loop");
+        if (loopStack.isEmpty())
+            return semantic("out of loop: %s", e.pos());
 
-        // TODO: 检查是否在循环中
         return e;
     }
 
     public Entity visit(ContinueStatement e) {
         assert enterProc != null;
         if (e.label().has()) {
-            if (enterProc.labels()
-                    .contains(e.label().get()))
+            if (enterProc.labels().contains(e.label().get()))
                 return semantic("label not found: %s",
                         e.label().get());
         }
 
-        if (loopStack.isEmpty()) semantic("out of loop");
+        if (loopStack.isEmpty())
+            return semantic("out of loop: %s", e.pos());
 
-        // TODO: 检查是否在循环中
         return e;
     }
 
@@ -1186,11 +1205,34 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(SwitchBranch e) {
-        return EntityVisitor.super.visit(e);
+        for (var ce : e.constants()) {
+            var le = computeConst(ce);
+            if (le.literal() instanceof IntegerLiteral ||
+                    le.literal() instanceof BoolLiteral)
+                continue;
+            return semantic("switch case constants need intger or bool",
+                    ce.pos());
+        }
+
+        for (var s : e.statements()) visit(s);
+
+        return e;
     }
 
     public Entity visit(SwitchStatement e) {
-        return EntityVisitor.super.visit(e);
+        visit(e.init());
+        var td = typeDeducer.visit(e.value());
+        if (!typeDeducer.isInteger(td) && !typeDeducer.isBool(td)) {
+            return semantic("switch value need intger or bool",
+                    e.value().pos());
+        }
+        visit(e.value());
+
+        for (var br : e.branches()) visit(br);
+
+        for (var s : e.defaultBranch()) visit(s);
+
+        return e;
     }
 
     public Entity visit(ThrowStatement e) {
@@ -1326,14 +1368,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         visit(e.callee());
         e.arguments().forEach(this::visit);
 
-        var ctd = typeDeducer.visit(e.callee());
-        if (!(ctd instanceof PrimitiveTypeDeclarer ||
-                ctd instanceof FuncTypeDeclarer)) {
-            return semantic("require callable: %s", e.pos());
-        }
-        var rtd = typeDeducer.visit(ctd);
-        if (rtd instanceof VoidTypeDeclarer)
-            return e;
+        var rtd = typeDeducer.visit(e);
 
         if (rtd instanceof FuncTypeDeclarer ftd) {
             if (!ftd.generic().isEmpty())
@@ -1348,7 +1383,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (rtd instanceof PrimitiveTypeDeclarer ptd) {
             // explicit convert
             if (e.arguments().size() != 1)
-                return semantic("can only be one argument: %s", e.pos());
+                return semantic("convert : %s", e.pos());
             var a = e.arguments().getFirst();
             var td = typeDeducer.visit(a);
             if (td instanceof PrimitiveTypeDeclarer atd) {
@@ -1366,11 +1401,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 if (ptd.primitive().isBool() &&
                         lit.literal() instanceof BoolLiteral)
                     return e;
-
             }
 
             return semantic("can't convert: %s", a.pos());
         }
+
+        if (rtd instanceof VoidTypeDeclarer) return e;
 
         return semantic("%s is callee or convertor", e.pos());
     }
@@ -1476,16 +1512,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (!e.generic().isEmpty())
             return unsupported("generic");
 
-        var t = context.findType(e.symbol());
-        if (t.has()) return e;
-
-        var f = context.findFunc(e.symbol());
-        if (f.has()) return e;
-
-        var v = context.findVar(e.symbol());
-        if (v.has()) return e;
-
-        return semantic("undefined symbol: %s", e.symbol());
+        return typeDeducer.visit(e);
     }
 
     // attribute

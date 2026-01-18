@@ -10,6 +10,8 @@ import org.cossbow.feng.ast.lit.FloatLiteral;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.EnumDefinition;
+import org.cossbow.feng.ast.proc.Prototype;
+import org.cossbow.feng.ast.proc.PrototypeDefinition;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.util.Groups;
@@ -158,6 +160,22 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (td instanceof FuncTypeDeclarer ftd)
             return visit(ftd);
 
+        if (td instanceof DefinedTypeDeclarer dtd) {
+            var dt = context.findType(dtd.definedType().symbol());
+            if (dt.none())
+                return semantic("type not defined: %s",
+                        dtd.definedType().pos());
+
+            if (dt.must() instanceof PrototypeDefinition pd) {
+                if (!pd.generic().isEmpty())
+                    return unsupported("generic");
+                return visit(pd.prototype());
+            }
+        }
+
+        if (td instanceof ConvertorTypeDeclarer ctd)
+            return ctd.primitive().declarer(ctd.pos());
+
         return td;
     }
 
@@ -300,19 +318,20 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (s.module().none()) {
             var p = Primitive.ofCode(s.name().value());
             if (p.has())
-                return p.get().declarer(e.pos());
+                return new ConvertorTypeDeclarer(s.pos(), p.get());
         }
+
+        var v = context.findVar(s);
+        if (v.has()) return v.get().type().must();
+
         var f = context.findFunc(s);
         if (f.has())
             return new FuncTypeDeclarer(e.pos(),
                     f.get().procedure().prototype(), e.generic());
 
-        var v = context.findVar(s);
-        if (v.has()) return v.get().type().must();
-
         var t = context.findType(s);
         if (t.none())
-            return semantic("unknown symbol '%s' ?", s);
+            return semantic("unknown symbol %s%s", s, s.pos());
 
         if (t.get() instanceof PrimitiveDefinition pd)
             return pd.primitive().declarer(e.pos());
@@ -324,15 +343,28 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     //
 
+
     @Override
-    public TypeDeclarer visit(FuncTypeDeclarer ftd) {
-        var rs = ftd.prototype().returnSet();
+    public TypeDeclarer visit(Prototype e) {
+        var rs = e.returnSet();
         if (rs.isEmpty())
-            return new VoidTypeDeclarer(ftd.pos());
+            return new VoidTypeDeclarer(e.pos());
         if (rs.size() == 1) {
             return rs.getFirst();
         }
-        return new TupleTypeDeclarer(ftd.pos(), rs);
+        return new TupleTypeDeclarer(e.pos(), rs);
+    }
+
+    @Override
+    public TypeDeclarer visit(FuncTypeDeclarer ftd) {
+        if (!ftd.generic().isEmpty())
+            return unsupported("generic");
+        return visit(ftd.prototype());
+    }
+
+    @Override
+    public TypeDeclarer visit(ConvertorTypeDeclarer e) {
+        return e.primitive().declarer(e.pos());
     }
 
     @Override
@@ -381,13 +413,19 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     @Override
     public TupleTypeDeclarer visit(ReturnTuple e) {
         var td = visit(e.call());
+
         if (td instanceof FuncTypeDeclarer ftd)
             return new TupleTypeDeclarer(e.pos(),
                     ftd.prototype().returnSet());
-        if (td instanceof PrimitiveTypeDeclarer ptd) {
+
+        if (td instanceof PrimitiveTypeDeclarer ptd)
             return new TupleTypeDeclarer(e.pos(),
                     List.of(ptd));
-        }
+
+        if (td instanceof ConvertorTypeDeclarer ctd)
+            return new TupleTypeDeclarer(e.pos(),
+                    List.of(ctd.primitive().declarer(e.pos())));
+
         return unreachable();
     }
 }
