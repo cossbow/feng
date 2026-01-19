@@ -411,16 +411,6 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
     }
 
     @Override
-    public CppGenerator visit(IfTuple e) {
-        return unsupported("if-tuple");
-    }
-
-    @Override
-    public CppGenerator visit(SwitchTuple e) {
-        return unsupported("switch-tuple");
-    }
-
-    @Override
     public CppGenerator visit(ReturnTuple e) {
         visit(e.call());
         return this;

@@ -1,6 +1,5 @@
 package org.cossbow.feng.visit;
 
-import org.cossbow.feng.analysis.VariableTypeDeclarer;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Attribute;
 import org.cossbow.feng.ast.attr.AttributeDefinition;
@@ -159,7 +158,6 @@ public interface EntityVisitor<R> {
 		return switch (e) {
 			case ArrayTypeDeclarer ee -> visit(ee);
 			case DefinedTypeDeclarer ee -> visit(ee);
-			case VariableTypeDeclarer ee -> visit(ee);
 			case FuncTypeDeclarer ee -> visit(ee);
 			case ConvertorTypeDeclarer ee -> visit(ee);
 			case MemTypeDeclarer ee -> visit(ee);
@@ -175,8 +173,6 @@ public interface EntityVisitor<R> {
 	default R visit(ArrayTypeDeclarer e) { return unreachable(); }
 
 	default R visit(DefinedTypeDeclarer e) { return unreachable(); }
-
-	default R visit(VariableTypeDeclarer e) { return unreachable(); }
 
 	default R visit(FuncTypeDeclarer e) { return unreachable(); }
 
@@ -401,20 +397,14 @@ public interface EntityVisitor<R> {
 	default R visit(Tuple e) {
 		return switch (e) {
 			case ArrayTuple ee -> visit(ee);
-			case IfTuple ee -> visit(ee);
 			case ReturnTuple ee -> visit(ee);
-			case SwitchTuple ee -> visit(ee);
 			case null, default -> unreachable();
 		};
 	}
 
 	default R visit(ArrayTuple e) { return unreachable(); }
 
-	default R visit(IfTuple e) { return unreachable(); }
-
 	default R visit(ReturnTuple e) { return unreachable(); }
-
-	default R visit(SwitchTuple e) { return unreachable(); }
 
 	default R visit(StructureField e) { return unreachable(); }
 

@@ -114,8 +114,6 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     @Override
     public TypeDeclarer visit(UnaryExpression e) {
         var t = visit(e.operand());
-        if (t instanceof VariableTypeDeclarer vtd)
-            t = vtd.type();
         switch (e.operator()) {
             case INVERT -> {
                 if (isInteger(t) || isBool(t)) return t;
@@ -161,11 +159,6 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     public TypeDeclarer getCallable(PrimaryExpression e) {
         var td = visit(e);
-
-        if (td instanceof VariableTypeDeclarer vtd) {
-            td = vtd.type();
-        }
-
         if (td instanceof FuncTypeDeclarer ftd)
             return ftd;
 
@@ -204,8 +197,6 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     @Override
     public TypeDeclarer visit(IndexOfExpression e) {
         var td = visit(e.subject());
-        if (td instanceof VariableTypeDeclarer vtd)
-            td = vtd.type();
         if (td instanceof ArrayTypeDeclarer atd) {
             return atd.element();
         }
@@ -278,7 +269,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (ev.has()) return ev.must().a();
 
         var f = typeTool.getField(e.subject(), e.member());
-        if (f.has()) return f.must().a();
+        if (f.has()) return f.must().b().type();
 
         var o = typeTool.getMethod(e.subject(), e.member());
         if (!o.has()) return unreachable();
@@ -345,8 +336,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         }
 
         var v = context.findVar(s);
-        if (v.has()) return new VariableTypeDeclarer(
-                v.get(), v.get().type().must());
+        if (v.has()) return v.get().type().must();
 
         var f = context.findFunc(s);
         if (f.has())
@@ -424,14 +414,6 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             return semantic("nested tuple: %s", v.pos());
         }
         return new TupleTypeDeclarer(e.pos(), list);
-    }
-
-    public TypeDeclarer visit(IfTuple e) {
-        return unsupported("if-tuple");
-    }
-
-    public TypeDeclarer visit(SwitchTuple e) {
-        return unsupported("switch-tuple");
     }
 
     @Override

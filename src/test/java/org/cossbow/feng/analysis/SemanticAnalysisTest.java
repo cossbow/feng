@@ -600,8 +600,8 @@ public class SemanticAnalysisTest {
     @Test
     public void testTransferable2() {
         var def = "class A{} class B:A{} class C:B{} ";
-        checkTrue(def + "func f(b *C) { var a *A = b; }");
-        checkTrue(def + "func f(b *C) { var a *A = b; }");
+        checkTrue(def + "func f(c *C) { var a *B = c; }");
+        checkTrue(def + "func f(c *C) { var a *A = c; }");
     }
 
     @Test
@@ -613,31 +613,151 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testTransferable4() {
+        var def = "interface I{} class A(I){} class B:A{}";
+        checkTrue(def + "func f(b *B) { var i *I = b; }");
+        checkFalse(def + "func f(i *I) { var b *B = i; }");
+    }
+
+    @Test
+    public void testTransferable5() {
         var def = "interface I{} interface J{I;} class A(J){} ";
         checkTrue(def + "func f(b *A) { var a *I = b; }");
         checkFalse(def + "func f(b *I) { var a *A = b; }");
     }
 
     @Test
-    public void testTransferable5() {
+    public void testTransferable6() {
         var def = "interface I{} interface J{I;} ";
         checkTrue(def + "func f(b *J) { var a *I = b; }");
         checkFalse(def + "func f(b *I) { var a *J = b; }");
     }
 
     @Test
-    public void testTransferable6() {
+    public void testTransferable7() {
         var def = "interface I{} interface J{I;} interface K{J;}";
         checkTrue(def + "func f(b *K) { var a *I = b; }");
         checkFalse(def + "func f(b *I) { var a *K = b; }");
     }
 
     @Test
-    public void testPhantom1() {
-        var d = "class A{} class B:A{} var a A; ";
-//        checkFalse(d + "const r &A = a;");
+    public void testPhantomRefer1() {
+        var d = "class A{} class B:A{} var a A; var b B; ";
+        checkFalse(d + "const r &A = a;");
         checkTrue(d + "func f() { const r &A = a; }");
-//        checkTrue(d + "func f(b *A) { const r &A = b; }");
+        checkTrue(d + "func f() { const r &A = b; }");
+        checkTrue(d + "func f(c func(&A)) { c(a); }");
+        checkTrue(d + "func f(c func(&A)) { c(b); }");
+        d = "class A{} class B:A{} const a A; const b B; ";
+        checkFalse(d + "const r &A = a;");
+        checkFalse(d + "func f() { const r &A = a; }");
+        checkFalse(d + "func f() { const r &A = b; }");
+        checkFalse(d + "func f(c func(&A)) { c(a); }");
+        checkFalse(d + "func f(c func(&A)) { c(b); }");
+    }
+
+    @Test
+    public void testPhantomRefer2() {
+        var d = "interface I{} class A(I){} class B:A{} ";
+        checkTrue(d + "func f() { var a A; const r &A = a; }");
+        checkTrue(d + "func f() { var b B; const r &A = b; }");
+        checkTrue(d + "func f() { var a A; const r &I = a; }");
+        checkTrue(d + "func f() { var b B; const r &I = b; }");
+
+        checkTrue(d + "func f() { const a *A; const r &A = a; }");
+        checkTrue(d + "func f() { const b *B; const r &A = b; }");
+        checkTrue(d + "func f() { const a *A; const r &I = a; }");
+        checkTrue(d + "func f() { const b *B; const r &I = b; }");
+
+        checkFalse(d + "func f() { var a *A; const r &A = a; }");
+        checkFalse(d + "func f() { var b *B; const r &A = b; }");
+        checkFalse(d + "func f() { var a *A; const r &I = a; }");
+        checkFalse(d + "func f() { var b *B; const r &I = b; }");
+
+        checkFalse(d + "func f() { const a A; const r &A = a; }");
+        checkFalse(d + "func f() { const b B; const r &A = b; }");
+        checkFalse(d + "func f() { const a A; const r &I = a; }");
+        checkFalse(d + "func f() { const b B; const r &I = b; }");
+    }
+
+    @Test
+    public void testPhantomRefer3() {
+        var d = "interface I{} class A(I){} class B:A{} ";
+        checkTrue(d + "func f(a *A) { const r &A = a; }");
+        checkTrue(d + "func f(b *B) { const r &A = b; }");
+        checkTrue(d + "func f(a *A) { const r &I = a; }");
+        checkTrue(d + "func f(b *B) { const r &I = b; }");
+
+        checkFalse(d + "func f(a A) { const r &A = a; }");
+        checkFalse(d + "func f(b B) { const r &A = b; }");
+        checkFalse(d + "func f(a A) { const r &I = a; }");
+        checkFalse(d + "func f(b B) { const r &I = b; }");
+    }
+
+    @Test
+    public void testPhantomRefer4() {
+        var d = "interface I{} class A(I){} class B:A{} ";
+        checkTrue(d + "func f(c func(a &B)) { var a B;c(a); }");
+        checkTrue(d + "func f(c func(a &A)) { var a B;c(a); }");
+        checkTrue(d + "func f(c func(a &I)) { var a B;c(a); }");
+        checkFalse(d + "func f(c func(a &B)) { var a *B;c(a); }");
+        checkFalse(d + "func f(c func(a &A)) { var a *B;c(a); }");
+        checkFalse(d + "func f(c func(a &I)) { var a *B;c(a); }");
+
+        checkFalse(d + "func f(c func(a &B), b B) { c(b); }");
+        checkFalse(d + "func f(c func(a &A), b B) { c(b); }");
+        checkFalse(d + "func f(c func(a &I), b B) { c(b); }");
+        checkTrue(d + "func f(c func(a &B), b *B) { c(b); }");
+        checkTrue(d + "func f(c func(a &A), b *B) { c(b); }");
+        checkTrue(d + "func f(c func(a &I), b *B) { c(b); }");
+        checkTrue(d + "func f(c func(a &I), b *B) { c(b); }");
+
+        checkTrue(d + "func f(c func(a &B), b &B) { c(b); }");
+        checkTrue(d + "func f(c func(a &A), b &B) { c(b); }");
+        checkTrue(d + "func f(c func(a &I), b &B) { c(b); }");
+        checkTrue(d + "func f(c func(a &I), b &B) { c(b); }");
+
+    }
+
+    @Test
+    public void testPhantomRefer5() {
+        var d = "interface I{} class A(I){} class B:A{} class R{var b B;}";
+        checkTrue(d + "func f(c func(a &B)) { var r R;c(r.b); }");
+        checkTrue(d + "func f(c func(a &A)) { var r R;c(r.b); }");
+        checkTrue(d + "func f(c func(a &I)) { var r R;c(r.b); }");
+
+        checkFalse(d + "func f(c func(a &B), r R) { c(r.b); }");
+        checkFalse(d + "func f(c func(a &A), r R) { c(r.b); }");
+        checkFalse(d + "func f(c func(a &I), r R) { c(r.b); }");
+
+
+        checkTrue(d + "func f(c func(a &B), r *R) { c(r.b); }");
+        checkTrue(d + "func f(c func(a &A), r *R) { c(r.b); }");
+        checkTrue(d + "func f(c func(a &I), r *R) { c(r.b); }");
+
+        checkFalse(d + "func f(c func(a &B), r R) { c(r.b); }");
+        checkFalse(d + "func f(c func(a &A), r R) { c(r.b); }");
+        checkFalse(d + "func f(c func(a &I), r R) { c(r.b); }");
+
+        checkTrue(d + "func f(c func(a &B), r &R) { c(r.b); }");
+        checkTrue(d + "func f(c func(a &A), r &R) { c(r.b); }");
+        checkTrue(d + "func f(c func(a &I), r &R) { c(r.b); }");
+
+    }
+
+    @Test
+    public void testPhantomRefer6() {
+        var d = "interface I{} class A(I){} class B:A{} class R{const b *B;}";
+        checkTrue(d + "func f(c func(a &B)) { var r R;c(r.b); }");
+        checkTrue(d + "func f(c func(a &A)) { var r R;c(r.b); }");
+        checkTrue(d + "func f(c func(a &I)) { var r R;c(r.b); }");
+
+        checkTrue(d + "func f(c func(a &B), r *R) { c(r.b); }");
+        checkTrue(d + "func f(c func(a &A), r *R) { c(r.b); }");
+        checkTrue(d + "func f(c func(a &I), r *R) { c(r.b); }");
+
+        checkTrue(d + "func f(c func(a &B), r &R) { c(r.b); }");
+        checkTrue(d + "func f(c func(a &A), r &R) { c(r.b); }");
+        checkTrue(d + "func f(c func(a &I), r &R) { c(r.b); }");
     }
 
     //

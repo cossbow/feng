@@ -3,7 +3,7 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Position;
 
 /**
- * 非用于创建AST，仅用于语义分析
+ * 临时，不在AST上
  */
 public class VoidTypeDeclarer extends TypeDeclarer {
     public VoidTypeDeclarer(Position pos) {

@@ -4,6 +4,9 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.proc.Prototype;
 
+/**
+ * 临时及(AST)都有
+ */
 public class FuncTypeDeclarer extends TypeDeclarer {
     private Prototype prototype;
     private TypeArguments generic;

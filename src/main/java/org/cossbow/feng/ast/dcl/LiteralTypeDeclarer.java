@@ -6,6 +6,9 @@ import org.cossbow.feng.ast.lit.FloatLiteral;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.lit.Literal;
 
+/**
+ * 临时，不在AST上
+ */
 public class LiteralTypeDeclarer extends TypeDeclarer {
     private Literal literal;
 

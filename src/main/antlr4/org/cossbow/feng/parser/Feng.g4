@@ -400,9 +400,6 @@ callStatement
 ifStatement
     : IF '(' (init=embedAssignment SEMI)? expression ')' yes=statement (ELSE not=statement)?
     ;
-ifTuple
-    : IF '(' condition=expression ')' yes=tuple ELSE not=tuple
-    ;
 // statement: for
 forStatement
     : FOR '(' expression ')' statement      # UnaryForStatement
@@ -426,16 +423,6 @@ switchBranch
     ;
 switchBranchDefault
     : DEFAULT body=blockStatement
-    ;
-// mult-expression
-switchTuple
-    : SWITCH '(' expression ')' '{' switchRule* switchRuleDefault '}'
-    ;
-switchRule
-    : CASE constants=expressionList COLON values=tuple SEMI
-    ;
-switchRuleDefault
-    : DEFAULT COLON tuple SEMI
     ;
 // assignment in control statements
 embedAssignment
@@ -518,11 +505,6 @@ labeledStatement
 
 // tuple
 tuple
-    : arrayTuple
-    | ifTuple
-    | switchTuple
-    ;
-arrayTuple
     : values=expressionList
     ;
 

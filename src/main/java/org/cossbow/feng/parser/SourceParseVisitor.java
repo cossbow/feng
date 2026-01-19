@@ -1139,27 +1139,7 @@ final class SourceParseVisitor
     // statement: tuple
 
     @Override
-    public Entity visitIfTuple(FengParser.IfTupleContext ctx) {
-        var condition = (Expression) visit(ctx.condition);
-        var yes = (Tuple) visit(ctx.yes);
-        var not = (Tuple) visit(ctx.not);
-        return new IfTuple(posOf(ctx), condition, yes, not);
-    }
-
-    @Override
-    public Entity visitSwitchTuple(FengParser.SwitchTupleContext ctx) {
-        var value = (Expression) visit(ctx.expression());
-        var rules = ctx.switchRule().stream().map(rc -> {
-            var constants = parseExpressions(rc.constants);
-            var values = (Tuple) visit(rc.values);
-            return new SwitchTuple.Rule(constants, values);
-        }).toList();
-        var defTp = (Tuple) visit(ctx.switchRuleDefault().tuple());
-        return new SwitchTuple(posOf(ctx), value, rules, defTp);
-    }
-
-    @Override
-    public Entity visitArrayTuple(FengParser.ArrayTupleContext ctx) {
+    public Entity visitTuple(FengParser.TupleContext ctx) {
         var values = parseExpressions(ctx.values);
         if (values.size() == 1) {
             var v = values.getFirst();

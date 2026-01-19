@@ -60,11 +60,16 @@ public class ClassDefinition extends TypeDefinition
     //
 
     private transient Lazy<ClassDefinition> parent = Lazy.nil();
+    private transient Lazy<IdentifierTable<InterfaceDefinition>> interfaces = Lazy.nil();
     private transient Lazy<IdentifierTable<ClassField>> allFields = Lazy.nil();
     private transient Lazy<IdentifierTable<ClassMethod>> allMethods = Lazy.nil();
 
     public Lazy<ClassDefinition> parent() {
         return parent;
+    }
+
+    public Lazy<IdentifierTable<InterfaceDefinition>> interfaces() {
+        return interfaces;
     }
 
     public Lazy<IdentifierTable<ClassField>> allFields() {
