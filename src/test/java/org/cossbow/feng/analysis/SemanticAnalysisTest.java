@@ -16,7 +16,7 @@ import java.util.List;
 public class SemanticAnalysisTest {
 
     void checkTrue(String code) {
-        System.out.println("[testing]>>>");
+        System.out.print("[check]>>> ");
         System.out.println(code);
         System.out.println("<<<");
         var src = BaseParseTest.doParseFile(code);
@@ -113,6 +113,12 @@ public class SemanticAnalysisTest {
     public void testClassInherit4() {
         checkFalse("class A:B{} class B:A{}");
         checkFalse("class A:C{} class B:A{} class C:B{}");
+    }
+
+    @Test
+    public void testClassInherit5() {
+        checkFalse("class A{var b B;} class B:A{}");
+        checkFalse("class A{var c C;} class B:A{} class C:B{}");
     }
 
     @Test
@@ -626,6 +632,14 @@ public class SemanticAnalysisTest {
         checkFalse(def + "func f(b *I) { var a *K = b; }");
     }
 
+    @Test
+    public void testPhantom1() {
+        var d = "class A{} class B:A{} var a A; ";
+//        checkFalse(d + "const r &A = a;");
+        checkTrue(d + "func f() { const r &A = a; }");
+//        checkTrue(d + "func f(b *A) { const r &A = b; }");
+    }
+
     //
 
     @Test
@@ -775,16 +789,38 @@ public class SemanticAnalysisTest {
     public void testMemMap3() {
         var def = "struct A{ id int; } ";
         checkFalse(def + "func f(a *A) { a.id = 1; }");
+        checkTrue(def + "func f(a *ram`A`) { a.id = 1; }");
+        checkFalse(def + "func f(a *rom`A`) { a.id = 1; }");
     }
 
     @Test
     public void testMemTransfer1() {
+        checkTrue("func f(v *ram`uint`) { var i *ram`float` = v; }");
         checkTrue("func f(v *ram`uint`) { var i *rom`float` = v; }");
+        checkTrue("func f(v *rom`uint`) { var i *rom`float` = v; }");
+        checkFalse("func f(v *rom`uint`) { var i *ram`float` = v; }");
     }
 
     @Test
     public void testMemTransfer2() {
-        checkFalse("func f(v *rom`uint`) { var i *ram`float` = v; }");
+        var d = "class C{} interface I{} enum E{S,} attribute A{} ";
+        checkFalse(d + "func f(v *C) { var i *ram = v; }");
+        checkFalse(d + "func f(v *I) { var i *ram = v; }");
+        checkFalse(d + "func f(v E) { var i *ram = v; }");
+        checkFalse(d + "func f(v A) { var i *ram = v; }");
+        checkFalse(d + "func f(v int) { var i *ram = v; }");
+        checkFalse(d + "func f(v float) { var i *ram = v; }");
+        checkFalse(d + "func f(v bool) { var i *ram = v; }");
+    }
+
+    @Test
+    public void testMemTransfer3() {
+        checkTrue("func f() { var i *rom = \"字面量\"; }");
+        checkFalse("func f() { var i *ram = \"字面量\"; }");
+        checkFalse("func f() { var i &rom = \"字面量\"; }");
+        checkFalse("func f() { var i *ram = 1; }");
+        checkFalse("func f() { var i *ram = 3.3; }");
+        checkFalse("func f() { var i *ram = true; }");
     }
 
     // struct

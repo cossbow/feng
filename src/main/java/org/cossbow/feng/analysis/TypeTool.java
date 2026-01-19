@@ -51,6 +51,9 @@ public class TypeTool {
     public Optional<Groups.G2<TypeDeclarer, Field>>
     getField(PrimaryExpression subject, Identifier name) {
         var std = deduce(subject);
+        if (std instanceof VariableTypeDeclarer vtd)
+            std = vtd.type();
+
         var mtd = std;
         if (mtd instanceof MemTypeDeclarer mem) {
             if (mem.mapped().none())
@@ -87,6 +90,10 @@ public class TypeTool {
     public Optional<Groups.G2<DefinedTypeDeclarer, EnumDefinition.Value>>
     getEnum(PrimaryExpression subject, Identifier value) {
         var std = deduce(subject);
+
+        if (std instanceof VariableTypeDeclarer vtd)
+            std = vtd.type();
+
         if (!(std instanceof DefinedTypeDeclarer dtd))
             return Optional.empty();
 
@@ -127,6 +134,9 @@ public class TypeTool {
     public Optional<? extends Entity> getMethod(
             PrimaryExpression subject, Identifier name) {
         var std = deduce(subject);
+        if (std instanceof VariableTypeDeclarer vtd)
+            std = vtd.type();
+
         if (!(std instanceof DefinedTypeDeclarer dtd))
             return Optional.empty();
 
@@ -149,6 +159,8 @@ public class TypeTool {
     //
 
     public static Optional<Primitive.Kind> primitiveKind(TypeDeclarer td) {
+        if (td instanceof VariableTypeDeclarer vtd)
+            td = vtd.type();
         if (td instanceof PrimitiveTypeDeclarer ptd)
             return Optional.of(ptd.primitive().kind);
         if (td instanceof LiteralTypeDeclarer ltd)

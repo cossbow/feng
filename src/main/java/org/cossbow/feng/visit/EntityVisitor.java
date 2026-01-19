@@ -1,5 +1,6 @@
 package org.cossbow.feng.visit;
 
+import org.cossbow.feng.analysis.VariableTypeDeclarer;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Attribute;
 import org.cossbow.feng.ast.attr.AttributeDefinition;
@@ -158,6 +159,7 @@ public interface EntityVisitor<R> {
 		return switch (e) {
 			case ArrayTypeDeclarer ee -> visit(ee);
 			case DefinedTypeDeclarer ee -> visit(ee);
+			case VariableTypeDeclarer ee -> visit(ee);
 			case FuncTypeDeclarer ee -> visit(ee);
 			case ConvertorTypeDeclarer ee -> visit(ee);
 			case MemTypeDeclarer ee -> visit(ee);
@@ -173,6 +175,8 @@ public interface EntityVisitor<R> {
 	default R visit(ArrayTypeDeclarer e) { return unreachable(); }
 
 	default R visit(DefinedTypeDeclarer e) { return unreachable(); }
+
+	default R visit(VariableTypeDeclarer e) { return unreachable(); }
 
 	default R visit(FuncTypeDeclarer e) { return unreachable(); }
 

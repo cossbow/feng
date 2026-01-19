@@ -202,6 +202,14 @@ final class SourceParseVisitor
         return def;
     }
 
+    private void globalVarCheck(Variable v) {
+        if (v.type().none()) return;
+        var r = v.type().must().maybeRefer();
+        if (r.none()) return;
+        if (!r.must().checkType(PHANTOM)) return;
+        semantic("global variable can't be phantom reference: %s", v.pos());
+    }
+
     @Override
     public Entity visitGlobalDeclaration(FengParser.GlobalDeclarationContext ctx) {
         var stmt = (DeclarationStatement) visit(ctx.declaration());
@@ -214,13 +222,16 @@ final class SourceParseVisitor
                 return semantic("number of var and init not match");
             for (int i = 0; i < at.size(); i++) {
                 var v = stmt.variables().get(i);
+                globalVarCheck(v);
                 gvs.add(new GlobalVariable(v, defineSymbol(v.name()),
                         Optional.of(at.values().get(i))));
             }
         } else {
-            for (var v : stmt.variables())
+            for (var v : stmt.variables()) {
+                globalVarCheck(v);
                 gvs.add(new GlobalVariable(v, defineSymbol(v.name()),
                         Optional.empty()));
+            }
         }
         if (isExport(ctx.exportable()))
             for (var v : gvs)
@@ -1012,15 +1023,21 @@ final class SourceParseVisitor
 
     private List<Variable> parseVariables(
             FengParser.DeclaredNamesContext dnCtx,
-            Lazy<TypeDeclarer> typeDcl) {
+            Lazy<TypeDeclarer> type) {
         var modifier = parseModifier(dnCtx.modifier());
         var dcl = parseDeclare(dnCtx.declare);
+        type.use(td -> {
+            var r = td.maybeRefer();
+            if (r.none() || r.get().kind() != PHANTOM) return;
+            if (dcl == Declare.CONST) return;
+            semantic("phantom refer must be const: %s", td.pos());
+        });
         var names = identifiers(dnCtx.identifierList());
         var vars = new ArrayList<Variable>(names.size());
         var unique = new UniqueTable<Identifier, Identifier>(names.size());
         for (var name : names) {
             unique.add(name, name);
-            vars.add(new Variable(name.pos(), modifier, dcl, name, typeDcl));
+            vars.add(new Variable(name.pos(), modifier, dcl, name, type));
         }
         return vars;
     }

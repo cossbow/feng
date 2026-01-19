@@ -1,6 +1,7 @@
 package org.cossbow.feng.util;
 
 import java.util.NoSuchElementException;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public class Lazy<T> {
@@ -40,7 +41,14 @@ public class Lazy<T> {
     }
 
     public boolean match(Predicate<T> matcher) {
-        return has() && matcher.test(value);
+        var v = value;
+        if (v == null) return false;
+        return matcher.test(v);
+    }
+
+    public void use(Consumer<T> user) {
+        var v = value;
+        if (v != null) user.accept(v);
     }
 
     //

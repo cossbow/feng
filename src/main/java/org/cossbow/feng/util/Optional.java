@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 public class Optional<T> {
     private final T value;
@@ -47,6 +48,10 @@ public class Optional<T> {
     public <R> Optional<R> map(Function<T, R> f) {
         if (none()) return empty();
         return of(f.apply(value));
+    }
+
+    public Stream<T> stream() {
+        return has() ? Stream.of(value) : Stream.empty();
     }
 
     public <R> Optional<R> flat(Function<T, Optional<R>> f) {

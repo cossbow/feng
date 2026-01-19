@@ -114,6 +114,8 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     @Override
     public TypeDeclarer visit(UnaryExpression e) {
         var t = visit(e.operand());
+        if (t instanceof VariableTypeDeclarer vtd)
+            t = vtd.type();
         switch (e.operator()) {
             case INVERT -> {
                 if (isInteger(t) || isBool(t)) return t;
@@ -159,6 +161,11 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     public TypeDeclarer getCallable(PrimaryExpression e) {
         var td = visit(e);
+
+        if (td instanceof VariableTypeDeclarer vtd) {
+            td = vtd.type();
+        }
+
         if (td instanceof FuncTypeDeclarer ftd)
             return ftd;
 
@@ -197,6 +204,8 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     @Override
     public TypeDeclarer visit(IndexOfExpression e) {
         var td = visit(e.subject());
+        if (td instanceof VariableTypeDeclarer vtd)
+            td = vtd.type();
         if (td instanceof ArrayTypeDeclarer atd) {
             return atd.element();
         }
@@ -264,7 +273,6 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     @Override
     public TypeDeclarer visit(MemberOfExpression e) {
         if (!e.generic().isEmpty()) return unsupported("generic");
-
 
         var ev = typeTool.getEnum(e.subject(), e.member());
         if (ev.has()) return ev.must().a();
@@ -337,7 +345,8 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         }
 
         var v = context.findVar(s);
-        if (v.has()) return v.get().type().must();
+        if (v.has()) return new VariableTypeDeclarer(
+                v.get(), v.get().type().must());
 
         var f = context.findFunc(s);
         if (f.has())
