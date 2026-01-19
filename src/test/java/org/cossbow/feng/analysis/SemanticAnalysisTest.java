@@ -331,6 +331,8 @@ public class SemanticAnalysisTest {
         checkFalse("func F(int8); func f(v int){} func m(){ var c F = f; }");
         checkTrue("func F()int; func f()int{} func m(){ var c F = f; }");
         checkFalse("func F()int; func f()int8{} func m(){ var c F = f; }");
+        checkTrue("func F()int; func m(f func()int){ var c F = f; }");
+        checkFalse("func F()int; func m(f func()int8){ var c F = f; }");
     }
 
     @Test
@@ -340,6 +342,8 @@ public class SemanticAnalysisTest {
         checkFalse(def + "func F(*A); func f(*B){} func m(){ var c F = f; }");
         checkTrue(def + "func F()*A; func f()*A{} func m(){ var c F = f; }");
         checkTrue(def + "func F()*A; func f()*B{} func m(){ var c F = f; }");
+        checkTrue(def + "func F()*A; func m(f func()*A){ var c F = f; }");
+        checkTrue(def + "func F()*A; func m(f func()*B){ var c F = f; }");
     }
 
     @Test
@@ -923,7 +927,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testStatmentScope() {
+    public void testStatementScope() {
         checkFalse("func f(v int) { var v int; }");
         checkTrue("func f() { var v int; { var v int; } }");
         checkTrue("func f(v int) { { var v int; } }");
@@ -932,7 +936,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testStatmentIf() {
+    public void testStatementIf() {
         checkTrue("func f(v bool){if(v){var v int;}}");
         checkTrue("func f(v int){if(v>0){var v int;}}");
         checkFalse("func f(v int){if(var v int=0;v>0){var v int;}}");
@@ -945,15 +949,36 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testStatmentSwitch() {
-        var d = "func a(){} enum S{U,V,W,}";
-//        checkTrue(d + "func f(v int){switch(v){ case 1:a(); }}");
-//        checkFalse(d + "func f(v int, c int){switch(v){ case c:a(); }}");
-//        checkTrue(d + "func f(v int){switch(v){ case 1:a(); case 2:a(); }}");
-//        checkTrue(d + "func f(v int){switch(v){ case 1:a(); default:a(); }}");
-        checkTrue(d + "func f(v S){switch(v){ case U:a(); case V:a(); case W:a(); }}");
-        checkTrue(d + "func f(v S){switch(v){ case U:a(); default:a(); }}");
-        checkFalse(d + "func f(v S){switch(v){ case U:a(); }}");
+    public void testStatementSwitch() {
+        var d = "func a(){} enum E{U,V,W,} const S1K = 1<<10; var S1M = 1<<20;";
+        checkTrue(d + "func f(v int){switch(v){ case 1{} default{} }}");
+        checkTrue(d + "func f(v int){switch(v){ case S1K{} default{} }}");
+        checkFalse(d + "func f(v int){switch(v){ case S1M{} default{} }}");
+        checkFalse(d + "func f(v int){ const K1 = S1K; switch(v){ case K1{} default{} }}");
+        checkFalse(d + "func f(v int, c int){switch(v){ case c{} }}");
+        checkTrue(d + "func f(v int){switch(v){ case 1{} case 2{} default{} }}");
+        checkFalse(d + "func f(v int){switch(v){ case 1{} }}");
+        checkTrue(d + "func f(v E){switch(v){ case U{} case V{} case W{} }}");
+        checkTrue(d + "func f(v E){switch(v){ case U{} default{} }}");
+        checkFalse(d + "func f(v E){switch(v){ case U{} }}");
+        checkTrue(d + "func f(v E){switch(v){ case U{var v E;} default{var v E;}  }}");
+    }
+
+    @Test
+    public void testStatementThrow() {
+        var d = "func a(){} enum E{U,V,W,} const S1K = 1<<10; var S1M = 1<<20;";
+        checkTrue(d + "func f(v E){ throw v; }");
+    }
+
+    @Test
+    public void testStatementTry() {
+        var d = "func A(); enum E{U,V,W,} class C{} interface I{}";
+        checkTrue(d + "func f(v E){ try{}finally{} }");
+        checkTrue(d + "func f(v E){ try{var v E;}finally{} }");
+        checkTrue(d + "func f(v E){ try{}finally{var v E;} }");
+        checkTrue(d + "func f(v E){ try{}catch(v E){} }");
+        checkTrue(d + "func f(v E){ try{var v E;}catch(v E){} }");
+        checkFalse(d + "func f(v E){ try{}catch(v E){var v E;} }");
     }
 
 }

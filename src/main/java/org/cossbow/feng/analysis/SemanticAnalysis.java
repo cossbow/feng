@@ -1211,15 +1211,17 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         var set = new UniqueTable<IntegerLiteral, IntegerLiteral>();
         for (var b : s.branches()) {
             for (var c : b.constants()) {
-                if (c instanceof LiteralExpression le &&
-                        le.literal() instanceof IntegerLiteral il) {
+                var le = computeConst(c);
+                if (le.literal() instanceof IntegerLiteral il) {
                     set.add(il, il);
                     continue;
                 }
-                semantic("must be const intger: %s", c.pos());
+                semantic("must be const integer: %s", c.pos());
                 return;
             }
         }
+        if (s.defaultBranch().has()) return;
+        semantic("enum integer must add 'default': %s", s.pos());
     }
 
     private void checkConstantEnum(
@@ -1261,31 +1263,24 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         visit(e.init());
 
         var td = typeDeducer.visit(e.value());
-        var dt = (TypeDefinition) visit(td);
-        var isInteger = dt instanceof PrimitiveDefinition pd &&
-                pd.primitive().isInteger();
-        if (isInteger) {
+
+        if (td instanceof PrimitiveTypeDeclarer ptd) {
+            if (!ptd.primitive().isInteger())
+                return semantic("must be integer: %s", e.value().pos());
             checkConstantInteger(e);
-        } else {
-            if (!(dt instanceof EnumDefinition ed)) return semantic(
-                    "value must be intger or enum: %s",
-                    e.value().pos());
+        } else if (td instanceof DefinedTypeDeclarer dtd) {
+            var dt = visit(dtd.definedType());
+            if (!(dt instanceof EnumDefinition ed))
+                return semantic("must be enum: %s", e.value().pos());
             checkConstantEnum(e, ed);
+        } else {
+            return semantic("value require integer or enum: %s",
+                    e.value().pos());
         }
 
-        for (var br : e.branches()) {
-            context.enterScope();
-            for (var s : br.statements()) {
-                visit(s);
-            }
-            context.exitScope();
-        }
+        for (var br : e.branches()) visit(br.body());
 
-        context.enterScope();
-        e.defaultBranch().use(br -> {
-            for (var s : br.statements()) visit(s);
-        });
-        context.exitScope();
+        e.defaultBranch().use(br -> visit(br.body()));
 
         context.exitScope();
         return e;
@@ -1306,8 +1301,17 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     public Entity visit(CatchClause e) {
         context.enterScope();
+        var arg = e.argument();
+        if (e.typeSet().size() > 1) {
+            // TODO: 推导
+            return unsupported("catch multi types: %s",
+                    e.typeSet().get(1).pos());
+        } else {
+            arg.type().set(e.typeSet().getFirst());
+        }
         visit(e.argument());
         visit(e.typeSet());
+        context.putVar(e.argument());
         visit(e.body());
         context.exitScope();
         return e;

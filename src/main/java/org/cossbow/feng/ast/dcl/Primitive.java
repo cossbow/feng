@@ -49,6 +49,10 @@ public enum Primitive {
         return new PrimitiveTypeDeclarer(pos, this);
     }
 
+    public PrimitiveDefinition type(){
+        return PrimitiveDefinition.types.get(this);
+    }
+
     @Override
     public String toString() {
         return code;

@@ -20,7 +20,16 @@ public class TypeDeducerTest {
     final TypeDeducer deducer = new TypeDeducer(EmptySymbolContext.EMPTY);
 
     Primitive getPri(TypeDeclarer td) {
-        return ((PrimitiveTypeDeclarer) td).primitive();
+        if (td instanceof PrimitiveTypeDeclarer ptd)
+            return ptd.primitive();
+        if (td instanceof LiteralTypeDeclarer ltd) {
+            return switch (ltd.literal().compatible().must()) {
+                case INTEGER -> INT;
+                case FLOAT -> FLOAT;
+                case BOOL -> BOOL;
+            };
+        }
+        throw new AssertionError();
     }
 
     @Test

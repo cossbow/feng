@@ -25,6 +25,14 @@ public class BlockStatement extends Statement {
         return list;
     }
 
+    public int size() {
+        return list.size();
+    }
+
+    public boolean isEmpty() {
+        return list.isEmpty();
+    }
+
     public boolean newScope() {
         return newScope;
     }

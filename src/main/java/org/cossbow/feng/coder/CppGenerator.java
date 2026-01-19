@@ -382,10 +382,10 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
                 visit(cs);
                 write(":\n");
             }
-            for (var s : br.statements())
+            for (var s : br.body().list())
                 visit(s);
-            if (!br.fallthrough())
-                write("break;\n");
+
+            write("break;\n");
         }
         write("}\n");
         if (ss.init().has()) write('}');

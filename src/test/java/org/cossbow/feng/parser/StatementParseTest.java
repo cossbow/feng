@@ -153,16 +153,11 @@ public class StatementParseTest extends BaseParseTest {
         var a = randVarName(6);
         var code = """
                 switch(var %s = goods(); %s) {
-                case "0":
-                case "1":
-                    call1();
-                case "2":
-                    call2();
-                    fallthrough;
-                case "3","4":
-                    call3();
-                default:
-                    error();
+                case 0 {}
+                case 1 {call1();}
+                case 2 {call2();}
+                case 3,4 {call3();}
+                default {error();}
                 }
                 """.formatted(a, a);
         var stmt = (SwitchStatement) parseStmt(code);
@@ -176,34 +171,35 @@ public class StatementParseTest extends BaseParseTest {
         Assertions.assertEquals(symbol(a), varName(stmt.value()));
         {
             var br = stmt.branches().getFirst();
-            Assertions.assertEquals("0", string(br.constants().getFirst()));
-            Assertions.assertTrue(br.statements().isEmpty());
-            Assertions.assertFalse(br.fallthrough());
+            Assertions.assertEquals(0,
+                    integer(br.constants().getFirst()).value().intValue());
+            Assertions.assertTrue(br.body().isEmpty());
         }
         {
             var br = stmt.branches().get(1);
-            Assertions.assertEquals("1", string(br.constants().getFirst()));
-            Assertions.assertEquals(1, br.statements().size());
-            var c1 = (CallStatement) br.statements().getFirst();
+            Assertions.assertEquals(1,
+                    integer(br.constants().getFirst()).value().intValue());
+            Assertions.assertEquals(1, br.body().size());
+            var c1 = (CallStatement) br.body().list().getFirst();
             Assertions.assertEquals(symbol("call1"), varName(c1.call().callee()));
-            Assertions.assertFalse(br.fallthrough());
         }
         {
             var br = stmt.branches().get(2);
-            Assertions.assertEquals("2", string(br.constants().getFirst()));
-            Assertions.assertEquals(1, br.statements().size());
-            var c1 = (CallStatement) br.statements().getFirst();
+            Assertions.assertEquals(2,
+                    integer(br.constants().getFirst()).value().intValue());
+            Assertions.assertEquals(1, br.body().size());
+            var c1 = (CallStatement) br.body().list().getFirst();
             Assertions.assertEquals(symbol("call2"), varName(c1.call().callee()));
-            Assertions.assertTrue(br.fallthrough());
         }
         {
             var br = stmt.branches().get(3);
-            Assertions.assertEquals("3", string(br.constants().get(0)));
-            Assertions.assertEquals("4", string(br.constants().get(1)));
-            Assertions.assertEquals(1, br.statements().size());
-            var c1 = (CallStatement) br.statements().getFirst();
+            Assertions.assertEquals(3,
+                    integer(br.constants().get(0)).value().intValue());
+            Assertions.assertEquals(4,
+                    integer(br.constants().get(1)).value().intValue());
+            Assertions.assertEquals(1, br.body().size());
+            var c1 = (CallStatement) br.body().list().getFirst();
             Assertions.assertEquals(symbol("call3"), varName(c1.call().callee()));
-            Assertions.assertFalse(br.fallthrough());
         }
     }
 

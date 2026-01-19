@@ -1220,10 +1220,9 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitSwitchBranch(FengParser.SwitchBranchContext ctx) {
-        var statements = parseStatements(ctx.statementList());
+        var body = (BlockStatement) visit(ctx.body);
         var expressions = parseExpressions(ctx.expressionList());
-        var fallthrough = ctx.FALLTHROUGH() != null;
-        return new SwitchBranch(posOf(ctx), expressions, statements, fallthrough);
+        return new SwitchBranch(posOf(ctx), expressions, body);
     }
 
     @Override
@@ -1233,7 +1232,7 @@ final class SourceParseVisitor
         var branches = this.<SwitchBranch>visitList(ctx.switchBranch());
         var defBr = Optional.<Branch>empty();
         if (ctx.def != null) {
-            var list = parseStatements(ctx.def.statementList());
+            var list = (BlockStatement) visit(ctx.def.body);
             defBr = Optional.of(new Branch(posOf(ctx.def), list));
         }
         return new SwitchStatement(posOf(ctx), assign, value, branches, defBr);

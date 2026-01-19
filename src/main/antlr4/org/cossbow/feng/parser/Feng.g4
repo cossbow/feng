@@ -422,10 +422,10 @@ switchStatement
                 '{' switchBranch* def=switchBranchDefault? '}'
     ;
 switchBranch
-    : CASE expressionList COLON statementList (FALLTHROUGH SEMI)?
+    : CASE expressionList body=blockStatement
     ;
 switchBranchDefault
-    : DEFAULT COLON statementList
+    : DEFAULT body=blockStatement
     ;
 // mult-expression
 switchTuple
@@ -761,7 +761,6 @@ CONTINUE        : 'continue' ;
 BREAK           : 'break' ;
 SWITCH          : 'switch' ;
 CASE            : 'case' ;
-FALLTHROUGH     : 'fallthrough' ;
 DEFAULT         : 'default' ;
 GOTO            : 'goto' ;
 THROW           : 'throw' ;

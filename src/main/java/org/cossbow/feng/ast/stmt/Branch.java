@@ -3,18 +3,16 @@ package org.cossbow.feng.ast.stmt;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
 
-import java.util.List;
-
 public class Branch extends Entity {
-    private List<Statement> statements;
+    private BlockStatement body;
 
     public Branch(Position pos,
-                  List<Statement> statements) {
+                  BlockStatement body) {
         super(pos);
-        this.statements = statements;
+        this.body = body;
     }
 
-    public List<Statement> statements() {
-        return statements;
+    public BlockStatement body() {
+        return body;
     }
 }

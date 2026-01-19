@@ -47,14 +47,10 @@ func checkForStatement(max int,
 
 func checkSwitchStatement(c int) {
     switch( var v = c % 4 ; c) {
-    case 0:
-    case 1:
-        return v;
-    case 2:
-        fallthrough;
-    case 3:
-        print(v);
-    default:
+    case 0 {}
+    case 1 {return v;}
+    case 2,3 {print(v);}
+    default {}
     }
 }
 
