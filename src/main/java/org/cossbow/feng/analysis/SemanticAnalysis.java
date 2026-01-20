@@ -222,8 +222,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     public Entity visit(Refer e) {
         if (e.kind() == ReferKind.WEAK)
             unsupported("weak-reference");
-        if (e.required())
-            unsupported("require reference");
         return e;
     }
 
@@ -237,7 +235,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return unsupported("generic");
         var type = context.findType(dt.symbol());
         if (type.none())
-            return semantic("%s not defined", dt.symbol());
+            return semantic("type %s not defined", dt.symbol());
         if (!type.get().generic().isEmpty())
             return unsupported("generic");
         return type.get();
@@ -310,12 +308,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     public Entity visit(LiteralTypeDeclarer ltd) {
         return ltd;
-    }
-
-    public Entity visit(ThisTypeDeclarer ctd) {
-        if (enterClass == null)
-            semantic("this only use in class");
-        return ctd;
     }
 
     public Entity visit(TupleTypeDeclarer ttd) {
@@ -557,7 +549,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
     }
 
-    public Optional<ClassDefinition> classFieldType(TypeDeclarer t) {
+    private Optional<ClassDefinition>
+    getClassTypeField(TypeDeclarer t) {
         assert enterClass != null;
 
         if (t instanceof DefinedTypeDeclarer ctd) {
@@ -573,7 +566,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (t instanceof ArrayTypeDeclarer atd) {
             if (atd.refer().has())
                 return Optional.empty();
-            return classFieldType(atd.element());
+            return getClassTypeField(atd.element());
         }
 
         return Optional.empty();
@@ -583,7 +576,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         var cyc = checkCyclic(cd, d -> {
             var inherit = d.inherit().stream().map(this::findParent);
             var fields = d.fields().stream().map(ClassField::type)
-                    .map(this::classFieldType).flatMap(Optional::stream);
+                    .map(this::getClassTypeField).flatMap(Optional::stream);
             return Stream.concat(inherit, fields)
                     .toList();
         });
@@ -723,6 +716,22 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return proc;
     }
 
+    private <T> T missingReturn() {
+        return semantic("Missing return statement: %s",
+                enterProc.pos());
+    }
+
+    private boolean isEndStmt(Statement s) {
+        return s instanceof ReturnStatement
+                || s instanceof ThrowStatement;
+    }
+
+    private Void checkAllPathReturn(Procedure proc) {
+        if (!proc.prototype().returnSet().isEmpty()) return null;
+        var analyzer = new ReturnAnalyzer(this::isEndStmt);
+        if (analyzer.check(proc.body())) return null;
+        return missingReturn();
+    }
 
     public Entity visit(Prototype prot, boolean addVar) {
         visit(prot.parameterSet(), addVar);
@@ -794,11 +803,11 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 if (assignable(v.type().must(), t, Optional.empty()))
                     continue;
 
-                semantic("init value not compatible : %s", v.pos());
+                semantic("init value not assignable : %s", v.pos());
                 return;
             }
             if (!assignable(v.type().must(), t, Optional.of(at.values().get(i)))) {
-                semantic("init value not compatible : %s", v.pos());
+                semantic("init value not assignable : %s", v.pos());
                 return;
             }
         }
@@ -974,7 +983,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         var lt = visit(l.definedType());
         var rt = visit(r.definedType());
-        if (l.refer().none()) return lt.equals(rt);
+        if (l.refer().none())
+            return r.refer().none() && lt.equals(rt);
 
         var lr = l.refer().get();
 
@@ -1455,21 +1465,69 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     public Entity visit(AssertExpression e) {
         visit(e.subject());
-        visit(e.type());
-        var type = typeDeducer.visit(e.subject());
-        if (assignable(e.type(), type, Optional.of(e)))
+        var st = typeDeducer.visit(e.subject());
+        var sr = st.maybeRefer();
+        if (sr.none()) return semantic(
+                "require a refer: %s", e.subject().pos());
+
+        var et = e.type();
+        var er = et.maybeRefer();
+        if (er.none()) return semantic(
+                "type must refer: %s", e.type().pos());
+
+        if (sr.get().kind() != er.get().kind()) return
+                semantic("can't change refer kind from %s to %s: %s",
+                        sr.get().kind(), er.get().kind(), e.type().pos());
+
+        var sot = typeTool.getObject(st);
+        var eot = typeTool.getObject(et);
+        if (sot.none() || eot.none())
+            return semantic("require class or interface refer: %s",
+                    e.pos());
+
+        if (referable(eot.get(), sot.get()))
+            return e;
+        if (referable(sot.get(), eot.get()))
             return e;
 
-        return semantic("unassignable: %s", e.pos());
+        return semantic("inconvertible types %s to %s: %s",
+                st, et, e.pos());
+    }
+
+    private Entity checkConvertor(
+            ConvertorTypeDeclarer ctd, CallExpression e) {
+        // explicit convert
+        if (e.arguments().size() != 1)
+            return semantic("convert : %s", e.pos());
+        var a = e.arguments().getFirst();
+        var td = typeDeducer.visit(a);
+        if (td instanceof PrimitiveTypeDeclarer atd) {
+            if (ctd.primitive().isBool() == atd.primitive().isBool())
+                return e;
+        } else if (td instanceof LiteralTypeDeclarer lit) {
+            if (ctd.primitive().isInteger() &&
+                    lit.literal() instanceof IntegerLiteral)
+                return e;
+
+            if (ctd.primitive().isFloat() &&
+                    lit.literal() instanceof FloatLiteral)
+                return e;
+
+            if (ctd.primitive().isBool() &&
+                    lit.literal() instanceof BoolLiteral)
+                return e;
+        }
+
+        return semantic("can't convert: %s", a.pos());
     }
 
     public Entity visit(CallExpression e) {
         visit(e.callee());
         e.arguments().forEach(this::visit);
 
-        var rtd = typeDeducer.getCallable(e.callee());
+        var td = typeDeducer.getCallable(e.callee());
 
-        if (rtd instanceof FuncTypeDeclarer ftd) {
+        if (td instanceof FuncTypeDeclarer ftd) {
             if (!ftd.generic().isEmpty())
                 return unsupported("generic");
 
@@ -1479,33 +1537,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return semantic("arguments not compatible");
         }
 
-        if (rtd instanceof ConvertorTypeDeclarer ctd) {
-            // explicit convert
-            if (e.arguments().size() != 1)
-                return semantic("convert : %s", e.pos());
-            var a = e.arguments().getFirst();
-            var td = typeDeducer.visit(a);
-            if (td instanceof PrimitiveTypeDeclarer atd) {
-                if (ctd.primitive().isBool() == atd.primitive().isBool())
-                    return e;
-            } else if (td instanceof LiteralTypeDeclarer lit) {
-                if (ctd.primitive().isInteger() &&
-                        lit.literal() instanceof IntegerLiteral)
-                    return e;
-
-                if (ctd.primitive().isFloat() &&
-                        lit.literal() instanceof FloatLiteral)
-                    return e;
-
-                if (ctd.primitive().isBool() &&
-                        lit.literal() instanceof BoolLiteral)
-                    return e;
-            }
-
-            return semantic("can't convert: %s", a.pos());
+        if (td instanceof ConvertorTypeDeclarer ctd) {
+            return checkConvertor(ctd, e);
         }
-
-        if (rtd instanceof VoidTypeDeclarer) return e;
 
         return semantic("%s is callee or convertor", e.pos());
     }
@@ -1513,7 +1547,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     public Entity visit(CurrentExpression e) {
         if (enterMethod != null)
             return e;
-        return semantic("use %s outof method", e.name());
+        return semantic("use %s outside method", e.name());
     }
 
     public Entity visit(IndexOfExpression e) {
@@ -1569,20 +1603,30 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     public Entity visit(NewMemType e) {
         visit(e.mapped());
+        // TODO: check mapped types
         return e;
     }
 
     public Entity visit(NewExpression e) {
         visit(e.type());
-        e.init().use(this::visit);
-        if (e.init().none()) return e;
+        e.arg().use(this::visit);
+        if (e.arg().none()) return e;
+
+        if (e.type() instanceof NewMemType nmt) {
+            if (nmt.length().none()) return e;
+            var len = nmt.length().get();
+            var right = typeDeducer.visit(len);
+            if (typeDeducer.isInteger(right)) return e;
+            return semantic("ram length must integer: %s", len.pos());
+        }
+
         var left = typeDeducer.visit(e.type());
         if (e.type() instanceof NewArrayType na &&
                 left instanceof ArrayTypeDeclarer at) {
             left = new ArrayTypeDeclarer(at.pos(), at.element(),
                     Optional.of(na.length()), Optional.empty());
         }
-        var right = typeDeducer.visit(e.init().get());
+        var right = typeDeducer.visit(e.arg().get());
         if (assignable(left, right, Optional.empty())) return e;
 
         return semantic("new type and init type not match");

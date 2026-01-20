@@ -30,4 +30,14 @@ public class MemberOfExpression extends PrimaryExpression {
     public TypeArguments generic() {
         return generic;
     }
+
+    //
+
+
+    @Override
+    public String toString() {
+        if (generic.isEmpty())
+            return subject + "." + member;
+        return subject + "." + member + generic;
+    }
 }

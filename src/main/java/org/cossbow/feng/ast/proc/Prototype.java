@@ -32,4 +32,12 @@ public class Prototype extends Entity {
         return parameterSet.equals(p.parameterSet) &&
                 returnSet.equals(p.returnSet);
     }
+
+    //
+
+
+    @Override
+    public String toString() {
+        return "(" + parameterSet + ") " + returnSet;
+    }
 }

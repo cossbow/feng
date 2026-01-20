@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 public class ParameterSet {
 
@@ -38,5 +39,14 @@ public class ParameterSet {
                 return false;
 
         return true;
+    }
+
+    //
+
+
+    @Override
+    public String toString() {
+        return types().stream().map(Object::toString)
+                .collect(Collectors.joining(", "));
     }
 }

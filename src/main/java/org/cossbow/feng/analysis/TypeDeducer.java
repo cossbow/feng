@@ -8,6 +8,7 @@ import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.lit.BoolLiteral;
 import org.cossbow.feng.ast.lit.FloatLiteral;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
+import org.cossbow.feng.ast.lit.NilLiteral;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.EnumDefinition;
 import org.cossbow.feng.ast.proc.Prototype;
@@ -36,11 +37,10 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         typeTool = new TypeTool(context);
     }
 
-    public boolean isEnum(TypeDeclarer td) {
-        if (!(td instanceof DefinedTypeDeclarer dtd))
-            return false;
+    public boolean isNil(TypeDeclarer td) {
+        return td instanceof LiteralTypeDeclarer dtd &&
+                dtd.literal() instanceof NilLiteral;
 
-        return dtd.definition().must().domain() == TypeDomain.ENUM;
     }
 
     public boolean isBool(TypeDeclarer td) {
@@ -74,15 +74,12 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         return false;
     }
 
-    @Override
-    public TypeDeclarer visit(BinaryExpression e) {
-        var l = visit(e.left());
-        var r = visit(e.left());
-
+    private Optional<TypeDeclarer> primitiveBinOp(
+            TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
         var lk = TypeTool.primitiveKind(l);
         var rk = TypeTool.primitiveKind(r);
         if (lk.none() || rk.none())
-            return semantic("require primitive: %s", e.left().pos());
+            return Optional.empty();
 
         Primitive.Kind lp = lk.must(), rp = rk.must();
         if (lp != rp)
@@ -93,22 +90,56 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             case INTEGER -> {
                 if (BinaryOperator.SetMath.contains(op) ||
                         BinaryOperator.SetBits.contains(op))
-                    return l;
+                    return Optional.of(l);
                 if (BinaryOperator.SetRel.contains(op))
-                    return Primitive.BOOL.declarer(e.pos());
+                    return Optional.of(Primitive.BOOL.declarer(e.pos()));
             }
             case FLOAT -> {
                 if (BinaryOperator.SetMath.contains(op))
-                    return l;
+                    return Optional.of(l);
                 if (BinaryOperator.SetRel.contains(op))
-                    return Primitive.BOOL.declarer(e.pos());
+                    return Optional.of(Primitive.BOOL.declarer(e.pos()));
             }
             case BOOL -> {
                 if (BinaryOperator.SetLogic.contains(op))
-                    return l;
+                    return Optional.of(l);
             }
         }
-        return semantic("binary-operate not for: %s", l);
+        return Optional.empty();
+    }
+
+    private Optional<TypeDeclarer> derivedTypeBinOp(
+            TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
+        if (e.operator() != BinaryOperator.EQ &&
+                e.operator() != BinaryOperator.NE)
+            return Optional.empty();
+
+        Optional<TypeDeclarer> ret = Optional.of(
+                Primitive.BOOL.declarer(e.pos()));
+
+        var lr = l.maybeRefer().has();
+        var rr = r.maybeRefer().has();
+        if (lr == rr) return l.equals(r) ? ret : Optional.empty();
+
+        if (isNil(l) || isNil(r))
+            return ret;
+
+        return Optional.empty();
+    }
+
+    @Override
+    public TypeDeclarer visit(BinaryExpression e) {
+        var l = visit(e.left());
+        var r = visit(e.right());
+
+        var td = primitiveBinOp(l, r, e);
+        if (td.has()) return td.get();
+
+        td = derivedTypeBinOp(l, r, e);
+        if (td.has()) return td.get();
+
+        return semantic("binary-operate not for: %s %s %s",
+                l, e.operator(), r);
     }
 
     @Override
@@ -432,6 +463,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             return new TupleTypeDeclarer(e.pos(),
                     List.of(ctd.primitive().declarer(e.pos())));
 
-        return unreachable();
+        return new TupleTypeDeclarer(e.pos(),
+                List.of(td));
     }
 }

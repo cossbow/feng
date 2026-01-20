@@ -1,13 +1,13 @@
 package org.cossbow.feng.visit;
 
-import org.cossbow.feng.ast.dcl.Primitive;
-import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
+import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.Optional;
 
 public class GlobalSymbolContext implements SymbolContext {
 

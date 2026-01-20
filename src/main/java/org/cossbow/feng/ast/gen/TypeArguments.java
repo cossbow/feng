@@ -33,8 +33,9 @@ public class TypeArguments extends Entity {
 
     @Override
     public String toString() {
-        return arguments.stream().map(Object::toString)
-                .collect(Collectors.joining(", "));
+        return '`' + arguments.stream().map(Object::toString)
+                .collect(Collectors.joining(", "))
+                + '`';
     }
 
     //

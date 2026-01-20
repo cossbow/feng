@@ -6,22 +6,22 @@ import org.cossbow.feng.ast.dcl.NewType;
 
 public class NewExpression extends PrimaryExpression {
     private NewType type;
-    private Optional<Expression> init;
+    private Optional<Expression> arg;
 
     public NewExpression(Position pos,
                          NewType type,
-                         Optional<Expression> init) {
+                         Optional<Expression> arg) {
         super(pos);
         this.type = type;
-        this.init = init;
+        this.arg = arg;
     }
 
     public NewType type() {
         return type;
     }
 
-    public Optional<Expression> init() {
-        return init;
+    public Optional<Expression> arg() {
+        return arg;
     }
 
     @Override

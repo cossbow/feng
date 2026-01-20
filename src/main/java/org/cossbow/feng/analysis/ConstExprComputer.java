@@ -98,7 +98,7 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
 
     @Override
     public Expression visit(NewExpression e) {
-        var init = visit(e.init());
+        var init = visit(e.arg());
         return new NewExpression(e.pos(), e.type(), init);
     }
 

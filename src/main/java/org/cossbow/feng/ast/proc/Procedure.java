@@ -34,4 +34,12 @@ public class Procedure extends Entity {
         return labels;
     }
 
+
+    //
+
+
+    @Override
+    public String toString() {
+        return prototype.toString();
+    }
 }

@@ -6,19 +6,22 @@ import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.util.Lazy;
 
-public class ClassMethod extends Entity implements Method,Exportable {
+public class ClassMethod extends Entity implements Method, Exportable {
     private boolean export;
     private Identifier name;
     private FunctionDefinition func;
+    private boolean returnThis;
 
     public ClassMethod(Position pos,
                        boolean export,
                        Identifier name,
-                       FunctionDefinition func) {
+                       FunctionDefinition func,
+                       boolean returnThis) {
         super(pos);
         this.export = export;
         this.name = name;
         this.func = func;
+        this.returnThis = returnThis;
     }
 
     public boolean export() {
@@ -31,6 +34,10 @@ public class ClassMethod extends Entity implements Method,Exportable {
 
     public FunctionDefinition func() {
         return func;
+    }
+
+    public boolean returnThis() {
+        return returnThis;
     }
 
     @Override
@@ -51,4 +58,11 @@ public class ClassMethod extends Entity implements Method,Exportable {
         return master;
     }
 
+    //
+
+
+    @Override
+    public String toString() {
+        return name.value() + func;
+    }
 }

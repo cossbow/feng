@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.SymbolTable;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.dcl.Variable;
+import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.stmt.DeclarationStatement;
 
@@ -20,4 +21,7 @@ public class ParseSymbolTable {
     public final SymbolTable<GlobalVariable> exportedVariables = new SymbolTable<>();
 
 
+    public ParseSymbolTable() {
+        namedTypes.add(ClassDefinition.ObjectName, ClassDefinition.ObjectClass);
+    }
 }

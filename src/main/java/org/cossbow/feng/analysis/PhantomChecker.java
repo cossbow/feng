@@ -7,19 +7,20 @@ import org.cossbow.feng.ast.stmt.ArrayTuple;
 import org.cossbow.feng.ast.stmt.Tuple;
 import org.cossbow.feng.visit.SymbolContext;
 
-import static org.cossbow.feng.util.ErrorUtil.semantic;
-import static org.cossbow.feng.util.ErrorUtil.unsupported;
+import static org.cossbow.feng.util.ErrorUtil.*;
 
 /**
  * 详情见<a href="https://gitee.com/cossbow/feng/tree/semantics/#虚引用类型">虚引用类型</a>
  */
 public class PhantomChecker {
-    private SymbolContext context;
-    private TypeTool typeTool;
+    private final SymbolContext context;
+    private final TypeTool typeTool;
+    private final TypeDeducer deducer;
 
     public PhantomChecker(SymbolContext context) {
         this.context = context;
         typeTool = new TypeTool(context);
+        deducer = new TypeDeducer(context);
     }
 
     //
@@ -71,11 +72,14 @@ public class PhantomChecker {
      * 详情见<a href="https://gitee.com/cossbow/feng/tree/semantics/#this关键字">this关键字</a>
      */
     public boolean check(CurrentExpression e) {
-        return unsupported("refer this");
+        return true;
     }
 
     public boolean check(IndexOfExpression e) {
-        return check(e.subject());
+        var td = deducer.visit(e.subject());
+        if (!(td instanceof ArrayTypeDeclarer atd))
+            return unreachable();
+        return !atd.refer().has() && check(e.subject());
     }
 
     public boolean check(LambdaExpression e) {

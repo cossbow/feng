@@ -3,12 +3,13 @@ package org.cossbow.feng.ast.oop;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.DefinedType;
+import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
-public class ClassDefinition extends TypeDefinition
+public class ClassDefinition extends ObjectDefinition
         implements HaveFields<ClassField> {
     private Optional<DefinedType> inherit;
     private SymbolTable<DefinedType> impl;
@@ -81,8 +82,12 @@ public class ClassDefinition extends TypeDefinition
     }
     //
 
-    public static final Identifier ObjectName = new Identifier(Position.ZERO, "Object");
-    public static final Symbol ObjectSymbol = new Symbol(Position.ZERO, ObjectName);
+    public static final Identifier ObjectName = new Identifier(
+            Position.ZERO, "Object");
+    public static final Symbol ObjectSymbol = new Symbol(
+            Position.ZERO, ObjectName);
+    public static final Optional<DefinedType> ObjectType = Optional.of(
+            new DefinedType(Position.ZERO, ObjectSymbol, TypeArguments.EMPTY));
 
     public static final ClassDefinition ObjectClass =
             new ClassDefinition(Position.ZERO, Modifier.empty(),

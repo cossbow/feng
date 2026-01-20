@@ -146,9 +146,28 @@ public class TypeTool {
 
     }
 
+    public Optional<ObjectDefinition> getObject(TypeDeclarer td) {
+        if (!(td instanceof DefinedTypeDeclarer dtd))
+            return Optional.empty();
+
+        var dt = dtd.definedType();
+        assert dt.generic().isEmpty();
+        var def = context.findType(dt.symbol());
+        if (!def.has()) return Optional.empty();
+
+        var t = def.get();
+        if (t instanceof ClassDefinition cd)
+            return Optional.of(cd);
+        if (t instanceof InterfaceDefinition id)
+            return Optional.of(id);
+
+        return Optional.empty();
+    }
+
     //
 
-    public static Optional<Primitive.Kind> primitiveKind(TypeDeclarer td) {
+    public static Optional<Primitive.Kind>
+    primitiveKind(TypeDeclarer td) {
         if (td instanceof PrimitiveTypeDeclarer ptd)
             return Optional.of(ptd.primitive().kind);
         if (td instanceof LiteralTypeDeclarer ltd)

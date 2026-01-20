@@ -52,4 +52,16 @@ public class Refer extends Entity {
         result = 31 * result + Boolean.hashCode(immutable);
         return result;
     }
+
+    //
+
+
+    @Override
+    public String toString() {
+        var s = new StringBuilder(4);
+        s.append(kind.symbol);
+        if (required) s.append('!');
+        if (immutable) s.append('#');
+        return s.toString();
+    }
 }

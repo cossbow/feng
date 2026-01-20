@@ -703,11 +703,19 @@ final class SourceParseVisitor
     @Override
     public Entity visitInterfaceMemberMethod(
             FengParser.InterfaceMemberMethodContext ctx) {
+        var pos = posOf(ctx);
         var modifier = parseModifier(ctx.modifier());
+        nestedDefineMethod(pos);
         var name = identifier(ctx.name);
+        enterMethodName = name;
+        methodReturnThis = false;
         var generic = typeParameters(ctx.typeParameters());
         var prototype = (Prototype) visit(ctx.prototype());
-        return new InterfaceMethod(posOf(ctx), modifier, name, generic, prototype);
+        var method = new InterfaceMethod(pos, modifier, name, generic,
+                prototype, methodReturnThis);
+        methodReturnThis = false;
+        enterMethodName = null;
+        return method;
     }
 
 
@@ -729,16 +737,27 @@ final class SourceParseVisitor
 
     private volatile Symbol enterClassSymbol;
     private volatile Identifier enterMethodName;
+    private volatile boolean methodReturnThis;
+
+    private void mustInMethod(Position pos) {
+        if (enterMethodName == null)
+            semantic("must use in method: %s", pos);
+    }
+
+    private void nestedDefineMethod(Position pos) {
+        if (enterMethodName != null)
+            semantic("nested define method: %s", pos);
+    }
 
     @Override
     public Entity visitClassDefinition(FengParser.ClassDefinitionContext ctx) {
         var modifier = parseModifier(ctx.modifier());
         var symbol = defineSymbol(ctx.name);
-        if (enterClassSymbol != null)
-            semantic("nested define class: %s", symbol);
+        if (enterClassSymbol != null) semantic("nested define class: %s", symbol);
         enterClassSymbol = symbol;
         var generic = typeParameters(ctx.typeParameters());
         var inherit = this.<DefinedType>visitOptional(ctx.classInherit());
+        if (inherit.none()) inherit = ClassDefinition.ObjectType;
         var impl = parseClassImpl(ctx.classImpl());
 
         var methods = new IdentifierTable<ClassMethod>();
@@ -751,13 +770,16 @@ final class SourceParseVisitor
 
             if (mi.method != null) {
                 var mName = identifier(mi.method.name);
-                assert enterMethodName == null;
+                nestedDefineMethod(posOf(mi.method));
                 enterMethodName = mName;
+                methodReturnThis = false;
                 var mGeneric = typeParameters(mi.method.typeParameters());
                 var procedure = (Procedure) visit(mi.method.procedure());
                 var func = new FunctionDefinition(posOf(mi), mModifier,
                         new Symbol(mName.pos(), mName), mGeneric, procedure);
-                var method = new ClassMethod(posOf(mi), mExport, mName, func);
+                var method = new ClassMethod(posOf(mi), mExport, mName,
+                        func, methodReturnThis);
+                methodReturnThis = false;
                 methods.add(mName, method);
                 var o = fields.tryGet(mName);
                 if (o.has()) duplicate(mName, o.get().name());
@@ -813,7 +835,7 @@ final class SourceParseVisitor
         return new LiteralExpression(posOf(ctx), literal);
     }
 
-    private NewType parseNewType(NewDefinedType type) {
+    private NewType parseNewType(NewDefinedType type, Optional<Expression> arg) {
         var dt = type.type();
         if (!dt.symbol().module().none())
             return type;
@@ -827,25 +849,33 @@ final class SourceParseVisitor
         if (mt == null) return type;
         if (mt.readonly()) return semantic("can't new rom");
 
-        var args = dt.generic().arguments();
-        if (args.size() > 1)
-            semantic("at most, %s can only map one type", name);
+        var gen = dt.generic().arguments();
+        if (gen.size() > 1) return semantic(
+                "at most, %s can only map one type", name);
 
-        var mapped = !args.isEmpty() ? args.getFirst() : null;
-        return new NewMemType(type.pos(), Optional.of(mapped));
+        if (gen.isEmpty()) {
+            if (arg.none()) return semantic(
+                    "require size in bytes: %s", type.pos());
+        } else {
+            if (arg.has()) return semantic(
+                    "only be one type and length: ", arg.get().pos());
+        }
+
+        var mapped = !gen.isEmpty() ? gen.getFirst() : null;
+        return new NewMemType(type.pos(), Optional.of(mapped), arg);
     }
 
     @Override
     public Entity visitNewExpression(FengParser.NewExpressionContext ctx) {
         var new_ = ctx.new_();
         var type = (NewType) visit(new_.newType());
+        var arg = this.<Expression>visitOptional(new_.expression());
         type = switch (type) {
-            case NewDefinedType dt -> parseNewType(dt);
+            case NewDefinedType dt -> parseNewType(dt, arg);
             case NewArrayType at -> at;
             case null, default -> unreachable();
         };
-        var init = this.<Expression>visitOptional(new_.expression());
-        return new NewExpression(posOf(ctx), type, init);
+        return new NewExpression(posOf(ctx), type, arg);
     }
 
     @Override
@@ -898,7 +928,7 @@ final class SourceParseVisitor
             var mn = enterMethodName;
             if (cn == null || mn == null)
                 return semantic(
-                        "%s must use in method", ctx.current);
+                        "'this' must use in method: %s", posOf(ctx.current));
             var type = ctx.current.getType();
             return switch (type) {
                 case FengParser.THIS -> new CurrentExpression(pos, cn, mn, true);
@@ -1339,8 +1369,9 @@ final class SourceParseVisitor
     private List<TypeDeclarer> parseReturnSet(FengParser.ReturnSetContext ctx) {
         if (ctx == null) return List.of();
         if (ctx.current != null) {
-            unsupported("return this");
-            return List.of(new ThisTypeDeclarer(posOf(ctx)));
+            mustInMethod(posOf(ctx.current));
+            methodReturnThis = true;
+            return List.of();
         }
 
         var tdCtx = ctx.typeDeclarer();

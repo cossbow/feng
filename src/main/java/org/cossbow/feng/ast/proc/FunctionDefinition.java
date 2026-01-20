@@ -27,4 +27,12 @@ public class FunctionDefinition extends Definition {
     public Prototype prototype() {
         return procedure.prototype();
     }
+
+    //
+
+
+    @Override
+    public String toString() {
+        return procedure.toString();
+    }
 }

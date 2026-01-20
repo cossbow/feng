@@ -7,7 +7,7 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.util.Lazy;
 
-public class InterfaceDefinition extends TypeDefinition {
+public class InterfaceDefinition extends ObjectDefinition {
     private IdentifierTable<InterfaceMethod> methods;
     private SymbolTable<DefinedType> parts;
     private MacroTable macros;

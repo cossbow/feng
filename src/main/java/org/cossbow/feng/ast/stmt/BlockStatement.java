@@ -33,6 +33,14 @@ public class BlockStatement extends Statement {
         return list.isEmpty();
     }
 
+    public Statement get(int i) {
+        return list.get(i);
+    }
+
+    public Statement last() {
+        return list.getLast();
+    }
+
     public boolean newScope() {
         return newScope;
     }

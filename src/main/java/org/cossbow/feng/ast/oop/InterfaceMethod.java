@@ -14,17 +14,20 @@ public class InterfaceMethod extends Entity implements Method {
     private Identifier name;
     private TypeParameters generic;
     private Prototype prototype;
+    private boolean returnThis;
 
     public InterfaceMethod(Position pos,
                            Modifier modifier,
                            Identifier name,
                            TypeParameters generic,
-                           Prototype prototype) {
+                           Prototype prototype,
+                           boolean returnThis) {
         super(pos);
         this.modifier = modifier;
         this.name = name;
         this.generic = generic;
         this.prototype = prototype;
+        this.returnThis = returnThis;
     }
 
     public Modifier modifier() {
@@ -41,6 +44,10 @@ public class InterfaceMethod extends Entity implements Method {
 
     public Prototype prototype() {
         return prototype;
+    }
+
+    public boolean returnThis() {
+        return returnThis;
     }
 
     private transient Lazy<InterfaceDefinition> master = Lazy.nil();

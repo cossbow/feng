@@ -21,4 +21,12 @@ public class IndexOfExpression extends PrimaryExpression {
     public Expression index() {
         return index;
     }
+
+    //
+
+
+    @Override
+    public String toString() {
+        return subject + "[" + index + "]";
+    }
 }
