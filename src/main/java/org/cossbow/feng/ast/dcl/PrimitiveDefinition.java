@@ -25,6 +25,8 @@ public class PrimitiveDefinition extends TypeDefinition {
         return primitive;
     }
 
+    //
+
     static final Map<Primitive, PrimitiveDefinition> types;
 
     static {

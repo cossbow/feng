@@ -1,0 +1,4 @@
+
+class String {
+    const data rom`[]uint8`;
+}

@@ -120,7 +120,7 @@ public class PhantomChecker {
     }
 
     private boolean check(TypeDeclarer t) {
-        if (!(t instanceof DefinedTypeDeclarer) &&
+        if (!(t instanceof DerivedTypeDeclarer) &&
                 !(t instanceof MemTypeDeclarer)) {
             return false;
         }

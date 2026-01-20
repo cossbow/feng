@@ -6,7 +6,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.LiteralExpression;
@@ -288,7 +288,7 @@ public class BaseParseTest {
     }
 
     public static Symbol typeName(TypeDeclarer td) {
-        return ((DefinedTypeDeclarer) td).definedType().symbol();
+        return ((DerivedTypeDeclarer) td).definedType().symbol();
     }
 
 }

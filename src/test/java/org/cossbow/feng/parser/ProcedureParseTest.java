@@ -4,7 +4,7 @@ package org.cossbow.feng.parser;
 import org.cossbow.feng.Pair;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Symbol;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.BlockStatement;
 import org.cossbow.feng.ast.stmt.CallStatement;
@@ -84,7 +84,7 @@ public class ProcedureParseTest extends BaseParseTest {
             for (var expect : expectParams) {
                 var variable = params.get(expect.a());
                 Assertions.assertEquals(expect.a(), variable.name());
-                var vtd = (DefinedTypeDeclarer) variable.type().must();
+                var vtd = (DerivedTypeDeclarer) variable.type().must();
                 Assertions.assertEquals(expect.b(), vtd.definedType().symbol());
                 Assertions.assertTrue(vtd.refer().none());
             }

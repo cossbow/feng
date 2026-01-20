@@ -1,0 +1,10 @@
+
+class Node {
+    var key uint64;
+    var value *Object;
+    var next *Node;
+}
+
+class HashMap {
+    var tab [*]Node;
+}

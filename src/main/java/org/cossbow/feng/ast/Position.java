@@ -6,7 +6,9 @@ public record Position(String file, Token start, Token stop) {
 
     @Override
     public String toString() {
-        return file + "(" + start.getLine() + ","
+        if (file.isEmpty()) return "";
+        if (start == null) return "(" + file + ")";
+        return "(" + file + ":" + start.getLine() + ","
                 + start.getCharPositionInLine() + ")";
     }
 

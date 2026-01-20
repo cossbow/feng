@@ -1,7 +1,7 @@
 package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.dcl.Declare;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.FuncTypeDeclarer;
 import org.cossbow.feng.ast.dcl.Referable;
 import org.cossbow.feng.ast.expr.*;
@@ -37,7 +37,7 @@ public class ConstChecker implements EntityVisitor<Boolean> {
 
     @Override
     public Boolean visit(AssertExpression e) {
-        if (!(e.type() instanceof DefinedTypeDeclarer td))
+        if (!(e.type() instanceof DerivedTypeDeclarer td))
             return semantic("assert not allowed: %s", e.type());
         if (td.refer().none())
             return semantic("assert require reference");

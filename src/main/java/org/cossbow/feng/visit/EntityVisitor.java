@@ -140,7 +140,7 @@ public interface EntityVisitor<R> {
 	default R visit(NewType e) {
 		return switch (e) {
 			case NewArrayType ee -> visit(ee);
-			case NewDefinedType ee -> visit(ee);
+			case NewDerivedType ee -> visit(ee);
 			case NewMemType ee -> visit(ee);
 			case null, default -> unreachable();
 		};
@@ -148,7 +148,7 @@ public interface EntityVisitor<R> {
 
 	default R visit(NewArrayType e) { return unreachable(); }
 
-	default R visit(NewDefinedType e) { return unreachable(); }
+	default R visit(NewDerivedType e) { return unreachable(); }
 
 	default R visit(NewMemType e) { return unreachable(); }
 
@@ -157,7 +157,7 @@ public interface EntityVisitor<R> {
 	default R visit(TypeDeclarer e) {
 		return switch (e) {
 			case ArrayTypeDeclarer ee -> visit(ee);
-			case DefinedTypeDeclarer ee -> visit(ee);
+			case DerivedTypeDeclarer ee -> visit(ee);
 			case FuncTypeDeclarer ee -> visit(ee);
 			case ConvertorTypeDeclarer ee -> visit(ee);
 			case MemTypeDeclarer ee -> visit(ee);
@@ -171,7 +171,7 @@ public interface EntityVisitor<R> {
 
 	default R visit(ArrayTypeDeclarer e) { return unreachable(); }
 
-	default R visit(DefinedTypeDeclarer e) { return unreachable(); }
+	default R visit(DerivedTypeDeclarer e) { return unreachable(); }
 
 	default R visit(FuncTypeDeclarer e) { return unreachable(); }
 
@@ -249,7 +249,20 @@ public interface EntityVisitor<R> {
 
 	default R visit(UnaryExpression e) { return unreachable(); }
 
-	default R visit(DefinedType e) { return unreachable(); }
+	default R visit(DefinedType e) {
+		return switch (e) {
+			case DerivedType t -> visit(t);
+			case MemType t -> visit(t);
+			case PrimitiveType t -> visit(t);
+			case null, default -> unreachable();
+		};
+	}
+
+	default R visit(DerivedType e) { return unreachable(); }
+
+	default R visit(MemType e) { return unreachable(); }
+
+	default R visit(PrimitiveType e) { return unreachable(); }
 
 	default R visit(TypeArguments e) { return unreachable(); }
 

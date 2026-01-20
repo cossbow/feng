@@ -540,6 +540,7 @@ public class SemanticAnalysisTest {
     public void testAssertExpression1() {
         var d = "class A{} class B:A{} class C{}";
         checkSucc(d + "func f(s *Object){ var e = s?(*A); }");
+        checkSucc(d + "func f(s *A){ var e = s?(*A); }");
         checkSucc(d + "func f(s *B){ var e = s?(*A); }");
         checkFail(d + "func f(s *C){ var e = s?(*A); }");
     }
@@ -1020,6 +1021,7 @@ public class SemanticAnalysisTest {
         checkSucc("func f() { var i = new(ram`[2]int`); }");
         checkSucc("func f(s int) { var i = new(ram, s); }");
         checkFail("func f() { var i = new(ram`[2]int`, 2); }");
+        checkFail("func f() { var s *ram`int`int``; }");
     }
 
     @Test
@@ -1033,6 +1035,12 @@ public class SemanticAnalysisTest {
         checkFail(def + "func f(a *A) { a.id = 1; }");
         checkSucc(def + "func f(a *ram`A`) { a.id = 1; }");
         checkFail(def + "func f(a *rom`A`) { a.id = 1; }");
+    }
+
+    @Test
+    public void testMemMap4() {
+        checkSucc("func f(){ var r *ram`[]int`; }");
+        checkFail("func f(){ var r = new(ram`[]int`); }");
     }
 
     @Test

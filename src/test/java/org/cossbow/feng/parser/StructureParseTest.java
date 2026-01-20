@@ -39,7 +39,7 @@ public class StructureParseTest extends BaseParseTest {
                     Primitive.ofCode(name.name().value()).get());
             return;
         }
-        if (type instanceof DefinedTypeDeclarer dt) {
+        if (type instanceof DerivedTypeDeclarer dt) {
             Assertions.assertEquals(name, dt.definedType().symbol());
             return;
         }
@@ -114,7 +114,7 @@ public class StructureParseTest extends BaseParseTest {
         var f = foo.fields().get(a);
         Assertions.assertEquals(a, f.name());
 
-        var dt = ((DefinedTypeDeclarer) f.type()).definedType();
+        var dt = ((DerivedTypeDeclarer) f.type()).definedType();
         Assertions.assertTrue(dt.symbol().module().none());
         var def = (StructureDefinition) src.table().unnamedTypes.get(dt.symbol().name());
         Assertions.assertEquals(1, def.fields().size());
@@ -155,7 +155,7 @@ public class StructureParseTest extends BaseParseTest {
             var len = randInt(10, 100);
             var fields = parseFields("a [%d]struct{a int;};".formatted(len));
             var at = (ArrayTypeDeclarer) fields.get(identifier("a")).type();
-            Assertions.assertInstanceOf(DefinedTypeDeclarer.class, at.element());
+            Assertions.assertInstanceOf(DerivedTypeDeclarer.class, at.element());
             Assertions.assertEquals(len, integer(at.length()).value());
         }
     }

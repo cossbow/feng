@@ -57,7 +57,7 @@ public class TypeTool {
                 return Optional.empty();
             mtd = mem.mapped().get();
         }
-        if (!(mtd instanceof DefinedTypeDeclarer dtd))
+        if (!(mtd instanceof DerivedTypeDeclarer dtd))
             return Optional.empty();
 
         var dt = dtd.definedType();
@@ -84,10 +84,10 @@ public class TypeTool {
         return Optional.empty();
     }
 
-    public Optional<Groups.G2<DefinedTypeDeclarer, EnumDefinition.Value>>
+    public Optional<Groups.G2<DerivedTypeDeclarer, EnumDefinition.Value>>
     getEnum(PrimaryExpression subject, Identifier value) {
         var std = deduce(subject);
-        if (!(std instanceof DefinedTypeDeclarer dtd))
+        if (!(std instanceof DerivedTypeDeclarer dtd))
             return Optional.empty();
 
         var o = context.findType(dtd.definedType().symbol());
@@ -127,7 +127,7 @@ public class TypeTool {
     public Optional<? extends Entity> getMethod(
             PrimaryExpression subject, Identifier name) {
         var std = deduce(subject);
-        if (!(std instanceof DefinedTypeDeclarer dtd))
+        if (!(std instanceof DerivedTypeDeclarer dtd))
             return Optional.empty();
 
         var dt = dtd.definedType().symbol();
@@ -147,7 +147,7 @@ public class TypeTool {
     }
 
     public Optional<ObjectDefinition> getObject(TypeDeclarer td) {
-        if (!(td instanceof DefinedTypeDeclarer dtd))
+        if (!(td instanceof DerivedTypeDeclarer dtd))
             return Optional.empty();
 
         var dt = dtd.definedType();

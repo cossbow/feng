@@ -1,26 +1,28 @@
 package org.cossbow.feng.ast.dcl;
 
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.gen.MemType;
 import org.cossbow.feng.util.Optional;
 
 public class NewMemType extends NewType {
-    private Optional<TypeDeclarer> mapped;
-    private Optional<Expression> length;
+    private final MemType type;
 
     public NewMemType(Position pos,
-                      Optional<TypeDeclarer> mapped,
-                      Optional<Expression> length) {
+                      MemType type) {
         super(pos);
-        this.mapped = mapped;
-        this.length = length;
+        this.type = type;
+    }
+
+    public MemType type() {
+        return type;
+    }
+
+    public boolean readonly() {
+        return type.readonly();
     }
 
     public Optional<TypeDeclarer> mapped() {
-        return mapped;
+        return type.mapped();
     }
 
-    public Optional<Expression> length() {
-        return length;
-    }
 }

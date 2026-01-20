@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.gen;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.util.Optional;
 
 import java.util.List;
 import java.util.Objects;
@@ -19,6 +20,18 @@ public class TypeArguments extends Entity {
 
     public List<TypeDeclarer> arguments() {
         return arguments;
+    }
+
+    public int size() {
+        return arguments.size();
+    }
+
+    public TypeDeclarer get(int i) {
+        return arguments.get(i);
+    }
+
+    public Optional<TypeDeclarer> tryGet(int i) {
+        return isEmpty() ? Optional.empty() : Optional.of(get(i));
     }
 
     public boolean isEmpty() {

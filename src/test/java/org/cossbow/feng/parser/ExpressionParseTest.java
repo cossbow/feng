@@ -2,9 +2,9 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.UnaryOperator;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.NewArrayType;
-import org.cossbow.feng.ast.dcl.NewDefinedType;
+import org.cossbow.feng.ast.dcl.NewDerivedType;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.stmt.AssignmentsStatement;
@@ -49,7 +49,7 @@ public class ExpressionParseTest extends BaseParseTest {
     public void testNew() {
         var typeName = randTypeSymbol(32);
         var expr = this.<NewExpression>parseExpr("new(%s)".formatted(typeName));
-        var defType = ((NewDefinedType) expr.type()).type();
+        var defType = ((NewDerivedType) expr.type()).type();
         Assertions.assertTrue(defType.generic().isEmpty());
         Assertions.assertEquals(typeName, defType.symbol());
     }
@@ -61,7 +61,7 @@ public class ExpressionParseTest extends BaseParseTest {
             var typeParams = anyNames(RandTypeSymbol, 8, i);
             var code = "new(%s`%s`)".formatted(typeName, idList(typeParams));
             var expr = this.<NewExpression>parseExpr(code);
-            var defType = ((NewDefinedType) expr.type()).type();
+            var defType = ((NewDerivedType) expr.type()).type();
             Assertions.assertEquals(typeName, defType.symbol());
             checkIds(typeParams, defType.generic().arguments(),
                     BaseParseTest::typeName);
@@ -73,7 +73,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var typeName = randTypeSymbol(32);
         var code = "new(%s,{Id=1})".formatted(typeName);
         var expr = this.<NewExpression>parseExpr(code);
-        var defType = ((NewDefinedType) expr.type()).type();
+        var defType = ((NewDerivedType) expr.type()).type();
         Assertions.assertEquals(typeName, defType.symbol());
         Assertions.assertInstanceOf(ObjectExpression.class, expr.arg().must());
     }
@@ -96,7 +96,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var typeName = randTypeSymbol(16);
         var expr = (AssertExpression) parseExpr("%s?(*%s)".formatted(name, typeName));
         Assertions.assertEquals(name, varName(expr.subject()));
-        var type = (DefinedTypeDeclarer) expr.type();
+        var type = (DerivedTypeDeclarer) expr.type();
         Assertions.assertEquals(typeName, type.definedType().symbol());
         Assertions.assertTrue(type.definedType().generic().isEmpty());
         var ref = type.refer().get();
@@ -162,7 +162,7 @@ public class ExpressionParseTest extends BaseParseTest {
 
         var nt = (NewArrayType) ((NewExpression) expr.subject()).type();
         Assertions.assertEquals(size, varName(nt.length()));
-        var dt = (DefinedTypeDeclarer) nt.element();
+        var dt = (DerivedTypeDeclarer) nt.element();
         Assertions.assertEquals(type, dt.definedType().symbol());
 
         Assertions.assertEquals(index, varName(expr.index()));
@@ -279,7 +279,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var expr = (MemberOfExpression) parseExpr("new(%s).%s".formatted(type, field));
 
         var left = (NewExpression) expr.subject();
-        var defType = ((NewDefinedType) left.type()).type();
+        var defType = ((NewDerivedType) left.type()).type();
         Assertions.assertEquals(type, defType.symbol());
 
         Assertions.assertEquals(field, expr.member());

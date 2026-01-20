@@ -3,7 +3,7 @@ package org.cossbow.feng.parser;
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Symbol;
-import org.cossbow.feng.ast.dcl.NewDefinedType;
+import org.cossbow.feng.ast.dcl.NewDerivedType;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.BinaryExpression;
 import org.cossbow.feng.ast.expr.CallExpression;
@@ -265,7 +265,7 @@ public class StatementParseTest extends BaseParseTest {
         var stmt = (ThrowStatement) parseStmt(code);
         var newExpr = (NewExpression) stmt.exception();
         Assertions.assertTrue(newExpr.arg().none());
-        Assertions.assertEquals(type, ((NewDefinedType) newExpr.type()).type().symbol());
+        Assertions.assertEquals(type, ((NewDerivedType) newExpr.type()).type().symbol());
     }
 
     @Test

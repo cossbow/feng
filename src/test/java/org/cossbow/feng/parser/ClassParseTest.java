@@ -2,7 +2,7 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.dcl.Declare;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassField;
 import org.junit.jupiter.api.Assertions;
@@ -82,7 +82,7 @@ public class ClassParseTest extends BaseParseTest {
                     var f = fields.get(name);
                     Assertions.assertSame(dcl.getKey(), f.declare());
                     Assertions.assertEquals(name, f.name());
-                    var t = (DefinedTypeDeclarer) f.type();
+                    var t = (DerivedTypeDeclarer) f.type();
                     Assertions.assertEquals(type, t.definedType().symbol());
                     Assertions.assertTrue(t.definedType().generic().isEmpty());
                     Assertions.assertTrue(t.refer().none());
@@ -104,7 +104,7 @@ public class ClassParseTest extends BaseParseTest {
                     var f = fields.get(name);
                     Assertions.assertSame(dcl.getKey(), f.declare());
                     Assertions.assertEquals(name, f.name());
-                    var t = (DefinedTypeDeclarer) f.type();
+                    var t = (DerivedTypeDeclarer) f.type();
                     Assertions.assertEquals(type, t.definedType().symbol());
                     Assertions.assertTrue(t.definedType().generic().isEmpty());
                     var ref = t.refer().get();

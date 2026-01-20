@@ -25,9 +25,9 @@ public class MemDefinition extends TypeDefinition {
     public static final MemDefinition RAM = new MemDefinition("ram", false);
     public static final MemDefinition ROM = new MemDefinition("rom", true);
 
-    public static final Map<String, MemDefinition> CACHE = Map.of(
-            RAM.symbol().name().value(), RAM,
-            ROM.symbol().name().value(), ROM
+    public static final Map<Symbol, MemDefinition> CACHE = Map.of(
+            RAM.symbol(), RAM,
+            ROM.symbol(), ROM
     );
 
     public static MemDefinition get(boolean readonly) {

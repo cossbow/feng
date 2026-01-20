@@ -4,9 +4,9 @@ package org.cossbow.feng.parser;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.util.Optional;
-import org.cossbow.feng.ast.dcl.DefinedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.NewArrayType;
-import org.cossbow.feng.ast.dcl.NewDefinedType;
+import org.cossbow.feng.ast.dcl.NewDerivedType;
 import org.cossbow.feng.ast.expr.BinaryExpression;
 import org.cossbow.feng.ast.expr.NewExpression;
 import org.cossbow.feng.ast.oop.ClassDefinition;
@@ -98,7 +98,7 @@ public class ExportImportTest extends BaseParseTest {
         var ds = (DeclarationStatement) parseLocal(im, code);
         var v = ds.variables().getFirst();
         Assertions.assertEquals(name, v.name());
-        var dt = ((DefinedTypeDeclarer) v.type().must())
+        var dt = ((DerivedTypeDeclarer) v.type().must())
                 .definedType().symbol();
         Assertions.assertEquals(type, dt);
     }
@@ -133,7 +133,7 @@ public class ExportImportTest extends BaseParseTest {
         var ds = (DeclarationStatement) parseLocal(im, code);
         var e = ((ArrayTuple) ds.init().must()).values().getFirst();
         var n = (NewExpression) e;
-        var t = ((NewDefinedType) n.type()).type();
+        var t = ((NewDerivedType) n.type()).type();
         Assertions.assertEquals(type, t.symbol());
         Assertions.assertEquals(param,
                 typeName(t.generic().arguments().getFirst()));

@@ -308,7 +308,7 @@ typeDeclarer
     | arrayTypeDeclarer
     ;
 arrayTypeDeclarer
-    : '[' arrayType ']' typeDeclarer
+    : '[' arrayType? ']' typeDeclarer
     ;
 arrayType
     : len=expression

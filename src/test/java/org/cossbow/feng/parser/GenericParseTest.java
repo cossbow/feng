@@ -146,7 +146,7 @@ public class GenericParseTest extends BaseParseTest {
     }
 
     private Symbol getSimpleTypeParam(TypeConstraint e) {
-        var dt = ((DefinedTypeConstraint) e).definedType();
+        var dt = (DerivedType) ((DefinedTypeConstraint) e).definedType();
         Assertions.assertTrue(dt.generic().isEmpty());
         return dt.symbol();
     }

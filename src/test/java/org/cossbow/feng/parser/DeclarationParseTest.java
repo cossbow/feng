@@ -78,7 +78,7 @@ public class DeclarationParseTest extends BaseParseTest {
         {
             var dcl = parseLocalDecl("var u *User");
             var v = dcl.variables().getFirst();
-            var td = (DefinedTypeDeclarer) v.type().must();
+            var td = (DerivedTypeDeclarer) v.type().must();
             var ref = td.refer().get();
             Assertions.assertSame(STRONG, ref.kind());
             Assertions.assertFalse(ref.required());
@@ -86,7 +86,7 @@ public class DeclarationParseTest extends BaseParseTest {
         {
             var dcl = parseLocalDecl("var u *!User");
             var v = dcl.variables().getFirst();
-            var td = (DefinedTypeDeclarer) v.type().must();
+            var td = (DerivedTypeDeclarer) v.type().must();
             var ref = td.refer().get();
             Assertions.assertSame(STRONG, ref.kind());
             Assertions.assertTrue(ref.required());
@@ -94,7 +94,7 @@ public class DeclarationParseTest extends BaseParseTest {
         {
             var dcl = parseLocalDecl("var u &User");
             var v = dcl.variables().getFirst();
-            var td = (DefinedTypeDeclarer) v.type().must();
+            var td = (DerivedTypeDeclarer) v.type().must();
             var ref = td.refer().get();
             Assertions.assertSame(PHANTOM, ref.kind());
             Assertions.assertFalse(ref.required());
@@ -102,7 +102,7 @@ public class DeclarationParseTest extends BaseParseTest {
         {
             var dcl = parseLocalDecl("var u &!User");
             var v = dcl.variables().getFirst();
-            var td = (DefinedTypeDeclarer) v.type().must();
+            var td = (DerivedTypeDeclarer) v.type().must();
             var ref = td.refer().get();
             Assertions.assertSame(PHANTOM, ref.kind());
             Assertions.assertTrue(ref.required());
@@ -110,7 +110,7 @@ public class DeclarationParseTest extends BaseParseTest {
         {
             var dcl = parseLocalDecl("var u ~User");
             var v = dcl.variables().getFirst();
-            var td = (DefinedTypeDeclarer) v.type().must();
+            var td = (DerivedTypeDeclarer) v.type().must();
             var ref = td.refer().get();
             Assertions.assertSame(WEAK, ref.kind());
             Assertions.assertFalse(ref.required());
@@ -129,7 +129,7 @@ public class DeclarationParseTest extends BaseParseTest {
             for (int i = 0; i < 10; i++) {
                 var name = randTypeSymbol(16);
                 var dcl = parseLocalDecl(fmt.formatted(name));
-                var td = (DefinedTypeDeclarer) dcl.variables().getFirst().type().must();
+                var td = (DerivedTypeDeclarer) dcl.variables().getFirst().type().must();
                 Assertions.assertEquals(name, td.definedType().symbol());
             }
         }

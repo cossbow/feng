@@ -3,7 +3,7 @@ package org.cossbow.feng.analysis;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
-import org.cossbow.feng.ast.gen.DefinedType;
+import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.lit.BoolLiteral;
 import org.cossbow.feng.ast.lit.FloatLiteral;
@@ -159,14 +159,14 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     @Override
     public TypeDeclarer visit(CurrentExpression e) {
-        DefinedType dt;
+        DerivedType dt;
         if (e.isSelf()) {
-            dt = new DefinedType(e.pos(), e.type(), TypeArguments.EMPTY);
+            dt = new DerivedType(e.pos(), e.type(), TypeArguments.EMPTY);
         } else {
             var type = (ClassDefinition) context.findType(e.type()).must();
             dt = type.inherit().must();
         }
-        return new DefinedTypeDeclarer(e.pos(), dt, Optional.empty());
+        return new DerivedTypeDeclarer(e.pos(), dt, Optional.empty());
     }
 
     @Override
@@ -193,7 +193,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (td instanceof FuncTypeDeclarer ftd)
             return ftd;
 
-        if (td instanceof DefinedTypeDeclarer dtd) {
+        if (td instanceof DerivedTypeDeclarer dtd) {
             var dt = context.findType(dtd.definedType().symbol());
             if (dt.none())
                 return semantic("type not defined: %s",
@@ -256,7 +256,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                 return semantic("unmaped: %s", subject.pos());
             mtd = mem.mapped().get();
         }
-        if (!(mtd instanceof DefinedTypeDeclarer dtd))
+        if (!(mtd instanceof DerivedTypeDeclarer dtd))
             return semantic("required user-defined-type: %s", mtd);
 
         var dt = dtd.definedType();
@@ -313,10 +313,9 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     }
 
     @Override
-    public TypeDeclarer visit(NewDefinedType dt) {
-        return new DefinedTypeDeclarer(dt.pos(),
-                dt.type(), Optional.of(new Refer(dt.pos(),
-                STRONG, false, false)));
+    public TypeDeclarer visit(NewDerivedType t) {
+        var ref = new Refer(t.pos(), STRONG, false, false);
+        return new DerivedTypeDeclarer(t.pos(), t.type(), Optional.of(ref));
     }
 
     @Override
@@ -328,12 +327,10 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     }
 
     @Override
-    public TypeDeclarer visit(NewMemType e) {
-        return new MemTypeDeclarer(e.pos(),
-                false,
-                Optional.of(new Refer(e.pos(), STRONG,
-                        true, false)),
-                e.mapped());
+    public TypeDeclarer visit(NewMemType t) {
+        return new MemTypeDeclarer(t.pos(),
+                t.type(), new Refer(t.pos(), STRONG,
+                true, false));
     }
 
     @Override
@@ -381,7 +378,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (t.get() instanceof PrimitiveDefinition pd)
             return pd.primitive().declarer(e.pos());
 
-        return new DefinedTypeDeclarer(e.pos(), new DefinedType(
+        return new DerivedTypeDeclarer(e.pos(), new DerivedType(
                 e.pos(), t.get().symbol(), TypeArguments.EMPTY),
                 Optional.empty(), t);
     }

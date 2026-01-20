@@ -1,37 +1,34 @@
 package org.cossbow.feng.ast.dcl;
 
 import org.cossbow.feng.ast.TypeDefinition;
-import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.gen.DefinedType;
 
-import java.util.Objects;
-
-public class DefinedTypeDeclarer extends TypeDeclarer
+public class DerivedTypeDeclarer extends TypeDeclarer
         implements Referable {
-    private DefinedType definedType;
+    private DerivedType definedType;
     private Optional<Refer> refer;
 
     private transient Optional<TypeDefinition> definition;
 
-    public DefinedTypeDeclarer(Position pos,
-                               DefinedType definedType,
+    public DerivedTypeDeclarer(Position pos,
+                               DerivedType definedType,
                                Optional<Refer> refer) {
         this(pos, definedType, refer, Optional.empty());
     }
 
-    public DefinedTypeDeclarer(Position pos,
-                               DefinedType definedType,
+    public DerivedTypeDeclarer(Position pos,
+                               DerivedType definedType,
                                Optional<Refer> refer,
                                Optional<TypeDefinition> definition) {
         super(pos);
         this.definedType = definedType;
         this.refer = refer;
-        this.definition=definition;
+        this.definition = definition;
     }
 
-    public DefinedType definedType() {
+    public DerivedType definedType() {
         return definedType;
     }
 
@@ -47,7 +44,7 @@ public class DefinedTypeDeclarer extends TypeDeclarer
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof DefinedTypeDeclarer t))
+        if (!(o instanceof DerivedTypeDeclarer t))
             return false;
         return definedType.equals(t.definedType)
                 && refer.equals(t.refer);

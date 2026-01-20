@@ -4,7 +4,9 @@ import org.cossbow.feng.analysis.TypeDeducer;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
-import org.cossbow.feng.ast.gen.DefinedType;
+import org.cossbow.feng.ast.gen.DerivedType;
+import org.cossbow.feng.ast.gen.MemType;
+import org.cossbow.feng.ast.gen.PrimitiveType;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassField;
@@ -94,7 +96,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
     }
 
     @Override
-    public CppGenerator visit(DefinedTypeDeclarer td) {
+    public CppGenerator visit(DerivedTypeDeclarer td) {
         visit(td.definedType());
         if (td.refer().has()) {
             var ref = td.refer().get();
@@ -214,10 +216,20 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
     }
 
     @Override
-    public CppGenerator visit(DefinedType dt) {
+    public CppGenerator visit(DerivedType dt) {
         visit(dt.symbol());
         if (!dt.generic().isEmpty())
             unsupported("泛型未实现");
+        return this;
+    }
+
+    @Override
+    public CppGenerator visit(MemType dt) {
+        return this;
+    }
+
+    @Override
+    public CppGenerator visit(PrimitiveType dt) {
         return this;
     }
 
@@ -556,7 +568,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
             td = mtd.mapped().get();
         }
         visit(e.subject());
-        if (td instanceof DefinedTypeDeclarer dtd) {
+        if (td instanceof DerivedTypeDeclarer dtd) {
             if (dtd.refer().has())
                 write("->");
             else

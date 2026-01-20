@@ -5,9 +5,7 @@ import org.cossbow.feng.ast.attr.AttributeDefinition;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
-import org.cossbow.feng.ast.gen.DefinedType;
-import org.cossbow.feng.ast.gen.TypeArguments;
-import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
@@ -185,11 +183,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     public Entity visit(GlobalVariable gv) {
         if (gv.init().none()) {
-            if (gv.declare() == Declare.CONST) {
-                return semantic("const must init: %s", gv.pos());
-            }
-            // TODO: 值默认值
-            return gv;
+            if (gv.declare() != Declare.CONST)
+                return visit((Variable) gv);
+            return semantic("const must init: %s", gv.pos());
         }
 
         var et = typeDeducer.visit(gv.init().must());
@@ -230,7 +226,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return unsupported("generic");
     }
 
-    public TypeDefinition visit(DefinedType dt) {
+    public TypeDefinition visit(DerivedType dt) {
         if (!dt.generic().isEmpty())
             return unsupported("generic");
         var type = context.findType(dt.symbol());
@@ -241,7 +237,21 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return type.get();
     }
 
-    public TypeDefinition visit(DefinedTypeDeclarer td) {
+    @Override
+    public Entity visit(MemType t) {
+        if (t.mapped().none()) return t;
+
+        visit(t.mapped().get());
+
+        return t;
+    }
+
+    @Override
+    public Entity visit(PrimitiveType t) {
+        return t;
+    }
+
+    public TypeDefinition visit(DerivedTypeDeclarer td) {
         var dt = visit(td.definedType());
         var r = td.refer();
         visit(r);
@@ -272,25 +282,27 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return td;
     }
 
-    private boolean checkMappable(DefinedTypeDeclarer dtd) {
-        if (dtd.refer().has())
-            return semantic("mem can't map reference");
+    private boolean checkMappable(DerivedTypeDeclarer dtd) {
+        if (dtd.refer().has()) return
+                semantic("can't map refer: %s", dtd.pos());
         var type = visit(dtd.definedType());
-        return type instanceof StructureDefinition;
+        if (type instanceof StructureDefinition) return true;
+        return semantic("can't map %s: %s", type, dtd.pos());
     }
 
     private boolean checkMappable(ArrayTypeDeclarer td) {
-        if (td.refer().has()) return false;
+        if (td.refer().has()) return
+                semantic("can't map refer: %s", td.pos());
         return checkMappable(td.element());
     }
 
     private boolean checkMappable(TypeDeclarer td) {
         return switch (td) {
             case PrimitiveTypeDeclarer ignored -> true;
-            case DefinedTypeDeclarer dtd -> checkMappable(dtd);
+            case DerivedTypeDeclarer dtd -> checkMappable(dtd);
             case ArrayTypeDeclarer atd -> checkMappable(atd);
             case null -> unreachable();
-            default -> false;
+            default -> semantic("can't map type %s", td.pos());
         };
     }
 
@@ -358,7 +370,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return semantic("require integer or float: %s", ptd.pos());
         }
 
-        if (td instanceof DefinedTypeDeclarer dtd) {
+        if (td instanceof DerivedTypeDeclarer dtd) {
             if (dtd.refer().has()) {
                 return semantic("can't be reference");
             }
@@ -496,7 +508,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     }
 
-    private ClassDefinition findParent(DefinedType t) {
+    private ClassDefinition findParent(DerivedType t) {
         var dt = visit(t);
         if (dt instanceof ClassDefinition pcd)
             return pcd;
@@ -553,7 +565,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     getClassTypeField(TypeDeclarer t) {
         assert enterClass != null;
 
-        if (t instanceof DefinedTypeDeclarer ctd) {
+        if (t instanceof DerivedTypeDeclarer ctd) {
             if (ctd.refer().has())
                 return Optional.empty();
 
@@ -612,7 +624,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     public Entity visit(ClassField cf) {
         assert enterClass != null;
         visit(cf.type());
-        if (cf.type() instanceof DefinedTypeDeclarer ctd) {
+        if (cf.type() instanceof DerivedTypeDeclarer ctd) {
             var isPhantom = ctd.refer().match(
                     r -> r.checkType(ReferKind.PHANTOM));
             if (!isPhantom) return visit(ctd);
@@ -751,7 +763,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     private void visit(UnnamedParameterSet ps) {
         for (var td : ps.types()) {
-            if (td instanceof DefinedTypeDeclarer dtd) {
+            if (td instanceof DerivedTypeDeclarer dtd) {
                 var isWeak = dtd.refer().match(
                         r -> r.checkType(ReferKind.WEAK));
                 if (isWeak)
@@ -849,7 +861,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     private boolean initializable(
-            DefinedTypeDeclarer l, ObjectTypeDeclarer o) {
+            DerivedTypeDeclarer l, ObjectTypeDeclarer o) {
         var lt = visit(l.definedType());
 
         if (lt instanceof StructureDefinition def)
@@ -975,7 +987,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     private boolean
-    assignable(DefinedTypeDeclarer l, DefinedTypeDeclarer r,
+    assignable(DerivedTypeDeclarer l, DerivedTypeDeclarer r,
                Optional<Expression> re) {
 
         assert l.definedType().generic().isEmpty() : "generic";
@@ -1022,7 +1034,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     private boolean assignable(
-            DefinedTypeDeclarer l, FuncTypeDeclarer r) {
+            DerivedTypeDeclarer l, FuncTypeDeclarer r) {
         visit(r.generic());
 
         var dt = visit(l.definedType());
@@ -1096,8 +1108,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                     && fl.generic().equals(fr.generic());
         }
 
-        if (l instanceof DefinedTypeDeclarer dl) {
-            if (r instanceof DefinedTypeDeclarer dr)
+        if (l instanceof DerivedTypeDeclarer dl) {
+            if (r instanceof DerivedTypeDeclarer dr)
                 return assignable(dl, dr, re);
             if (r instanceof ObjectTypeDeclarer o)
                 return initializable(dl, o);
@@ -1303,7 +1315,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             if (!ptd.primitive().isInteger())
                 return semantic("must be integer: %s", e.value().pos());
             checkConstantInteger(e);
-        } else if (td instanceof DefinedTypeDeclarer dtd) {
+        } else if (td instanceof DerivedTypeDeclarer dtd) {
             var dt = visit(dtd.definedType());
             if (!(dt instanceof EnumDefinition ed))
                 return semantic("must be enum: %s", e.value().pos());
@@ -1594,17 +1606,43 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    public Entity visit(NewDefinedType e) {
+    public Entity visit(NewDerivedType e) {
         var def = visit(e.type());
         if (def instanceof ClassDefinition)
             return e;
         return semantic("require class: %s", e.type().pos());
     }
 
+    private void checkNewMemSize(TypeDeclarer td) {
+        if (td instanceof ArrayTypeDeclarer atd) {
+            if (atd.length().has()) {
+                checkNewMemSize(atd.element());
+                return;
+            }
+            semantic("new mem type must specify length: %s",
+                    td.pos());
+            return;
+        }
+
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            for (var atd : dtd.definedType().generic().arguments()) {
+                checkNewMemSize(atd);
+            }
+            return;
+        }
+
+        if (td instanceof PrimitiveTypeDeclarer) return;
+
+        unreachable();
+    }
+
     public Entity visit(NewMemType e) {
-        visit(e.mapped());
-        // TODO: check mapped types
-        return e;
+        if (e.mapped().none()) return e;
+        if (checkMappable(e.mapped().get())) {
+            checkNewMemSize(e.mapped().get());
+            return e;
+        }
+        return semantic("can't map type %s", e.pos());
     }
 
     public Entity visit(NewExpression e) {
@@ -1612,9 +1650,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         e.arg().use(this::visit);
         if (e.arg().none()) return e;
 
-        if (e.type() instanceof NewMemType nmt) {
-            if (nmt.length().none()) return e;
-            var len = nmt.length().get();
+        if (e.type() instanceof NewMemType) {
+            var len = e.arg().get();
             var right = typeDeducer.visit(len);
             if (typeDeducer.isInteger(right)) return e;
             return semantic("ram length must integer: %s", len.pos());

@@ -322,23 +322,40 @@ final class SourceParseVisitor
     @Override
     public Entity visitArrayTypeDeclarer(
             FengParser.ArrayTypeDeclarerContext ctx) {
-        var type = ctx.arrayType();
-        var len = this.<Expression>visitOptional(type.len);
+        var pos = posOf(ctx);
+        var typeDcl = (TypeDeclarer) visit(ctx.typeDeclarer());
+        var at = ctx.arrayType();
+
+        if (enterMemType) {
+            var len = Optional.<Expression>empty();
+            if (at != null) {
+                len = this.visitOptional(at.len);
+                if (len.none()) return
+                        semantic("mem type can't map refer");
+            }
+            return new ArrayTypeDeclarer(pos, typeDcl,
+                    len, Optional.empty());
+        }
+        if (at == null) {
+            return semantic(
+                    "require array refer-symbol or length: %s", pos);
+        }
+
+        var len = this.<Expression>visitOptional(at.len);
         var ref = Optional.<Refer>empty();
         if (len.none()) {
-            ReferKind rt = switch (type.kind.getType()) {
+            ReferKind rt = switch (at.kind.getType()) {
                 case FengParser.MUL -> STRONG;
                 case FengParser.BITAND -> PHANTOM;
                 default -> unreachable();
             };
-            var required = type.required != null;
-            var immutable = type.immutable != null;
+            var required = at.required != null;
+            var immutable = at.immutable != null;
             if (immutable) unsupported("immutable");
-            ref = Optional.of(new Refer(posOf(type.kind), rt,
+            ref = Optional.of(new Refer(posOf(at.kind), rt,
                     required, immutable));
         }
-        var typeDcl = (TypeDeclarer) visit(ctx.typeDeclarer());
-        return new ArrayTypeDeclarer(posOf(ctx),
+        return new ArrayTypeDeclarer(pos,
                 typeDcl, len, ref);
     }
 
@@ -361,38 +378,20 @@ final class SourceParseVisitor
     @Override
     public Entity visitDefinedTypeDeclarer(
             FengParser.DefinedTypeDeclarerContext ctx) {
-        var dt = (DefinedType) visit(ctx.definedType());
-        if (dt.symbol().module().none()) {
-            var name = dt.symbol().name().value();
-            var pri = Primitive.ofCode(name);
-            if (pri.has()) {
-                if (!dt.generic().isEmpty())
-                    return semantic("primitive with generic");
-                var refer = parseRefer(ctx.refer());
-                if (refer.has())
-                    return semantic("primitive with reference");
-                return pri.get().declarer(posOf(ctx));
-            }
-
-            var mt = MemDefinition.CACHE.get(name);
-            if (mt != null) {
-                var args = dt.generic().arguments();
-                if (args.size() > 1) {
-                    return semantic("%s can't multi map: %s",
-                            mt.symbol(), args.getFirst().pos());
-                }
-                var mapped = !args.isEmpty() ?
-                        args.getFirst() : null;
-                var refer = parseRefer(ctx.refer());
-                if (refer.none())
-                    return semantic("%s only for reference: %s",
-                            mt.symbol(), dt.pos());
-                return new MemTypeDeclarer(posOf(ctx), mt.readonly(),
-                        refer, Optional.of(mapped));
-            }
-        }
         var refer = parseRefer(ctx.refer());
-        return new DefinedTypeDeclarer(posOf(ctx), dt, refer);
+        var dt = (DefinedType) visit(ctx.definedType());
+        if (dt instanceof MemType mt) {
+            if (refer.none()) return semantic(
+                    "%s only for reference: %s", dt.name(), dt.pos());
+            return new MemTypeDeclarer(dt.pos(), mt, refer.get());
+        }
+        if (dt instanceof PrimitiveType pt) {
+            if (refer.has()) return semantic(
+                    "primitive can't be refer: %s", dt.pos());
+            return new PrimitiveTypeDeclarer(pt.pos(), pt.primitive());
+        }
+        return new DerivedTypeDeclarer(posOf(ctx),
+                (DerivedType) dt, refer);
     }
 
     @Override
@@ -404,22 +403,6 @@ final class SourceParseVisitor
     public List<TypeDeclarer> parseTypeDeclarerList(
             FengParser.TypeDeclarerListContext ctx) {
         return visitList(ctx.typeDeclarer());
-    }
-
-    @Override
-    public Entity visitNewType(FengParser.NewTypeContext ctx) {
-        var pos = posOf(ctx);
-        var defTp = ctx.definedType();
-        if (defTp != null) {
-            var dt = (DefinedType) visit(defTp);
-            return new NewDefinedType(pos, dt);
-        }
-        var at = ctx.newArrayType();
-        var element = (TypeDeclarer) visit(at.typeDeclarer());
-        var length = (Expression) visit(at.expression());
-        var immutable = at.immutable != null;
-        if (immutable) unsupported("immutable");
-        return new NewArrayType(pos, element, length, immutable);
     }
 
     //
@@ -437,11 +420,35 @@ final class SourceParseVisitor
         return new TypeArguments(posOf(ctx), arguments);
     }
 
+    private volatile boolean enterMemType;
+
     @Override
     public Entity visitDefinedType(FengParser.DefinedTypeContext ctx) {
         var symbol = parseSymbol(ctx.symbol());
+        var md = MemDefinition.CACHE.get(symbol);
+        if (md != null) {
+            if (enterMemType) return semantic(
+                    "nested mapping mem type: %s", symbol.name());
+            enterMemType = true;
+            var args = typeArguments(ctx.typeArguments());
+            enterMemType = false;
+            if (args.size() > 1)
+                return semantic("mem can't map multi type: %s",
+                        args.get(1).pos());
+            return new MemType(posOf(ctx), md.readonly(), args.tryGet(0));
+        }
+        if (symbol.module().none()) {
+            var pd = Primitive.ofCode(symbol.name().value());
+            if (pd.has()) {
+                var ta = ctx.typeArguments();
+                if (ta != null)
+                    return semantic("primitive have no generic: %s", posOf(ta));
+
+                return new PrimitiveType(posOf(ctx), symbol.name(), pd.get());
+            }
+        }
         var args = typeArguments(ctx.typeArguments());
-        return new DefinedType(posOf(ctx), symbol, args);
+        return new DerivedType(posOf(ctx), symbol, args);
     }
 
 
@@ -609,20 +616,14 @@ final class SourceParseVisitor
     public Entity visitDefinedStructureFieldType(
             FengParser.DefinedStructureFieldTypeContext ctx) {
         var type = (DefinedType) visit(ctx.definedType());
-        var name = type.symbol().name().value();
-        var pri = Primitive.ofCode(name);
-        if (pri.has()) {
-            if (type.generic().isEmpty())
-                return pri.get().declarer(posOf(ctx));
-
-            return semantic("primitive with generic: %s", type.generic().pos());
-        }
-        var mem = MemDefinition.CACHE.get(name);
-        if (mem != null) {
+        if (type instanceof MemType) {
             return semantic("can't be mem type: %s", type.pos());
         }
-
-        return new DefinedTypeDeclarer(posOf(ctx), type, Optional.empty());
+        if (type instanceof PrimitiveType pt) {
+            return pt.primitive().declarer(posOf(ctx));
+        }
+        return new DerivedTypeDeclarer(posOf(ctx), (DerivedType) type,
+                Optional.empty());
     }
 
     @Override
@@ -637,8 +638,8 @@ final class SourceParseVisitor
     public Entity visitUnnamedStructureFieldType(
             FengParser.UnnamedStructureFieldTypeContext ctx) {
         var def = (StructureDefinition) visit(ctx.unnamedStructureDefinition());
-        var dt = new DefinedType(def.pos(), def.symbol(), TypeArguments.EMPTY);
-        return new DefinedTypeDeclarer(posOf(ctx), dt, Optional.empty());
+        var dt = new DerivedType(def.pos(), def.symbol(), TypeArguments.EMPTY);
+        return new DerivedTypeDeclarer(posOf(ctx), dt, Optional.empty());
     }
 
 
@@ -679,12 +680,15 @@ final class SourceParseVisitor
         var symbol = defineSymbol(ctx.name);
         var generic = typeParameters(ctx.typeParameters());
         var methods = new IdentifierTable<InterfaceMethod>();
-        var parts = new SymbolTable<DefinedType>();
+        var parts = new SymbolTable<DerivedType>();
         var macros = new MacroTable();
         for (var imc : ctx.interfaceMember()) {
             if (imc.part != null) {
                 var part = (DefinedType) visit(imc.part.definedType());
-                parts.add(part.symbol(), part);
+                if (!(part instanceof DerivedType dt))
+                    return semantic("require derived type: %s", part.pos());
+
+                parts.add(dt.symbol(), dt);
             } else if (imc.method != null) {
                 var method = (InterfaceMethod) visit(imc.method);
                 methods.add(method.name(), method);
@@ -728,11 +732,31 @@ final class SourceParseVisitor
     //
 
 
-    private SymbolTable<DefinedType> parseClassImpl(
+    private SymbolTable<DerivedType> parseClassImpl(
             FengParser.ClassImplContext ctx) {
-        var tab = new SymbolTable<DefinedType>();
+        var tab = new SymbolTable<DerivedType>();
         if (ctx == null) return tab;
-        return parseUniques(tab, ctx.definedType(), DefinedType::symbol);
+        var dts = this.<DefinedType>visitList(ctx.definedType());
+        for (var dt : dts) {
+            if (dt instanceof DerivedType der) {
+                tab.add(der.symbol(), der);
+                continue;
+            }
+            return semantic("require derived type: %s", dt.pos());
+        }
+        return tab;
+    }
+
+    private Optional<DerivedType> parseClassInherit(
+            FengParser.ClassInheritContext ctx) {
+        if (ctx == null) return ClassDefinition.ObjectType;
+
+        var dt = (DefinedType) visit(ctx);
+        if (dt instanceof DerivedType der)
+            return Optional.of(der);
+
+        return semantic("require derived type: %s",
+                dt.pos());
     }
 
     private volatile Symbol enterClassSymbol;
@@ -756,8 +780,7 @@ final class SourceParseVisitor
         if (enterClassSymbol != null) semantic("nested define class: %s", symbol);
         enterClassSymbol = symbol;
         var generic = typeParameters(ctx.typeParameters());
-        var inherit = this.<DefinedType>visitOptional(ctx.classInherit());
-        if (inherit.none()) inherit = ClassDefinition.ObjectType;
+        var inherit = parseClassInherit(ctx.classInherit());
         var impl = parseClassImpl(ctx.classImpl());
 
         var methods = new IdentifierTable<ClassMethod>();
@@ -835,34 +858,27 @@ final class SourceParseVisitor
         return new LiteralExpression(posOf(ctx), literal);
     }
 
-    private NewType parseNewType(NewDefinedType type, Optional<Expression> arg) {
-        var dt = type.type();
-        if (!dt.symbol().module().none())
-            return type;
-
-        var name = dt.symbol().name().value();
-        var pri = Primitive.ofCode(name);
-        if (pri.has())
-            return semantic("can't new primitive");
-
-        var mt = MemDefinition.CACHE.get(name);
-        if (mt == null) return type;
-        if (mt.readonly()) return semantic("can't new rom");
-
-        var gen = dt.generic().arguments();
-        if (gen.size() > 1) return semantic(
-                "at most, %s can only map one type", name);
-
-        if (gen.isEmpty()) {
-            if (arg.none()) return semantic(
-                    "require size in bytes: %s", type.pos());
-        } else {
-            if (arg.has()) return semantic(
-                    "only be one type and length: ", arg.get().pos());
+    @Override
+    public Entity visitNewType(FengParser.NewTypeContext ctx) {
+        var pos = posOf(ctx);
+        var defTp = ctx.definedType();
+        if (defTp == null) {
+            var at = ctx.newArrayType();
+            var element = (TypeDeclarer) visit(at.typeDeclarer());
+            var length = (Expression) visit(at.expression());
+            var immutable = at.immutable != null;
+            if (immutable) unsupported("immutable");
+            return new NewArrayType(pos, element, length, immutable);
         }
 
-        var mapped = !gen.isEmpty() ? gen.getFirst() : null;
-        return new NewMemType(type.pos(), Optional.of(mapped), arg);
+        var t = (DefinedType) visit(defTp);
+        if (t instanceof PrimitiveType) {
+            return semantic("can't new primitive: %s", t.pos());
+        }
+        if (t instanceof DerivedType dt) {
+            return new NewDerivedType(pos, dt);
+        }
+        return new NewMemType(pos, (MemType) t);
     }
 
     @Override
@@ -870,11 +886,17 @@ final class SourceParseVisitor
         var new_ = ctx.new_();
         var type = (NewType) visit(new_.newType());
         var arg = this.<Expression>visitOptional(new_.expression());
-        type = switch (type) {
-            case NewDefinedType dt -> parseNewType(dt, arg);
-            case NewArrayType at -> at;
-            case null, default -> unreachable();
-        };
+
+        if (type instanceof NewMemType mt) {
+            if (mt.mapped().none()) {
+                if (arg.none()) return semantic(
+                        "require size in bytes: %s", type.pos());
+            } else {
+                if (arg.has()) return semantic(
+                        "only be one type and length: ", arg.get().pos());
+            }
+        }
+
         return new NewExpression(posOf(ctx), type, arg);
     }
 

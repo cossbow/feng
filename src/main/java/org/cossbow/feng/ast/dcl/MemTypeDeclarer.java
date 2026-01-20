@@ -1,35 +1,33 @@
 package org.cossbow.feng.ast.dcl;
 
+import org.cossbow.feng.ast.gen.MemType;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 
 public class MemTypeDeclarer extends TypeDeclarer
         implements Referable {
-    private boolean readonly;
-    private Optional<Refer> refer;
-    private Optional<TypeDeclarer> mapped;
+    private MemType type;
+    private Refer refer;
 
     public MemTypeDeclarer(Position pos,
-                           boolean readonly,
-                           Optional<Refer> refer,
-                           Optional<TypeDeclarer> mapped) {
+                           MemType type,
+                           Refer refer) {
         super(pos);
-        this.readonly = readonly;
-        this.mapped = mapped;
+        this.type = type;
         this.refer = refer;
     }
 
     public boolean readonly() {
-        return readonly;
+        return type.readonly();
     }
 
     @Override
     public Optional<Refer> refer() {
-        return refer;
+        return Optional.of(refer);
     }
 
     public Optional<TypeDeclarer> mapped() {
-        return mapped;
+        return type.mapped();
     }
 
     @Override
@@ -37,7 +35,7 @@ public class MemTypeDeclarer extends TypeDeclarer
         if (!(o instanceof MemTypeDeclarer t))
             return false;
 
-        return readonly == t.readonly &&
+        return type.equals(t.type) &&
                 refer.equals(t.refer);
     }
 

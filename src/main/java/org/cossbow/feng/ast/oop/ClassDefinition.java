@@ -2,7 +2,7 @@ package org.cossbow.feng.ast.oop;
 
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.gen.DefinedType;
+import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
@@ -11,8 +11,8 @@ import org.cossbow.feng.util.Optional;
 
 public class ClassDefinition extends ObjectDefinition
         implements HaveFields<ClassField> {
-    private Optional<DefinedType> inherit;
-    private SymbolTable<DefinedType> impl;
+    private Optional<DerivedType> inherit;
+    private SymbolTable<DerivedType> impl;
     private IdentifierTable<ClassField> fields;
     private IdentifierTable<ClassMethod> methods;
     private MacroTable macros;
@@ -21,8 +21,8 @@ public class ClassDefinition extends ObjectDefinition
                            Modifier modifier,
                            Symbol symbol,
                            TypeParameters generic,
-                           Optional<DefinedType> inherit,
-                           SymbolTable<DefinedType> impl,
+                           Optional<DerivedType> inherit,
+                           SymbolTable<DerivedType> impl,
                            IdentifierTable<ClassField> fields,
                            IdentifierTable<ClassMethod> methods,
                            MacroTable macros) {
@@ -34,11 +34,11 @@ public class ClassDefinition extends ObjectDefinition
         this.macros = macros;
     }
 
-    public Optional<DefinedType> inherit() {
+    public Optional<DerivedType> inherit() {
         return inherit;
     }
 
-    public SymbolTable<DefinedType> impl() {
+    public SymbolTable<DerivedType> impl() {
         return impl;
     }
 
@@ -86,8 +86,8 @@ public class ClassDefinition extends ObjectDefinition
             Position.ZERO, "Object");
     public static final Symbol ObjectSymbol = new Symbol(
             Position.ZERO, ObjectName);
-    public static final Optional<DefinedType> ObjectType = Optional.of(
-            new DefinedType(Position.ZERO, ObjectSymbol, TypeArguments.EMPTY));
+    public static final Optional<DerivedType> ObjectType = Optional.of(
+            new DerivedType(Position.ZERO, ObjectSymbol, TypeArguments.EMPTY));
 
     public static final ClassDefinition ObjectClass =
             new ClassDefinition(Position.ZERO, Modifier.empty(),

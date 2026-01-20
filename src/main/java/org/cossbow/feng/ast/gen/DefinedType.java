@@ -1,42 +1,26 @@
 package org.cossbow.feng.ast.gen;
 
 import org.cossbow.feng.ast.Entity;
+import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 
-import java.util.Objects;
-
+abstract
 public class DefinedType extends Entity {
-    private Symbol symbol;
-    private TypeArguments generic;
+    private final Identifier name;
 
     public DefinedType(Position pos,
-                       Symbol symbol,
-                       TypeArguments generic) {
+                       Identifier name) {
         super(pos);
-        this.symbol = symbol;
-        this.generic = generic;
+        this.name = name;
     }
 
-    public Symbol symbol() {
-        return symbol;
-    }
-
-    public TypeArguments generic() {
-        return generic;
+    public Identifier name() {
+        return name;
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (!(o instanceof DefinedType t))
-            return false;
-        return symbol.equals(t.symbol) &&
-                generic.equals(t.generic);
-    }
+    abstract
+    public boolean equals(Object o);
 
-    @Override
-    public String toString() {
-        if (generic.isEmpty()) return symbol.toString();
-        return symbol.toString() + '`' + generic + '`';
-    }
 }
