@@ -7,23 +7,27 @@ import org.cossbow.feng.ast.Position;
 public class MemTypeDeclarer extends TypeDeclarer
         implements Referable {
     private MemType type;
-    private Refer refer;
+    private Refer ref;
 
     public MemTypeDeclarer(Position pos,
                            MemType type,
                            Refer refer) {
         super(pos);
         this.type = type;
-        this.refer = refer;
+        this.ref = refer;
     }
 
     public boolean readonly() {
         return type.readonly();
     }
 
+    public Refer ref() {
+        return ref;
+    }
+
     @Override
     public Optional<Refer> refer() {
-        return Optional.of(refer);
+        return Optional.of(ref);
     }
 
     public Optional<TypeDeclarer> mapped() {
@@ -36,7 +40,7 @@ public class MemTypeDeclarer extends TypeDeclarer
             return false;
 
         return type.equals(t.type) &&
-                refer.equals(t.refer);
+                ref.equals(t.ref);
     }
 
 }

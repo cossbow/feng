@@ -61,25 +61,26 @@ public class ClassDefinition extends ObjectDefinition
     //
 
     private transient Lazy<ClassDefinition> parent = Lazy.nil();
-    private transient Lazy<IdentifierTable<InterfaceDefinition>> interfaces = Lazy.nil();
-    private transient Lazy<IdentifierTable<ClassField>> allFields = Lazy.nil();
-    private transient Lazy<IdentifierTable<ClassMethod>> allMethods = Lazy.nil();
+    private transient IdentifierTable<InterfaceDefinition> interfaces = new IdentifierTable<>();
+    private transient IdentifierTable<ClassField> allFields = new IdentifierTable<>();
+    private transient IdentifierTable<ClassMethod> allMethods = new IdentifierTable<>();
 
     public Lazy<ClassDefinition> parent() {
         return parent;
     }
 
-    public Lazy<IdentifierTable<InterfaceDefinition>> interfaces() {
+    public IdentifierTable<InterfaceDefinition> interfaces() {
         return interfaces;
     }
 
-    public Lazy<IdentifierTable<ClassField>> allFields() {
+    public IdentifierTable<ClassField> allFields() {
         return allFields;
     }
 
-    public Lazy<IdentifierTable<ClassMethod>> allMethods() {
+    public IdentifierTable<ClassMethod> allMethods() {
         return allMethods;
     }
+
     //
 
     public static final Identifier ObjectName = new Identifier(

@@ -32,4 +32,14 @@ public class MemType extends DefinedType {
         return readonly == t.readonly &&
                 mapped.equals(t.mapped);
     }
+
+    //
+
+
+    @Override
+    public String toString() {
+        var md = MemDefinition.get(readonly);
+        if (mapped.none()) return md.symbol().toString();
+        return md.symbol() + "`" + mapped.get() + "`";
+    }
 }

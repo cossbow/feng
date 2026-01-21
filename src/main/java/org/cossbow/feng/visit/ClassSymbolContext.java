@@ -25,7 +25,7 @@ public class ClassSymbolContext extends LocalSymbolContext {
         if (f.has()) return f;
         if (symbol.module().has())
             return semantic("func %s not defined", symbol);
-        return definition.allMethods().must().tryGet(symbol.name())
+        return definition.allMethods().tryGet(symbol.name())
                 .map(ClassMethod::func);
     }
 
@@ -36,7 +36,7 @@ public class ClassSymbolContext extends LocalSymbolContext {
         if (symbol.module().has())
             return semantic("var %s not declared", symbol);
 
-        return definition.allFields().must().tryGet(symbol.name())
+        return definition.allFields().tryGet(symbol.name())
                 .map(ClassField::variable);
     }
 

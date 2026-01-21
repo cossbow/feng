@@ -4,31 +4,36 @@ import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
+import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.util.Lazy;
 
 public class Variable extends Entity {
-    private Modifier modifier;
-    private Declare declare;
-    private Identifier name;
-    private Lazy<TypeDeclarer> type;
+    private final Modifier modifier;
+    private final Declare declare;
+    private final Identifier name;
+    private final Lazy<TypeDeclarer> type;
+    private final Lazy<Expression> value;
 
     public Variable(Position pos,
                     Modifier modifier,
                     Declare declare,
                     Identifier name,
-                    Lazy<TypeDeclarer> type) {
+                    Lazy<TypeDeclarer> type,
+                    Lazy<Expression> value) {
         super(pos);
         this.modifier = modifier;
         this.declare = declare;
         this.name = name;
         this.type = type;
+        this.value = value;
     }
 
     public Variable(Position pos,
                     Modifier modifier,
                     Declare declare,
                     Identifier name) {
-        this(pos, modifier, declare, name, Lazy.nil());
+        this(pos, modifier, declare, name,
+                Lazy.nil(), Lazy.nil());
     }
 
     public Modifier modifier() {
@@ -47,4 +52,15 @@ public class Variable extends Entity {
         return type;
     }
 
+    public Lazy<Expression> value() {
+        return value;
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        if (type.none()) return declare.code + " " + name;
+        return declare.code + " " + name + " " + type.get();
+    }
 }

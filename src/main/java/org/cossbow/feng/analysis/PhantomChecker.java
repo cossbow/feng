@@ -2,6 +2,7 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
+import org.cossbow.feng.ast.lit.NilLiteral;
 import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.stmt.ArrayTuple;
 import org.cossbow.feng.ast.stmt.Tuple;
@@ -116,7 +117,8 @@ public class PhantomChecker {
     }
 
     public boolean check(LiteralExpression e) {
-        return e.literal() instanceof StringLiteral;
+        return e.literal() instanceof StringLiteral
+                || e.literal() instanceof NilLiteral;
     }
 
     private boolean check(TypeDeclarer t) {

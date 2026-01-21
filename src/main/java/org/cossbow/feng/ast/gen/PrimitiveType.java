@@ -23,4 +23,12 @@ public class PrimitiveType extends DefinedType {
         return o instanceof PrimitiveType t
                 && primitive == t.primitive;
     }
+
+    //
+
+
+    @Override
+    public String toString() {
+        return primitive.toString();
+    }
 }

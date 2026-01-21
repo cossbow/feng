@@ -2,6 +2,7 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.Declare;
+import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.util.ErrorUtil;
@@ -82,6 +83,11 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
     }
 
     @Override
+    public Expression visit(CurrentExpression e) {
+        return e;
+    }
+
+    @Override
     public Expression visit(LambdaExpression e) {
         return e;
     }
@@ -133,11 +139,11 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
         if (!symbolSet.add(s)) return ErrorUtil.semantic(
                 "initialization cycle for %s", s);
 
-        var v = context.findVar(s);
-        if (v.none()) return e;
-        if (v.get() instanceof GlobalVariable gv) {
-            if (gv.declare() == Declare.CONST && gv.init().has())
-                return gv.init().must();
+        var o = context.findVar(s);
+        if (o.none()) return e;
+        if (o.get() instanceof Variable v) {
+            if (v.declare() == Declare.CONST && v.value().has())
+                return v.value().must();
         }
 
         return e;

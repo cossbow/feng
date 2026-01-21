@@ -118,7 +118,7 @@ public class TypeTool {
 
     public Optional<? extends Entity>
     getMethod(InterfaceDefinition id, Identifier name) {
-        var m = id.all().must().tryGet(name);
+        var m = id.all().tryGet(name);
         if (m.has()) return m;
         return semantic("interface %s has no method: %s",
                 id.symbol(), name);

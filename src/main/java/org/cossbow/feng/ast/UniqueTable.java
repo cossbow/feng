@@ -31,12 +31,6 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
             addIndex(n);
     }
 
-    public UniqueTable(Map<K, V> entries) {
-        this(entries.size());
-        for (var e : entries.entrySet())
-            add(e.getKey(), e.getValue());
-    }
-
     private void addIndex(Node<K, V> node) {
         var old = table.putIfAbsent(node.key, node);
         if (old != null)
@@ -47,6 +41,13 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
         var node = new Node<>(key, value);
         addIndex(node);
         nodes.add(node);
+    }
+
+    public void addAll(UniqueTable<K, V> other) {
+        nodes.addAll(other.nodes);
+        for (var n : other.nodes) {
+            addIndex(n);
+        }
     }
 
     public V get(K key) {

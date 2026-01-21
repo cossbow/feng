@@ -1,7 +1,6 @@
 package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.dcl.Declare;
-import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.FuncTypeDeclarer;
 import org.cossbow.feng.ast.dcl.Referable;
 import org.cossbow.feng.ast.expr.*;
@@ -31,35 +30,18 @@ public class ConstChecker implements EntityVisitor<Boolean> {
     }
 
     @Override
-    public Boolean visit(ArrayExpression e) {
-        return true;
-    }
-
-    @Override
-    public Boolean visit(AssertExpression e) {
-        if (!(e.type() instanceof DerivedTypeDeclarer td))
-            return semantic("assert not allowed: %s", e.type());
-        if (td.refer().none())
-            return semantic("assert require reference");
-        return td.refer().get().immutable();
-    }
-
-    @Override
     public Boolean visit(CallExpression e) {
         var td = deducer.visit(e.callee());
         if (!(td instanceof FuncTypeDeclarer ftd))
-            return true;
+            return unreachable();
 
         var rs = ftd.prototype().returnSet();
         if (rs.size() > 1) semantic("no multi-returns here");
 
-        td = rs.getFirst();
-        return switch (td) {
-            case Referable r -> r.refer().none()
-                    || r.refer().get().immutable();
-            case null -> unreachable();
-            default -> true;
-        };
+        if (!(rs.getFirst() instanceof Referable r))
+            return unreachable();
+
+        return r.refer().none() || r.refer().get().immutable();
     }
 
     @Override

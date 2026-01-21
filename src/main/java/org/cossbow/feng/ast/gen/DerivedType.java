@@ -31,4 +31,12 @@ public class DerivedType extends DefinedType {
                 generic.equals(t.generic);
     }
 
+    //
+
+
+    @Override
+    public String toString() {
+        return generic.isEmpty() ? symbol.toString() :
+                symbol.toString() + generic;
+    }
 }

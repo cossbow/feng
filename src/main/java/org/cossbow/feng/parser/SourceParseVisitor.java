@@ -224,13 +224,13 @@ final class SourceParseVisitor
                 var v = stmt.variables().get(i);
                 globalVarCheck(v);
                 gvs.add(new GlobalVariable(v, defineSymbol(v.name()),
-                        Optional.of(at.values().get(i))));
+                        Lazy.of(at.values().get(i))));
             }
         } else {
             for (var v : stmt.variables()) {
                 globalVarCheck(v);
                 gvs.add(new GlobalVariable(v, defineSymbol(v.name()),
-                        Optional.empty()));
+                        Lazy.nil()));
             }
         }
         if (isExport(ctx.exportable()))
@@ -1089,7 +1089,7 @@ final class SourceParseVisitor
         var unique = new UniqueTable<Identifier, Identifier>(names.size());
         for (var name : names) {
             unique.add(name, name);
-            vars.add(new Variable(name.pos(), modifier, dcl, name, type));
+            vars.add(new Variable(name.pos(), modifier, dcl, name, type, Lazy.nil()));
         }
         return vars;
     }
@@ -1296,7 +1296,8 @@ final class SourceParseVisitor
     public Entity visitCatchClause(FengParser.CatchClauseContext ctx) {
         var modifier = parseModifier(ctx.modifier());
         var name = identifier(ctx.name);
-        var variable = new Variable(name.pos(), modifier, Declare.CONST, name);
+        var variable = new Variable(name.pos(), modifier,
+                Declare.CONST, name, Lazy.nil(), Lazy.nil());
         var typeSet = this.<TypeDeclarer>visitList(ctx.catchTypeSet().typeDeclarer());
         var body = (BlockStatement) visit(ctx.blockStatement());
         return new CatchClause(posOf(ctx), variable, typeSet, body.unscope());
@@ -1381,7 +1382,7 @@ final class SourceParseVisitor
             var names = identifiers(pc.identifierList());
             for (var name : names) {
                 var v = new Variable(name.pos(), modifier,
-                        Declare.CONST, name, Lazy.of(type));
+                        Declare.CONST, name, Lazy.of(type), Lazy.nil());
                 params.add(name, v);
             }
         }

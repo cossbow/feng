@@ -43,7 +43,7 @@ public class ClassField extends Field implements Exportable {
 
     public Variable variable() {
         return new Variable(pos(), modifier, declare,
-                name(), Lazy.of(type()));
+                name(), Lazy.of(type()), Lazy.nil());
     }
 
     @Override

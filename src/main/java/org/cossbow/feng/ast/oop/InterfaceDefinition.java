@@ -40,9 +40,9 @@ public class InterfaceDefinition extends ObjectDefinition {
 
     //
 
-    private transient Lazy<IdentifierTable<InterfaceMethod>> all = Lazy.nil();
+    private transient IdentifierTable<InterfaceMethod> all = new IdentifierTable<>();
 
-    public Lazy<IdentifierTable<InterfaceMethod>> all() {
+    public IdentifierTable<InterfaceMethod> all() {
         return all;
     }
 }

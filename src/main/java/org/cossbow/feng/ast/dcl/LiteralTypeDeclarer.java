@@ -1,10 +1,7 @@
 package org.cossbow.feng.ast.dcl;
 
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.lit.BoolLiteral;
-import org.cossbow.feng.ast.lit.FloatLiteral;
-import org.cossbow.feng.ast.lit.IntegerLiteral;
-import org.cossbow.feng.ast.lit.Literal;
+import org.cossbow.feng.ast.lit.*;
 
 /**
  * 临时，不在AST上
@@ -32,6 +29,14 @@ public class LiteralTypeDeclarer extends TypeDeclarer {
 
     public boolean isBool() {
         return literal instanceof BoolLiteral;
+    }
+
+    public boolean isNil() {
+        return literal instanceof NilLiteral;
+    }
+
+    public boolean isString() {
+        return literal instanceof StringLiteral;
     }
 
 
