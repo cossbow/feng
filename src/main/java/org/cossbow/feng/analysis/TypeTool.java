@@ -60,7 +60,7 @@ public class TypeTool {
         if (!(mtd instanceof DerivedTypeDeclarer dtd))
             return Optional.empty();
 
-        var dt = dtd.definedType();
+        var dt = dtd.derivedType();
         if (!dt.generic().isEmpty()) return unsupported("generic");
 
         var o = context.findType(dt.symbol());
@@ -90,7 +90,7 @@ public class TypeTool {
         if (!(std instanceof DerivedTypeDeclarer dtd))
             return Optional.empty();
 
-        var o = context.findType(dtd.definedType().symbol());
+        var o = context.findType(dtd.derivedType().symbol());
         if (o.none()) return semantic(
                 "undefined type: %s", subject.pos());
 
@@ -130,7 +130,7 @@ public class TypeTool {
         if (!(std instanceof DerivedTypeDeclarer dtd))
             return Optional.empty();
 
-        var dt = dtd.definedType().symbol();
+        var dt = dtd.derivedType().symbol();
 
         var o = context.findType(dt);
         if (o.none()) return semantic("undefined type: %s", dt);
@@ -150,7 +150,7 @@ public class TypeTool {
         if (!(td instanceof DerivedTypeDeclarer dtd))
             return Optional.empty();
 
-        var dt = dtd.definedType();
+        var dt = dtd.derivedType();
         assert dt.generic().isEmpty();
         var def = context.findType(dt.symbol());
         if (!def.has()) return Optional.empty();

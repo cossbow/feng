@@ -130,7 +130,7 @@ public class DeclarationParseTest extends BaseParseTest {
                 var name = randTypeSymbol(16);
                 var dcl = parseLocalDecl(fmt.formatted(name));
                 var td = (DerivedTypeDeclarer) dcl.variables().getFirst().type().must();
-                Assertions.assertEquals(name, td.definedType().symbol());
+                Assertions.assertEquals(name, td.derivedType().symbol());
             }
         }
     }
@@ -164,7 +164,7 @@ public class DeclarationParseTest extends BaseParseTest {
             var td = (ArrayTypeDeclarer) v.type().must();
             Assertions.assertEquals(symbol("Host"), typeName(td.element()));
             Assertions.assertTrue(td.length().none());
-            Assertions.assertTrue(td.refer().must().checkType(STRONG));
+            Assertions.assertTrue(td.refer().must().isKind(STRONG));
             Assertions.assertFalse(td.refer().must().immutable());
             Assertions.assertFalse(td.refer().must().required());
         }
@@ -178,7 +178,7 @@ public class DeclarationParseTest extends BaseParseTest {
             var td2 = (ArrayTypeDeclarer) td.element();
             Assertions.assertEquals(symbol("Host"), typeName(td2.element()));
             Assertions.assertTrue(td2.length().none());
-            Assertions.assertTrue(td2.refer().must().checkType(PHANTOM));
+            Assertions.assertTrue(td2.refer().must().isKind(PHANTOM));
             Assertions.assertFalse(td2.refer().must().immutable());
             Assertions.assertTrue(td2.refer().must().required());
         }

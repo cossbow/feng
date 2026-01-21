@@ -288,7 +288,7 @@ public class BaseParseTest {
     }
 
     public static Symbol typeName(TypeDeclarer td) {
-        return ((DerivedTypeDeclarer) td).definedType().symbol();
+        return ((DerivedTypeDeclarer) td).derivedType().symbol();
     }
 
 }

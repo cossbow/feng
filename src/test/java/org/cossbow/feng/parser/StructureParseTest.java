@@ -40,7 +40,7 @@ public class StructureParseTest extends BaseParseTest {
             return;
         }
         if (type instanceof DerivedTypeDeclarer dt) {
-            Assertions.assertEquals(name, dt.definedType().symbol());
+            Assertions.assertEquals(name, dt.derivedType().symbol());
             return;
         }
         Assertions.fail("invalid type: %s".formatted(type));
@@ -114,7 +114,7 @@ public class StructureParseTest extends BaseParseTest {
         var f = foo.fields().get(a);
         Assertions.assertEquals(a, f.name());
 
-        var dt = ((DerivedTypeDeclarer) f.type()).definedType();
+        var dt = ((DerivedTypeDeclarer) f.type()).derivedType();
         Assertions.assertTrue(dt.symbol().module().none());
         var def = (StructureDefinition) src.table().unnamedTypes.get(dt.symbol().name());
         Assertions.assertEquals(1, def.fields().size());

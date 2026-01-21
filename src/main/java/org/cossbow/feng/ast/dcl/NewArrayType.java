@@ -29,4 +29,13 @@ public class NewArrayType extends NewType {
     public boolean immutable() {
         return immutable;
     }
+
+    //
+
+    @Override
+    public String toString() {
+        if (immutable)
+            return "[" + length + "#]" + element;
+        return "[" + length + "]" + element;
+    }
 }

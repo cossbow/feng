@@ -97,7 +97,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
 
     @Override
     public CppGenerator visit(DerivedTypeDeclarer td) {
-        visit(td.definedType());
+        visit(td.derivedType());
         if (td.refer().has()) {
             var ref = td.refer().get();
             switch (ref.kind()) {

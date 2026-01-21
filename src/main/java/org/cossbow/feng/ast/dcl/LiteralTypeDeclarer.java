@@ -46,4 +46,11 @@ public class LiteralTypeDeclarer extends TypeDeclarer {
         return literal.getClass().equals(t.literal.getClass());
     }
 
+    //
+
+
+    @Override
+    public String toString() {
+        return literal.toString();
+    }
 }

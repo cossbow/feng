@@ -15,4 +15,11 @@ public class NewDerivedType extends NewType {
     public DerivedType type() {
         return type;
     }
+
+    //
+
+    @Override
+    public String toString() {
+        return type.toString();
+    }
 }

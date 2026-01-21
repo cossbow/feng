@@ -5,10 +5,7 @@ import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.TypeArguments;
-import org.cossbow.feng.ast.lit.BoolLiteral;
-import org.cossbow.feng.ast.lit.FloatLiteral;
-import org.cossbow.feng.ast.lit.IntegerLiteral;
-import org.cossbow.feng.ast.lit.NilLiteral;
+import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.EnumDefinition;
 import org.cossbow.feng.ast.proc.Prototype;
@@ -74,6 +71,22 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         return false;
     }
 
+    private Optional<TypeDeclarer> stringLiteralBinOp(
+            TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
+        if (l instanceof LiteralTypeDeclarer ltd &&
+                r instanceof LiteralTypeDeclarer rtd) {
+            var ll = ltd.literal();
+            var rl = rtd.literal();
+            if (ll instanceof StringLiteral ls
+                    && rl instanceof StringLiteral rs) {
+                if (e.operator() == BinaryOperator.ADD) {
+                    return Optional.of(l);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     private Optional<TypeDeclarer> primitiveBinOp(
             TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
         var lk = TypeTool.primitiveKind(l);
@@ -132,13 +145,16 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         var l = visit(e.left());
         var r = visit(e.right());
 
-        var td = primitiveBinOp(l, r, e);
+        var td = stringLiteralBinOp(l, r, e);
+        if (td.has()) return td.get();
+
+        td = primitiveBinOp(l, r, e);
         if (td.has()) return td.get();
 
         td = derivedTypeBinOp(l, r, e);
         if (td.has()) return td.get();
 
-        return semantic("binary-operate not for: %s %s %s",
+        return semantic("illegal operation: %s %s %s",
                 l, e.operator(), r);
     }
 
@@ -153,7 +169,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                 if (isNumber(t)) return t;
             }
         }
-        return unsupported("unary-operation: %s %s",
+        return semantic("illegal operation: %s %s",
                 e.operator(), t);
     }
 
@@ -194,16 +210,16 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
             return ftd;
 
         if (td instanceof DerivedTypeDeclarer dtd) {
-            var dt = context.findType(dtd.definedType().symbol());
+            var dt = context.findType(dtd.derivedType().symbol());
             if (dt.none())
                 return semantic("type not defined: %s",
-                        dtd.definedType().pos());
+                        dtd.derivedType().pos());
 
             if (dt.must() instanceof PrototypeDefinition pd) {
                 if (!pd.generic().isEmpty())
                     return unsupported("generic");
                 return new FuncTypeDeclarer(e.pos(), pd.prototype(),
-                        dtd.definedType().generic());
+                        dtd.derivedType().generic());
             }
         }
 
@@ -259,7 +275,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (!(mtd instanceof DerivedTypeDeclarer dtd))
             return semantic("required user-defined-type: %s", mtd);
 
-        var dt = dtd.definedType();
+        var dt = dtd.derivedType();
         var o = context.findType(dt.symbol());
         if (o.none()) return semantic(
                 "undefined type: %s", dt.symbol());

@@ -25,4 +25,10 @@ public class NewMemType extends NewType {
         return type.mapped();
     }
 
+    //
+
+    @Override
+    public String toString() {
+        return type.toString();
+    }
 }

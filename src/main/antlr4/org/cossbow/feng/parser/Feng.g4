@@ -322,7 +322,7 @@ definedTypeDeclarer
     : refer? definedType
     ;
 refer
-    : kind=(MUL|BITAND|BITXOR) required=NOT? immutable=HASH?
+    : kind=(MUL|BITAND) required=NOT? immutable=HASH?
     ;
 funcTypeDeclarer
     : FUNC prototype

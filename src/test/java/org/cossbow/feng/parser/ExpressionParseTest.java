@@ -97,8 +97,8 @@ public class ExpressionParseTest extends BaseParseTest {
         var expr = (AssertExpression) parseExpr("%s?(*%s)".formatted(name, typeName));
         Assertions.assertEquals(name, varName(expr.subject()));
         var type = (DerivedTypeDeclarer) expr.type();
-        Assertions.assertEquals(typeName, type.definedType().symbol());
-        Assertions.assertTrue(type.definedType().generic().isEmpty());
+        Assertions.assertEquals(typeName, type.derivedType().symbol());
+        Assertions.assertTrue(type.derivedType().generic().isEmpty());
         var ref = type.refer().get();
         Assertions.assertSame(STRONG, ref.kind());
         Assertions.assertFalse(ref.required());
@@ -163,7 +163,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var nt = (NewArrayType) ((NewExpression) expr.subject()).type();
         Assertions.assertEquals(size, varName(nt.length()));
         var dt = (DerivedTypeDeclarer) nt.element();
-        Assertions.assertEquals(type, dt.definedType().symbol());
+        Assertions.assertEquals(type, dt.derivedType().symbol());
 
         Assertions.assertEquals(index, varName(expr.index()));
     }

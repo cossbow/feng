@@ -3,8 +3,6 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
 
-import java.util.Objects;
-
 public class Refer extends Entity {
     private ReferKind kind;
     private boolean required;
@@ -24,7 +22,7 @@ public class Refer extends Entity {
         return kind;
     }
 
-    public boolean checkType(ReferKind t) {
+    public boolean isKind(ReferKind t) {
         return kind == t;
     }
 

@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.IdentifierTable;
 
 public class ObjectExpression extends PrimaryExpression {
-    private IdentifierTable<Expression> entries;
+    private final IdentifierTable<Expression> entries;
 
     public ObjectExpression(Position pos,
                             IdentifierTable<Expression> entries) {

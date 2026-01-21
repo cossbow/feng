@@ -83,8 +83,8 @@ public class ClassParseTest extends BaseParseTest {
                     Assertions.assertSame(dcl.getKey(), f.declare());
                     Assertions.assertEquals(name, f.name());
                     var t = (DerivedTypeDeclarer) f.type();
-                    Assertions.assertEquals(type, t.definedType().symbol());
-                    Assertions.assertTrue(t.definedType().generic().isEmpty());
+                    Assertions.assertEquals(type, t.derivedType().symbol());
+                    Assertions.assertTrue(t.derivedType().generic().isEmpty());
                     Assertions.assertTrue(t.refer().none());
                 }
             }
@@ -105,8 +105,8 @@ public class ClassParseTest extends BaseParseTest {
                     Assertions.assertSame(dcl.getKey(), f.declare());
                     Assertions.assertEquals(name, f.name());
                     var t = (DerivedTypeDeclarer) f.type();
-                    Assertions.assertEquals(type, t.definedType().symbol());
-                    Assertions.assertTrue(t.definedType().generic().isEmpty());
+                    Assertions.assertEquals(type, t.derivedType().symbol());
+                    Assertions.assertTrue(t.derivedType().generic().isEmpty());
                     var ref = t.refer().get();
                     Assertions.assertSame(STRONG, ref.kind());
                     Assertions.assertFalse(ref.required());

@@ -14,6 +14,8 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.function.BiFunction;
 
+import static org.cossbow.feng.util.ErrorUtil.unsupported;
+
 public class ConstExprComputer implements EntityVisitor<Expression> {
 
     private final SymbolContext context;
@@ -72,7 +74,7 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
         var callee = visit(e.callee());
         if (callee instanceof PrimaryExpression pe)
             return new CallExpression(e.pos(), pe, visit(e.arguments()));
-        return ErrorUtil.unsupported("required callable: %s", callee);
+        return unsupported("required callable: %s", callee);
     }
 
     @Override
@@ -113,16 +115,6 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
         var res = e.entries().map(this::visit);
         return new ObjectExpression(e.pos(),
                 new IdentifierTable<>(res));
-    }
-
-    @Override
-    public Expression visit(PairsExpression e) {
-        var pn = e.pairs().stream().map(pair -> {
-            var k = visit(pair.key());
-            var val = visit(pair.value());
-            return new PairsExpression.Pair(k, val);
-        }).toList();
-        return new PairsExpression(e.pos(), pn);
     }
 
     @Override
@@ -168,8 +160,9 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
                 BigDecimal r = switch (op) {
                     case POSITIVE -> fl.value();
                     case NEGATIVE -> fl.value().negate();
-                    case INVERT -> ErrorUtil.unsupported(
-                            "float not support: " + op);
+                    case INVERT -> unsupported(
+                            "float not support %s: %s",
+                            op, e.pos());
                 };
                 return new LiteralExpression(e.pos(),
                         new FloatLiteral(fl.pos(), r));
@@ -180,8 +173,8 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
                 }
             }
 
-            return ErrorUtil.unsupported(
-                    l.type() + " not support: " + op);
+            return unsupported("%s not support: %s",
+                    l.type(), op);
         }
 
         return new UnaryExpression(e.pos(), op, operand);
@@ -235,7 +228,7 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
 
     static BigInteger checkRange(BigInteger a) {
         if (a.bitLength() <= 64) return a;
-        return ErrorUtil.unsupported("integer overflow");
+        return unsupported("integer overflow");
     }
 
     static Literal calc(BinaryOperator op,
@@ -268,7 +261,7 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
             var c = a.shiftRight(bs.intValue());
             return new IntegerLiteral(al.pos(), c, al.radix());
         }
-        return ErrorUtil.unsupported("integer not support " + op);
+        return unsupported("integer not support " + op);
     }
 
 
@@ -276,17 +269,18 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
     static final BigDecimal MinFloat64 = new BigDecimal(Double.MIN_VALUE);
 
     static BigDecimal checkRange(BigDecimal a) {
-        if (MinFloat64.compareTo(a) < 0 &&
-                MaxFloat64.compareTo(a) > 0)
+        var v = a.abs();
+        if (MinFloat64.compareTo(v) < 0 &&
+                MaxFloat64.compareTo(v) > 0)
             return a;
-        return ErrorUtil.unsupported("float overflow");
+        return unsupported("float overflow");
     }
 
     static BigDecimal pow(BigDecimal a, BigDecimal b) {
         double va = a.doubleValue(), vb = b.doubleValue();
         double vr = Math.pow(va, vb);
         if (Double.isInfinite(vr))
-            ErrorUtil.unsupported("float overflow");
+            unsupported("float overflow");
         return BigDecimal.valueOf(vr);
     }
 
@@ -324,7 +318,7 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
             return new BoolLiteral(al.pos(), r);
         }
 
-        return ErrorUtil.unsupported("float not support " + op);
+        return unsupported("float not support " + op);
     }
 
 
@@ -350,7 +344,7 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
             var c = im.calc(a.value(), b.value());
             return new BoolLiteral(a.pos(), c);
         }
-        return ErrorUtil.unsupported("bool not support " + op);
+        return unsupported("bool not support " + op);
     }
 
 
@@ -358,7 +352,7 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
                         StringLiteral a,
                         StringLiteral b) {
         if (op != BinaryOperator.ADD)
-            return ErrorUtil.unsupported("string not support " + op);
+            return unsupported("string not support " + op);
 
         return new StringLiteral(a.pos(), a.value() + b.value());
     }

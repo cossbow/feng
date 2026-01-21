@@ -206,7 +206,7 @@ final class SourceParseVisitor
         if (v.type().none()) return;
         var r = v.type().must().maybeRefer();
         if (r.none()) return;
-        if (!r.must().checkType(PHANTOM)) return;
+        if (!r.must().isKind(PHANTOM)) return;
         semantic("global variable can't be phantom reference: %s", v.pos());
     }
 
@@ -336,10 +336,9 @@ final class SourceParseVisitor
             return new ArrayTypeDeclarer(pos, typeDcl,
                     len, Optional.empty());
         }
-        if (at == null) {
-            return semantic(
-                    "require array refer-symbol or length: %s", pos);
-        }
+        if (at == null) return
+                syntax("require array refer-symbol or length: %s", pos);
+
 
         var len = this.<Expression>visitOptional(at.len);
         var ref = Optional.<Refer>empty();
@@ -1417,12 +1416,13 @@ final class SourceParseVisitor
     @Override
     public Entity visitProcedure(FengParser.ProcedureContext ctx) {
         var prototype = (Prototype) visit(ctx.prototype());
-        this.labels = new HashMap<>();
+        assert labels == null;
+        labels = new HashMap<>();
         var body = (BlockStatement) visit(ctx.blockStatement());
-        var labels = Set.copyOf(this.labels.keySet());
-        this.labels = null;
+        var l = Set.copyOf(labels.keySet());
+        labels = null;
         return new Procedure(posOf(ctx), prototype,
-                body.unscope(), labels);
+                body.unscope(), l);
     }
 
 

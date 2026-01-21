@@ -99,7 +99,7 @@ public class ExportImportTest extends BaseParseTest {
         var v = ds.variables().getFirst();
         Assertions.assertEquals(name, v.name());
         var dt = ((DerivedTypeDeclarer) v.type().must())
-                .definedType().symbol();
+                .derivedType().symbol();
         Assertions.assertEquals(type, dt);
     }
 

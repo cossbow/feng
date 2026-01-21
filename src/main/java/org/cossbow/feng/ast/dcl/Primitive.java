@@ -9,28 +9,30 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public enum Primitive {
-    INT("int", Kind.INTEGER),
-    INT8("int8", Kind.INTEGER),
-    INT16("int16", Kind.INTEGER),
-    INT32("int32", Kind.INTEGER),
-    INT64("int64", Kind.INTEGER),
-    UINT("uint", Kind.INTEGER),
-    UINT8("uint8", Kind.INTEGER),
-    UINT16("uint16", Kind.INTEGER),
-    UINT32("uint32", Kind.INTEGER),
-    UINT64("uint64", Kind.INTEGER),
-    FLOAT("float", Kind.FLOAT),
-    FLOAT32("float32", Kind.FLOAT),
-    FLOAT64("float64", Kind.FLOAT),
-    BOOL("bool", Kind.BOOL),
+    INT("int", Kind.INTEGER, 64),
+    INT8("int8", Kind.INTEGER, 8),
+    INT16("int16", Kind.INTEGER, 16),
+    INT32("int32", Kind.INTEGER, 32),
+    INT64("int64", Kind.INTEGER, 64),
+    UINT("uint", Kind.INTEGER, 64),
+    UINT8("uint8", Kind.INTEGER, 8),
+    UINT16("uint16", Kind.INTEGER, 16),
+    UINT32("uint32", Kind.INTEGER, 32),
+    UINT64("uint64", Kind.INTEGER, 64),
+    FLOAT("float", Kind.FLOAT, 64),
+    FLOAT32("float32", Kind.FLOAT, 32),
+    FLOAT64("float64", Kind.FLOAT, 64),
+    BOOL("bool", Kind.BOOL, 8),
     ;
 
     public final String code;
     public final Kind kind;
+    public final int width;
 
-    Primitive(String code, Kind kind) {
+    Primitive(String code, Kind kind, int width) {
         this.code = code;
         this.kind = kind;
+        this.width = width;
     }
 
     public boolean isInteger() {
