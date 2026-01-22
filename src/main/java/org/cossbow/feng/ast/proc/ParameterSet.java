@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 public class ParameterSet {
@@ -26,6 +27,7 @@ public class ParameterSet {
     }
 
     @Override
+    final
     public boolean equals(Object o) {
         if (!(o instanceof ParameterSet ps))
             return false;
@@ -39,6 +41,12 @@ public class ParameterSet {
                 return false;
 
         return true;
+    }
+
+    @Override
+    final
+    public int hashCode() {
+        return types().hashCode();
     }
 
     //

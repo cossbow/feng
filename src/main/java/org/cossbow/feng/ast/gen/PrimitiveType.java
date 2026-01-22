@@ -24,6 +24,11 @@ public class PrimitiveType extends DefinedType {
                 && primitive == t.primitive;
     }
 
+    @Override
+    public int hashCode() {
+        return primitive.hashCode();
+    }
+
     //
 
 

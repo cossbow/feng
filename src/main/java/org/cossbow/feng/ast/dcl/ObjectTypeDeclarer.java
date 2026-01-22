@@ -26,4 +26,8 @@ public class ObjectTypeDeclarer extends TypeDeclarer {
         return entries.equals(t.entries);
     }
 
+    @Override
+    public int hashCode() {
+        return entries.hashCode();
+    }
 }

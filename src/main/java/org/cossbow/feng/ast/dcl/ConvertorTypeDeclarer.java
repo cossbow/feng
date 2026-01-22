@@ -19,7 +19,12 @@ public class ConvertorTypeDeclarer extends TypeDeclarer {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof ConvertorTypeDeclarer;
+        return o instanceof ConvertorTypeDeclarer t
+                && primitive == t.primitive;
     }
 
+    @Override
+    public int hashCode() {
+        return primitive.hashCode();
+    }
 }

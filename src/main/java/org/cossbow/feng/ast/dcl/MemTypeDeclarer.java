@@ -4,10 +4,12 @@ import org.cossbow.feng.ast.gen.MemType;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 
+import java.util.Objects;
+
 public class MemTypeDeclarer extends TypeDeclarer
         implements Referable {
-    private MemType type;
-    private Refer ref;
+    private final MemType type;
+    private final Refer ref;
 
     public MemTypeDeclarer(Position pos,
                            MemType type,
@@ -43,4 +45,16 @@ public class MemTypeDeclarer extends TypeDeclarer
                 ref.equals(t.ref);
     }
 
+    @Override
+    public int hashCode() {
+        return 31 * type.hashCode() + ref.hashCode();
+    }
+
+    //
+
+
+    @Override
+    public String toString() {
+        return ref.toString() + type;
+    }
 }

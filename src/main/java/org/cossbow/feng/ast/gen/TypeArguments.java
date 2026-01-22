@@ -40,9 +40,16 @@ public class TypeArguments extends Entity {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof TypeArguments that)) return false;
-        return Objects.equals(arguments, that.arguments);
+        return o instanceof TypeArguments t &&
+                arguments.equals(t.arguments);
     }
+
+    @Override
+    public int hashCode() {
+        return arguments.hashCode();
+    }
+
+    //
 
     @Override
     public String toString() {

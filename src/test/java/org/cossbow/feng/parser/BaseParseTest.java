@@ -140,11 +140,11 @@ public class BaseParseTest {
     );
 
     public static String operator(BinaryOperator op) {
-        return Objects.requireNonNull(operatorSymbols.get(op));
+        return op.code;
     }
 
     public static String operator(UnaryOperator op) {
-        return Objects.requireNonNull(operatorSymbols.get(op));
+        return op.code;
     }
 
     //

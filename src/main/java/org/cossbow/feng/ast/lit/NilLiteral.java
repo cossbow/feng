@@ -18,6 +18,13 @@ public class NilLiteral extends Literal {
     }
 
     @Override
+    public int hashCode() {
+        return type().hashCode();
+    }
+
+    //
+
+    @Override
     public String toString() {
         return type();
     }

@@ -32,9 +32,15 @@ public class BoolLiteral extends Literal {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof BoolLiteral t)) return false;
-        return value == t.value;
+        return o instanceof BoolLiteral t
+                && value == t.value;
     }
+
+    @Override
+    public int hashCode() {
+        return Boolean.hashCode(value);
+    }
+    //
 
     @Override
     public String toString() {

@@ -24,33 +24,16 @@ public class TypeTool {
         return new TypeDeducer(context).visit(e);
     }
 
-    public Optional<ClassDefinition> getParent(ClassDefinition cd) {
-        if (cd.inherit().none())
-            return Optional.empty();
-
-        var pt = context.findType(cd.inherit().must().symbol());
-        if (pt.none())
-            return semantic("class %s not defined", cd.inherit().must());
-
-        if (pt.must() instanceof ClassDefinition pcd)
-            return Optional.of(pcd);
-
-        return semantic("require class: %s", cd.inherit().must());
-    }
-
-    public Optional<ClassField> getField(ClassDefinition cd, Identifier name) {
-        var f = cd.fields().tryGet(name);
-        if (f.has()) return f;
-
-        var pcd = getParent(cd);
-        if (pcd.has()) return getField(pcd.must(), name);
-
-        return Optional.empty();
-    }
-
     public Optional<Groups.G2<TypeDeclarer, Field>>
     getField(PrimaryExpression subject, Identifier name) {
         var std = deduce(subject);
+
+        if (std instanceof ArrayTypeDeclarer atd) {
+            var af = atd.getField(name);
+            if (af.has()) return af.map(f -> Groups.g2(atd, f));
+            return semantic("array has no field %s: %s", name, name.pos());
+        }
+
         var mtd = std;
         if (mtd instanceof MemTypeDeclarer mem) {
             if (mem.mapped().none())
@@ -77,7 +60,7 @@ public class TypeTool {
         }
 
         if (def instanceof ClassDefinition cd) {
-            var f = getField(cd, name);
+            var f = cd.allFields().tryGet(name);
             if (f.has()) return Optional.of(Groups.g2(std, f.must()));
         }
 
@@ -105,18 +88,6 @@ public class TypeTool {
     }
 
     public Optional<? extends Entity>
-    getMethod(ClassDefinition cd, Identifier name) {
-        var f = cd.methods().tryGet(name);
-        if (f.has()) return f;
-
-        var pcd = getParent(cd);
-        if (pcd.has()) return getMethod(pcd.must(), name);
-
-        return semantic("class %s has no method %s",
-                cd.symbol(), name);
-    }
-
-    public Optional<? extends Entity>
     getMethod(InterfaceDefinition id, Identifier name) {
         var m = id.all().tryGet(name);
         if (m.has()) return m;
@@ -136,7 +107,7 @@ public class TypeTool {
         if (o.none()) return semantic("undefined type: %s", dt);
 
         if (o.must() instanceof ClassDefinition cd)
-            return getMethod(cd, name);
+            return cd.allMethods().tryGet(name);
 
         if (o.must() instanceof InterfaceDefinition id) {
             return getMethod(id, name);

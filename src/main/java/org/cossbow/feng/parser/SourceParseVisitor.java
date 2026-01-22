@@ -803,8 +803,8 @@ final class SourceParseVisitor
                         func, methodReturnThis);
                 methodReturnThis = false;
                 methods.add(mName, method);
-                var o = fields.tryGet(mName);
-                if (o.has()) duplicate(mName, o.get().name());
+//                var o = fields.tryGet(mName);
+//                if (o.has()) duplicate(mName, o.get().name());
                 enterMethodName = null;
             } else if (mi.fields != null) {
                 var dcl = parseDeclare(mi.fields.declare);
@@ -814,8 +814,8 @@ final class SourceParseVisitor
                     var field = new ClassField(fName.pos(), mModifier,
                             mExport, dcl, fName, td);
                     fields.add(fName, field);
-                    var o = methods.tryGet(fName);
-                    if (o.has()) duplicate(fName, o.get().name());
+//                    var o = methods.tryGet(fName);
+//                    if (o.has()) duplicate(fName, o.get().name());
                 }
             } else {
                 var macro = (Macro) visit(mi.macro());
@@ -1037,7 +1037,7 @@ final class SourceParseVisitor
         var bin = parseBinaryOperator(ctx.op);
         var lhs = (Expression) visit(ctx.lhs);
         var rhs = (Expression) visit(ctx.rhs);
-        return new BinaryExpression(posOf(ctx), bin, lhs, rhs);
+        return new BinaryExpression(posOf(ctx.op), bin, lhs, rhs);
     }
 
     @Override

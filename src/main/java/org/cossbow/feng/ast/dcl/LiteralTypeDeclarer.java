@@ -3,11 +3,13 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.lit.*;
 
+import java.util.Objects;
+
 /**
  * 临时，不在AST上
  */
 public class LiteralTypeDeclarer extends TypeDeclarer {
-    private Literal literal;
+    private final Literal literal;
 
     public LiteralTypeDeclarer(Position pos,
                                Literal literal) {
@@ -44,6 +46,11 @@ public class LiteralTypeDeclarer extends TypeDeclarer {
     public boolean equals(Object o) {
         if (!(o instanceof LiteralTypeDeclarer t)) return false;
         return literal.getClass().equals(t.literal.getClass());
+    }
+
+    @Override
+    public int hashCode() {
+        return literal.hashCode();
     }
 
     //

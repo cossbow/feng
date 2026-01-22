@@ -35,6 +35,12 @@ public class FloatLiteral extends Literal {
     }
 
     @Override
+    public int hashCode() {
+        return value.hashCode();
+    }
+
+    //
+    @Override
     public String toString() {
         return value.toPlainString();
     }

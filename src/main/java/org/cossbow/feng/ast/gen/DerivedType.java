@@ -31,6 +31,11 @@ public class DerivedType extends DefinedType {
                 generic.equals(t.generic);
     }
 
+    @Override
+    public int hashCode() {
+        return 31 * symbol.hashCode() + generic.hashCode();
+    }
+
     //
 
 

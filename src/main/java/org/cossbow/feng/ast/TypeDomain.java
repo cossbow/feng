@@ -13,6 +13,7 @@ public enum TypeDomain {
     INTERFACE("interface", true),
     CLASS("class", true),
     FUNC("func", false),
+    ARRAY("array", false),
     ;
 
     public final String name;

@@ -34,4 +34,24 @@ public class CurrentExpression extends PrimaryExpression {
     public String name() {
         return isSelf ? "this" : "super";
     }
+
+    //
+
+
+    @Override
+    public final boolean equals(Object o) {
+        if (!(o instanceof CurrentExpression t)) return false;
+
+        return isSelf == t.isSelf &&
+                className.equals(t.className)
+                && method.equals(t.method);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = className.hashCode();
+        result = 31 * result + method.hashCode();
+        result = 31 * result + Boolean.hashCode(isSelf);
+        return result;
+    }
 }

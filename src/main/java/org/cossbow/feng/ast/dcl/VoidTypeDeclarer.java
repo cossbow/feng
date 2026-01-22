@@ -14,4 +14,9 @@ public class VoidTypeDeclarer extends TypeDeclarer {
     public boolean equals(Object o) {
         return false;
     }
+
+    @Override
+    public int hashCode() {
+        return VoidTypeDeclarer.class.hashCode();
+    }
 }

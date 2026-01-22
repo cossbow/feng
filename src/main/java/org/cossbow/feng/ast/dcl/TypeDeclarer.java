@@ -12,6 +12,8 @@ public class TypeDeclarer extends Entity {
 
     abstract public boolean equals(Object obj);
 
+    abstract public int hashCode();
+
     public Optional<Refer> maybeRefer() {
         if (this instanceof Referable r)
             return r.refer();

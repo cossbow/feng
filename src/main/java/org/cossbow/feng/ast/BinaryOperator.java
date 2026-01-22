@@ -6,26 +6,41 @@ import java.util.Set;
 public enum BinaryOperator {
 
     // arithmetic
-    POW,
-    MUL, DIV, MOD,
-    ADD, SUB,
+    POW("^"),
+    MUL("*"), DIV("/"), MOD("%"),
+    ADD("+"), SUB("-"),
 
     // bit
-    LSHIFT, RSHIFT,
-    BITAND,
-    BITXOR,
-    BITOR,
+    LSHIFT("<<"), RSHIFT(">>"),
+    BITAND("&"),
+    BITXOR("~"),
+    BITOR("|"),
 
     // relation
-    EQ, NE,
-    GT, LT,
-    LE, GE,
+    EQ("=="), NE("!="),
+    GT(">"), LT("<"),
+    GE(">="), LE("<="),
 
     // bool
-    AND,
-    OR,
+    AND("&&"),
+    OR("||"),
 
     ;
+
+    public final String code;
+
+    BinaryOperator(String code) {
+        this.code = code;
+    }
+
+
+    //
+
+    @Override
+    public String toString() {
+        return code;
+    }
+
 
     //
 

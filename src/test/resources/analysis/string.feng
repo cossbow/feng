@@ -1,4 +1,29 @@
 
+export
+enum CharCode {
+    ASCII,
+    UTF8,
+}
+
 class String {
-    const data rom`[]uint8`;
+    const data *rom;
+    const code CharCode;
+
+    func data() *rom {
+        return data;
+    }
+
+    func char(index int) int32 {
+        if (CharCode.ASCII == code) {
+            const s &rom`[]uint8` = data;
+            return int32(s[index]);
+        }
+        const s &rom`[]uint16` = data;
+        return int32(s[index]);
+    }
+
+    func len() int {
+        return sizeof(data) << code.id;
+    }
+
 }

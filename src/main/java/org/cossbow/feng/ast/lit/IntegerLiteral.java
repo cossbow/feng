@@ -8,7 +8,7 @@ import java.math.BigInteger;
 
 public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral> {
     private final BigInteger value;
-    private final int radix;
+    private final transient int radix;
 
     public IntegerLiteral(Position pos,
                           BigInteger value,
@@ -46,6 +46,13 @@ public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral
         if (!(o instanceof IntegerLiteral f)) return false;
         return value.equals(f.value);
     }
+
+    @Override
+    public int hashCode() {
+        return value.hashCode();
+    }
+
+    //
 
     @Override
     public String toString() {

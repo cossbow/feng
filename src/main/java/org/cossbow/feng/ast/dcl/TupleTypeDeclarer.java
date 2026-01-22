@@ -28,4 +28,8 @@ public class TupleTypeDeclarer extends TypeDeclarer {
         return tuple.equals(t.tuple);
     }
 
+    @Override
+    public int hashCode() {
+        return tuple.hashCode();
+    }
 }

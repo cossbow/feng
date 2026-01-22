@@ -822,12 +822,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                     var iv = compute(at.values().get(i));
                     v.value().set(iv);
                     if (!assignable(v.type().must(), t, Optional.of(iv))) {
-                        semantic("init value not assignable : %s", v.pos());
+                        semantic("incompatible, can't init : %s", v.pos());
                         return;
                     }
                 } else {
                     if (!assignable(v.type().must(), t, Optional.empty())) {
-                        semantic("init value not assignable : %s", v.pos());
+                        semantic("incompatible, can't init : %s", v.pos());
                         return;
                     }
                 }
@@ -1003,6 +1003,13 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return false;
     }
 
+    private void enablePhantom(Optional<Expression> re) {
+        if (re.none()) return;
+        if (new PhantomChecker(context).checkEnable(re.get()))
+            return;
+        semantic("can't use phantom reference: %s", re.get().pos());
+    }
+
     private boolean
     assignable(DerivedTypeDeclarer l, DerivedTypeDeclarer r,
                Optional<Expression> re) {
@@ -1018,9 +1025,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         var lr = l.refer().get();
 
         if (lr.kind() == PHANTOM) {
-            var ok = re.match(e ->
-                    new PhantomChecker(context).checkEnable(e));
-            return ok && assignable(lt, rt);
+            enablePhantom(re);
+            return assignable(lt, rt);
         }
         if (lr.kind() == STRONG) {
             return r.refer().has() &&
@@ -1087,9 +1093,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
 
         if (r instanceof MemTypeDeclarer mr) {
+            enablePhantom(re);
             return l.readonly() || !mr.readonly();
         }
-        // TODO: check refer
 
         return false;
     }
@@ -1259,6 +1265,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(ReturnStatement e) {
+        visit(e.result());
         assert enterProc != null;
         var rs = enterProc.prototype().returnSet();
         if (rs.isEmpty()) {
@@ -1578,6 +1585,11 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         visit(e.subject());
         visit(e.index());
         var st = typeDeducer.visit(e.subject());
+        if (st instanceof MemTypeDeclarer mtd) {
+            if (mtd.mapped().none())
+                return semantic("must map type before use: %s", e.pos());
+            st = mtd.mapped().get();
+        }
         if (!(st instanceof ArrayTypeDeclarer))
             return semantic("only use for array: %s", e.pos());
 

@@ -154,8 +154,8 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         td = derivedTypeBinOp(l, r, e);
         if (td.has()) return td.get();
 
-        return semantic("illegal operation: %s %s %s",
-                l, e.operator(), r);
+        return semantic("unsupported operate (%s %s %s): %s",
+                l, e.operator(), r, e.pos());
     }
 
     @Override
@@ -169,8 +169,8 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                 if (isNumber(t)) return t;
             }
         }
-        return semantic("illegal operation: %s %s",
-                e.operator(), t);
+        return semantic("unsupported operate (%s %s): %s",
+                e.operator(), t, e.pos());
     }
 
     @Override
@@ -244,6 +244,11 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
     @Override
     public TypeDeclarer visit(IndexOfExpression e) {
         var td = visit(e.subject());
+        if (td instanceof MemTypeDeclarer mtd) {
+            if (mtd.mapped().none())
+                return semantic("must map type before use: %s", e.pos());
+            td=mtd.mapped().get();
+        }
         if (td instanceof ArrayTypeDeclarer atd) {
             return atd.element();
         }

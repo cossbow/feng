@@ -693,16 +693,25 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testNewExpression3() {
-        var d = "class C{const s int;} ";
-        checkSucc(d + "func f(){var b=new([2][*]int);}");
-        checkSucc(d + "func f(){var b=new([2][*]int, [nil]);}");
-        checkFail(d + "func f(){var b=new([2][*]int, [1]);}");
+        checkSucc("func f(){var b=new([2][*]int);}");
+        checkFail("func f(){var b=new([2][&]int);}");
+        checkSucc("func f(){var b=new([2][*]int, [nil]);}");
+        checkFail("func f(){var b=new([2][*]int, [1]);}");
+        checkSucc("func f(a [*][*]int){var b=new([2][*]int, a);}");
+        checkSucc("func f(a [*][3]int){var b=new([2][3]int, a);}");
+        checkSucc("func f(a [*]int){var b=new([2]int, a);}");
+        checkSucc("func f(a [2]int){var b=new([2]int, a);}");
+    }
 
+    @Test
+    public void testNewExpression4() {
+        var d = "class C{const s int;} ";
         checkSucc(d + "func f(){var b=new([2]C,[{s=1}]);}");
         checkSucc(d + "func f(a C){var b=new([2]C,[a]);}");
         checkFail(d + "func f(a *C){var b=new([2]C,[a]);}");
         checkSucc(d + "func f(a *C){var b=new([2]*C,[a]);}");
         checkFail(d + "func f(a &C){var b=new([2]C,[a]);}");
+        checkFail(d + "func f(){var b=new([2]&C);}");
     }
 
     //
@@ -1023,6 +1032,20 @@ public class SemanticAnalysisTest {
         checkFail(d + "func f(b B) { const a &A = b.ar[0]; }");
         checkFail(d + "func f(b *B) { const a &A = b.sz[0]; }");
         checkFail(d + "func f(b B) { const a &A = b.sz[0]; }");
+    }
+
+    @Test
+    public void testPhantomRefer10() {
+        var d = "class T{} ";
+        checkSucc(d + "class A{const v *T; func m(){ const r &T = v; } }");
+        checkFail(d + "class A{var v *T; func m(){ const r &T = v; } }");
+        checkSucc(d + "class A{const v *T; func m(){ const r &T = this.v; } }");
+        checkFail(d + "class A{var v *T; func m(){ const r &T = this.v; } }");
+
+        checkSucc("class A{const v *rom; func m(){ const r &rom = v; } }");
+        checkFail("class A{var v *rom; func m(){ const r &rom = v; } }");
+        checkSucc("class A{const v *rom; func m(){ const r &rom = this.v; } }");
+        checkFail("class A{var v *rom; func m(){ const r &rom = this.v; } }");
     }
 
     //
@@ -1546,10 +1569,13 @@ public class SemanticAnalysisTest {
         return SampleParseTest.class.getResourceAsStream("/analysis/" + name + ".feng");
     }
 
-    static Source parseSample(String name) {
+    static void parseSample(String name) {
+        System.out.printf("[test]%s.feng\n", name);
         try (var is = getSample(name)) {
             Assertions.assertNotNull(is);
-            return BaseParseTest.doParseFile(is);
+            var src = BaseParseTest.doParseFile(is);
+            var ctx = new GlobalSymbolContext(src.table());
+            new SemanticAnalysis(ctx).visit(src);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -1557,9 +1583,9 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testSample() {
-        var src = parseSample("list");
-        var ctx = new GlobalSymbolContext(src.table());
-        new SemanticAnalysis(ctx).visit(src);
+        parseSample("string");
+//        parseSample("list");
+//        parseSample("hashmap");
     }
 
 }

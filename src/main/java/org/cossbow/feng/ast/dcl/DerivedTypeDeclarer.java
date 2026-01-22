@@ -1,9 +1,9 @@
 package org.cossbow.feng.ast.dcl;
 
+import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.util.Optional;
-import org.cossbow.feng.ast.Position;
 
 public class DerivedTypeDeclarer extends TypeDeclarer
         implements Referable {
@@ -49,6 +49,14 @@ public class DerivedTypeDeclarer extends TypeDeclarer
         return derivedType.equals(t.derivedType)
                 && refer.equals(t.refer);
     }
+
+    @Override
+    public int hashCode() {
+        int result = derivedType.hashCode();
+        result = 31 * result + refer.hashCode();
+        return result;
+    }
+    //
 
     @Override
     public String toString() {

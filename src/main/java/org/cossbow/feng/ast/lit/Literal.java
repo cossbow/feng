@@ -21,4 +21,7 @@ public class Literal extends Entity {
     abstract
     public boolean equals(Object o);
 
+    abstract
+    public int hashCode();
+
 }

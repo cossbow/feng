@@ -26,18 +26,6 @@ public class PhantomChecker {
 
     //
 
-    public boolean checkEnable(Tuple t, int i) {
-        if (t instanceof ArrayTuple at)
-            return checkEnable(at, i);
-        return false;
-    }
-
-    public boolean checkEnable(ArrayTuple t, int i) {
-        return checkEnable(t.values().get(i));
-    }
-
-    //
-
     public boolean checkEnable(Expression e) {
         if (e instanceof PrimaryExpression pe)
             return checkEnable(pe);
@@ -92,7 +80,6 @@ public class PhantomChecker {
         if (g2.none())
             return semantic("field not defined: %s", e.member().pos());
 
-        var t = g2.get().a();
         var f = g2.get().b();
         var able = f.type().maybeRefer().has() == f.immutable();
         return checkEnable(e.subject()) == able;

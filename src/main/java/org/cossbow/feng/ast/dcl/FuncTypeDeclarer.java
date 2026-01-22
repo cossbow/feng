@@ -8,8 +8,8 @@ import org.cossbow.feng.ast.proc.Prototype;
  * 临时及(AST)都有
  */
 public class FuncTypeDeclarer extends TypeDeclarer {
-    private Prototype prototype;
-    private TypeArguments generic;
+    private final Prototype prototype;
+    private final TypeArguments generic;
 
     public FuncTypeDeclarer(Position pos,
                             Prototype prototype,
@@ -34,5 +34,12 @@ public class FuncTypeDeclarer extends TypeDeclarer {
 
         return prototype.equals(t.prototype)
                 || generic.equals(t.generic);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = prototype.hashCode();
+        result = 31 * result + generic.hashCode();
+        return result;
     }
 }

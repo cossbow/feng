@@ -5,6 +5,8 @@ import org.cossbow.feng.ast.dcl.MemDefinition;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.util.Optional;
 
+import java.util.Objects;
+
 public class MemType extends DefinedType {
     private final boolean readonly;
     private final Optional<TypeDeclarer> mapped;
@@ -31,6 +33,12 @@ public class MemType extends DefinedType {
             return false;
         return readonly == t.readonly &&
                 mapped.equals(t.mapped);
+    }
+
+    @Override
+    public int hashCode() {
+        return 31 * Boolean.hashCode(readonly)
+                + mapped.hashCode();
     }
 
     //

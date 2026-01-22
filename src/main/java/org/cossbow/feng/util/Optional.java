@@ -81,13 +81,13 @@ public class Optional<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(value);
+        return value != null ? value.hashCode() : 0;
     }
 
     @Override
     public String toString() {
-        if (value == null) return "<>";
-        return "<" + value + ">";
+        if (value == null) return "";
+        return value.toString();
     }
 
     //

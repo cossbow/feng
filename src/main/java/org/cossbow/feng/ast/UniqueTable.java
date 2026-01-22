@@ -129,6 +129,11 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
         return nodes.equals(t.nodes);
     }
 
+    @Override
+    public int hashCode() {
+        return nodes.hashCode();
+    }
+
     //
 
     public record Node<K, V>(K key, V value) {

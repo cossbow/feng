@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 import java.util.List;
+import java.util.Objects;
 
 public class Prototype extends Entity {
     private ParameterSet parameterSet;
@@ -33,7 +34,13 @@ public class Prototype extends Entity {
                 returnSet.equals(p.returnSet);
     }
 
-    //
+    @Override
+    public int hashCode() {
+        int result = parameterSet.hashCode();
+        result = 31 * result + returnSet.hashCode();
+        return result;
+    }
+//
 
 
     @Override

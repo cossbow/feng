@@ -17,11 +17,17 @@ public class PrimitiveTypeDeclarer extends TypeDeclarer {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof PrimitiveTypeDeclarer t))
-            return false;
+        return o instanceof PrimitiveTypeDeclarer t
+                && primitive == t.primitive;
 
-        return primitive == t.primitive;
     }
+
+    @Override
+    public int hashCode() {
+        return primitive.hashCode();
+    }
+
+    //
 
     @Override
     public String toString() {

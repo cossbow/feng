@@ -23,4 +23,8 @@ public class DefinedType extends Entity {
     abstract
     public boolean equals(Object o);
 
+    @Override
+    abstract
+    public int hashCode();
+
 }
