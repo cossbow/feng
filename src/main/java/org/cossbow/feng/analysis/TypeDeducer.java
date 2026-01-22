@@ -6,6 +6,7 @@ import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.lit.*;
+import org.cossbow.feng.ast.mod.Global;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.EnumDefinition;
 import org.cossbow.feng.ast.proc.Prototype;
@@ -204,6 +205,11 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         return e.type();
     }
 
+    @Override
+    public TypeDeclarer visit(SizeofExpression e) {
+        return Primitive.INT.declarer(e.pos());
+    }
+
     public TypeDeclarer getCallable(PrimaryExpression e) {
         var td = visit(e);
         if (td instanceof FuncTypeDeclarer ftd)
@@ -247,7 +253,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (td instanceof MemTypeDeclarer mtd) {
             if (mtd.mapped().none())
                 return semantic("must map type before use: %s", e.pos());
-            td=mtd.mapped().get();
+            td = mtd.mapped().get();
         }
         if (td instanceof ArrayTypeDeclarer atd) {
             return atd.element();
@@ -396,12 +402,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (t.none())
             return semantic("undefined symbol '%s': %s", s, s.pos());
 
-        if (t.get() instanceof PrimitiveDefinition pd)
-            return pd.primitive().declarer(e.pos());
-
-        return new DerivedTypeDeclarer(e.pos(), new DerivedType(
-                e.pos(), t.get().symbol(), TypeArguments.EMPTY),
-                Optional.empty(), t);
+        return new DefinitionTypeDeclarer(e.pos(), t.get());
     }
 
     //

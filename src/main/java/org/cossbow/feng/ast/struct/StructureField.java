@@ -22,4 +22,13 @@ public class StructureField extends Field {
         return bitfield;
     }
 
+    private volatile int bitfieldValue;
+
+    public int bitfieldValue() {
+        return bitfieldValue;
+    }
+
+    public void bitfieldValue(int bitfieldValue) {
+        this.bitfieldValue = bitfieldValue;
+    }
 }

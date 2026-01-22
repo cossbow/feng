@@ -1,7 +1,6 @@
 package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.BinaryOperator;
-import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.ast.TypeDomain;
 import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.err.SemanticException;
@@ -641,6 +640,16 @@ public class SemanticAnalysisTest {
     }
 
     @Test
+    public void testSizeofExpression1() {
+        var d = "struct A{} class B{}";
+        checkSucc(d + "func f(){ var s = sizeof(A); }");
+        checkSucc(d + "func f(){ var s = sizeof(*B); }");
+        checkSucc(d + "func f(){ var s = sizeof(&B); }");
+        checkSucc(d + "func f(){ var s = sizeof([4]int); }");
+        checkSucc(d + "func f(){ var s = sizeof([*]int); }");
+    }
+
+    @Test
     public void testIndexExpression1() {
         checkSucc("func f(a [*]int){var v=a[0];}");
         checkFail("func f(a [*]int){var v=a[true];}");
@@ -1149,6 +1158,17 @@ public class SemanticAnalysisTest {
     }
 
     @Test
+    public void testArray12() {
+        var d = "const s1=s2*s3-s4; const s4=s2+s3; const s3=s2-1; const s2=5; ";
+        checkSucc(d + "func f(a [s1]int){ var b [11]int = a; }");
+        checkFail(d + "func f(a [s1]int){ var b [s3]int = a; }");
+        checkFail(d + "func f(a [s1]int){ var b [s2]int = a; }");
+        checkSucc(d+"func f(){var a=new([s1]int);}");
+        checkSucc(d+"func f(){var a=new(ram`[s1]int`);}");
+        checkSucc(d+"func f(a *ram){var b *ram`[s1]int` = a;}");
+    }
+
+    @Test
     public void testDeclareMultiArray1() {
         checkSucc("func t() { var a [2][4]int = []; }");
         checkSucc("func t() { var a [2][4]int = [[]]; }");
@@ -1208,6 +1228,8 @@ public class SemanticAnalysisTest {
     @Test
     public void testGlobalVar3() {
         checkSucc("const a = 1; var b = a;");
+        checkSucc("var b = a; const a = 1;");
+        checkSucc("var x = c*b; const c = a+b; const a,b = 1,2;");
         checkFail("var a = 1; var b = a;");
         checkFail("var a = b; var b = 1;");
     }
@@ -1269,6 +1291,13 @@ public class SemanticAnalysisTest {
     public void testMemMap5() {
         checkSucc("func f(){ const s = 10; var r = new(ram`[s]int`); }");
         checkFail("func f(s int){ var r = new(ram`[s]int`); }");
+    }
+
+    @Test
+    public void testMemMap6() {
+        checkSucc("func f(r *ram){ var s = r.length; }");
+        checkSucc("func f(r *ram){ var s int = r.length; }");
+        checkFail("func f(r *ram){ var s = r.len; }");
     }
 
     @Test
@@ -1451,12 +1480,21 @@ public class SemanticAnalysisTest {
     @Test
     public void testEnum2() {
         checkSucc("enum S{A,B,} func f() { var s S; s=S.A; }");
+        checkFail("enum S{A,B,} func f() { var s int; s=S.A; }");
+        checkFail("enum S{A,B,} func f() { var s S; s=S.C; }");
     }
 
     @Test
     public void testEnum3() {
-        checkFail("enum S{A,B,} func f() { var s int; s=S.A; }");
-        checkFail("enum S{A,B,} func f() { var s S; s=S.C; }");
+        var d = "enum S{A,B=4,C,}";
+
+        checkSucc(d + "func f(s S) { var v = S.B.id; }");
+        checkSucc(d + "func f(s S) { var v = S.B.name; }");
+        checkSucc(d + "func f(s S) { var v = S.B.value; }");
+
+        checkSucc(d + "func f(s S) { var v = s.id; }");
+        checkSucc(d + "func f(s S) { var v = s.name; }");
+        checkSucc(d + "func f(s S) { var v = s.value; }");
     }
 
     // statement
@@ -1584,8 +1622,8 @@ public class SemanticAnalysisTest {
     @Test
     public void testSample() {
         parseSample("string");
-//        parseSample("list");
-//        parseSample("hashmap");
+        parseSample("list");
+        parseSample("hashmap");
     }
 
 }

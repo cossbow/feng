@@ -9,6 +9,8 @@ import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
+import java.util.List;
+
 public class ClassDefinition extends ObjectDefinition
         implements HaveFields<ClassField> {
     private Optional<DerivedType> inherit;
@@ -82,6 +84,14 @@ public class ClassDefinition extends ObjectDefinition
     }
 
     //
+
+    private final Lazy<List<ClassDefinition>> initDeps = Lazy.nil();
+
+    public Lazy<List<ClassDefinition>> initDeps() {
+        return initDeps;
+    }
+
+    // static
 
     public static final Identifier ObjectName = new Identifier(
             Position.ZERO, "Object");

@@ -5,8 +5,6 @@ import org.cossbow.feng.ast.dcl.MemDefinition;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.util.Optional;
 
-import java.util.Objects;
-
 public class MemType extends DefinedType {
     private final boolean readonly;
     private final Optional<TypeDeclarer> mapped;

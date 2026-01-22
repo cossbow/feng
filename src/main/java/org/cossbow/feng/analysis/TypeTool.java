@@ -4,6 +4,9 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
+import org.cossbow.feng.ast.gen.DerivedType;
+import org.cossbow.feng.ast.gen.TypeArguments;
+import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.util.Groups;
@@ -36,8 +39,10 @@ public class TypeTool {
 
         var mtd = std;
         if (mtd instanceof MemTypeDeclarer mem) {
-            if (mem.mapped().none())
-                return Optional.empty();
+            if (mem.mapped().none()) {
+                var md = MemDefinition.get(mem.readonly());
+                return md.getField(name).map(f -> Groups.g2(std, f));
+            }
             mtd = mem.mapped().get();
         }
         if (!(mtd instanceof DerivedTypeDeclarer dtd))
@@ -51,48 +56,31 @@ public class TypeTool {
                 "undefined type: %s", dt.symbol());
         var def = o.get();
 
-        if (def instanceof StructureDefinition sd) {
-            var sf = sd.fields().tryGet(name);
-            if (sf.has())
-                return Optional.of(Groups.g2(std, sf.get()));
-            return semantic("%s %s has no field %s",
-                    sd.domain(), def.symbol(), name);
-        }
-
-        if (def instanceof ClassDefinition cd) {
-            var f = cd.allFields().tryGet(name);
-            if (f.has()) return Optional.of(Groups.g2(std, f.must()));
-        }
-
-        return Optional.empty();
+        Optional<? extends Field> of = switch (def) {
+            case StructureDefinition sd -> sd.fields().tryGet(name);
+            case ClassDefinition cd -> cd.allFields().tryGet(name);
+            case EnumDefinition ed -> ed.getField(name);
+            case null, default -> Optional.empty();
+        };
+        return of.map(f -> Groups.g2(std, f));
     }
 
     public Optional<Groups.G2<DerivedTypeDeclarer, EnumDefinition.Value>>
     getEnum(PrimaryExpression subject, Identifier value) {
         var std = deduce(subject);
-        if (!(std instanceof DerivedTypeDeclarer dtd))
+        if (!(std instanceof DefinitionTypeDeclarer dtd))
             return Optional.empty();
 
-        var o = context.findType(dtd.derivedType().symbol());
-        if (o.none()) return semantic(
-                "undefined type: %s", subject.pos());
+        if (!(dtd.definition() instanceof EnumDefinition ed))
+            return Optional.empty();
 
-        if (o.must() instanceof EnumDefinition ed) {
-            var v = ed.values().tryGet(value);
-            if (v.has()) return Optional.of(Groups.g2(dtd, v.must()));
-            return semantic("enum value not defined: %s",
-                    value.pos());
-        }
+        var vo = ed.values().tryGet(value);
+        if (vo.none()) return Optional.empty();
 
-        return Optional.empty();
-    }
-
-    public Optional<? extends Entity>
-    getMethod(InterfaceDefinition id, Identifier name) {
-        var m = id.all().tryGet(name);
-        if (m.has()) return m;
-        return semantic("interface %s has no method: %s",
-                id.symbol(), name);
+        var v = vo.get();
+        return Optional.of(Groups.g2(new DerivedTypeDeclarer(value.pos(),
+                new DerivedType(std.pos(), ed.symbol(), TypeArguments.EMPTY),
+                Optional.empty()), v));
     }
 
     public Optional<? extends Entity> getMethod(
@@ -106,15 +94,11 @@ public class TypeTool {
         var o = context.findType(dt);
         if (o.none()) return semantic("undefined type: %s", dt);
 
-        if (o.must() instanceof ClassDefinition cd)
-            return cd.allMethods().tryGet(name);
-
-        if (o.must() instanceof InterfaceDefinition id) {
-            return getMethod(id, name);
-        }
-
-        return semantic("require class: %s", dt);
-
+        return switch (o.must()) {
+            case ClassDefinition cd -> cd.allMethods().tryGet(name);
+            case InterfaceDefinition id -> id.all().tryGet(name);
+            default -> Optional.empty();
+        };
     }
 
     public Optional<ObjectDefinition> getObject(TypeDeclarer td) {

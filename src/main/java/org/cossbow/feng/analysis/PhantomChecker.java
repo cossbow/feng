@@ -36,6 +36,7 @@ public class PhantomChecker {
     public boolean checkEnable(PrimaryExpression e) {
         return switch (e) {
             case AssertExpression ee -> checkEnable(ee);
+            case SizeofExpression ee -> checkEnable(ee);
             case CallExpression ee -> checkEnable(ee);
             case CurrentExpression ee -> checkEnable(ee);
             case IndexOfExpression ee -> checkEnable(ee);
@@ -50,7 +51,10 @@ public class PhantomChecker {
     }
 
     public boolean checkEnable(AssertExpression e) {
-        return unsupported("assert");
+        return false;
+    }
+    public boolean checkEnable(SizeofExpression e) {
+        return false;
     }
 
     public boolean checkEnable(CallExpression e) {

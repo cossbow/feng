@@ -6,24 +6,28 @@ enum CharCode {
 }
 
 class String {
-    const data *rom;
+    const value *rom;
     const code CharCode;
 
-    func data() *rom {
-        return data;
+    func value() *rom {
+        return value;
     }
 
     func char(index int) int32 {
         if (CharCode.ASCII == code) {
-            const s &rom`[]uint8` = data;
+            const s &rom`[]uint8` = value;
             return int32(s[index]);
         }
-        const s &rom`[]uint16` = data;
+        const s &rom`[]uint16` = value;
         return int32(s[index]);
     }
 
     func len() int {
-        return sizeof(data) << code.id;
+        return value.length << code.id;
+    }
+
+    func isEmpty() bool {
+        return value.length == 0;
     }
 
 }

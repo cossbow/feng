@@ -656,8 +656,9 @@ final class SourceParseVisitor
         var modifier = parseModifier(ctx.modifier());
         var symbol = defineSymbol(ctx.name);
         var values = new IdentifierTable<EnumDefinition.Value>();
+        var id = 0;
         for (var vc : ctx.enumValue()) {
-            var v = new EnumDefinition.Value(posOf(vc),
+            var v = new EnumDefinition.Value(posOf(vc), id++,
                     identifier(vc.name), visitOptional(vc.value));
             values.add(v.name(), v);
         }
@@ -904,6 +905,12 @@ final class SourceParseVisitor
         var subject = (PrimaryExpression) visit(ctx.primaryExpr());
         var type = (TypeDeclarer) visit(ctx.assert_().typeDeclarer());
         return new AssertExpression(posOf(ctx), subject, type);
+    }
+
+    @Override
+    public Entity visitSizeofExpression(FengParser.SizeofExpressionContext ctx) {
+        var td = (TypeDeclarer) visit(ctx.sizeof().typeDeclarer());
+        return new SizeofExpression(posOf(ctx), td);
     }
 
     @Override

@@ -6,6 +6,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.util.Optional;
 
+import java.math.BigInteger;
 import java.util.Map;
 
 public class ArrayTypeDeclarer extends TypeDeclarer
@@ -48,6 +49,18 @@ public class ArrayTypeDeclarer extends TypeDeclarer
 
     public boolean literal() {
         return literal;
+    }
+
+    //
+
+    private volatile BigInteger lenValue;
+
+    public BigInteger lenValue() {
+        return lenValue;
+    }
+
+    public void lenValue(BigInteger lv) {
+        this.lenValue = lv;
     }
 
     //
@@ -96,7 +109,6 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         int result = element.hashCode();
         result = 31 * result + length.hashCode();
         result = 31 * result + refer.hashCode();
-        result = 31 * result + Boolean.hashCode(literal);
         return result;
     }
 

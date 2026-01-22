@@ -1,5 +1,6 @@
 package org.cossbow.feng.analysis;
 
+import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.FuncTypeDeclarer;
 import org.cossbow.feng.ast.dcl.Referable;
@@ -85,5 +86,9 @@ public class ConstChecker implements EntityVisitor<Boolean> {
         return visit(e.child());
     }
 
+    @Override
+    public Boolean visit(SizeofExpression e) {
+        return true;
+    }
 
 }

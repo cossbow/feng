@@ -17,7 +17,7 @@ public class CppGeneratorTest {
         var sb = new StringBuilder("/* -------------------- */\n");
         var ctx = new GlobalSymbolContext(src.table());
         new SemanticAnalysis(ctx).visit(src);
-        new CppGenerator(ctx, sb).visit(src);
+        new CppGenerator(src.table(), ctx, sb).visit(src);
         System.out.println(sb);
     }
 

@@ -70,6 +70,11 @@ public class ConstExprComputer implements EntityVisitor<Expression> {
     }
 
     @Override
+    public Expression visit(SizeofExpression e) {
+        return e;
+    }
+
+    @Override
     public Expression visit(CallExpression e) {
         var callee = visit(e.callee());
         if (callee instanceof PrimaryExpression pe)

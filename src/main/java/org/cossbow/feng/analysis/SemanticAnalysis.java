@@ -148,9 +148,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return deps;
     }
 
-    private void visitGlobalVariable(
+    private Optional<DAGGraph<GlobalVariable>> visitGlobalVariable(
             IdentifierTable<GlobalVariable> global) {
-        if (global.isEmpty()) return;
+        if (global.isEmpty()) return Optional.empty();
         var edges = new ArrayList<Groups.G2<GlobalVariable, GlobalVariable>>();
         for (var gv : global) {
             if (gv.value().none()) continue;
@@ -159,20 +159,18 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             });
             if (cyc.has()) semantic("cyclic init: %s", cyc.get().symbol());
             var deps = searchDependencies(global, gv.value().must());
-            for (var dep : deps)
-                edges.add(Groups.g2(dep, gv));
+            for (var dep : deps) edges.add(Groups.g2(dep, gv));
         }
         var dag = new DAGGraph<>(global.values(), edges);
-        new DAGTask<GlobalVariable, Boolean>(dag, (gv, args) -> {
-            visit(gv);
-            return CompletableFuture.completedFuture(true);
-        }).results();
+        dag.bfs(this::visit);
+        return Optional.of(dag);
     }
 
     public Entity visit(Source s) {
         var tab = s.table();
 
-        visitGlobalVariable(tab.variables);
+        var dagVars = visitGlobalVariable(tab.variables);
+        if ((dagVars.has())) tab.dagVars.set(dagVars.get());
 
         visitEnum(tab.namedTypes);
         visitStructure(tab.namedTypes);
@@ -287,7 +285,10 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     public Entity visit(ArrayTypeDeclarer td) {
         arrayStack.push(td);
         visit(td.element());
-        td.length().use(this::visit);
+        if (td.length().has()) {
+            var i = computeConstInteger(td.length().get());
+            td.lenValue(i.value());
+        }
         if (!td.refer().none()) {
             visit(td.refer().get());
         }
@@ -372,10 +373,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return unsupported("generic");
 
         var cyc = checkCyclic(def, d -> {
-            return d.fields().stream().map(StructureField::type)
+            var deps = d.fields().stream().map(StructureField::type)
                     .map(this::structFieldType)
                     .filter(Optional::has)
                     .map(Optional::get).toList();
+            d.initDeps().set(deps);
+            return deps;
         });
         if (cyc.has()) return semantic("%s cyclic extends: %s",
                 def.symbol(), cyc.must().symbol());
@@ -413,22 +416,24 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             }
             var i = computeConstInteger(atd.length().must());
             if (i.value().compareTo(BigInteger.ZERO) < 0) {
-                semantic("can't be negative: %s", atd.length().get().pos());
+                return semantic("can't be negative: %s",
+                        atd.length().get().pos());
             }
+            atd.lenValue(i.value());
             return structFieldType(atd.element());
         }
 
         return semantic("illegal type: %s%s", td, td.pos());
     }
 
-    private void structBitfield(PrimitiveTypeDeclarer td, Expression bf) {
+    private int structBitfield(PrimitiveTypeDeclarer td, Expression bf) {
         var il = computeConstInteger(bf);
 
         var v = il.value().intValue();
         if (0 < v && v <= td.primitive().width)
-            return;
+            return v;
 
-        semantic("bitfield must in range [1,64]: %s", bf.pos());
+        return semantic("bitfield must in range [1,64]: %s", bf.pos());
     }
 
     public Entity visit(StructureField sf) {
@@ -436,7 +441,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         sf.bitfield().use(bf -> {
             if (sf.type() instanceof PrimitiveTypeDeclarer ptd) {
-                structBitfield(ptd, bf);
+                var i = structBitfield(ptd, bf);
+                sf.bitfieldValue(i);
                 return;
             }
             semantic("bitfield only for primitive: %s", bf.pos());
@@ -450,13 +456,13 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     public Entity visit(EnumDefinition def) {
         var i = 0;
         for (var v : def.values()) {
-            v.code(i++);
+            v.val(i++);
             if (v.init().none()) {
                 continue;
             }
             var il = computeConstInteger(v.init().must());
             v.init().set(new LiteralExpression(il.pos(), il));
-            v.code(il.value().intValue());
+            v.val(il.value().intValue());
         }
 
         return def;
@@ -594,8 +600,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             var inherit = d.inherit().stream().map(this::findParent);
             var fields = d.fields().stream().map(ClassField::type)
                     .map(this::getClassTypeField).flatMap(Optional::stream);
-            return Stream.concat(inherit, fields)
-                    .toList();
+            var initDeps = Stream.concat(inherit, fields).toList();
+            d.initDeps().set(initDeps);
+            return initDeps;
         });
         if (cyc.none()) return;
         semantic("cyclic init: %s",
@@ -1525,6 +1532,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 st, et, e.pos());
     }
 
+    @Override
+    public Entity visit(SizeofExpression se) {
+        visit(se.type());
+        return se;
+    }
+
     private Entity checkConvertor(
             ConvertorTypeDeclarer ctd, CallExpression e) {
         // explicit convert
@@ -1612,16 +1625,16 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (!e.generic().isEmpty()) return unsupported("generic");
         visit(e.subject());
 
-        var ev = typeTool.getEnum(e.subject(), e.member());
-        if (ev.has()) return ev.must().b();
-
         var f = typeTool.getField(e.subject(), e.member());
         if (f.has()) return f.must().b();
 
         var m = typeTool.getMethod(e.subject(), e.member());
         if (m.has()) return m.must();
 
-        return unreachable();
+        var ev = typeTool.getEnum(e.subject(), e.member());
+        if (ev.has()) return ev.must().b();
+
+        return semantic("member '%s' not defined: %s", e.member(), e.pos());
     }
 
     public Entity visit(NewArrayType e) {
@@ -1664,6 +1677,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                     semantic("array length must >0: %s", len.pos());
                     return;
                 }
+                atd.lenValue(lit.value());
             }
 
             checkMapArraySize(atd.element(), flexible, false);

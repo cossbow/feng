@@ -560,6 +560,7 @@ operandExpr
     | FUNC procedure            # LambdaExpression
     | '(' expression ')'        # ParenExpression
     | new                       # NewExpression
+    | sizeof                    # SizeofExpression
     ;
 
 referExpr
@@ -627,6 +628,10 @@ newType
 newArrayType
     : '[' len=expression immutable=HASH? ']' typeDeclarer
     ;
+sizeof
+    : SIZEOF '(' (typeDeclarer) ')'
+    ;
+
 
 
 //
@@ -732,8 +737,8 @@ FUNC            : 'func' ;
 MACRO           : 'macro' ;
 CONST           : 'const' ;
 VAR             : 'var' ;
-LET             : 'let' ;
 NEW             : 'new' ;
+SIZEOF          : 'sizeof' ;
 // Keywords: Control
 RETURN          : 'return' ;
 IF              : 'if' ;

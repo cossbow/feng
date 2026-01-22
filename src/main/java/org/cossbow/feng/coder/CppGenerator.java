@@ -1,6 +1,7 @@
 package org.cossbow.feng.coder;
 
 import org.cossbow.feng.analysis.TypeDeducer;
+import org.cossbow.feng.analysis.TypeTool;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
@@ -11,29 +12,48 @@ import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassField;
 import org.cossbow.feng.ast.oop.ClassMethod;
+import org.cossbow.feng.ast.oop.InterfaceDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.ast.proc.PrototypeDefinition;
 import org.cossbow.feng.ast.proc.UnnamedParameterSet;
 import org.cossbow.feng.ast.proc.VariableParameterSet;
 import org.cossbow.feng.ast.stmt.*;
+import org.cossbow.feng.ast.struct.StructureDefinition;
+import org.cossbow.feng.ast.struct.StructureField;
+import org.cossbow.feng.dag.DAGGraph;
+import org.cossbow.feng.dag.DAGTask;
+import org.cossbow.feng.parser.ParseSymbolTable;
+import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.visit.EntityVisitor;
 import org.cossbow.feng.visit.SymbolContext;
 
 import java.io.IOException;
+import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class CppGenerator implements EntityVisitor<CppGenerator> {
+    private final ParseSymbolTable table;
     private final SymbolContext context;
     private final Appendable out;
 
     private final TypeDeducer deducer;
+    private final TypeTool typeTool;
 
-    public CppGenerator(SymbolContext context,
+    public CppGenerator(ParseSymbolTable table,
+                        SymbolContext context,
                         Appendable out) {
+        this.table = table;
         this.context = context;
         this.out = out;
         this.deducer = new TypeDeducer(context);
+        this.typeTool = new TypeTool(context);
     }
 
 
@@ -69,33 +89,125 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
 
     // global
 
-    @Override
-    public CppGenerator visit(Source e) {
-        if (!e.imports().isEmpty()) return unsupported("import");
-        for (var def : e.types())
-            visit(def);
-        for (var def : e.functions())
-            visit(def);
-        for (var dcl : e.variables())
+    public CppGenerator visit(Source src) {
+        if (!src.imports().isEmpty()) return unsupported("import");
+
+        visitTypes(src.types());
+        if (src.table().dagVars.has())
+            visitGlobalVariables(src.table().dagVars.must());
+
+        for (var dcl : src.variables())
             visit(dcl);
+        for (var def : src.functions())
+            visit(def);
         return this;
     }
 
+    void declareType(PrototypeDefinition def) {
+    }
+
+    void declareType(StructureDefinition def) {
+    }
+
+    void declareType(EnumDefinition def) {
+    }
+
+    void declareType(InterfaceDefinition def) {
+    }
+
+    void declareType(ClassDefinition def) {
+        write("class ");
+        visit(def.symbol().name());
+        endStmt();
+    }
+
+    void declareType(TypeDefinition def) {
+        switch (def) {
+            case ClassDefinition cd -> declareType(cd);
+            case InterfaceDefinition cd -> declareType(cd);
+            case EnumDefinition cd -> declareType(cd);
+            case StructureDefinition cd -> declareType(cd);
+            case PrototypeDefinition cd -> declareType(cd);
+            case null, default -> unreachable();
+        }
+    }
+
+
+    void visitStructures(List<TypeDefinition> types) {
+        var all = new ArrayList<StructureDefinition>();
+        var edges = new ArrayList<Groups.G2<StructureDefinition, StructureDefinition>>();
+        for (var def : types) {
+            if (!(def instanceof StructureDefinition sd)) continue;
+            all.add(sd);
+            sd.initDeps().use(deps -> {
+                for (var dep : deps) edges.add(Groups.g2(dep, sd));
+            });
+        }
+        var dag = new DAGGraph<>(all, edges);
+        dag.bfs(this::visit);
+    }
+
+    void visitClasses(List<TypeDefinition> types) {
+        var all = new ArrayList<ClassDefinition>();
+        var edges = new ArrayList<Groups.G2<ClassDefinition, ClassDefinition>>();
+        for (var def : types) {
+            if (!(def instanceof ClassDefinition cd)) continue;
+            all.add(cd);
+            cd.initDeps().use(deps -> {
+                for (var dep : deps) edges.add(Groups.g2(dep, cd));
+            });
+        }
+        var dag = new DAGGraph<>(all, edges);
+        dag.bfs(this::visit);
+    }
+
+    void visitTypes(List<TypeDefinition> types) {
+        for (var t : types) declareType(t);
+        visitStructures(types);
+        visitClasses(types);
+    }
+
+    void visitGlobalVariables(DAGGraph<GlobalVariable> dag) {
+        new DAGTask<>(dag, (gv, deps) -> {
+            visit(gv);
+            return CompletableFuture.completedFuture(true);
+        });
+    }
+
+    static final String STATIC = "static";
+
+    public CppGenerator visit(GlobalVariable v) {
+        write(STATIC);
+        write(' ');
+        visit(v.type().must());
+        write(' ');
+        visit(v.name());
+        if (v.value().none()) return this;
+        write(" = ");
+        visit(v.value().must());
+        endStmt();
+        return this;
+    }
 
     // type declarer
 
-    @Override
+    static class ValueArrayKey {
+        private TypeDeclarer element;
+        private BigInteger length;
+    }
+
     public CppGenerator visit(ArrayTypeDeclarer td) {
-        write('[');
-        if (td.length().has()) {
-            unsupported("未实现定长数组");
-        }
-        write(']');
+        write("struct Array_");
         visit(td.element());
+        if (td.length().has()) {
+            write('[');
+            write(']');
+        } else {
+        }
+
         return this;
     }
 
-    @Override
     public CppGenerator visit(DerivedTypeDeclarer td) {
         visit(td.derivedType());
         if (td.refer().has()) {
@@ -137,17 +249,35 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return unreachable();
     }
 
+    //
+
+    public CppGenerator visit(StructureField sf) {
+        visit(sf.type());
+        return this;
+    }
+
+    public CppGenerator visit(StructureDefinition sd) {
+        write("struct ");
+        visit(sd.symbol().name());
+        write(" {\n");
+        for (var sf : sd.fields()) {
+            visit(sf);
+        }
+        write("};\n");
+        return this;
+    }
+
+
     // class definition
 
     private volatile ClassDefinition enterClass;
     private volatile ClassMethod enterMethod;
 
-    @Override
     public CppGenerator visit(ClassDefinition cd) {
         assert enterClass == null;
         enterClass = cd;
         write("class ");
-        visit(cd.symbol());
+        visit(cd.symbol().name());
         write(' ');
         if (cd.inherit().has() || !cd.impl().isEmpty()) {
             write(": public ");
@@ -180,7 +310,6 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(ClassMethod cm) {
         assert enterClass != null;
         assert enterMethod == null;
@@ -190,13 +319,11 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(Identifier id) {
         write(id.value());
         return this;
     }
 
-    @Override
     public CppGenerator visit(Symbol s) {
         if (s.module().has()) {
             visit(s.module().get());
@@ -207,15 +334,16 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
     }
 
 
-    @Override
     public CppGenerator visit(Variable v) {
         visit(v.type().must());
         write(' ');
         visit(v.name());
+        if (v.value().none()) return this;
+        write(" = ");
+        visit(v.value().must());
         return this;
     }
 
-    @Override
     public CppGenerator visit(DerivedType dt) {
         visit(dt.symbol());
         if (!dt.generic().isEmpty())
@@ -223,17 +351,14 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(MemType dt) {
         return this;
     }
 
-    @Override
     public CppGenerator visit(PrimitiveType dt) {
         return this;
     }
 
-    @Override
     public CppGenerator visit(ClassField cf) {
         assert enterClass != null;
         visit(cf.type());
@@ -245,7 +370,6 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
 
     private volatile FunctionDefinition enterFunc;
 
-    @Override
     public CppGenerator visit(FunctionDefinition fd) {
         assert enterFunc == null;
         enterFunc = fd;
@@ -277,7 +401,6 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(BlockStatement bs) {
         write("{\n");
         for (var s : bs.list())
@@ -291,14 +414,12 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(ReturnStatement rs) {
         write("return ");
         rs.result().use(this::visit);
         return endStmt();
     }
 
-    @Override
     public CppGenerator visit(DeclarationStatement ds) {
         if (ds.init().none()) {
             ds.variables().forEach(this::visit);
@@ -310,23 +431,19 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(AssignmentsStatement e) {
         return EntityVisitor.super.visit(e);
     }
 
-    @Override
     public CppGenerator visit(BreakStatement e) {
         return EntityVisitor.super.visit(e);
     }
 
-    @Override
     public CppGenerator visit(CallStatement e) {
         visit(e.call());
         return endStmt();
     }
 
-    @Override
     public CppGenerator visit(ConditionalForStatement s) {
         write("for(");
         s.initializer().use(this::visit);
@@ -337,24 +454,20 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return visit(s.body());
     }
 
-    @Override
     public CppGenerator visit(IterableForStatement s) {
         return unsupported("iterable for");
     }
 
-    @Override
     public CppGenerator visit(ContinueStatement s) {
         write("continue ");
         s.label().use(this::visit);
         return endStmt();
     }
 
-    @Override
     public CppGenerator visit(GotoStatement e) {
         return unsupported("goto");
     }
 
-    @Override
     public CppGenerator visit(IfStatement s) {
         if (s.init().has()) {
             write('{');
@@ -372,14 +485,12 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(LabeledStatement s) {
         visit(s.label());
         write(':');
         return visit(s.statement());
     }
 
-    @Override
     public CppGenerator visit(SwitchStatement ss) {
         if (ss.init().has()) {
             write('{');
@@ -404,31 +515,26 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(ThrowStatement e) {
         return unsupported("throw");
     }
 
-    @Override
     public CppGenerator visit(TryStatement e) {
         return unsupported("try..catch");
     }
 
     // expression
 
-    @Override
     public CppGenerator visit(ArrayTuple e) {
         writeSeq(e.values(), COMMA);
         return this;
     }
 
-    @Override
     public CppGenerator visit(ReturnTuple e) {
         visit(e.call());
         return this;
     }
 
-    @Override
     public CppGenerator visit(Expression e) {
         write('(');
         EntityVisitor.super.visit(e);
@@ -440,7 +546,6 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return unsupported("幂运算");
     }
 
-    @Override
     public CppGenerator visit(BinaryExpression e) {
         var op = e.operator();
         if (op == BinaryOperator.POW)
@@ -474,7 +579,6 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(ArrayExpression e) {
         write('{');
         writeSeq(e.elements(), COMMA);
@@ -482,12 +586,10 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(AssertExpression e) {
         return unsupported("断言未实现");
     }
 
-    @Override
     public CppGenerator visit(CallExpression e) {
         visit(e.callee());
         write('(');
@@ -496,7 +598,6 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(IndexOfExpression e) {
         visit(e.subject());
         write('[');
@@ -505,36 +606,30 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(LambdaExpression e) {
         return unsupported("尼玛函数");
     }
 
-    @Override
     public CppGenerator visit(BoolLiteral e) {
         write(e.value() ? "true" : "false");
         return this;
     }
 
-    @Override
     public CppGenerator visit(FloatLiteral e) {
         write(e.value().toPlainString());
         return this;
     }
 
-    @Override
     public CppGenerator visit(IntegerLiteral e) {
         write(e.value().toString(e.radix()));
         return this;
     }
 
-    @Override
     public CppGenerator visit(NilLiteral e) {
         write("NULL");
         return this;
     }
 
-    @Override
     public CppGenerator visit(StringLiteral e) {
         write('"');
         write(e.value());
@@ -542,19 +637,16 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(LiteralExpression e) {
         visit(e.literal());
         return this;
     }
 
-    @Override
     public CppGenerator visit(CurrentExpression e) {
         if (e.isSelf()) return write("this->");
         return unsupported("super");
     }
 
-    @Override
     public CppGenerator visit(MemberOfExpression e) {
         if (e.subject() instanceof CurrentExpression ce) {
             visit(ce);
@@ -580,12 +672,10 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(NewExpression e) {
         return unsupported("new");
     }
 
-    @Override
     public CppGenerator visit(ObjectExpression e) {
         write('{');
         e.entries().each((name, expr) -> {
@@ -596,12 +686,10 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(PairsExpression e) {
         return unsupported("pairs");
     }
 
-    @Override
     public CppGenerator visit(ParenExpression e) {
         write('(');
         visit(e.child());
@@ -609,14 +697,12 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         return this;
     }
 
-    @Override
     public CppGenerator visit(ReferExpression e) {
         if (!e.generic().isEmpty()) return unsupported("generic");
         visit(e.symbol());
         return this;
     }
 
-    @Override
     public CppGenerator visit(UnaryExpression e) {
         var op = e.operator();
         var td = deducer.visit(e.operand());

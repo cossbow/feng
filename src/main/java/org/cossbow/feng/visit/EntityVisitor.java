@@ -26,6 +26,7 @@ import org.cossbow.feng.ast.var.AssignableOperand;
 import org.cossbow.feng.ast.var.FieldAssignableOperand;
 import org.cossbow.feng.ast.var.IndexAssignableOperand;
 import org.cossbow.feng.ast.var.VariableAssignableOperand;
+import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
 import java.util.List;
@@ -33,6 +34,11 @@ import java.util.List;
 import static org.cossbow.feng.util.ErrorUtil.unreachable;
 
 public interface EntityVisitor<R> {
+
+    default <T extends Entity> Optional<R> visit(Lazy<T> e) {
+        if (e.none()) return Optional.empty();
+        return Optional.of(visit(e.must()));
+    }
 
     default <T extends Entity> Optional<R> visit(Optional<T> e) {
         if (e.none()) return Optional.empty();
@@ -206,6 +212,7 @@ public interface EntityVisitor<R> {
 		return switch (e) {
 			case ArrayExpression ee -> visit(ee);
 			case AssertExpression ee -> visit(ee);
+			case SizeofExpression ee -> visit(ee);
 			case CallExpression ee -> visit(ee);
 			case CurrentExpression ee -> visit(ee);
 			case IndexOfExpression ee -> visit(ee);
@@ -224,6 +231,8 @@ public interface EntityVisitor<R> {
 	default R visit(ArrayExpression e) { return unreachable(); }
 
 	default R visit(AssertExpression e) { return unreachable(); }
+
+	default R visit(SizeofExpression e) { return unreachable(); }
 
 	default R visit(CallExpression e) { return unreachable(); }
 
