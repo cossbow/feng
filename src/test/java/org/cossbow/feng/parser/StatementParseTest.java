@@ -11,6 +11,7 @@ import org.cossbow.feng.ast.expr.NewExpression;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.var.VariableAssignableOperand;
+import org.cossbow.feng.err.SyntaxException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -221,7 +222,7 @@ public class StatementParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testTernaryFor() {
+    public void testTernaryFor1() {
         var i = randVarName(10);
         var n = symbol(randVarName(16));
         var c = symbol(randVarName(32));
@@ -242,6 +243,17 @@ public class StatementParseTest extends BaseParseTest {
         var aop = ((AssignmentsStatement) stmt.updater().must());
         var left = ((VariableAssignableOperand) aop.operands().getFirst());
         Assertions.assertEquals(symbol(i), left.symbol());
+    }
+
+    @Test
+    public void testTernaryFor2() {
+        var code = "for(var i=0; i<10; var j=1) j+=1;";
+        try {
+            parseStmt(code);
+            Assertions.fail("there had a syntax error");
+        } catch (SyntaxException e) {
+            Assertions.assertTrue(true);
+        }
     }
 
     @Test
@@ -342,7 +354,7 @@ public class StatementParseTest extends BaseParseTest {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":{}");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(BlockStatement.class, stmt.statement());
+        Assertions.assertInstanceOf(BlockStatement.class, stmt.target());
     }
 
     @Test
@@ -350,7 +362,7 @@ public class StatementParseTest extends BaseParseTest {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":var a,b,c int;");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(DeclarationStatement.class, stmt.statement());
+        Assertions.assertInstanceOf(DeclarationStatement.class, stmt.target());
     }
 
     @Test
@@ -358,7 +370,7 @@ public class StatementParseTest extends BaseParseTest {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":a,b,c=1,2,3;");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(AssignmentsStatement.class, stmt.statement());
+        Assertions.assertInstanceOf(AssignmentsStatement.class, stmt.target());
     }
 
     @Test
@@ -366,7 +378,7 @@ public class StatementParseTest extends BaseParseTest {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":a+=3;");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(AssignmentsStatement.class, stmt.statement());
+        Assertions.assertInstanceOf(AssignmentsStatement.class, stmt.target());
     }
 
     @Test
@@ -374,7 +386,7 @@ public class StatementParseTest extends BaseParseTest {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":a();");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(CallStatement.class, stmt.statement());
+        Assertions.assertInstanceOf(CallStatement.class, stmt.target());
     }
 
     @Test
@@ -382,7 +394,7 @@ public class StatementParseTest extends BaseParseTest {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":if(a>0)acc();");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(IfStatement.class, stmt.statement());
+        Assertions.assertInstanceOf(IfStatement.class, stmt.target());
     }
 
     @Test
@@ -390,7 +402,7 @@ public class StatementParseTest extends BaseParseTest {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":switch(a){}");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(SwitchStatement.class, stmt.statement());
+        Assertions.assertInstanceOf(SwitchStatement.class, stmt.target());
     }
 
     @Test
@@ -398,7 +410,7 @@ public class StatementParseTest extends BaseParseTest {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":for(a>0)a-=1;");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(ConditionalForStatement.class, stmt.statement());
+        Assertions.assertInstanceOf(ConditionalForStatement.class, stmt.target());
     }
 
     @Test
@@ -406,7 +418,7 @@ public class StatementParseTest extends BaseParseTest {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":throw e;");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(ThrowStatement.class, stmt.statement());
+        Assertions.assertInstanceOf(ThrowStatement.class, stmt.target());
     }
 
     @Test
@@ -414,7 +426,7 @@ public class StatementParseTest extends BaseParseTest {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":try{e();}finally{}");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(TryStatement.class, stmt.statement());
+        Assertions.assertInstanceOf(TryStatement.class, stmt.target());
     }
 
 

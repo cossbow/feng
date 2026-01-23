@@ -6,11 +6,11 @@ import org.cossbow.feng.ast.TypeDefinition;
 /**
  * 临时，不在AST上
  */
-public class DefinitionTypeDeclarer extends TypeDeclarer {
+public class DefinitionDeclarer extends TypeDeclarer {
     private final TypeDefinition definition;
 
-    public DefinitionTypeDeclarer(Position pos,
-                                  TypeDefinition definition) {
+    public DefinitionDeclarer(Position pos,
+                              TypeDefinition definition) {
         super(pos);
         this.definition = definition;
     }
@@ -23,7 +23,7 @@ public class DefinitionTypeDeclarer extends TypeDeclarer {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof DefinitionTypeDeclarer t))
+        if (!(o instanceof DefinitionDeclarer t))
             return false;
         return definition.equals(t.definition);
     }

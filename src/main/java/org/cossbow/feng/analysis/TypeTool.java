@@ -6,7 +6,6 @@ import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.TypeArguments;
-import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.util.Groups;
@@ -68,7 +67,7 @@ public class TypeTool {
     public Optional<Groups.G2<DerivedTypeDeclarer, EnumDefinition.Value>>
     getEnum(PrimaryExpression subject, Identifier value) {
         var std = deduce(subject);
-        if (!(std instanceof DefinitionTypeDeclarer dtd))
+        if (!(std instanceof DefinitionDeclarer dtd))
             return Optional.empty();
 
         if (!(dtd.definition() instanceof EnumDefinition ed))

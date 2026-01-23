@@ -336,8 +336,8 @@ final class SourceParseVisitor
             return new ArrayTypeDeclarer(pos, typeDcl,
                     len, Optional.empty());
         }
-        if (at == null) return
-                syntax("require array refer-symbol or length: %s", pos);
+        if (at == null) return syntax(
+                "array require refer-symbol or length: %s", pos);
 
 
         var len = this.<Expression>visitOptional(at.len);
@@ -1256,6 +1256,9 @@ final class SourceParseVisitor
         var initializer = (Statement) visit(clause.init);
         var condition = (Expression) visit(clause.expression());
         var updater = (Statement) visit(clause.next);
+        if (updater instanceof DeclarationStatement) {
+            return syntax("can't declare variable here: %s", updater.pos());
+        }
         var body = (Statement) visit(ctx.statement());
         return new ConditionalForStatement(posOf(ctx), unscope(body),
                 Optional.of(initializer), condition,
@@ -1360,6 +1363,10 @@ final class SourceParseVisitor
                     label, label.pos(), ol.pos());
 
         var stmt = (Statement) visit(ctx.statement());
+        if (stmt instanceof LabeledStatement)
+            return semantic("can't use multi label: %s", label.pos());
+        if (stmt instanceof DeclarationStatement)
+            return semantic("can't use for declaration: %s", label.pos());
         return new LabeledStatement(posOf(ctx), label, stmt);
     }
 

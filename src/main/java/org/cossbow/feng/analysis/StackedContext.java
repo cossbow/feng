@@ -11,6 +11,8 @@ import org.cossbow.feng.visit.ClassSymbolContext;
 import org.cossbow.feng.visit.LocalSymbolContext;
 import org.cossbow.feng.visit.SymbolContext;
 
+import java.util.function.Supplier;
+
 public class StackedContext implements SymbolContext {
     private final Stack<SymbolContext> stack = new Stack<>();
 

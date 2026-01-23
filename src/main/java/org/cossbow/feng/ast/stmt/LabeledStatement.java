@@ -4,22 +4,22 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 
 public class LabeledStatement extends Statement {
-    private Identifier label;
-    private Statement statement;
+    private final Identifier label;
+    private final Statement target;
 
     public LabeledStatement(Position pos,
                             Identifier label,
-                            Statement statement) {
+                            Statement target) {
         super(pos);
         this.label = label;
-        this.statement = statement;
+        this.target = target;
     }
 
     public Identifier label() {
         return label;
     }
 
-    public Statement statement() {
-        return statement;
+    public Statement target() {
+        return target;
     }
 }

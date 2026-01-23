@@ -1,14 +1,23 @@
 package org.cossbow.feng.analysis;
 
+import org.cossbow.feng.ast.lit.BoolLiteral;
 import org.cossbow.feng.ast.stmt.*;
+import org.cossbow.feng.util.Optional;
 
-import java.util.function.Predicate;
+import java.util.List;
+
+import static org.cossbow.feng.util.ErrorUtil.semantic;
+import static org.cossbow.feng.util.ErrorUtil.unreachable;
 
 public class ReturnAnalyzer {
-    private final Predicate<Statement> checker;
 
-    public ReturnAnalyzer(Predicate<Statement> checker) {
-        this.checker = checker;
+    public ReturnAnalyzer() {
+    }
+
+    //
+
+    public boolean check(Optional<Statement> o) {
+        return o.has() && check(o.get());
     }
 
     public boolean check(Statement s) {
@@ -16,77 +25,69 @@ public class ReturnAnalyzer {
             case BlockStatement ee -> check(ee);
             case ForStatement ee -> check(ee);
             case IfStatement ee -> check(ee);
-            case LabeledStatement ee -> check(ee);
+            case LabeledStatement ee -> check(ee.target());
             case SwitchStatement ee -> check(ee);
-            case ThrowStatement ee -> check(ee);
             case TryStatement ee -> check(ee);
+            case ThrowStatement ee -> true;
             case ReturnStatement ee -> true;
             case null, default -> false;
         };
     }
 
-    private boolean isEnd(Statement s) {
-        return s instanceof ReturnStatement
-                || s instanceof ThrowStatement;
+    public boolean check(List<Statement> list) {
+        var found = false;
+        for (var s : list) {
+            if (check(s)) {
+                found = true;
+            } else if (found) {
+                semantic("unreachable statement: %s", s.pos());
+            }
+        }
+        return found;
     }
 
     public boolean check(BlockStatement bs) {
-        if (bs.isEmpty()) return false;
-
-        for (int i = bs.size() - 1; i >= 0; i--) {
-            var s = bs.get(i);
-            if (check(s)) return true;
-        }
-
-        return false;
-    }
-
-    public boolean check(CallStatement s) {
-        return false;
-    }
-
-    public boolean check(ContinueStatement s) {
-        return false;
-    }
-
-    public boolean check(DeclarationStatement s) {
-        return false;
+        return check(bs.list());
     }
 
     public boolean check(ForStatement s) {
-        return false;
+        return switch (s) {
+            case ConditionalForStatement fs -> check(fs);
+            case IterableForStatement fs -> check(fs);
+            case null, default -> unreachable();
+        };
     }
 
     public boolean check(ConditionalForStatement s) {
-        return false;
+        return s.cond().match(BoolLiteral::value);
     }
 
     public boolean check(IterableForStatement s) {
         return false;
     }
 
-    public boolean check(GotoStatement s) {
-        return false;
-    }
-
     public boolean check(IfStatement s) {
-        return false;
-    }
-
-    public boolean check(LabeledStatement s) {
-        return false;
+        return check(s.yes()) && check(s.not());
     }
 
     public boolean check(SwitchStatement s) {
-        return false;
-    }
+        var found = true;
+        for (var b : s.branches()) {
+            found = found && check(b.body());
+        }
+        if (s.defaultBranch().none()) return found;
 
-    public boolean check(ThrowStatement s) {
-        return false;
+        return found && check(s.defaultBranch().get().body());
     }
 
     public boolean check(TryStatement s) {
-        return false;
+        var found = check(s.body());
+        for (var c : s.catchClauses()) {
+            found = found && check(c.body());
+        }
+        if (found) return true;
+        if (s.finallyClause().none()) return false;
+        return check(s.finallyClause().get());
     }
 
 }

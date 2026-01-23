@@ -5,8 +5,8 @@ import org.cossbow.feng.ast.Position;
 import java.util.List;
 
 public class BlockStatement extends Statement {
-    private List<Statement> list;
-    private boolean newScope;
+    private final List<Statement> list;
+    private final boolean newScope;
 
     public BlockStatement(Position pos,
                           List<Statement> list) {

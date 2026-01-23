@@ -28,14 +28,6 @@ public class Variable extends Entity {
         this.value = value;
     }
 
-    public Variable(Position pos,
-                    Modifier modifier,
-                    Declare declare,
-                    Identifier name) {
-        this(pos, modifier, declare, name,
-                Lazy.nil(), Lazy.nil());
-    }
-
     public Modifier modifier() {
         return modifier;
     }

@@ -19,8 +19,8 @@ import org.cossbow.feng.ast.var.FieldAssignableOperand;
 import org.cossbow.feng.ast.var.IndexAssignableOperand;
 import org.cossbow.feng.ast.var.VariableAssignableOperand;
 import org.cossbow.feng.dag.DAGGraph;
-import org.cossbow.feng.dag.DAGTask;
 import org.cossbow.feng.util.Groups;
+import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.Stack;
 import org.cossbow.feng.visit.EntityVisitor;
@@ -28,7 +28,6 @@ import org.cossbow.feng.visit.SymbolContext;
 
 import java.math.BigInteger;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 import static org.cossbow.feng.ast.dcl.ReferKind.*;
@@ -54,6 +53,20 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     private Expression compute(Expression e) {
         return new ConstExprComputer(context).visit(e);
+    }
+
+    private Optional<LiteralExpression> tryComputeConst(Expression e) {
+        var res = compute(e);
+        if (res instanceof LiteralExpression le)
+            return Optional.of(le);
+        return Optional.empty();
+    }
+
+    private Optional<IntegerLiteral> tryComputeConstInteger(Expression e) {
+        var res = compute(e);
+        if (res instanceof LiteralExpression le)
+            return le.asInteger();
+        return Optional.empty();
     }
 
     private LiteralExpression computeConst(Expression e) {
@@ -287,6 +300,10 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         visit(td.element());
         if (td.length().has()) {
             var i = computeConstInteger(td.length().get());
+            if (i.value().compareTo(BigInteger.ZERO) < 0) {
+                return semantic("array length require >= 0: %s",
+                        td.length().get().pos());
+            }
             td.lenValue(i.value());
         }
         if (!td.refer().none()) {
@@ -735,26 +752,20 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         context.enterScope();
         visit(proc.prototype(), true);
         visit(proc.body());
+        checkAllPathReturn(proc);
         context.exitScope();
         enterProc = null;
         return proc;
     }
 
-    private <T> T missingReturn() {
-        return semantic("Missing return statement: %s",
+    private void checkAllPathReturn(Procedure proc) {
+        if (proc.prototype().returnSet().isEmpty()) return;
+        var analyzer = new ReturnAnalyzer();
+        if (analyzer.check(proc.body()))
+            return;
+
+        semantic("missing return statement: %s",
                 enterProc.pos());
-    }
-
-    private boolean isEndStmt(Statement s) {
-        return s instanceof ReturnStatement
-                || s instanceof ThrowStatement;
-    }
-
-    private Void checkAllPathReturn(Procedure proc) {
-        if (!proc.prototype().returnSet().isEmpty()) return null;
-        var analyzer = new ReturnAnalyzer(this::isEndStmt);
-        if (analyzer.check(proc.body())) return null;
-        return missingReturn();
     }
 
     public Entity visit(Prototype prot, boolean addVar) {
@@ -1020,9 +1031,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     private boolean
     assignable(DerivedTypeDeclarer l, DerivedTypeDeclarer r,
                Optional<Expression> re) {
-
-        assert l.derivedType().generic().isEmpty() : "generic";
-        assert r.derivedType().generic().isEmpty() : "generic";
+        visit(l.derivedType().generic());
+        visit(r.derivedType().generic());
 
         var lt = visit(l.derivedType());
         var rt = visit(r.derivedType());
@@ -1041,9 +1051,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                     && assignable(lt, rt);
         }
 
-        assert l.refer().none();
-        assert r.refer().none();
-        return l.derivedType().equals(r.derivedType());
+        return unreachable();
     }
 
     private boolean assignable(
@@ -1196,7 +1204,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(LabeledStatement e) {
-        return visit(e.statement());
+        return visit(e.target());
     }
 
     private final Stack<ForStatement> loopStack = new Stack<>();
@@ -1229,6 +1237,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         loopStack.push(e);
         context.enterScope();
         EntityVisitor.super.visit(e);
+        visit(e.body());
         context.exitScope();
         loopStack.pop();
         return e;
@@ -1242,17 +1251,80 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         semantic("condition must be bool");
     }
 
+    private Optional<BoolLiteral> tryComputeBool(Expression e) {
+        var ce = compute(e);
+        if (!(ce instanceof LiteralExpression le))
+            return Optional.empty();
+        if (le.literal() instanceof BoolLiteral bl)
+            return Optional.of(bl);
+        return unreachable();
+    }
+
     public Entity visit(ConditionalForStatement e) {
         e.initializer().use(this::visit);
         requireBool(e.condition());
-        visit(e.condition());
+        var ce = tryComputeBool(e.condition());
+        if (ce.has()) {
+            e.cond().set(ce.get());
+        } else {
+            visit(e.condition());
+        }
         e.updater().use(this::visit);
-        visit(e.body());
         return e;
     }
 
+    private Entity forIterable(IterableForStatement e, ArrayTypeDeclarer atd) {
+        var args = e.arguments();
+        if (args.size() > 2)
+            return semantic("can't over 2 receivers: %s",
+                    args.get(2).pos());
+
+        var v = args.getFirst();
+        var ev = new Variable(v.pos(), Modifier.empty(), Declare.CONST,
+                v, Lazy.of(atd.element()), Lazy.nil());
+        context.putVar(ev);
+
+        if (args.size() < 2) return e;
+
+        var i = args.getLast();
+        var iv = new Variable(i.pos(), Modifier.empty(), Declare.CONST,
+                i, Lazy.of(Primitive.INT.declarer(i.pos())), Lazy.nil());
+        context.putVar(iv);
+        return e;
+    }
+
+    private Entity forIterable(IterableForStatement e, EnumDefinition ed) {
+        if (e.arguments().size() != 1)
+            return semantic("can only be 1 receiver: %s");
+        var a = e.arguments().getFirst();
+        var t = new DerivedTypeDeclarer(a.pos(), new DerivedType(a.pos(),
+                ed.symbol(), TypeArguments.EMPTY), Optional.empty());
+        var v = new Variable(a.pos(), Modifier.empty(), Declare.CONST, a,
+                Lazy.of(t), Lazy.nil());
+        context.putVar(v);
+        return e;
+    }
+
+    private Entity forIterable(IterableForStatement e, DefinitionDeclarer dtd) {
+        if (dtd.definition() instanceof EnumDefinition ed)
+            return forIterable(e, ed);
+        return semantic("no iterable implement %s: %s",
+                dtd.definition(), e.iterable().pos());
+    }
+
     public Entity visit(IterableForStatement e) {
-        return unsupported("iterable loop");
+        visit(e.iterable());
+        var type = typeDeducer.visit(e.iterable());
+
+        if (type instanceof ArrayTypeDeclarer atd)
+            return forIterable(e, atd);
+
+        if (type instanceof DefinitionDeclarer dtd)
+            return forIterable(e, dtd);
+
+        return semantic("no iterable implement %s: %s",
+                type, e.iterable().pos());
+
     }
 
     public Entity visit(GotoStatement e) {
@@ -1277,10 +1349,10 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         var rs = enterProc.prototype().returnSet();
         if (rs.isEmpty()) {
             if (e.result().none()) return e;
-            return semantic("no return");
+            return semantic("no result types");
         }
         if (e.result().none())
-            return semantic("has return");
+            return semantic("has result types");
 
         var tp = typeDeducer.visit(e.result().get()).tuple();
         if (assignable(rs, tp, List.of())) return e;
@@ -1307,7 +1379,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             for (var c : b.constants()) {
                 if (c instanceof ReferExpression le) {
                     if (!le.generic().isEmpty()) {
-                        semantic("generic");
+                        unsupported("generic");
                         return;
                     }
                     if (le.symbol().module().none()) {
@@ -1324,13 +1396,20 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 return;
             }
         }
-        if (s.defaultBranch().has())
-            return;
 
-        for (var ev : type.values()) {
-            if (set.exists(ev.name())) continue;
-            semantic("must cover all values or add 'default': %s",
-                    s.value().pos());
+        var except = type.values().stream()
+                .map(EnumDefinition.Value::name)
+                .filter(v -> !set.exists(v))
+                .toList();
+        if (except.isEmpty()) {
+            if (s.defaultBranch().none())
+                return;
+            semantic("'default' was unreachable when all covered: %s",
+                    s.defaultBranch().get().pos());
+        } else {
+            if (s.defaultBranch().has()) return;
+            semantic("covered missing %s %s: %s", type.symbol(),
+                    except, s.value().pos());
         }
     }
 
@@ -1397,10 +1476,16 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     public Entity visit(IndexAssignableOperand io) {
         var td = typeDeducer.visit(io.subject());
+        var isRef = td.maybeRefer();
+        if (td instanceof MemTypeDeclarer mtd) {
+            if (mtd.mapped().none())
+                return semantic("must map type before use: %s", io.pos());
+            td = mtd.mapped().get();
+        }
         if (!(td instanceof ArrayTypeDeclarer atd))
             return semantic("require array: %s", io.pos());
-        if (atd.refer().has()) {
-            if (atd.refer().get().immutable())
+        if (isRef.has()) {
+            if (isRef.get().immutable())
                 return semantic("immutable array: %s", io.pos());
         } else {
             if (constChecker.visit(io.subject())) {
@@ -1432,8 +1517,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             if (s instanceof MemTypeDeclarer mtd) {
                 if (!mtd.readonly())
                     return sf.type();
-                return semantic("rom can't write: %s",
-                        e.pos());
+                return semantic("must map type before use: %s", e.pos());
             }
             assert s instanceof DerivedTypeDeclarer;
 
@@ -1594,23 +1678,78 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return unreachable();
     }
 
+    private void indexOf(
+            Expression index, DefinitionDeclarer dtd) {
+        if (!(dtd.definition() instanceof EnumDefinition ed)) {
+            semantic("only enum type can use index: %s", dtd.pos());
+            return;
+        }
+
+        var i = tryComputeConstInteger(index);
+        if (i.none()) return;
+
+        var idx = i.get();
+        if (idx.isNegative()) {
+            semantic("negative index: %s", index.pos());
+            return;
+        }
+
+        if (idx.compareTo(BigInteger.valueOf(ed.values().size())) < 0)
+            return;
+
+        semantic("index out of bounds: %s", index.pos());
+    }
+
+    private void indexOf(
+            Expression index, ArrayTypeDeclarer atd) {
+        var i = tryComputeConstInteger(index);
+        if (i.none()) return;
+
+        var idx = i.get();
+        if (idx.isNegative()) {
+            semantic("negative index: %s", index.pos());
+            return;
+        }
+
+        if (atd.length().none()) return;
+
+        var e = compute(atd.length().get());
+        if (!(e instanceof LiteralExpression le))
+            return;
+        var len = (IntegerLiteral) le.literal();
+
+        if (idx.compareTo(len) < 0) return;
+
+        semantic("index out of bounds: %s", index.pos());
+    }
+
     public Entity visit(IndexOfExpression e) {
         visit(e.subject());
         visit(e.index());
+
+        var it = typeDeducer.visit(e.index());
+        if (!typeDeducer.isInteger(it)) {
+            return semantic("index require integer: %s", e.pos());
+        }
+
         var st = typeDeducer.visit(e.subject());
+        if (st instanceof DefinitionDeclarer dtd) {
+            indexOf(e.index(), dtd);
+            return e;
+        }
+
         if (st instanceof MemTypeDeclarer mtd) {
             if (mtd.mapped().none())
                 return semantic("must map type before use: %s", e.pos());
             st = mtd.mapped().get();
         }
-        if (!(st instanceof ArrayTypeDeclarer))
-            return semantic("only use for array: %s", e.pos());
+        if (st instanceof ArrayTypeDeclarer atd) {
+            indexOf(e.index(), atd);
+            return e;
+        }
 
-        var it = typeDeducer.visit(e.index());
-        if (typeDeducer.isInteger(it)) return e;
-
-        return semantic("index require integer: %s", e.pos());
-
+        return semantic("%s not implement index: %s",
+                st, e.subject().pos());
     }
 
     public Entity visit(LambdaExpression e) {

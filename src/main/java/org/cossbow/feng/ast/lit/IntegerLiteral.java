@@ -26,15 +26,20 @@ public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral
         return radix;
     }
 
+    public int compareTo(BigInteger v) {
+        return value.compareTo(v);
+    }
+
     @Override
     public int compareTo(IntegerLiteral o) {
         return value.compareTo(o.value);
     }
 
-    @Override
-    public String type() {
-        return "integer";
+    public boolean isNegative() {
+        return value.compareTo(BigInteger.ZERO) < 0;
     }
+
+    //
 
     @Override
     public Optional<Primitive.Kind> compatible() {
@@ -50,6 +55,11 @@ public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral
     @Override
     public int hashCode() {
         return value.hashCode();
+    }
+
+    @Override
+    public String type() {
+        return "integer";
     }
 
     //

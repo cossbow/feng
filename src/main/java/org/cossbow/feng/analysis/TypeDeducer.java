@@ -6,7 +6,6 @@ import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.lit.*;
-import org.cossbow.feng.ast.mod.Global;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.EnumDefinition;
 import org.cossbow.feng.ast.proc.Prototype;
@@ -258,6 +257,13 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (td instanceof ArrayTypeDeclarer atd) {
             return atd.element();
         }
+        if (td instanceof DefinitionDeclarer dd) {
+            if (dd.definition() instanceof EnumDefinition ed) {
+                return new DerivedTypeDeclarer(e.pos(),
+                        new DerivedType(e.pos(), ed.symbol(),
+                                TypeArguments.EMPTY), Optional.empty());
+            }
+        }
         return unsupported("index required array");
     }
 
@@ -395,14 +401,14 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
         var f = context.findFunc(s);
         if (f.has())
-            return new FuncTypeDeclarer(e.pos(),
+            return new FuncTypeDeclarer(s.pos(),
                     f.get().procedure().prototype(), e.generic());
 
         var t = context.findType(s);
         if (t.none())
             return semantic("undefined symbol '%s': %s", s, s.pos());
 
-        return new DefinitionTypeDeclarer(e.pos(), t.get());
+        return new DefinitionDeclarer(s.pos(), t.get());
     }
 
     //

@@ -32,9 +32,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
 
 import static org.cossbow.feng.util.ErrorUtil.*;
 
@@ -488,7 +486,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
     public CppGenerator visit(LabeledStatement s) {
         visit(s.label());
         write(':');
-        return visit(s.statement());
+        return visit(s.target());
     }
 
     public CppGenerator visit(SwitchStatement ss) {
