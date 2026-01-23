@@ -171,6 +171,12 @@ public class SemanticAnalysisTest {
         checkFail("class A{ func m(){ var b B = this; } } class B{}");
     }
 
+    @Test
+    public void testThis4() {
+        var d = "class A{var id int; func m()this{}} ";
+//        checkSucc(d + "func f(a *A){var id = a.m().id;}");
+    }
+
     //
 
     @Test
@@ -369,6 +375,8 @@ public class SemanticAnalysisTest {
         checkFail("func F()int; func f()int8{} func m(){ var c F = f; }");
         checkSucc("func F()int; func m(f func()int){ var c F = f; }");
         checkFail("func F()int; func m(f func()int8){ var c F = f; }");
+
+        checkSucc("func F()int; func m(f F){ var c func()int = f; }");
     }
 
     @Test
@@ -825,11 +833,57 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testConstValue3() {
+    public void testConstValue2() {
         checkFail("class Dev { const id int; func f() { id = 0; } }");
         checkFail("class Dev { var id int; } func f(d Dev) { d.id = 0; }");
         checkFail("class Dev { var id int; } class Disk { var dev Dev; } func f(d Disk) { d.dev.id = 0; }");
         checkFail("class Dev { var id int; } func f(d [4]Dev) { d[0].id = 0; }");
+    }
+
+    @Test
+    public void testConstValue3() {
+        var d = "class A{var id int;} ";
+        checkSucc(d + "func f(a *A){a.id+=2;}");
+        checkFail(d + "func f(a  A){a.id+=2;}");
+    }
+
+    @Test
+    public void testConstValue4() {
+        var d = "class A{var id int;} class B{var a *A;}";
+        checkSucc(d + "func f(b *B){b.a.id+=2;}");
+        checkSucc(d + "func f(b  B){b.a.id+=2;}");
+    }
+
+    @Test
+    public void testConstValue5() {
+        var d = "class A{var id int;} class B{var a A;}";
+        checkSucc(d + "func f(b *B){b.a.id+=2;}");
+        checkFail(d + "func f(b  B){b.a.id+=2;}");
+    }
+
+    @Test
+    public void testConstValue6() {
+        var d = "struct A{id int;} class B{var a A;}";
+        checkSucc(d + "func f(b *B){b.a.id+=2;}");
+        checkFail(d + "func f(b  B){b.a.id+=2;}");
+    }
+
+    @Test
+    public void testConstValue7() {
+        var d = "struct A{id int;} class B{var a *ram`A`;}";
+        checkSucc(d + "func f(b *B){b.a.id+=2;}");
+        checkSucc(d + "func f(b  B){b.a.id+=2;}");
+    }
+
+    @Test
+    public void testConstValue8() {
+        var d = "struct A{id int;} struct B{a A;} ";
+        checkFail(d + "func f(b B){b.a.id+=2;}");
+
+        checkSucc(d + "func f(b *ram`B`){b.a.id+=2;}");
+        checkFail(d + "func f(b *rom`B`){b.a.id+=2;}");
+
+        checkSucc(d + "func f(b *ram`B`){var i int = -b.a.id;}");
     }
 
     //

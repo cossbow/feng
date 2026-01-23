@@ -8,8 +8,8 @@ import org.cossbow.feng.ast.expr.PrimaryExpression;
 import org.cossbow.feng.ast.gen.TypeArguments;
 
 public class FieldAssignableOperand extends AssignableOperand {
-    private PrimaryExpression subject;
-    private Identifier field;
+    private final PrimaryExpression subject;
+    private final Identifier field;
 
     public FieldAssignableOperand(Position pos,
                                   PrimaryExpression subject,
@@ -30,5 +30,13 @@ public class FieldAssignableOperand extends AssignableOperand {
     @Override
     public Expression rhs() {
         return new MemberOfExpression(pos(), subject, field, TypeArguments.EMPTY);
+    }
+
+    //
+
+
+    @Override
+    public String toString() {
+        return subject + "." + field;
     }
 }

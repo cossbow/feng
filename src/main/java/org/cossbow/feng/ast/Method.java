@@ -3,10 +3,17 @@ package org.cossbow.feng.ast;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.proc.Prototype;
 
-public interface Method {
+abstract
+public class Method extends Entity {
 
-    Prototype prototype();
+    public Method(Position pos) {
+        super(pos);
+    }
 
-    TypeParameters generic();
+    abstract
+    public Prototype prototype();
+
+    abstract
+    public TypeParameters generic();
 
 }

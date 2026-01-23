@@ -4,6 +4,7 @@ package org.cossbow.feng.parser;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
@@ -79,8 +80,9 @@ public class BaseParseTest {
     }
 
     public static Definition firstDef(Source src) {
-        var types = src.types();
-        if (!types.isEmpty()) return types.getFirst();
+        var type = src.types().stream()
+                .filter(t -> t != ClassDefinition.ObjectClass).findFirst();
+        if (type.isPresent()) return type.get();
         var functions = src.functions();
         if (!functions.isEmpty()) return functions.getFirst();
         return ErrorUtil.syntax("parse fail");

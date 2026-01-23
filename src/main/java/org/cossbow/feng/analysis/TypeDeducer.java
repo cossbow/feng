@@ -4,10 +4,12 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.DerivedType;
+import org.cossbow.feng.ast.gen.MemType;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.EnumDefinition;
+import org.cossbow.feng.ast.oop.InterfaceDefinition;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.ast.proc.PrototypeDefinition;
 import org.cossbow.feng.ast.stmt.*;
@@ -142,8 +144,8 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     @Override
     public TypeDeclarer visit(BinaryExpression e) {
-        var l = visit(e.left());
-        var r = visit(e.right());
+        var l = visit(e.left()).unmap();
+        var r = visit(e.right()).unmap();
 
         var td = stringLiteralBinOp(l, r, e);
         if (td.has()) return td.get();
@@ -160,7 +162,7 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     @Override
     public TypeDeclarer visit(UnaryExpression e) {
-        var t = visit(e.operand());
+        var t = visit(e.operand()).unmap();
         switch (e.operator()) {
             case INVERT -> {
                 if (isInteger(t) || isBool(t)) return t;
@@ -306,13 +308,20 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
                     sd.domain(), type.symbol(), member);
         }
 
+        if (type instanceof InterfaceDefinition id) {
+            var im = id.all().tryGet(member);
+            if (im.has()) return Groups.g2(std, im.get());
+            return semantic("%s has no field %s",
+                    type, member);
+        }
+
         if (type instanceof ClassDefinition cd) {
             var cf = cd.fields().tryGet(member);
             if (cf.has()) return Groups.g2(std, cf.get());
             var cm = cd.methods().tryGet(member);
             if (cm.has()) return Groups.g2(std, cm.get());
-            return semantic("class %s has no field %s",
-                    type.symbol(), member);
+            return semantic("%s has no field %s",
+                    type, member);
         }
 
         if (type instanceof EnumDefinition ed) {
@@ -330,19 +339,23 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
         if (!e.generic().isEmpty()) return unsupported("generic");
 
         var ev = typeTool.getEnum(e.subject(), e.member());
-        if (ev.has()) return ev.must().a();
+        if (ev.has()) return ev.get().a();
 
         var f = typeTool.getField(e.subject(), e.member());
-        if (f.has()) return f.must().b().type();
+        if (f.has()) {
+            var g = f.get();
+            var ft = g.b().type();
+            if (g.a() instanceof MemTypeDeclarer mtd) {
+                return new MemTypeDeclarer(e.pos(), new MemType(e.pos(),
+                        mtd.readonly(), Optional.of(ft)), mtd.ref());
+            }
+            return ft;
+        }
 
         var o = typeTool.getMethod(e.subject(), e.member());
-        if (!o.has()) return unreachable();
-
-        if (!(o.must() instanceof Method m)) return unreachable();
-
+        if (o.none()) return unreachable();
         return new FuncTypeDeclarer(e.member().pos(),
-                m.prototype(), e.generic());
-
+                o.get().prototype(), e.generic(), o);
     }
 
     @Override

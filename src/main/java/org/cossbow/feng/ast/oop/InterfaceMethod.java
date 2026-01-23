@@ -9,7 +9,7 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.util.Lazy;
 
-public class InterfaceMethod extends Entity implements Method {
+public class InterfaceMethod extends Method {
     private Modifier modifier;
     private Identifier name;
     private TypeParameters generic;

@@ -82,7 +82,7 @@ public class TypeTool {
                 Optional.empty()), v));
     }
 
-    public Optional<? extends Entity> getMethod(
+    public Optional<Method> getMethod(
             PrimaryExpression subject, Identifier name) {
         var std = deduce(subject);
         if (!(std instanceof DerivedTypeDeclarer dtd))
@@ -94,8 +94,10 @@ public class TypeTool {
         if (o.none()) return semantic("undefined type: %s", dt);
 
         return switch (o.must()) {
-            case ClassDefinition cd -> cd.allMethods().tryGet(name);
-            case InterfaceDefinition id -> id.all().tryGet(name);
+            case ClassDefinition cd -> cd.allMethods()
+                    .tryGet(name).map(v -> v);
+            case InterfaceDefinition id -> id.all()
+                    .tryGet(name).map(v -> v);
             default -> Optional.empty();
         };
     }
@@ -127,6 +129,15 @@ public class TypeTool {
         if (td instanceof LiteralTypeDeclarer ltd)
             return ltd.literal().compatible();
         return Optional.empty();
+    }
+
+    //
+
+    public static TypeDeclarer unmap(TypeDeclarer td) {
+        if (td instanceof MemTypeDeclarer mtd) {
+            return mtd.mapped().must();
+        }
+        return td;
     }
 
 }

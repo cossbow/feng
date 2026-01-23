@@ -360,9 +360,9 @@ public class StatementParseTest extends BaseParseTest {
     @Test
     public void testLabelDeclaration() {
         var name = randVarName(32);
-        var stmt = (LabeledStatement) parseStmt(name + ":var a,b,c int;");
+        var stmt = (LabeledStatement) parseStmt(name + ": a();");
         Assertions.assertEquals(name, stmt.label());
-        Assertions.assertInstanceOf(DeclarationStatement.class, stmt.target());
+        Assertions.assertInstanceOf(CallStatement.class, stmt.target());
     }
 
     @Test

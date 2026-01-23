@@ -1,6 +1,5 @@
 package org.cossbow.feng.analysis;
 
-import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.FuncTypeDeclarer;
 import org.cossbow.feng.ast.dcl.Referable;
@@ -13,11 +12,11 @@ import org.cossbow.feng.visit.EntityVisitor;
 import static org.cossbow.feng.util.ErrorUtil.semantic;
 import static org.cossbow.feng.util.ErrorUtil.unreachable;
 
-public class ConstChecker implements EntityVisitor<Boolean> {
+public class ConstValueChecker implements EntityVisitor<Boolean> {
     private final StackedContext context;
     private final TypeDeducer deducer;
 
-    public ConstChecker(StackedContext context) {
+    public ConstValueChecker(StackedContext context) {
         this.context = new StackedContext(context);
         this.deducer = new TypeDeducer(context);
     }
@@ -25,9 +24,11 @@ public class ConstChecker implements EntityVisitor<Boolean> {
 
     @Override
     public Boolean visit(ReferExpression e) {
-        var v = context.findVar(e.symbol());
-        if (v.none()) return semantic("%s not declared", e.symbol());
-        return v.get().declare() == Declare.CONST;
+        var o = context.findVar(e.symbol());
+        if (o.none()) return semantic("%s not declared", e.symbol());
+        var v = o.get();
+        var isValue = v.type().must().maybeRefer().none();
+        return isValue && (v.declare() == Declare.CONST);
     }
 
     @Override
@@ -63,20 +64,19 @@ public class ConstChecker implements EntityVisitor<Boolean> {
     @Override
     public Boolean visit(MemberOfExpression e) {
         var g2 = deducer.getMember(e.subject(), e.member());
-        var s = g2.a();
-        var isRef = s instanceof Referable ref && ref.refer().has();
+        var isValue = g2.a().maybeRefer().none();
         var m = g2.b();
 
         if (m instanceof ClassMethod) return true;
 
         if (m instanceof ClassField cf) {
-            if (cf.declare() == Declare.CONST)
-                return true;
-            return visit(e.subject());
+            if (cf.declare() == Declare.CONST) return true;
+            return isValue && visit(e.subject());
         }
 
-        if (m instanceof StructureField)
-            return visit(e.subject());
+        if (m instanceof StructureField) {
+            return isValue && visit(e.subject());
+        }
 
         return unreachable();
     }

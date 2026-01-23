@@ -6,7 +6,7 @@ import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.util.Lazy;
 
-public class ClassMethod extends Entity implements Method, Exportable {
+public class ClassMethod extends Method implements Exportable {
     private boolean export;
     private Identifier name;
     private FunctionDefinition func;

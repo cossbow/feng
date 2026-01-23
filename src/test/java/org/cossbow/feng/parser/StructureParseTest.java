@@ -109,7 +109,7 @@ public class StructureParseTest extends BaseParseTest {
         var bt = randTypeSymbol(12);
         var code = "struct Foo { %s struct{%s %s;}; }".formatted(a, b, bt);
         var src = doParseFile(code);
-        var foo = (StructureDefinition) src.types().getFirst();
+        var foo = (StructureDefinition) src.type(identifier("Foo"));
         Assertions.assertEquals(1, foo.fields().size());
         var f = foo.fields().get(a);
         Assertions.assertEquals(a, f.name());

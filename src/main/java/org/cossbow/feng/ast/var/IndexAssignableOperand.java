@@ -6,8 +6,8 @@ import org.cossbow.feng.ast.expr.IndexOfExpression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 
 public class IndexAssignableOperand extends AssignableOperand {
-    private PrimaryExpression subject;
-    private Expression index;
+    private final PrimaryExpression subject;
+    private final Expression index;
 
     public IndexAssignableOperand(Position pos,
                                   PrimaryExpression subject,
@@ -28,5 +28,12 @@ public class IndexAssignableOperand extends AssignableOperand {
     @Override
     public Expression rhs() {
         return new IndexOfExpression(pos(), subject, index);
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        return subject + "[" + index + "]";
     }
 }

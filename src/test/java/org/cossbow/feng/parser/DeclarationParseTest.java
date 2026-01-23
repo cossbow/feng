@@ -13,7 +13,6 @@ import static org.cossbow.feng.ast.dcl.ReferKind.*;
 public class DeclarationParseTest extends BaseParseTest {
 
     private static final Map<Declare, String> DECLARES = Map.of(
-            Declare.LET, "let",
             Declare.VAR, "var",
             Declare.CONST, "const");
 
@@ -92,7 +91,7 @@ public class DeclarationParseTest extends BaseParseTest {
             Assertions.assertTrue(ref.required());
         }
         {
-            var dcl = parseLocalDecl("var u &User");
+            var dcl = parseLocalDecl("const u &User");
             var v = dcl.variables().getFirst();
             var td = (DerivedTypeDeclarer) v.type().must();
             var ref = td.refer().get();
@@ -100,20 +99,12 @@ public class DeclarationParseTest extends BaseParseTest {
             Assertions.assertFalse(ref.required());
         }
         {
-            var dcl = parseLocalDecl("var u &!User");
+            var dcl = parseLocalDecl("const u &!User");
             var v = dcl.variables().getFirst();
             var td = (DerivedTypeDeclarer) v.type().must();
             var ref = td.refer().get();
             Assertions.assertSame(PHANTOM, ref.kind());
             Assertions.assertTrue(ref.required());
-        }
-        {
-            var dcl = parseLocalDecl("var u ~User");
-            var v = dcl.variables().getFirst();
-            var td = (DerivedTypeDeclarer) v.type().must();
-            var ref = td.refer().get();
-            Assertions.assertSame(WEAK, ref.kind());
-            Assertions.assertFalse(ref.required());
         }
     }
 
@@ -121,9 +112,9 @@ public class DeclarationParseTest extends BaseParseTest {
     @Test
     public void testLocal4() {
         var fmtList = new String[]{
-                "var i %s",
-                "var i *%s",
-                "var i &%s",
+                "const i %s",
+                "const i *%s",
+                "const i &%s",
         };
         for (var fmt : fmtList) {
             for (int i = 0; i < 10; i++) {

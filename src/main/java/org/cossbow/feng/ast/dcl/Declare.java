@@ -1,7 +1,6 @@
 package org.cossbow.feng.ast.dcl;
 
 public enum Declare {
-    LET("let"),
     VAR("var"),
     CONST("const"),
     ;

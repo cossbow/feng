@@ -39,13 +39,13 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     private final StackedContext context;
     private final TypeDeducer typeDeducer;
-    private final ConstChecker constChecker;
+    private final ConstValueChecker constChecker;
     private final TypeTool typeTool;
 
     public SemanticAnalysis(SymbolContext parent) {
         context = new StackedContext(parent);
         typeDeducer = new TypeDeducer(context);
-        constChecker = new ConstChecker(context);
+        constChecker = new ConstValueChecker(context);
         typeTool = new TypeTool(context);
     }
 
@@ -235,8 +235,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(Refer e) {
-        if (e.kind() == WEAK)
-            unsupported("weak-reference");
         if (arrayStack.isEmpty()) return e;
         if (e.kind() != PHANTOM) return e;
         semantic("array element can't be phantom-reference: %s", e.pos());
@@ -787,11 +785,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     private void visit(UnnamedParameterSet ps) {
         for (var td : ps.types()) {
             if (td instanceof DerivedTypeDeclarer dtd) {
-                var isWeak = dtd.refer().match(
-                        r -> r.isKind(WEAK));
-                if (isWeak)
-                    semantic("can't be weak-reference: %s",
-                            dtd.pos());
                 dtd.refer().use(this::visit);
             }
             visit(td);
@@ -1116,6 +1109,17 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     private boolean assignable(
+            FuncTypeDeclarer l, DerivedTypeDeclarer r,
+            Optional<Expression> re) {
+        var td = visit(r.derivedType());
+        if (td instanceof PrototypeDefinition pd) {
+            return l.prototype().equals(pd.prototype());
+        }
+
+        return false;
+    }
+
+    private boolean assignable(
             TypeDeclarer l, TypeDeclarer r, Optional<Expression> re) {
         Objects.requireNonNull(l, "left");
         Objects.requireNonNull(r, "right");
@@ -1123,6 +1127,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (l.equals(r)) return true;
 
         if (l instanceof PrimitiveTypeDeclarer pl) {
+            r = r.unmap();
             if (r instanceof PrimitiveTypeDeclarer pr)
                 return pl.primitive() == pr.primitive();
             if (r instanceof LiteralTypeDeclarer lit)
@@ -1144,10 +1149,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             }
         }
 
-        if (l instanceof FuncTypeDeclarer fl &&
-                r instanceof FuncTypeDeclarer fr) {
-            return fl.prototype().equals(fr.prototype())
-                    && fl.generic().equals(fr.generic());
+        if (l instanceof FuncTypeDeclarer fl) {
+            if (r instanceof FuncTypeDeclarer fr)
+                return fl.prototype().equals(fr.prototype())
+                        && fl.generic().equals(fr.generic());
+            if (r instanceof DerivedTypeDeclarer fr)
+                return assignable(fl, fr, re);
         }
 
         if (l instanceof DerivedTypeDeclarer dl) {
@@ -1517,9 +1524,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             if (s instanceof MemTypeDeclarer mtd) {
                 if (!mtd.readonly())
                     return sf.type();
-                return semantic("must map type before use: %s", e.pos());
+                return semantic("rom can't write: %s", e.pos());
             }
-            assert s instanceof DerivedTypeDeclarer;
 
             var im = constChecker.visit(e.subject());
             if (im) return semantic("const variable: %s", e.pos());
@@ -1527,7 +1533,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
 
         if (f instanceof ClassField cf) {
-            if (cf.declare() != Declare.VAR)
+            if (cf.declare() == Declare.CONST)
                 return semantic("const field: %s", e.field().pos());
 
             if (s.maybeRefer().has()) return cf.type();
@@ -1768,7 +1774,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (f.has()) return f.must().b();
 
         var m = typeTool.getMethod(e.subject(), e.member());
-        if (m.has()) return m.must();
+        if (m.has()) return m.get();
 
         var ev = typeTool.getEnum(e.subject(), e.member());
         if (ev.has()) return ev.must().b();

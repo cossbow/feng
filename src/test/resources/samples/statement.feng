@@ -90,27 +90,4 @@ func tryStatement(run func()) {
 
 
 
-func multiIf(a, b int) int {
-    var a = if(a<b) true, "ok" else false, "not ok";
-    a = if(a<b) true, "ok" else false, "not ok";
-    return if(a<b) true, "ok" else false, "not ok";
-}
-
-func multiSwitch(a, b int) (int,int) {
-    var a = switch(a) {
-        case 1,2: 0,0;
-        case -1: 0;
-        default: 1,2;
-    };
-    a = switch(a) {
-        case 1,2: 0,0;
-        case -1: 0;
-        default: 1,2;
-    };
-    return switch(a) {
-        case 1,2: 0,0;
-        case -1: 0;
-        default: 1,2;
-    };
-}
 

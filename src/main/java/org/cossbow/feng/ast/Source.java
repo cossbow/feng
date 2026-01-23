@@ -26,8 +26,16 @@ public class Source extends Entity {
         return table.namedTypes.values();
     }
 
+    public TypeDefinition type(Identifier name) {
+        return table.namedTypes.get(name);
+    }
+
     public List<FunctionDefinition> functions() {
         return table.namedFunctions.values();
+    }
+
+    public FunctionDefinition function(Identifier name){
+        return table.namedFunctions.get(name);
     }
 
     public List<GlobalVariable> variables() {

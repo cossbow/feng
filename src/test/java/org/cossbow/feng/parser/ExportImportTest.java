@@ -113,11 +113,6 @@ public class ExportImportTest extends BaseParseTest {
         testTypeDeclarer("*");
     }
 
-    @Test
-    public void testTypeDeclarer3() {
-        testTypeDeclarer("&");
-    }
-
     Statement parseLocal(String im, String stmt) {
         var fun = im + "func main() { %s }".formatted(stmt);
         var func = doParseProc(fun);

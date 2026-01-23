@@ -19,4 +19,11 @@ public class TypeDeclarer extends Entity {
             return r.refer();
         return Optional.empty();
     }
+
+    public TypeDeclarer unmap() {
+        if (this instanceof MemTypeDeclarer mtd) {
+            return mtd.mapped().must();
+        }
+        return this;
+    }
 }
