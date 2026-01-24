@@ -1005,7 +1005,7 @@ public class SemanticAnalysisTest {
         var def = "struct A {} union B {} var size = 2; ";
         checkFalse(def + "struct R{ a [-1]A; }");
         checkFalse(def + "struct R{ a [size]A; }");
-        // 下面是语法错误
+        //
 //        checkFalse(def + "struct R{ a *A; }");
 //        checkFalse(def + "struct R{ a &A; }");
 //        checkFalse(def + "struct R{ a []A; }");
