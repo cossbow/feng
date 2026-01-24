@@ -482,7 +482,7 @@ public class SemanticAnalysisTest {
         for (var bo : BinaryOperator.SetLogic) {
             for (var p : ofKind(Primitive.Kind.BOOL)) {
                 var s = BaseParseTest.operatorSymbols.get(bo);
-                var c = "func f(a,b %s) { var i bool; i = a %s b; }"
+                var c = "func f(a,b %s) { var i bool; i = a %s b; ;}"
                         .formatted(p, s);
                 checkTrue(c);
             }
