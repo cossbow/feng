@@ -75,7 +75,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var expr = this.<NewExpression>parseExpr(code);
         var defType = ((NewDefinedType) expr.type()).type();
         Assertions.assertEquals(typeName, defType.symbol());
-        Assertions.assertInstanceOf(ObjectExpression.class, expr.init().must());
+        Assertions.assertInstanceOf(ObjectExpression.class, expr.arg().must());
     }
 
     @Test
@@ -87,7 +87,7 @@ public class ExpressionParseTest extends BaseParseTest {
         var arr = (NewArrayType) expr.type();
         Assertions.assertEquals(typeName, typeName(arr.element()));
         Assertions.assertEquals(BigInteger.valueOf(len), integer(arr.length()).value());
-        Assertions.assertInstanceOf(ArrayExpression.class, expr.init().must());
+        Assertions.assertInstanceOf(ArrayExpression.class, expr.arg().must());
     }
 
     @Test

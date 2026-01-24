@@ -264,7 +264,7 @@ public class StatementParseTest extends BaseParseTest {
         var code = "throw new(%s);".formatted(type);
         var stmt = (ThrowStatement) parseStmt(code);
         var newExpr = (NewExpression) stmt.exception();
-        Assertions.assertTrue(newExpr.init().none());
+        Assertions.assertTrue(newExpr.arg().none());
         Assertions.assertEquals(type, ((NewDefinedType) newExpr.type()).type().symbol());
     }
 

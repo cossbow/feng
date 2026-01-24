@@ -1,0 +1,50 @@
+
+class Node {
+    var next *Node;
+    var value *Object;
+}
+
+func newNode(value *Object) *Node {
+    return new(Node,{value=value});
+}
+
+class Queue {
+    var head,tail *Node;
+
+    func push(value *Object) {
+        var n = newNode(value);
+        tail.next = n;
+        tail = n;
+        if (head == nil) {
+            head = n;
+        }
+    }
+
+    func poll() *Object {
+        var n = head;
+        if (n == nil) return nil;
+        head = n.next;
+        return n.value;
+    }
+
+    func isEmpty() bool {
+        return head == nil;
+    }
+}
+
+class Data {
+    var value int;
+}
+
+func test() {
+    var queue = new(Queue);
+    for (var i = 0; i < 100; i+=1) {
+        queue.push(new(Data, {value=i}));
+    }
+
+    var c = 0;
+    for (queue.isEmpty()) {
+        var v = queue.poll()?(*Data);
+        c += v.value;
+    }
+}

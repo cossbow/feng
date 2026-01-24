@@ -1,4 +1,0 @@
-
-class Bus {}
-
-var b = new(Bus);
