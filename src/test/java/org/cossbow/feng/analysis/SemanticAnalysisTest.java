@@ -457,7 +457,7 @@ public class SemanticAnalysisTest {
     public void testBinaryExpression2() {
         for (var bo : BinaryOperator.SetBits) {
             for (var p : ofKind(Primitive.Kind.INTEGER)) {
-                var s = BaseParseTest.operatorSymbols.get(bo);
+                var s = BaseParseTest.operatorSymbols.get(bo);;
                 var c = "func f(a,b %s) { var i %s; i = a %s b; }"
                         .formatted(p, p, s);
                 checkTrue(c);
@@ -469,7 +469,7 @@ public class SemanticAnalysisTest {
     public void testBinaryExpression3() {
         for (var bo : BinaryOperator.SetRel) {
             for (var p : ofKind(Primitive.Kind.INTEGER, Primitive.Kind.FLOAT)) {
-                var s = BaseParseTest.operatorSymbols.get(bo);
+                var s = BaseParseTest.operatorSymbols.get(bo);;;
                 var c = "func f(a,b %s) { var i bool; i = a %s b; }"
                         .formatted(p, s);
                 checkTrue(c);
@@ -481,7 +481,7 @@ public class SemanticAnalysisTest {
     public void testBinaryExpression4() {
         for (var bo : BinaryOperator.SetLogic) {
             for (var p : ofKind(Primitive.Kind.BOOL)) {
-                var s = BaseParseTest.operatorSymbols.get(bo);
+                var s = BaseParseTest.operatorSymbols.get(bo);;;;
                 var c = "func f(a,b %s) { var i bool; i = a %s b; ;}"
                         .formatted(p, s);
                 checkTrue(c);
