@@ -189,16 +189,16 @@ public class TypeDeducer implements EntityVisitor<TypeDeclarer> {
 
     @Override
     public TypeDeclarer visit(ArrayExpression e) {
-        if (e.elements().isEmpty())
-            return new VoidTypeDeclarer(e.pos());
-
-        var td = visit(e.elements().getFirst());
-        var le = new LiteralExpression(e.pos(),
-                new IntegerLiteral(e.pos(),
-                        BigInteger.valueOf(e.elements().size()),
-                        10));
-        return new ArrayTypeDeclarer(e.pos(), td,
+        var es = e.elements();
+        var td = es.isEmpty() ? new VoidTypeDeclarer(e.pos())
+                : visit(es.getFirst());
+        var len = new IntegerLiteral(e.pos(),
+                BigInteger.valueOf(es.size()), 10);
+        var le = new LiteralExpression(e.pos(), len);
+        var atd = new ArrayTypeDeclarer(e.pos(), td,
                 Optional.of(le), Optional.empty(), true);
+        atd.lenValue(len.value());
+        return atd;
     }
 
     @Override

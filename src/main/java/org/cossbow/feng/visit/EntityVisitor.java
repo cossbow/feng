@@ -58,7 +58,6 @@ public interface EntityVisitor<R> {
 			case Attribute ee -> visit(ee);
 			case AttributeField ee -> visit(ee);
 			case Modifier ee -> visit(ee);
-			case Declaration ee -> visit(ee);
 			case NewType ee -> visit(ee);
 			case Refer ee -> visit(ee);
 			case TypeDeclarer ee -> visit(ee);
@@ -140,8 +139,6 @@ public interface EntityVisitor<R> {
 	default R visit(AttributeField e) { return unreachable(); }
 
 	default R visit(Modifier e) { return unreachable(); }
-
-	default R visit(Declaration e) { return unreachable(); }
 
 	default R visit(NewType e) {
 		return switch (e) {

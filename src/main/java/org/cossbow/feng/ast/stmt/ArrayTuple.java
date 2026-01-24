@@ -22,4 +22,11 @@ public class ArrayTuple extends Tuple {
     public int size() {
         return values.size();
     }
+
+    //
+
+    @Override
+    public String toString() {
+        return "(" + values + ")";
+    }
 }

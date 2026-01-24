@@ -63,6 +63,10 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         this.lenValue = lv;
     }
 
+    public boolean isEmpty() {
+        return lenValue.equals(BigInteger.ZERO);
+    }
+
     //
 
     public Optional<ArrayField> getField(Identifier name) {

@@ -235,9 +235,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(Refer e) {
-        if (arrayStack.isEmpty()) return e;
-        if (e.kind() != PHANTOM) return e;
-        semantic("array element can't be phantom-reference: %s", e.pos());
         return e;
     }
 
@@ -273,6 +270,21 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     //
 
+    private boolean enablePhantom = false;
+
+    public Entity visit(TypeDeclarer td) {
+        if (enablePhantom) {
+            enablePhantom = false;
+        } else {
+            illegalPhantom(td);
+        }
+        return EntityVisitor.super.visit(td);
+    }
+
+    public Entity visit(VoidTypeDeclarer e) {
+        return e;
+    }
+
     public TypeDefinition visit(DerivedTypeDeclarer td) {
         var dt = visit(td.derivedType());
         var r = td.refer();
@@ -291,10 +303,15 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("can't refer %s %s", dt.domain(), dt.symbol());
     }
 
-    private final Stack<Entity> arrayStack = new Stack<>();
+    private void illegalPhantom(TypeDeclarer td) {
+        var ref = td.maybeRefer();
+        if (ref.match(r -> r.isKind(PHANTOM))) {
+            semantic("can't be phantom-reference: %s",
+                    td.pos());
+        }
+    }
 
     public Entity visit(ArrayTypeDeclarer td) {
-        arrayStack.push(td);
         visit(td.element());
         if (td.length().has()) {
             var i = computeConstInteger(td.length().get());
@@ -307,7 +324,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (!td.refer().none()) {
             visit(td.refer().get());
         }
-        arrayStack.pop();
         return td;
     }
 
@@ -452,6 +468,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(StructureField sf) {
+        illegalPhantom(sf.type());
         structFieldType(sf.type());
 
         sf.bitfield().use(bf -> {
@@ -650,14 +667,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     public Entity visit(ClassField cf) {
         assert enterClass != null;
+        illegalPhantom(cf.type());
         visit(cf.type());
-        if (cf.type() instanceof DerivedTypeDeclarer ctd) {
-            var isPhantom = ctd.refer().match(
-                    r -> r.isKind(PHANTOM));
-            if (!isPhantom) return visit(ctd);
-            return semantic("can't be phantom-reference: %s",
-                    ctd.pos());
-        }
         return cf;
     }
 
@@ -768,7 +779,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     public Entity visit(Prototype prot, boolean addVar) {
         visit(prot.parameterSet(), addVar);
-        prot.returnSet().forEach(this::visit);
+        for (var td : prot.returnSet()) {
+            visit(td);
+        }
         return prot;
     }
 
@@ -784,15 +797,14 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     private void visit(UnnamedParameterSet ps) {
         for (var td : ps.types()) {
-            if (td instanceof DerivedTypeDeclarer dtd) {
-                dtd.refer().use(this::visit);
-            }
+            enablePhantom = true;
             visit(td);
         }
     }
 
     private void visit(VariableParameterSet ps, boolean addVar) {
         for (Variable v : ps.variables()) {
+            enablePhantom = true;
             visit(v);
             if (addVar) context.putVar(v);
         }
@@ -808,6 +820,13 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return bs;
     }
 
+    private void checkVoidType(TypeDeclarer td) {
+        if (td instanceof ArrayTypeDeclarer atd)
+            td = atd.element();
+        if (td instanceof VoidTypeDeclarer)
+            semantic("can't deduce type: %s", td.pos());
+    }
+
     private void initVar(List<Variable> variables, Tuple init) {
         visit(init);
         var td = typeDeducer.visit(init);
@@ -819,20 +838,18 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         for (int i = 0; i < variables.size(); i++) {
             var v = variables.get(i);
             var t = types.get(i);
+
+            if (init instanceof ArrayTuple at)
+                v.value().set(compute(at.values().get(i)));
+
             if (v.type().none()) {
-                if (init instanceof ArrayTuple at) {
-                    v.value().set(compute(at.values().get(i)));
-                }
-                if (t instanceof VoidTypeDeclarer) {
-                    semantic("can't deduce type: %s", v.pos());
-                    return;
-                }
+                checkVoidType(t);
+                // aotu set type
                 v.type().set(t);
             } else {
+                // check type
                 if (init instanceof ArrayTuple at) {
-                    var iv = compute(at.values().get(i));
-                    v.value().set(iv);
-                    if (!assignable(v.type().must(), t, Optional.of(iv))) {
+                    if (!assignable(v.type().must(), t, v.value().get())) {
                         semantic("incompatible, can't init : %s", v.pos());
                         return;
                     }
@@ -859,6 +876,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
         for (var v : ds.variables()) {
             assert v.type().has();
+            enablePhantom = true;
             visit(v);
             context.putVar(v);
         }
@@ -907,37 +925,47 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     private boolean
-    assignable(ArrayTypeDeclarer l, ArrayTypeDeclarer r) {
-        if (l.literal())
+    assignable(ArrayTypeDeclarer l, ArrayTypeDeclarer r,
+               Optional<Expression> re) {
+        if (l.literal()) // Not: [literal] = ??
             return semantic("literal can't assign: %s", l.pos());
 
-        if (!assignable(l.element(), r.element(), Optional.empty()))
-            return false;
+        var elOk = assignable(l.element(), r.element(),
+                Optional.empty(), false);
 
-        if (l.refer().has() ^ r.refer().has())
-            return semantic("value and refer can't assign");
+        if (l.refer().none()) {
+            var llen = computeConstInteger(l.length().must());
 
-        if (l.refer().has() && r.refer().has())
-            return true;
+            if (r.refer().has()) return false; // Not: [value] = [refer]
 
-        var ls = compute(l.length().must());
-        var rs = compute(r.length().must());
-        if (ls instanceof LiteralExpression le &&
-                rs instanceof LiteralExpression re) {
-            var ll = le.asInteger();
-            var rl = re.asInteger();
-            if (ll.has() && rl.has()) {
-                if (!r.literal())
-                    return ll.equals(rl);
-
-                if (ll.get().compareTo(rl.get()) >= 0)
-                    return true;
-
-                return semantic("out of bound: %s",
-                        re.pos());
+            if (r.literal()) {
+                if (r.isEmpty()) return true; // Yes: [value] = [literal]
+                // Yes: check index out of bounds
+                if (llen.value().compareTo(r.lenValue()) < 0)
+                    return semantic("index out of bound: %s", r.pos());
+                return elOk;
             }
+
+            // Yes: must both equals-length and same-type-element
+            var rlen = computeConstInteger(r.length().must());
+            return llen.equals(rlen) && elOk;
         }
-        return false;
+
+        if (r.literal()) return false; // Not: [refer] = [literal]
+
+        if (!elOk)
+            return false; // Not: element not same
+
+        var lr = l.refer().get();
+
+        if (lr.kind() == PHANTOM) {
+            checkEnablePhantom(re);
+            return true;
+        }
+
+        return lr.kind() == STRONG && r.refer().has() &&
+                r.refer().get().isKind(STRONG);
+
     }
 
     private boolean assignable(ClassDefinition l, ClassDefinition r) {
@@ -945,13 +973,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         visit(r.generic());
 
         if (r.same(l)) return true;
-        if (r.inherit().none()) return false;
-
-        var pt = visit(r.inherit().get());
-        if (pt instanceof ClassDefinition pc)
-            return assignable(l, pc);
-
-        return false;
+        return r.parent().match(p -> assignable(l, p));
     }
 
     private boolean assignable(InterfaceDefinition l, ClassDefinition r) {
@@ -960,8 +982,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         if (r.impl().exists(l.symbol())) return true;
 
-        var ok = r.inherit().map(this::findParent)
-                .match(p -> assignable(l, p));
+        var ok = r.parent().match(p -> assignable(l, p));
         if (ok) return true;
 
         for (var dt : r.impl()) {
@@ -989,12 +1010,14 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return false;
     }
 
-    private boolean assignable(TypeDefinition l, TypeDefinition r) {
+    private boolean assignable(TypeDefinition l, TypeDefinition r, boolean covariant) {
         if (l instanceof StructureDefinition ls) {
             if (r instanceof StructureDefinition rs)
                 return assignable(ls, rs);
             return false;
         }
+
+        if (!covariant) return l.equals(r);
 
         if (l instanceof ClassDefinition lc) {
             if (r instanceof ClassDefinition rc)
@@ -1014,7 +1037,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return false;
     }
 
-    private void enablePhantom(Optional<Expression> re) {
+    private void checkEnablePhantom(Optional<Expression> re) {
         if (re.none()) return;
         if (new PhantomChecker(context).checkEnable(re.get()))
             return;
@@ -1023,7 +1046,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     private boolean
     assignable(DerivedTypeDeclarer l, DerivedTypeDeclarer r,
-               Optional<Expression> re) {
+               Optional<Expression> re, boolean covariant) {
         visit(l.derivedType().generic());
         visit(r.derivedType().generic());
 
@@ -1035,13 +1058,13 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         var lr = l.refer().get();
 
         if (lr.kind() == PHANTOM) {
-            enablePhantom(re);
-            return assignable(lt, rt);
+            checkEnablePhantom(re);
+            return assignable(lt, rt, covariant);
         }
         if (lr.kind() == STRONG) {
             return r.refer().has() &&
                     r.refer().get().isKind(STRONG)
-                    && assignable(lt, rt);
+                    && assignable(lt, rt, covariant);
         }
 
         return unreachable();
@@ -1101,7 +1124,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
 
         if (r instanceof MemTypeDeclarer mr) {
-            enablePhantom(re);
+            checkEnablePhantom(re);
             return l.readonly() || !mr.readonly();
         }
 
@@ -1120,7 +1143,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     private boolean assignable(
-            TypeDeclarer l, TypeDeclarer r, Optional<Expression> re) {
+            TypeDeclarer l, TypeDeclarer r,
+            Optional<Expression> re, boolean covariant) {
         Objects.requireNonNull(l, "left");
         Objects.requireNonNull(r, "right");
 
@@ -1140,13 +1164,10 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         if (l instanceof ArrayTypeDeclarer al) {
             if (r instanceof ArrayTypeDeclarer ar)
-                return assignable(al, ar);
+                return assignable(al, ar, re);
             if (r instanceof LiteralTypeDeclarer lit)
                 return lit.literal() instanceof NilLiteral
                         && al.refer().has();
-            if (r instanceof VoidTypeDeclarer) {
-                return al.refer().none();
-            }
         }
 
         if (l instanceof FuncTypeDeclarer fl) {
@@ -1159,7 +1180,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         if (l instanceof DerivedTypeDeclarer dl) {
             if (r instanceof DerivedTypeDeclarer dr)
-                return assignable(dl, dr, re);
+                return assignable(dl, dr, re, covariant);
             if (r instanceof ObjectTypeDeclarer o)
                 return initializable(dl, o);
             if (r instanceof FuncTypeDeclarer f)
@@ -1173,6 +1194,13 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         return false;
     }
+
+    private boolean assignable(
+            TypeDeclarer l, TypeDeclarer r,
+            Optional<Expression> re) {
+        return assignable(l, r, re, true);
+    }
+
 
     private boolean assignable(List<TypeDeclarer> left,
                                List<TypeDeclarer> right,
@@ -1613,9 +1641,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return semantic("require class or interface refer: %s",
                     e.pos());
 
-        if (assignable(eot.get(), sot.get()))
+        if (assignable(eot.get(), sot.get(), true))
             return e;
-        if (assignable(sot.get(), eot.get()))
+        if (assignable(sot.get(), eot.get(), true))
             return e;
 
         return semantic("inconvertible types %s to %s: %s",
@@ -1624,6 +1652,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     @Override
     public Entity visit(SizeofExpression se) {
+        enablePhantom = true;
         visit(se.type());
         return se;
     }
@@ -1783,7 +1812,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(NewArrayType e) {
-        arrayStack.push(e);
         visit(e.element());
         visit(e.length());
         var td = typeDeducer.visit(e.length());
@@ -1791,7 +1819,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 ptd.primitive().isInteger()) ||
                 (td instanceof LiteralTypeDeclarer ltd &&
                         ltd.literal() instanceof IntegerLiteral)) {
-            arrayStack.pop();
             return e;
         }
 

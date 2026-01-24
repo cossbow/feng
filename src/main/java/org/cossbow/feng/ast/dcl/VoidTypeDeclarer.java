@@ -12,11 +12,18 @@ public class VoidTypeDeclarer extends TypeDeclarer {
 
     @Override
     public boolean equals(Object o) {
-        return false;
+        return o instanceof VoidTypeDeclarer;
     }
 
     @Override
     public int hashCode() {
         return VoidTypeDeclarer.class.hashCode();
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        return "<void>";
     }
 }

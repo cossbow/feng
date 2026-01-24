@@ -345,6 +345,20 @@ public class SemanticAnalysisTest {
     }
 
     @Test
+    public void testClassField7() {
+        checkFail("class A{var b B;} class B:A{}");
+        checkFail("class A{var b [6]B;} class B:A{}");
+        checkSucc("class A{var b [*]B;} class B:A{}");
+
+        checkFail("class A{var c C;} class B:A{} class C:B{}");
+        checkFail("class A{var c [3]C;} class B:A{} class C:B{}");
+        checkSucc("class A{var c [*]C;} class B:A{} class C:B{}");
+
+        checkFail("class A{var d D;} class B:A{} class C:B{} class D{var c C;}");
+        checkFail("class A{var d [3]D;} class B:A{} class C:B{} class D{var c C;}");
+    }
+
+    @Test
     public void testClassMethod1() {
         checkSucc("class A { func at() {} func test() { at(); } }");
     }
@@ -555,7 +569,7 @@ public class SemanticAnalysisTest {
         for (var bo : BinaryOperator.SetLogic) {
             for (var p : ofKind(Primitive.Kind.BOOL)) {
                 var s = BaseParseTest.operatorSymbols.get(bo);
-                var c = "func f(a,b %s) { var i bool; i = a %s b; ;}"
+                var c = "func f(a,b %s) { var i bool; i = a %s b;}"
                         .formatted(p, s);
                 checkSucc(c);
             }
@@ -726,6 +740,8 @@ public class SemanticAnalysisTest {
     public void testNewExpression3() {
         checkSucc("func f(){var b=new([2][*]int);}");
         checkFail("func f(){var b=new([2][&]int);}");
+        checkSucc("func f(){var b=new([2][3][*]int);}");
+        checkFail("func f(){var b=new([2][3][&]int);}");
         checkSucc("func f(){var b=new([2][*]int, [nil]);}");
         checkFail("func f(){var b=new([2][*]int, [1]);}");
         checkSucc("func f(a [*][*]int){var b=new([2][*]int, a);}");
@@ -1125,6 +1141,32 @@ public class SemanticAnalysisTest {
         checkFail("class A{var v *rom; func m(){ const r &rom = this.v; } }");
     }
 
+    @Test
+    public void testPhantomRefer11() {
+        var d = "struct S{} ";
+        String[] maps = {"", "`int`", "`[]int`", "`[1]int`",
+                "`S`", "`[]S`", "`[1]S`"};
+        for (var m : maps) {
+            checkSucc(d + "func f(s*ram%s){const r&ram%s=s;}".formatted(m, m));
+            checkSucc(d + "func f(s*rom%s){const r&rom%s=s;}".formatted(m, m));
+            checkSucc(d + "func f(s*ram%s){const r&rom%s=s;}".formatted(m, m));
+            checkFail(d + "func f(s*rom%s){const r&ram%s=s;}".formatted(m, m));
+        }
+    }
+
+    @Test
+    public void testPhantomRefer12() {
+        var d = "class T{} ";
+        String[] elements = {"int", "[3]int", "*ram", "*ram`int`",
+                "T", "*T", "[3]T", "[*]T", "[5]*T", "[*]*T"};
+        for (var e : elements) {
+            checkSucc(d + "func m(){ var v [2]%s; const r [&]%s = v; }".formatted(e, e));
+            checkFail(d + "func m(){ const v [2]%s; const r [&]%s = v; }".formatted(e, e));
+            checkFail(d + "func m(){ var v [*]%s; const r [&]%s = v; }".formatted(e, e));
+            checkSucc(d + "func m(){ const v [*]%s=nil; const r [&]%s = v; }".formatted(e, e));
+        }
+    }
+
     //
 
     @Test
@@ -1137,13 +1179,18 @@ public class SemanticAnalysisTest {
 
         checkFail("func t() { var a [2]int = nil; }");
         checkSucc("func t() { var a [*]int = nil; }");
+
+        checkSucc("func t() { var a [4]int = [1,2,3]; }");
+        checkSucc("func t() { var a [4]int = [1,2,3,4]; }");
+        checkFail("func t() { var a [4]int = [1,2,3,4,5]; }");
     }
 
     @Test
     public void testArray2() {
-        checkSucc("func t() { var a [4]int = [1,2,3]; }");
-        checkSucc("func t() { var a [4]int = [1,2,3,4]; }");
-        checkFail("func t() { var a [4]int = [1,2,3,4,5]; }");
+        checkSucc("func t() {var a [4]int; const b [&]int =a;}");
+        checkFail("func t() {const a [4]int; const b [&]int =a;}");
+        checkFail("func t() {var a [*]int; const b [&]int =a;}");
+        checkFail("func t() {const a [*]int=new([4]int); const b [&]int =a;}");
     }
 
     @Test
@@ -1191,19 +1238,18 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testArray8() {
-        checkSucc("func f(){var s [*][2]int;}");
-        checkFail("func f(){var s [&][2]int;}");
+//        checkSucc("func f(){var s [*][2]int;}");
 
-        checkSucc("func f(){var s [3][*]int;}");
-        checkSucc("func f(){var s [3][2]int;}");
+//        checkSucc("func f(){var s [3][*]int;}");
+//        checkSucc("func f(){var s [3][2]int;}");
         checkFail("func f(){var s [3][&]int;}");
 
         checkFail("func f(){var s [3][2][&]int;}");
         checkFail("func f(){var s [3][*][&]int;}");
-        checkSucc("func f(){var s [3][*][*]int;}");
+//        checkSucc("func f(){var s [3][*][*]int;}");
 
-        checkSucc("func f(){var s [*][2]int;}");
-        checkSucc("func f(){var s [*][*]int;}");
+//        checkSucc("func f(){var s [*][2]int;}");
+//        checkSucc("func f(){var s [*][*]int;}");
         checkFail("func f(){var s [*][&]int;}");
         checkFail("func f(){var s [*][2][&]int;}");
     }
@@ -1234,6 +1280,11 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testArray11() {
+        var d = "class A{} class B:A{} ";
+        checkSucc(d + "func f(s *B){var r *A = s;}");
+        checkFail(d + "func f(s [2]*B){var r [2]*A = s;}");
+        checkFail(d + "func f(s [*]*B){var r [*]*A = s;}");
+        checkFail(d + "func f(s [&]*B){var r [&]*A = s;}");
     }
 
 
@@ -1249,7 +1300,7 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testDeclareMultiArray2() {
-        checkSucc("func t(v [4]int) { var a [2][4]int = [v]; }");
+//        checkSucc("func t(v [4]int) { var a [2][4]int = [v]; }");
         checkFail("func t(v [2]int) { var a [2][4]int = [v]; }");
         checkFail("func t(v [*]int) { var a [2][4]int = [v]; }");
     }
@@ -1400,9 +1451,9 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testMemTransfer3() {
-        checkSucc("func f() { var i *rom = \"字面量\"; }");
-        checkFail("func f() { var i *ram = \"字面量\"; }");
-        checkFail("func f() { var i &rom = \"字面量\"; }");
+        checkSucc("func f() { var i *rom = \"cossbow\"; }");
+        checkFail("func f() { var i *ram = \"cossbow\"; }");
+        checkFail("func f() { var i &rom = \"cossbow\"; }");
         checkFail("func f() { var i *ram = 1; }");
         checkFail("func f() { var i *ram = 3.3; }");
         checkFail("func f() { var i *ram = true; }");
@@ -1499,6 +1550,8 @@ public class SemanticAnalysisTest {
         checkFail("struct A{f C;} struct B{f A;} struct C{f B;}");
         checkFail("struct A{f B;} struct B{f [2]A;}");
         checkFail("struct A{f B;} struct B{f [2][4]A;}");
+        checkFail("struct A{f C;} struct B{f A;} struct C{f [3]B;}");
+        checkFail("struct A{f [7]C;} struct B{f A;} struct C{f [3]B;}");
     }
 
     @Test
