@@ -26,6 +26,10 @@ public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral
         return radix;
     }
 
+    public int compareTo(long v) {
+        return value.compareTo(BigInteger.valueOf(v));
+    }
+
     public int compareTo(BigInteger v) {
         return value.compareTo(v);
     }
@@ -33,10 +37,6 @@ public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral
     @Override
     public int compareTo(IntegerLiteral o) {
         return value.compareTo(o.value);
-    }
-
-    public boolean isNegative() {
-        return value.compareTo(BigInteger.ZERO) < 0;
     }
 
     //

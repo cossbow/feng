@@ -764,19 +764,19 @@ final class SourceParseVisitor
 
     private void mustInMethod(Position pos) {
         if (enterMethodName == null)
-            semantic("must use in method: %s", pos);
+            syntax("must use in method: %s", pos);
     }
 
     private void nestedDefineMethod(Position pos) {
         if (enterMethodName != null)
-            semantic("nested define method: %s", pos);
+            syntax("nested define method: %s", pos);
     }
 
     @Override
     public Entity visitClassDefinition(FengParser.ClassDefinitionContext ctx) {
         var modifier = parseModifier(ctx.modifier());
         var symbol = defineSymbol(ctx.name);
-        if (enterClassSymbol != null) semantic("nested define class: %s", symbol);
+        if (enterClassSymbol != null) syntax("nested define class: %s", symbol);
         enterClassSymbol = symbol;
         var generic = typeParameters(ctx.typeParameters());
         var inherit = parseClassInherit(ctx.classInherit());
@@ -888,7 +888,7 @@ final class SourceParseVisitor
 
         if (type instanceof NewMemType mt) {
             if (mt.mapped().none()) {
-                if (arg.none()) return semantic(
+                if (arg.none()) return syntax(
                         "require size in bytes: %s", type.pos());
             } else {
                 if (arg.has()) return semantic(
@@ -949,13 +949,11 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitReferExpr(FengParser.ReferExprContext ctx) {
-        var pos = posOf(ctx);
         if (ctx.current != null) {
+            var pos = posOf(ctx.current);
             var cn = enterClassSymbol;
             var mn = enterMethodName;
-            if (cn == null || mn == null)
-                return semantic(
-                        "'this' must use in method: %s", posOf(ctx.current));
+            mustInMethod(pos);
             var type = ctx.current.getType();
             return switch (type) {
                 case FengParser.THIS -> new CurrentExpression(pos, cn, mn, true);
@@ -964,6 +962,7 @@ final class SourceParseVisitor
             };
         }
 
+        var pos = posOf(ctx);
         var symbol = parseSymbol(ctx.symbol());
         var generic = typeArguments(ctx.typeArguments());
         return new ReferExpression(pos, symbol, generic);

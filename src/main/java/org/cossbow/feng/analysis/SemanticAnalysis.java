@@ -437,8 +437,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             if (def instanceof StructureDefinition sd)
                 return Optional.of(sd);
 
-            return semantic("require structure type: %s",
-                    dtd.derivedType().pos());
+            return semantic("structure field type can't be %s: %s",
+                    dtd.derivedType(), td.pos());
         }
 
         if (td instanceof ArrayTypeDeclarer atd) {
@@ -848,16 +848,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 v.type().set(t);
             } else {
                 // check type
-                if (init instanceof ArrayTuple at) {
-                    if (!assignable(v.type().must(), t, v.value().get())) {
-                        semantic("incompatible, can't init : %s", v.pos());
-                        return;
-                    }
-                } else {
-                    if (!assignable(v.type().must(), t, Optional.empty())) {
-                        semantic("incompatible, can't init : %s", v.pos());
-                        return;
-                    }
+                if (!assignable(v.type().must(), t, v.value().get())) {
+                    semantic("incompatible, can't init : %s", v.pos());
+                    return;
                 }
             }
 
@@ -1708,55 +1701,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(CurrentExpression e) {
-        if (enterMethod != null)
-            return e;
-        return unreachable();
+        return e;
     }
 
-    private void indexOf(
-            Expression index, DefinitionDeclarer dtd) {
-        if (!(dtd.definition() instanceof EnumDefinition ed)) {
-            semantic("only enum type can use index: %s", dtd.pos());
-            return;
-        }
-
-        var i = tryComputeConstInteger(index);
-        if (i.none()) return;
-
-        var idx = i.get();
-        if (idx.isNegative()) {
-            semantic("negative index: %s", index.pos());
-            return;
-        }
-
-        if (idx.compareTo(BigInteger.valueOf(ed.values().size())) < 0)
-            return;
-
-        semantic("index out of bounds: %s", index.pos());
-    }
-
-    private void indexOf(
-            Expression index, ArrayTypeDeclarer atd) {
-        var i = tryComputeConstInteger(index);
-        if (i.none()) return;
-
-        var idx = i.get();
-        if (idx.isNegative()) {
-            semantic("negative index: %s", index.pos());
-            return;
-        }
-
-        if (atd.length().none()) return;
-
-        var e = compute(atd.length().get());
-        if (!(e instanceof LiteralExpression le))
-            return;
-        var len = (IntegerLiteral) le.literal();
-
-        if (idx.compareTo(len) < 0) return;
-
-        semantic("index out of bounds: %s", index.pos());
-    }
 
     public Entity visit(IndexOfExpression e) {
         visit(e.subject());
@@ -1766,11 +1713,23 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (!typeDeducer.isInteger(it)) {
             return semantic("index require integer: %s", e.pos());
         }
+        var idx = tryComputeConstInteger(e.index());
+        idx.use(i -> {
+            if (i.compareTo(0) >= 0) return;
+            semantic("negative index: %s", e.index().pos());
+        });
 
         var st = typeDeducer.visit(e.subject());
         if (st instanceof DefinitionDeclarer dtd) {
-            indexOf(e.index(), dtd);
-            return e;
+            if (dtd.definition() instanceof EnumDefinition ed) {
+                idx.use(i -> {
+                    if (i.compareTo(ed.values().size()) < 0)
+                        return;
+                    semantic("index out of bounds: %s", e.pos());
+                });
+                return e;
+            }
+            return semantic("only enum type can use index: %s", e.pos());
         }
 
         if (st instanceof MemTypeDeclarer mtd) {
@@ -1779,7 +1738,11 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             st = mtd.mapped().get();
         }
         if (st instanceof ArrayTypeDeclarer atd) {
-            indexOf(e.index(), atd);
+            var len = atd.length().flat(this::tryComputeConstInteger);
+            len.coexist(idx, (l, i) -> {
+                if (l.compareTo(i) > 0) return;
+                semantic("index out of bounds: %s", e.pos());
+            });
             return e;
         }
 
@@ -1814,6 +1777,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     public Entity visit(NewArrayType e) {
         visit(e.element());
         visit(e.length());
+        visit(e.element());
         var td = typeDeducer.visit(e.length());
         if ((td instanceof PrimitiveTypeDeclarer ptd &&
                 ptd.primitive().isInteger()) ||

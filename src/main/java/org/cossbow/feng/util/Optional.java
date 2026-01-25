@@ -2,6 +2,7 @@ package org.cossbow.feng.util;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -57,6 +58,11 @@ public class Optional<T> {
     public <R> Optional<R> flat(Function<T, Optional<R>> f) {
         if (none()) return empty();
         return f.apply(value);
+    }
+
+    public void coexist(Optional<T> o, BiConsumer<T, T> u) {
+        if (has() && o.has())
+            u.accept(value, o.value);
     }
 
     //

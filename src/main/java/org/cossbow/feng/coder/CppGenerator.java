@@ -13,10 +13,7 @@ import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassField;
 import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
-import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.ast.proc.PrototypeDefinition;
-import org.cossbow.feng.ast.proc.UnnamedParameterSet;
-import org.cossbow.feng.ast.proc.VariableParameterSet;
+import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
@@ -85,19 +82,32 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         }
     }
 
+    void newLine(int n) {
+        for (int i = 0; i < n; i++)
+            write('\n');
+    }
+
+    void writeComment(String text) {
+        write("// ").write(text).newLine(1);
+    }
+
     // global
 
     public CppGenerator visit(Source src) {
         if (!src.imports().isEmpty()) return unsupported("import");
 
         visitTypes(src.types());
-        if (src.table().dagVars.has())
-            visitGlobalVariables(src.table().dagVars.must());
 
-        for (var dcl : src.variables())
-            visit(dcl);
-        for (var def : src.functions())
-            visit(def);
+        writeComment("global variable");
+        src.table().dagVars.use(dag -> {
+            dag.bfs(this::visit);
+            newLine(1);
+        });
+        newLine(2);
+
+        writeComment("function definition");
+        visitFunctions(src.table());
+
         return this;
     }
 
@@ -105,12 +115,9 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
     }
 
     void declareType(StructureDefinition def) {
-    }
-
-    void declareType(EnumDefinition def) {
-    }
-
-    void declareType(InterfaceDefinition def) {
+        write("struct ");
+        visit(def.symbol().name());
+        endStmt();
     }
 
     void declareType(ClassDefinition def) {
@@ -119,15 +126,22 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         endStmt();
     }
 
+    void declareType(EnumDefinition def) {
+    }
+
+    void declareType(InterfaceDefinition def) {
+    }
+
     void declareType(TypeDefinition def) {
         switch (def) {
-            case ClassDefinition cd -> declareType(cd);
-            case InterfaceDefinition cd -> declareType(cd);
-            case EnumDefinition cd -> declareType(cd);
             case StructureDefinition cd -> declareType(cd);
+            case ClassDefinition cd -> declareType(cd);
+            case EnumDefinition cd -> declareType(cd);
             case PrototypeDefinition cd -> declareType(cd);
+            case InterfaceDefinition cd -> declareType(cd);
             case null, default -> unreachable();
         }
+        newLine(1);
     }
 
 
@@ -141,6 +155,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
                 for (var dep : deps) edges.add(Groups.g2(dep, sd));
             });
         }
+        if (all.isEmpty()) return;
         var dag = new DAGGraph<>(all, edges);
         dag.bfs(this::visit);
     }
@@ -149,27 +164,55 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         var all = new ArrayList<ClassDefinition>();
         var edges = new ArrayList<Groups.G2<ClassDefinition, ClassDefinition>>();
         for (var def : types) {
+            if (table.builtinTypes.exists(def.symbol().name()))
+                continue;
             if (!(def instanceof ClassDefinition cd)) continue;
             all.add(cd);
             cd.initDeps().use(deps -> {
-                for (var dep : deps) edges.add(Groups.g2(dep, cd));
+                for (var dep : deps) {
+                    if (dep != ClassDefinition.ObjectClass)
+                        edges.add(Groups.g2(dep, cd));
+                }
             });
         }
+        if (all.isEmpty()) return;
         var dag = new DAGGraph<>(all, edges);
         dag.bfs(this::visit);
     }
 
     void visitTypes(List<TypeDefinition> types) {
+        writeComment("type declaration");
         for (var t : types) declareType(t);
-        visitStructures(types);
-        visitClasses(types);
+        var definedTypes = types.stream()
+                .filter(d -> !table.builtinTypes.exists(d.symbol().name()))
+                .toList();
+        writeComment("type definition");
+        writeComment("struct definition");
+        visitStructures(definedTypes);
+        writeComment("class definition");
+        visitClasses(definedTypes);
+        newLine(2);
     }
 
-    void visitGlobalVariables(DAGGraph<GlobalVariable> dag) {
-        new DAGTask<>(dag, (gv, deps) -> {
-            visit(gv);
-            return CompletableFuture.completedFuture(true);
-        });
+    void declareFunction(FunctionDefinition fd) {
+        writePrototype(fd.symbol().name(), fd.procedure().prototype());
+        endStmt();
+    }
+
+    void visitFunctions(ParseSymbolTable table) {
+        for (var fd : table.namedFunctions) {
+            declareFunction(fd);
+            newLine(1);
+        }
+        newLine(2);
+
+        var list = table.namedFunctions.stream()
+                .filter(f -> !table.builtinFunctions.exists(f.symbol().name()))
+                .toList();
+        for (var fd : list) {
+            visit(fd);
+            newLine(1);
+        }
     }
 
     static final String STATIC = "static";
@@ -277,23 +320,6 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         write("class ");
         visit(cd.symbol().name());
         write(' ');
-        if (cd.inherit().has() || !cd.impl().isEmpty()) {
-            write(": public ");
-            int i = 0;
-            if (cd.inherit().has()) {
-                visit(cd.inherit().get());
-            } else {
-                visit(cd.impl().getValue(0));
-                i = 1;
-            }
-            for (; i < cd.impl().size(); i++) {
-                write(',');
-                visit(cd.impl().getValue(i));
-            }
-            write(' ');
-        } else {
-            write(": public Object ");
-        }
         write("{\n");
         if (!cd.fields().isEmpty()) write("public:\n");
         for (var f : cd.fields().values())
@@ -303,7 +329,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
         for (var m : cd.methods().values())
             visit(m);
 
-        write("};\n");
+        write("};\n\n");
         enterClass = null;
         return this;
     }
@@ -368,12 +394,9 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
 
     private volatile FunctionDefinition enterFunc;
 
-    public CppGenerator visit(FunctionDefinition fd) {
-        assert enterFunc == null;
-        enterFunc = fd;
-        var proc = fd.procedure();
-        var ps = proc.prototype().parameterSet();
-        var rs = proc.prototype().returnSet();
+    void writePrototype(Identifier name, Prototype prototype) {
+        var ps = prototype.parameterSet();
+        var rs = prototype.returnSet();
         if (rs.size() > 1) {
             unsupported("多返回值未实现");
         } else if (rs.size() == 1) {
@@ -382,7 +405,7 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
             write("void");
         }
         write(' ');
-        visit(fd.symbol());
+        visit(name);
         write('(');
         switch (ps) {
             case VariableParameterSet vps:
@@ -393,7 +416,15 @@ public class CppGenerator implements EntityVisitor<CppGenerator> {
                 break;
             case null, default:
         }
-        write(")\n");
+        write(')');
+    }
+
+    public CppGenerator visit(FunctionDefinition fd) {
+        assert enterFunc == null;
+        enterFunc = fd;
+        var proc = fd.procedure();
+        writePrototype(fd.symbol().name(), proc.prototype());
+        newLine(1);
         visit(proc.body());
         enterFunc = null;
         return this;

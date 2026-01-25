@@ -1,6 +1,5 @@
 package org.cossbow.feng.ast.oop;
 
-import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Method;
 import org.cossbow.feng.ast.Position;
@@ -10,11 +9,11 @@ import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.util.Lazy;
 
 public class InterfaceMethod extends Method {
-    private Modifier modifier;
-    private Identifier name;
-    private TypeParameters generic;
-    private Prototype prototype;
-    private boolean returnThis;
+    private final Modifier modifier;
+    private final Identifier name;
+    private final TypeParameters generic;
+    private final Prototype prototype;
+    private final boolean returnThis;
 
     public InterfaceMethod(Position pos,
                            Modifier modifier,

@@ -159,12 +159,6 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testThis2() {
-        checkFail("class A{ var id int; } func m(){ this.id = 0; }");
-        checkFail("class A{ var id int; } func m(){ var id = this; }");
-    }
-
-    @Test
-    public void testThis3() {
         checkSucc("class A{ func m(){ var a A; a = this; } }");
         checkSucc("class A{ func m(){ const a &A = this; } }");
         checkFail("class A{ func m(){ const a *A = this; } }");
@@ -172,7 +166,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testThis4() {
+    public void testThis3() {
         var d = "class A{var id int; func m()this{}} ";
 //        checkSucc(d + "func f(a *A){var id = a.m().id;}");
     }
@@ -980,8 +974,19 @@ public class SemanticAnalysisTest {
         checkFail(def + "func f(b *I) { var a *K = b; }");
     }
 
+    //
+
     @Test
-    public void testPhantomRefer1() {
+    public void testPhantom1() {
+        var d = "class A{} ";
+        checkSucc(d + "func f(a &A){ const r &A = a; }");
+        checkFail(d + "func f(a &A){ var r &A = a; }");
+        checkFail(d + "func f(a &A){ var r *A = a; }");
+        checkFail(d + "func f(a &A){ var r A = a; }");
+    }
+
+    @Test
+    public void testPhantomInherit1() {
         var d = "class A{} class B:A{} var a A; var b B; ";
         checkFail(d + "const r &A = a;");
         checkSucc(d + "func f() { const r &A = a; }");
@@ -997,7 +1002,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testPhantomRefer2() {
+    public void testPhantomInherit2() {
         var d = "interface I{} class A(I){} class B:A{} ";
         checkSucc(d + "func f() { var a A; const r &A = a; }");
         checkSucc(d + "func f() { var b B; const r &A = b; }");
@@ -1021,7 +1026,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testPhantomRefer3() {
+    public void testPhantomInherit3() {
         var d = "interface I{} class A(I){} class B:A{} ";
         checkSucc(d + "func f(a *A) { const r &A = a; }");
         checkSucc(d + "func f(b *B) { const r &A = b; }");
@@ -1035,7 +1040,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testPhantomRefer4() {
+    public void testPhantomInherit4() {
         var d = "interface I{} class A(I){} class B:A{} ";
         checkSucc(d + "func f(c func(a &B)) { var a B;c(a); }");
         checkSucc(d + "func f(c func(a &A)) { var a B;c(a); }");
@@ -1060,7 +1065,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testPhantomRefer5() {
+    public void testPhantomInherit5() {
         var d = "interface I{} class A(I){} class B:A{} class R{var b B;}";
         checkSucc(d + "func f(c func(a &B)) { var r R;c(r.b); }");
         checkSucc(d + "func f(c func(a &A)) { var r R;c(r.b); }");
@@ -1086,7 +1091,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testPhantomRefer6() {
+    public void testPhantomInherit6() {
         var d = "interface I{} class A(I){} class B:A{} class R{const b *B;}";
         checkSucc(d + "func f(c func(a &B)) { var r R;c(r.b); }");
         checkSucc(d + "func f(c func(a &A)) { var r R;c(r.b); }");
@@ -1102,7 +1107,18 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testPhantomRefer7() {
+    public void testPhantomField1() {
+        var d = "struct R{s S;} struct S{v float;} class C{var r R;} ";
+        checkFail(d + "func f(c *C){const s &S = c.r.s;}");
+        // TODO
+    }
+
+    @Test
+    public void testPhantomField2() {
+    }
+
+    @Test
+    public void testPhantomField3() {
         var d = "interface I{} interface J{I;} class R{const j *J;} ";
         checkSucc(d + "func f(r *R){ const i &I = r.j; }");
         d = d + "class T{var r R;}";
@@ -1110,25 +1126,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testPhantomRefer8() {
-        var d = "class A{} ";
-        checkSucc(d + "func f(a &A){ const r &A = a; }");
-        checkFail(d + "func f(a &A){ var r &A = a; }");
-        checkFail(d + "func f(a &A){ var r *A = a; }");
-        checkFail(d + "func f(a &A){ var r A = a; }");
-    }
-
-    @Test
-    public void testPhantomRefer9() {
-        var d = "class A{} class B{var ar [4]A; const sz [*]A;} ";
-        checkSucc(d + "func f(b *B) { const a &A = b.ar[0]; }");
-        checkFail(d + "func f(b B) { const a &A = b.ar[0]; }");
-        checkFail(d + "func f(b *B) { const a &A = b.sz[0]; }");
-        checkFail(d + "func f(b B) { const a &A = b.sz[0]; }");
-    }
-
-    @Test
-    public void testPhantomRefer10() {
+    public void testPhantomMethod1() {
         var d = "class T{} ";
         checkSucc(d + "class A{const v *T; func m(){ const r &T = v; } }");
         checkFail(d + "class A{var v *T; func m(){ const r &T = v; } }");
@@ -1142,7 +1140,16 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testPhantomRefer11() {
+    public void testPhantomArray1() {
+        var d = "class A{} class B{var ar [4]A; const sz [*]A;} ";
+        checkSucc(d + "func f(b *B) { const a &A = b.ar[0]; }");
+        checkFail(d + "func f(b B) { const a &A = b.ar[0]; }");
+        checkFail(d + "func f(b *B) { const a &A = b.sz[0]; }");
+        checkFail(d + "func f(b B) { const a &A = b.sz[0]; }");
+    }
+
+    @Test
+    public void testPhantomArray2() {
         var d = "struct S{} ";
         String[] maps = {"", "`int`", "`[]int`", "`[1]int`",
                 "`S`", "`[]S`", "`[1]S`"};
@@ -1155,7 +1162,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testPhantomRefer12() {
+    public void testPhantomArray3() {
         var d = "class T{} ";
         String[] elements = {"int", "[3]int", "*ram", "*ram`int`",
                 "T", "*T", "[3]T", "[*]T", "[5]*T", "[*]*T"};
@@ -1165,6 +1172,25 @@ public class SemanticAnalysisTest {
             checkFail(d + "func m(){ var v [*]%s; const r [&]%s = v; }".formatted(e, e));
             checkSucc(d + "func m(){ const v [*]%s=nil; const r [&]%s = v; }".formatted(e, e));
         }
+    }
+
+    @Test
+    public void testPhantomArray4() {
+        var d = "class C{var id int;} struct S{head [4]int;}";
+        String[] elements = {"int", "[3]int", "*ram", "*ram`int`", "S", "[1]S", "[*]S",
+                "C", "*C", "[3]C", "[*]C", "[5]*C", "[*]*C"};
+        for (var e : elements) {
+            checkSucc(d + "class T{var f [3]%s;} func m(t *T){ const r [&]%s = t.f; }".formatted(e, e));
+            checkFail(d + "class T{const f [3]%s;} func m(t *T){ const r [&]%s = t.f; }".formatted(e, e));
+            checkFail(d + "class T{var f [*]%s;} func m(t *T){ const r [&]%s = t.f; }".formatted(e, e));
+            checkSucc(d + "class T{const f [*]%s;} func m(t *T){ const r [&]%s = t.f; }".formatted(e, e));
+        }
+    }
+
+    @Test
+    public void testPhantomArray5() {
+        checkSucc("union U{t [2]int;} struct S{h [13]U;} func f(){ var s S; const r [&]U = s.h; }");
+        // TODO
     }
 
     //
@@ -1238,18 +1264,18 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testArray8() {
-//        checkSucc("func f(){var s [*][2]int;}");
+        checkSucc("func f(){var s [*][2]int;}");
 
-//        checkSucc("func f(){var s [3][*]int;}");
-//        checkSucc("func f(){var s [3][2]int;}");
+        checkSucc("func f(){var s [3][*]int;}");
+        checkSucc("func f(){var s [3][2]int;}");
         checkFail("func f(){var s [3][&]int;}");
 
         checkFail("func f(){var s [3][2][&]int;}");
         checkFail("func f(){var s [3][*][&]int;}");
-//        checkSucc("func f(){var s [3][*][*]int;}");
+        checkSucc("func f(){var s [3][*][*]int;}");
 
-//        checkSucc("func f(){var s [*][2]int;}");
-//        checkSucc("func f(){var s [*][*]int;}");
+        checkSucc("func f(){var s [*][2]int;}");
+        checkSucc("func f(){var s [*][*]int;}");
         checkFail("func f(){var s [*][&]int;}");
         checkFail("func f(){var s [*][2][&]int;}");
     }
