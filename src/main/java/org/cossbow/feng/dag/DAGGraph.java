@@ -1,10 +1,16 @@
 package org.cossbow.feng.dag;
 
+import org.cossbow.feng.util.Counter;
+import org.cossbow.feng.util.DAGUtil;
 import org.cossbow.feng.util.Groups;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+
+import static org.cossbow.feng.util.CommonUtil.subtract;
 
 
 /**
@@ -21,21 +27,31 @@ public class DAGGraph<Key> {
 
     private final Set<Key> heads, tails;
 
-    private final Map<Key, Set<Key>> forwardIndex;
-    private final Map<Key, Set<Key>> reverseIndex;
+    private final Map<Key, Set<Key>> forward;
+    private final Map<Key, Set<Key>> reverse;
 
-    public DAGGraph(Collection<Key> all,
-                    Iterable<Groups.G2<Key, Key>> edges) {
-        if (null == all || all.isEmpty()) {
+    public DAGGraph(Set<Key> all,
+                    Map<Key, Set<Key>> forward,
+                    Map<Key, Set<Key>> reverse) {
+        this.all = all;
+        this.forward = Map.copyOf(forward);
+        this.reverse = Map.copyOf(reverse);
+        this.tails = Set.copyOf(subtract(all, this.forward.keySet()));
+        this.heads = Set.copyOf(subtract(all, this.reverse.keySet()));
+    }
+
+    public static <Key> DAGGraph<Key> make(Collection<Key> nodes,
+                                           Iterable<Groups.G2<Key, Key>> edges) {
+        if (null == nodes || nodes.isEmpty()) {
             throw new IllegalArgumentException("keys empty");
         }
-        this.all = Set.copyOf(all);
-        if (this.all.size() != all.size()) {
+        var all = Set.copyOf(nodes);
+        if (all.size() != nodes.size()) {
             throw new IllegalArgumentException("Has duplicate Key");
         }
 
-        var keyMap = new HashMap<Key, Key>(this.all.size());
-        for (Key k : this.all) {
+        var keyMap = new HashMap<Key, Key>(all.size());
+        for (Key k : all) {
             keyMap.put(k, k);
         }
 
@@ -53,16 +69,8 @@ public class DAGGraph<Key> {
             forward.computeIfAbsent(from, hashSet()).add(to);
             reverse.computeIfAbsent(to, hashSet()).add(from);
         }
-        if (!checkAcyclic(this.all, forward, reverse)) {
-            throw new IllegalArgumentException("Serious error: graph has cycle！");
-        }
-
-        this.forwardIndex = Map.copyOf(forward);
-        this.reverseIndex = Map.copyOf(reverse);
-        this.tails = Set.copyOf(subtract(this.all, this.forwardIndex.keySet()));
-        this.heads = Set.copyOf(subtract(this.all, this.reverseIndex.keySet()));
+        return new DAGGraph<>(all, forward, reverse);
     }
-
 
     //
 
@@ -79,26 +87,41 @@ public class DAGGraph<Key> {
     }
 
     public Set<Key> prev(Key key) {
-        return reverseIndex.getOrDefault(key, Set.of());
+        return reverse.getOrDefault(key, Set.of());
     }
 
     public Set<Key> next(Key key) {
-        return forwardIndex.getOrDefault(key, Set.of());
+        return forward.getOrDefault(key, Set.of());
     }
 
     //
 
-    public void bfs(Consumer<Key> consumer) {
+    public DAGGraph<Key> acyclic() {
+        var c = checkCyclic();
+        if (c.isEmpty()) return this;
+        throw new IllegalArgumentException("cyclic graph: " + c);
+    }
+
+    public List<Key> checkCyclic() {
+        for (Key key : all) {
+            var cyc = DAGUtil.checkCyclic(key, this::next);
+            if (!cyc.isEmpty())
+                return cyc;
+        }
+        return List.of();
+    }
+
+    public void travel(BiConsumer<Key, Set<Key>> consumer) {
         var traveled = new HashMap<Key, Boolean>(all.size());
-        var heads = subtract(all, reverseIndex.keySet());
+        var heads = subtract(all, reverse.keySet());
         var queue = new ArrayDeque<>(heads);
         for (Key head : heads) {
             traveled.put(head, Boolean.FALSE);
         }
         while (!queue.isEmpty()) {
             var ck = queue.pollLast();
-            consumer.accept(ck);
-            var next = forwardIndex.get(ck);
+            var next = forward.get(ck);
+            consumer.accept(ck, next);
             if (null != next && !next.isEmpty()) {
                 // 发现后继
                 for (Key nk : next) {
@@ -111,6 +134,14 @@ public class DAGGraph<Key> {
         }
     }
 
+    public void bfs(Consumer<Key> run) {
+        var task = new DAGTask<Key, Boolean>(this, (key, deps) -> {
+            run.accept(key);
+            return CompletableFuture.completedFuture(Boolean.TRUE);
+        });
+        task.results();
+    }
+
     //
     // static function
 
@@ -118,15 +149,6 @@ public class DAGGraph<Key> {
 
     static <Key> Function<Key, Set<Key>> hashSet() {
         return k -> new HashSet<>();
-    }
-
-    static <Key> Set<Key> subtract(Set<Key> minuend, Set<Key> subtraction) {
-        var difference = new HashSet<Key>(minuend.size() - subtraction.size());
-        for (Key k : minuend) {
-            if (subtraction.contains(k)) continue;
-            difference.add(k);
-        }
-        return difference;
     }
 
     public static <Key> boolean checkAcyclic(
@@ -169,19 +191,4 @@ public class DAGGraph<Key> {
         return c != null ? c.size() : 0;
     }
 
-    static class Counter {
-        private transient int value;
-
-        public Counter(int value) {
-            this.value = value;
-        }
-
-        public int dec() {
-            return --value;
-        }
-
-        public int inc() {
-            return ++value;
-        }
-    }
 }

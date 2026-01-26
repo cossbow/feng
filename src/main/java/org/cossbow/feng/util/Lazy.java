@@ -26,6 +26,10 @@ public class Lazy<T> {
         this.value = value;
     }
 
+    public void set(Optional<T> value) {
+        this.value = value.get();
+    }
+
     public void setIfNone(T value) {
         T v = this.value;
         if (v != null) return;
@@ -55,8 +59,8 @@ public class Lazy<T> {
 
     @Override
     public String toString() {
-        if (value == null) return "<>";
-        return "<" + value + ">";
+        if (value == null) return "nil";
+        return value.toString();
     }
 
 

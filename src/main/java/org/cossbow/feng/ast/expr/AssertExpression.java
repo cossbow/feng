@@ -1,15 +1,15 @@
 package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 
 public class AssertExpression extends PrimaryExpression {
     private PrimaryExpression subject;
-    private TypeDeclarer type;
+    private DerivedTypeDeclarer type;
 
     public AssertExpression(Position pos,
                             PrimaryExpression subject,
-                            TypeDeclarer type) {
+                            DerivedTypeDeclarer type) {
         super(pos);
         this.subject = subject;
         this.type = type;
@@ -19,7 +19,22 @@ public class AssertExpression extends PrimaryExpression {
         return subject;
     }
 
-    public TypeDeclarer type() {
+    public DerivedTypeDeclarer type() {
         return type;
+    }
+
+    @Override
+    public boolean unbound() {
+        return subject.unbound();
+    }
+
+    private volatile boolean needCheck;
+
+    public boolean needCheck() {
+        return needCheck;
+    }
+
+    public void needCheck(boolean needCheck) {
+        this.needCheck = needCheck;
     }
 }

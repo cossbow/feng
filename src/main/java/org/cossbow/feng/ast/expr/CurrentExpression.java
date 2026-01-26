@@ -54,4 +54,11 @@ public class CurrentExpression extends PrimaryExpression {
         result = 31 * result + Boolean.hashCode(isSelf);
         return result;
     }
+
+    //
+
+    @Override
+    public String toString() {
+        return name();
+    }
 }

@@ -21,7 +21,7 @@ public class DAGGraphTest {
                 Groups.g2(2, 4),
                 Groups.g2(3, 4)
         );
-        new DAGGraph<>(nodes, edges);
+        DAGGraph.make(nodes, edges).acyclic();
     }
 
     @Test
@@ -34,7 +34,7 @@ public class DAGGraphTest {
                 Groups.g2(4, 1)
         );
         try {
-            new DAGGraph<>(nodes, edges);
+            DAGGraph.make(nodes, edges).acyclic();
             Assertions.fail("The graph is illegal");
         } catch (IllegalArgumentException e) {
             System.out.println(e.getMessage());
@@ -58,7 +58,7 @@ public class DAGGraphTest {
         );
 
         try {
-            new DAGGraph<>(nodes, edges);
+            DAGGraph.make(nodes, edges).acyclic();
             Assertions.fail("It's a cyclic graph");
         } catch (IllegalArgumentException e) {
             System.out.println(e.getMessage());
@@ -78,7 +78,7 @@ public class DAGGraphTest {
                 Groups.g2(3, 5),
                 Groups.g2(6, 5)
         );
-        var graph = new DAGGraph<>(nodes, edges);
+        var graph = DAGGraph.make(nodes, edges).acyclic();
 
         Assertions.assertEquals(Set.of(1, 6), graph.heads());
         Assertions.assertEquals(Set.of(4, 5), graph.tails());
@@ -93,7 +93,7 @@ public class DAGGraphTest {
                 Groups.g2(2, 4),
                 Groups.g2(3, 4)
         );
-        var r = new DAGGraph<>(nodes, edges);
+        var r = DAGGraph.make(nodes, edges).acyclic();
         Assertions.assertEquals(Set.copyOf(nodes), r.all());
 
         Assertions.assertEquals(Set.of(1), r.heads());
@@ -121,7 +121,7 @@ public class DAGGraphTest {
                 Groups.g2(3, 4),
                 Groups.g2(5, 6)
         );
-        new DAGGraph<>(nodes, edges).bfs(System.out::println);
+        DAGGraph.make(nodes, edges).acyclic().bfs(System.out::println);
     }
 
     @Test
@@ -153,7 +153,7 @@ public class DAGGraphTest {
             }
         }
 
-        return new DAGGraph<>(nodes, edges);
+        return DAGGraph.make(nodes, edges).acyclic();
     }
 
 }

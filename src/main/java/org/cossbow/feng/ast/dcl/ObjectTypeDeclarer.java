@@ -3,6 +3,8 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.Position;
 
+import java.util.stream.Collectors;
+
 /**
  * 临时，不在AST上
  */
@@ -29,5 +31,15 @@ public class ObjectTypeDeclarer extends TypeDeclarer {
     @Override
     public int hashCode() {
         return entries.hashCode();
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        return entries.nodes().stream()
+                .map(n -> n.key() + "=" + n.value())
+                .collect(Collectors.joining(
+                        ", ", "{", "}"));
     }
 }

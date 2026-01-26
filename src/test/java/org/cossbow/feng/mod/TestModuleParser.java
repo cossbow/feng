@@ -6,6 +6,7 @@ import org.cossbow.feng.util.ErrorUtil;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
 public class TestModuleParser {
@@ -14,7 +15,7 @@ public class TestModuleParser {
 
     FModule parse(Path mp) {
         try {
-            return new ModuleParser().parse(base, mp);
+            return new ModuleParser(StandardCharsets.UTF_8).parse(base, mp);
         } catch (IOException e) {
             return ErrorUtil.io(e);
         }

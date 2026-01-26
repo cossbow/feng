@@ -4,9 +4,6 @@ package org.cossbow.feng.parser;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.cossbow.feng.ast.*;
-import org.cossbow.feng.ast.oop.ClassDefinition;
-import org.cossbow.feng.util.ErrorUtil;
-import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.expr.Expression;
@@ -15,14 +12,19 @@ import org.cossbow.feng.ast.expr.ReferExpression;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.lit.Literal;
 import org.cossbow.feng.ast.lit.StringLiteral;
+import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.ast.stmt.*;
+import org.cossbow.feng.ast.stmt.CallStatement;
+import org.cossbow.feng.ast.stmt.Statement;
+import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.Optional;
 import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
@@ -53,7 +55,8 @@ public class BaseParseTest {
     static final int EDGE_ALL = EDGE_LOWERCASE + 1;
 
     static ParseResult doParse(CharStream cs) {
-        return new SourceParser("", new ParseSymbolTable()).parse(cs);
+        return new SourceParser("", StandardCharsets.UTF_8,
+                new ParseSymbolTable()).parse(cs);
     }
 
     public static Source doParseFile(String code) {
@@ -242,7 +245,7 @@ public class BaseParseTest {
     }
 
     public static String string(Expression expr) {
-        return ((StringLiteral) lit(expr)).value();
+        return ((StringLiteral) lit(expr)).string();
     }
 
     public static IntegerLiteral integer(Expression expr) {
@@ -260,17 +263,6 @@ public class BaseParseTest {
     public static Symbol calleeName(Statement stmt) {
         return varName(((CallStatement) stmt).call().callee());
     }
-
-    public static List<Expression> exprs(Tuple tuple) {
-        return ((ArrayTuple) tuple).values();
-    }
-
-    public static Expression first(Tuple tuple) {
-        if (tuple instanceof ReturnTuple rt)
-            return rt.call();
-        return exprs(tuple).getFirst();
-    }
-
 
     public static <T, R> void checkIds(List<R> names,
                                        IdentifierTable<T> table) {

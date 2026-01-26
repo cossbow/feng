@@ -5,7 +5,6 @@ import java.util.Map;
 
 public enum TypeDomain {
     PRIMITIVE("primitive", false),
-    MEM("mem", false),
     STRUCT("struct", true),
     UNION("union", true),
     ENUM("enum", true),
@@ -17,11 +16,11 @@ public enum TypeDomain {
     ;
 
     public final String name;
-    public final boolean derived;
+    public final boolean custom;
 
-    TypeDomain(String name, boolean derived) {
+    TypeDomain(String name, boolean custom) {
         this.name = name;
-        this.derived = derived;
+        this.custom = custom;
     }
 
     @Override

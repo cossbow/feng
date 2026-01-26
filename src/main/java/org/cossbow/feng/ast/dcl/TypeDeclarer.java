@@ -20,10 +20,28 @@ public class TypeDeclarer extends Entity {
         return Optional.empty();
     }
 
-    public TypeDeclarer unmap() {
-        if (this instanceof MemTypeDeclarer mtd) {
-            return mtd.mapped().must();
-        }
-        return this;
+    public boolean referKind(ReferKind kind) {
+        return this instanceof Referable r && r.isKind(kind);
     }
+
+    private long unit;
+
+    public long unit() {
+        return unit;
+    }
+
+    public void unit(long unit) {
+        this.unit = unit;
+    }
+
+    //
+
+    public boolean isNil() {
+        return false;
+    }
+
+    public boolean isBool() {
+        return false;
+    }
+
 }

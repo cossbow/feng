@@ -8,6 +8,9 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.util.Lazy;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class InterfaceMethod extends Method {
     private final Modifier modifier;
     private final Identifier name;
@@ -50,8 +53,13 @@ public class InterfaceMethod extends Method {
     }
 
     private transient Lazy<InterfaceDefinition> master = Lazy.nil();
+    private final List<ClassMethod> impls = new ArrayList<>();
 
     public Lazy<InterfaceDefinition> master() {
         return master;
+    }
+
+    public List<ClassMethod> impls() {
+        return impls;
     }
 }

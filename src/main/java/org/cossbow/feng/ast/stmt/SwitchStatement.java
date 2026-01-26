@@ -1,12 +1,15 @@
 package org.cossbow.feng.ast.stmt;
 
+import org.cossbow.feng.ast.Scope;
+import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
+import java.util.ArrayList;
 import java.util.List;
 
-public class SwitchStatement extends Statement {
+public class SwitchStatement extends Statement implements Scope {
     private Optional<Statement> init;
     private Expression value;
     private List<SwitchBranch> branches;
@@ -32,6 +35,10 @@ public class SwitchStatement extends Statement {
         return value;
     }
 
+    public void value(Expression value) {
+        this.value = value;
+    }
+
     public List<SwitchBranch> branches() {
         return branches;
     }
@@ -39,4 +46,18 @@ public class SwitchStatement extends Statement {
     public Optional<Branch> defaultBranch() {
         return defaultBranch;
     }
+
+    //
+
+    private volatile List<Variable> stack = List.of();
+
+    public List<Variable> stack() {
+        return stack;
+    }
+
+    @Override
+    public void stack(List<Variable> variables) {
+        stack = variables;
+    }
+
 }

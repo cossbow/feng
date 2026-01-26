@@ -10,22 +10,12 @@ public class DerivedTypeDeclarer extends TypeDeclarer
     private DerivedType derivedType;
     private Optional<Refer> refer;
 
-    private transient Optional<TypeDefinition> definition;
-
     public DerivedTypeDeclarer(Position pos,
                                DerivedType derivedType,
                                Optional<Refer> refer) {
-        this(pos, derivedType, refer, Optional.empty());
-    }
-
-    public DerivedTypeDeclarer(Position pos,
-                               DerivedType derivedType,
-                               Optional<Refer> refer,
-                               Optional<TypeDefinition> definition) {
         super(pos);
         this.derivedType = derivedType;
         this.refer = refer;
-        this.definition = definition;
     }
 
     public DerivedType derivedType() {
@@ -34,10 +24,6 @@ public class DerivedTypeDeclarer extends TypeDeclarer
 
     public Optional<Refer> refer() {
         return refer;
-    }
-
-    public Optional<TypeDefinition> definition() {
-        return definition;
     }
 
     //

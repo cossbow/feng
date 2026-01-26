@@ -24,9 +24,15 @@ public class FloatLiteral extends Literal {
     }
 
     @Override
-    public Optional<Primitive.Kind> compatible() {
-        return Optional.of(Primitive.Kind.FLOAT);
+    public Optional<Primitive> compatible() {
+        return Optional.of(Primitive.FLOAT);
     }
+
+    public IntegerLiteral toInteger() {
+        return new IntegerLiteral(pos(), value.toBigInteger());
+    }
+
+    //
 
     @Override
     public boolean equals(Object o) {

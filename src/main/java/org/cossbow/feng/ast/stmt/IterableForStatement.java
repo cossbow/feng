@@ -25,4 +25,8 @@ public class IterableForStatement extends ForStatement {
     public Expression iterable() {
         return iterable;
     }
+
+    public void iterable(Expression iterable) {
+        this.iterable = iterable;
+    }
 }

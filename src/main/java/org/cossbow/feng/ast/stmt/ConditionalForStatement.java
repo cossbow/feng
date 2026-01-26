@@ -30,6 +30,10 @@ public class ConditionalForStatement extends ForStatement {
         return condition;
     }
 
+    public void condition(Expression condition) {
+        this.condition = condition;
+    }
+
     public Optional<Statement> updater() {
         return updater;
     }

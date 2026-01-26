@@ -7,6 +7,10 @@ import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.util.Optional;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
+
 public class LocalSymbolContext implements SymbolContext {
     private final SymbolContext parent;
 
@@ -39,4 +43,14 @@ public class LocalSymbolContext implements SymbolContext {
     public void putVar(Variable variable) {
         variables.add(variable.name(), variable);
     }
+
+    @Override
+    public List< Variable> scope() {
+        return new ArrayList<>(variables.values());
+    }
+
+    public Stream<Variable> local() {
+        return Stream.concat(parent.local(), variables.stream());
+    }
+
 }

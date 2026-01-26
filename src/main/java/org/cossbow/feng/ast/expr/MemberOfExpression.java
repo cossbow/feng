@@ -1,22 +1,59 @@
 package org.cossbow.feng.ast.expr;
 
+import org.cossbow.feng.ast.Field;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.gen.TypeArguments;
+import org.cossbow.feng.ast.oop.ClassMethod;
+import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.Optional;
 
-public class MemberOfExpression extends PrimaryExpression {
+public class MemberOfExpression extends NestedExpression {
     private PrimaryExpression subject;
     private Identifier member;
     private TypeArguments generic;
+
+    private Optional<? extends Field> field;
+    private Optional<ClassMethod> method;
+
+    public MemberOfExpression(Position pos,
+                              PrimaryExpression subject,
+                              Identifier member,
+                              TypeArguments generic,
+                              Optional<? extends Field> field,
+                              Optional<ClassMethod> method) {
+        super(pos);
+        this.subject = subject;
+        this.member = member;
+        this.generic = generic;
+        this.field = field;
+        this.method = method;
+    }
+
+    public MemberOfExpression(Position pos,
+                              PrimaryExpression subject,
+                              Identifier member,
+                              TypeArguments generic,
+                              Field field) {
+        this(pos, subject, member, generic,
+                Optional.of(field), Optional.empty());
+    }
+
+    public MemberOfExpression(Position pos,
+                              PrimaryExpression subject,
+                              Identifier member,
+                              TypeArguments generic,
+                              ClassMethod method) {
+        this(pos, subject, member, generic,
+                Optional.empty(), Optional.of(method));
+    }
 
     public MemberOfExpression(Position pos,
                               PrimaryExpression subject,
                               Identifier member,
                               TypeArguments generic) {
-        super(pos);
-        this.subject = subject;
-        this.member = member;
-        this.generic = generic;
+        this(pos, subject, member, generic,
+                Optional.empty(), Optional.empty());
     }
 
     public PrimaryExpression subject() {
@@ -31,8 +68,16 @@ public class MemberOfExpression extends PrimaryExpression {
         return generic;
     }
 
-    //
 
+    public Optional<? extends Field> field() {
+        return field;
+    }
+
+    public Optional<ClassMethod> method() {
+        return method;
+    }
+
+    //
 
     @Override
     public String toString() {

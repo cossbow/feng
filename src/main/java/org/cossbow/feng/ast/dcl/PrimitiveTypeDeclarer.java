@@ -1,18 +1,32 @@
 package org.cossbow.feng.ast.dcl;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.util.Optional;
 
-public class PrimitiveTypeDeclarer extends TypeDeclarer {
-    private Primitive primitive;
+public class PrimitiveTypeDeclarer extends TypeDeclarer
+        implements Referable {
+    private final Primitive primitive;
+    private final Optional<Refer> refer;
 
     public PrimitiveTypeDeclarer(Position pos,
-                                 Primitive primitive) {
+                                 Primitive primitive,
+                                 Optional<Refer> refer) {
         super(pos);
         this.primitive = primitive;
+        this.refer = refer;
     }
 
     public Primitive primitive() {
         return primitive;
+    }
+
+    @Override
+    public Optional<Refer> refer() {
+        return refer;
+    }
+
+    public boolean isBool() {
+        return primitive.isBool();
     }
 
     @Override
@@ -31,6 +45,7 @@ public class PrimitiveTypeDeclarer extends TypeDeclarer {
 
     @Override
     public String toString() {
-        return primitive.code;
+        if (refer.none()) return primitive.code;
+        return refer.get() + primitive.code;
     }
 }

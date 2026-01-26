@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.*;
 
 import static org.cossbow.feng.dag.DAGTaskTest.TestNode.*;
@@ -44,7 +43,7 @@ public class DAGTaskTest {
                 Groups.g2(N1, N6)
         );
 
-        graph = new DAGGraph<>(List.of(values()), edges);
+        graph = DAGGraph.make(List.of(values()), edges).acyclic();
     }
 
     static int sumDAGResults(Collection<Integer> results) {

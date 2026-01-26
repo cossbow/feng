@@ -7,16 +7,16 @@ import org.cossbow.feng.ast.TypeDefinition;
  * 临时，不在AST上
  */
 public class DefinitionDeclarer extends TypeDeclarer {
-    private final TypeDefinition definition;
+    private final TypeDefinition def;
 
     public DefinitionDeclarer(Position pos,
-                              TypeDefinition definition) {
+                              TypeDefinition def) {
         super(pos);
-        this.definition = definition;
+        this.def = def;
     }
 
-    public TypeDefinition definition() {
-        return definition;
+    public TypeDefinition def() {
+        return def;
     }
 
     //
@@ -25,18 +25,18 @@ public class DefinitionDeclarer extends TypeDeclarer {
     public boolean equals(Object o) {
         if (!(o instanceof DefinitionDeclarer t))
             return false;
-        return definition.equals(t.definition);
+        return def.equals(t.def);
     }
 
     @Override
     public int hashCode() {
-        return definition.hashCode();
+        return def.hashCode();
     }
 
     //
 
     @Override
     public String toString() {
-        return definition.toString();
+        return def.toString();
     }
 }

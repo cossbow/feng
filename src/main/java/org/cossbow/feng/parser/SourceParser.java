@@ -3,16 +3,19 @@ package org.cossbow.feng.parser;
 import org.antlr.v4.runtime.*;
 import org.cossbow.feng.ast.Source;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
 public class SourceParser {
 
     private final String file;
+    private final Charset charset;
     private final ParseSymbolTable tab;
 
-    public SourceParser(String file, ParseSymbolTable tab) {
+    public SourceParser(String file, Charset charset, ParseSymbolTable tab) {
         this.file = file;
+        this.charset = charset;
         this.tab = tab;
     }
 
@@ -22,7 +25,7 @@ public class SourceParser {
         var parser = new FengParser(ts);
         var ec = new ErrorCollector();
         parser.addErrorListener(ec);
-        var visitor = new SourceParseVisitor(file, tab);
+        var visitor = new SourceParseVisitor(file, charset, tab);
         var root = (Source) visitor.visit(parser.source());
         return new ParseResult(root, ec.errors);
     }

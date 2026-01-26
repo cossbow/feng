@@ -52,7 +52,7 @@ public class ClassField extends Field implements Exportable {
 
     //
 
-    private final transient Lazy<ClassDefinition> master = Lazy.nil();
+    private final Lazy<ClassDefinition> master = Lazy.nil();
 
     public Lazy<ClassDefinition> master() {
         return master;
@@ -76,4 +76,10 @@ public class ClassField extends Field implements Exportable {
         }
     }
 
+    //
+
+    @Override
+    public String toString() {
+        return declare + " " + super.toString();
+    }
 }

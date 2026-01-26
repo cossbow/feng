@@ -21,20 +21,22 @@ import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
-import org.cossbow.feng.ast.var.AssignableOperand;
-import org.cossbow.feng.ast.var.FieldAssignableOperand;
-import org.cossbow.feng.ast.var.IndexAssignableOperand;
-import org.cossbow.feng.ast.var.VariableAssignableOperand;
+import org.cossbow.feng.ast.var.FieldOperand;
+import org.cossbow.feng.ast.var.IndexOperand;
+import org.cossbow.feng.ast.var.Operand;
+import org.cossbow.feng.ast.var.VariableOperand;
+import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
-import org.cossbow.feng.util.StringUtil;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.charset.Charset;
 import java.util.*;
 import java.util.function.Function;
 
-import static org.cossbow.feng.ast.dcl.ReferKind.*;
+import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
+import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 final class SourceParseVisitor
@@ -52,10 +54,12 @@ final class SourceParseVisitor
     //
 
     final String file;
+    final Charset charset;
     final ParseSymbolTable gst;
 
-    public SourceParseVisitor(String file, ParseSymbolTable gst) {
+    public SourceParseVisitor(String file, Charset charset, ParseSymbolTable gst) {
         this.file = file;
+        this.charset = charset;
         this.gst = gst;
     }
 
@@ -214,17 +218,15 @@ final class SourceParseVisitor
     public Entity visitGlobalDeclaration(FengParser.GlobalDeclarationContext ctx) {
         var stmt = (DeclarationStatement) visit(ctx.declaration());
         var gvs = new ArrayList<GlobalVariable>(stmt.size());
-        if (stmt.init().has()) {
-            var init = stmt.init().get();
-            if (!(init instanceof ArrayTuple at))
-                return semantic("global var need const expression");
-            if (stmt.size() != at.size())
+        if (!stmt.init().isEmpty()) {
+            var init = stmt.init();
+            if (stmt.size() != init.size())
                 return semantic("number of var and init not match");
-            for (int i = 0; i < at.size(); i++) {
+            for (int i = 0; i < init.size(); i++) {
                 var v = stmt.variables().get(i);
                 globalVarCheck(v);
                 gvs.add(new GlobalVariable(v, defineSymbol(v.name()),
-                        Lazy.of(at.values().get(i))));
+                        Lazy.of(init.get(i))));
             }
         } else {
             for (var v : stmt.variables()) {
@@ -233,9 +235,9 @@ final class SourceParseVisitor
                         Lazy.nil()));
             }
         }
-        if (isExport(ctx.exportable()))
-            for (var v : gvs)
-                gst.exportedVariables.add(v.symbol(), v);
+        if (isExport(ctx.exportable())) {
+            for (var v : gvs) gst.exportedVariables.add(v.symbol(), v);
+        }
         for (var v : gvs) {
             checkGlobalName(v.symbol().name(), v);
             gst.variables.add(v.name(), v);
@@ -297,7 +299,8 @@ final class SourceParseVisitor
     private StringLiteral parseString(TerminalNode tn) {
         if (tn == null) return null;
         var text = tn.getText();
-        return new StringLiteral(posOf(tn), text.substring(1, text.length() - 1)); // 去掉引号
+        text = text.substring(1, text.length() - 1);
+        return new StringLiteral(posOf(tn), charset, text.getBytes(charset)); // 去掉引号
     }
 
     private BoolLiteral parseBool(TerminalNode tn) {
@@ -319,45 +322,6 @@ final class SourceParseVisitor
     //
 
 
-    @Override
-    public Entity visitArrayTypeDeclarer(
-            FengParser.ArrayTypeDeclarerContext ctx) {
-        var pos = posOf(ctx);
-        var typeDcl = (TypeDeclarer) visit(ctx.typeDeclarer());
-        var at = ctx.arrayType();
-
-        if (enterMemType) {
-            var len = Optional.<Expression>empty();
-            if (at != null) {
-                len = this.visitOptional(at.len);
-                if (len.none()) return
-                        semantic("mem type can't map refer");
-            }
-            return new ArrayTypeDeclarer(pos, typeDcl,
-                    len, Optional.empty());
-        }
-        if (at == null) return syntax(
-                "array require refer-symbol or length: %s", pos);
-
-
-        var len = this.<Expression>visitOptional(at.len);
-        var ref = Optional.<Refer>empty();
-        if (len.none()) {
-            ReferKind rt = switch (at.kind.getType()) {
-                case FengParser.MUL -> STRONG;
-                case FengParser.BITAND -> PHANTOM;
-                default -> unreachable();
-            };
-            var required = at.required != null;
-            var immutable = at.immutable != null;
-            if (immutable) unsupported("immutable");
-            ref = Optional.of(new Refer(posOf(at.kind), rt,
-                    required, immutable));
-        }
-        return new ArrayTypeDeclarer(pos,
-                typeDcl, len, ref);
-    }
-
     private Optional<Refer> parseRefer(
             FengParser.ReferContext ctx) {
         if (ctx == null) return Optional.empty();
@@ -367,6 +331,7 @@ final class SourceParseVisitor
             default -> unreachable();
         };
         var required = ctx.required != null;
+        if (required) unsupported("required");
         var immutable = ctx.immutable != null;
         if (immutable) unsupported("immutable");
         return Optional.of(new Refer(posOf(ctx),
@@ -374,20 +339,25 @@ final class SourceParseVisitor
     }
 
     @Override
+    public Entity visitArrayTypeDeclarer(
+            FengParser.ArrayTypeDeclarerContext ctx) {
+        var pos = posOf(ctx);
+        var typeDcl = (TypeDeclarer) visit(ctx.typeDeclarer());
+        var at = ctx.arrayType();
+        var len = this.<Expression>visitOptional(at.len);
+        var refer = parseRefer(at.refer());
+        return new ArrayTypeDeclarer(pos,
+                typeDcl, len, refer);
+    }
+
+    @Override
     public Entity visitDefinedTypeDeclarer(
             FengParser.DefinedTypeDeclarerContext ctx) {
         var refer = parseRefer(ctx.refer());
         var dt = (DefinedType) visit(ctx.definedType());
-        if (dt instanceof MemType mt) {
-            if (refer.none()) return semantic(
-                    "%s only for reference: %s", dt.name(), dt.pos());
-            return new MemTypeDeclarer(dt.pos(), mt, refer.get());
-        }
-        if (dt instanceof PrimitiveType pt) {
-            if (refer.has()) return semantic(
-                    "primitive can't be refer: %s", dt.pos());
-            return new PrimitiveTypeDeclarer(pt.pos(), pt.primitive());
-        }
+        if (dt instanceof PrimitiveType pt)
+            return pt.primitive().declarer(pt.pos(), refer);
+
         return new DerivedTypeDeclarer(posOf(ctx),
                 (DerivedType) dt, refer);
     }
@@ -418,23 +388,9 @@ final class SourceParseVisitor
         return new TypeArguments(posOf(ctx), arguments);
     }
 
-    private volatile boolean enterMemType;
-
     @Override
     public Entity visitDefinedType(FengParser.DefinedTypeContext ctx) {
         var symbol = parseSymbol(ctx.symbol());
-        var md = MemDefinition.CACHE.get(symbol);
-        if (md != null) {
-            if (enterMemType) return semantic(
-                    "nested mapping mem type: %s", symbol.name());
-            enterMemType = true;
-            var args = typeArguments(ctx.typeArguments());
-            enterMemType = false;
-            if (args.size() > 1)
-                return semantic("mem can't map multi type: %s",
-                        args.get(1).pos());
-            return new MemType(posOf(ctx), md.readonly(), args.tryGet(0));
-        }
         if (symbol.module().none()) {
             var pd = Primitive.ofCode(symbol.name().value());
             if (pd.has()) {
@@ -568,8 +524,10 @@ final class SourceParseVisitor
         var symbol = defineSymbol(ctx.name);
         var generic = typeParameters(ctx.typeParameters());
         var fields = parseStructureMembers(ctx.structureFieldsDef());
-        return new StructureDefinition(posOf(ctx), modifier, symbol,
+        var def = new StructureDefinition(posOf(ctx), modifier, symbol,
                 generic, domain, fields);
+        for (var f : fields) f.master().set(def);
+        return def;
     }
 
     @Override
@@ -578,10 +536,11 @@ final class SourceParseVisitor
         var pos = posOf(ctx);
         var domain = parseDomain(ctx.domain);
         var fields = parseStructureMembers(ctx.structureFieldsDef());
-        var symbol = defineSymbol(StringUtil.rand(domain.name));
+        var symbol = defineSymbol(CommonUtil.rand(domain.name));
         var def = new StructureDefinition(pos, Modifier.empty(),
                 symbol, TypeParameters.empty(), domain, fields);
-        gst.unnamedTypes.add(symbol.name(), def);
+        gst.namedTypes.add(symbol.name(), def);
+        for (var f : fields) f.master().set(def);
         return def;
     }
 
@@ -614,9 +573,6 @@ final class SourceParseVisitor
     public Entity visitDefinedStructureFieldType(
             FengParser.DefinedStructureFieldTypeContext ctx) {
         var type = (DefinedType) visit(ctx.definedType());
-        if (type instanceof MemType) {
-            return semantic("can't be mem type: %s", type.pos());
-        }
         if (type instanceof PrimitiveType pt) {
             return pt.primitive().declarer(posOf(ctx));
         }
@@ -803,8 +759,6 @@ final class SourceParseVisitor
                         func, methodReturnThis);
                 methodReturnThis = false;
                 methods.add(mName, method);
-//                var o = fields.tryGet(mName);
-//                if (o.has()) duplicate(mName, o.get().name());
                 enterMethodName = null;
             } else if (mi.fields != null) {
                 var dcl = parseDeclare(mi.fields.declare);
@@ -814,8 +768,6 @@ final class SourceParseVisitor
                     var field = new ClassField(fName.pos(), mModifier,
                             mExport, dcl, fName, td);
                     fields.add(fName, field);
-//                    var o = methods.tryGet(fName);
-//                    if (o.has()) duplicate(fName, o.get().name());
                 }
             } else {
                 var macro = (Macro) visit(mi.macro());
@@ -861,23 +813,18 @@ final class SourceParseVisitor
     public Entity visitNewType(FengParser.NewTypeContext ctx) {
         var pos = posOf(ctx);
         var defTp = ctx.definedType();
-        if (defTp == null) {
-            var at = ctx.newArrayType();
-            var element = (TypeDeclarer) visit(at.typeDeclarer());
-            var length = (Expression) visit(at.expression());
-            var immutable = at.immutable != null;
-            if (immutable) unsupported("immutable");
-            return new NewArrayType(pos, element, length, immutable);
+
+        if (defTp != null) {
+            var t = (DefinedType) visit(defTp);
+            return new NewDefinedType(pos, t);
         }
 
-        var t = (DefinedType) visit(defTp);
-        if (t instanceof PrimitiveType) {
-            return semantic("can't new primitive: %s", t.pos());
-        }
-        if (t instanceof DerivedType dt) {
-            return new NewDerivedType(pos, dt);
-        }
-        return new NewMemType(pos, (MemType) t);
+        var at = ctx.newArrayType();
+        var element = (TypeDeclarer) visit(at.typeDeclarer());
+        var length = (Expression) visit(at.expression());
+        var immutable = at.immutable != null;
+        if (immutable) unsupported("immutable");
+        return new NewArrayType(pos, element, length, immutable);
     }
 
     @Override
@@ -885,17 +832,6 @@ final class SourceParseVisitor
         var new_ = ctx.new_();
         var type = (NewType) visit(new_.newType());
         var arg = this.<Expression>visitOptional(new_.expression());
-
-        if (type instanceof NewMemType mt) {
-            if (mt.mapped().none()) {
-                if (arg.none()) return syntax(
-                        "require size in bytes: %s", type.pos());
-            } else {
-                if (arg.has()) return semantic(
-                        "only be one type and length: ", arg.get().pos());
-            }
-        }
-
         return new NewExpression(posOf(ctx), type, arg);
     }
 
@@ -903,13 +839,23 @@ final class SourceParseVisitor
     public Entity visitAssertExpression(FengParser.AssertExpressionContext ctx) {
         var subject = (PrimaryExpression) visit(ctx.primaryExpr());
         var type = (TypeDeclarer) visit(ctx.assert_().typeDeclarer());
-        return new AssertExpression(posOf(ctx), subject, type);
+        if (type instanceof DerivedTypeDeclarer ptd)
+            return new AssertExpression(posOf(ctx), subject, ptd);
+        return semantic("assert require a derived type, not %s: %s",
+                type, type.pos());
     }
 
     @Override
     public Entity visitSizeofExpression(FengParser.SizeofExpressionContext ctx) {
         var td = (TypeDeclarer) visit(ctx.sizeof().typeDeclarer());
         return new SizeofExpression(posOf(ctx), td);
+    }
+
+    @Override
+    public Entity visitClosure(FengParser.ClosureContext ctx) {
+        var list = parseStatements(ctx.statementList());
+        var result = (Expression) visit(ctx.expression());
+        return new ClosureExpression(posOf(ctx), list, result);
     }
 
     @Override
@@ -938,6 +884,7 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitPairsExpr(FengParser.PairsExprContext ctx) {
+        unsupported("pairs");
         var pairs = new ArrayList<PairsExpression.Pair>();
         for (var pc : ctx.pair()) {
             var key = (Expression) visit(pc.key);
@@ -986,9 +933,21 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitCallExpression(FengParser.CallExpressionContext ctx) {
-        var handler = (PrimaryExpression) visit(ctx.primaryExpr());
-        var argSet = parseExpressions(ctx.argumentSet().args);
-        return new CallExpression(posOf(ctx), handler, argSet);
+        var callee = (PrimaryExpression) visit(ctx.primaryExpr());
+        var args = parseExpressions(ctx.argumentSet().args);
+        if (callee instanceof ReferExpression re) {
+            if (re.generic().isEmpty() && re.symbol().module().none()) {
+                var op = Primitive.ofCode(re.symbol().name());
+                if (op.has()) {
+                    if (args.size() > 1) {
+                        return semantic("can't convert multi values: %s",
+                                args.get(1).pos());
+                    }
+                    return new ConvertExpression(posOf(ctx), op.get(), args.getFirst());
+                }
+            }
+        }
+        return new CallExpression(posOf(ctx), callee, args);
     }
 
     @Override
@@ -1078,7 +1037,7 @@ final class SourceParseVisitor
 
     private List<Variable> parseVariables(
             FengParser.DeclaredNamesContext dnCtx,
-            Lazy<TypeDeclarer> type) {
+            Optional<TypeDeclarer> type) {
         var modifier = parseModifier(dnCtx.modifier());
         var dcl = parseDeclare(dnCtx.declare);
         type.use(td -> {
@@ -1092,7 +1051,7 @@ final class SourceParseVisitor
         var unique = new UniqueTable<Identifier, Identifier>(names.size());
         for (var name : names) {
             unique.add(name, name);
-            vars.add(new Variable(name.pos(), modifier, dcl, name, type, Lazy.nil()));
+            vars.add(new Variable(name.pos(), modifier, dcl, name, Lazy.of(type), Lazy.nil()));
         }
         return vars;
     }
@@ -1100,18 +1059,20 @@ final class SourceParseVisitor
     @Override
     public Entity visitOnlyDeclaration(FengParser.OnlyDeclarationContext ctx) {
         var typeDcl = (TypeDeclarer) visit(ctx.typeDeclarer());
-        var variables = parseVariables(ctx.declaredNames(), Lazy.of(typeDcl));
-        return new DeclarationStatement(posOf(ctx), variables,
-                Optional.empty());
+        var variables = parseVariables(ctx.declaredNames(), Optional.of(typeDcl));
+        return new DeclarationStatement(posOf(ctx), variables, List.of());
     }
 
     @Override
     public Entity visitAssignedDeclaration(
             FengParser.AssignedDeclarationContext ctx) {
         var typeDcl = this.<TypeDeclarer>visitOptional(ctx.typeDeclarer());
-        var variables = parseVariables(ctx.declaredNames(), Lazy.of(typeDcl));
+        var variables = parseVariables(ctx.declaredNames(), typeDcl);
         var init = (Tuple) visit(ctx.tuple());
-        return new DeclarationStatement(posOf(ctx), variables, Optional.of(init));
+        if (variables.size() != init.size()) {
+            return semantic("number of var and value not match: %s", posOf(ctx));
+        }
+        return new DeclarationStatement(posOf(ctx), variables, init.values());
     }
 
     @Override
@@ -1123,34 +1084,35 @@ final class SourceParseVisitor
     // statement: assignment
 
     @Override
-    public Entity visitVariableAssignableOperand(
-            FengParser.VariableAssignableOperandContext ctx) {
+    public Entity visitVariableOperand(
+            FengParser.VariableOperandContext ctx) {
         var name = parseSymbol(ctx.symbol());
-        return new VariableAssignableOperand(posOf(ctx), name);
+        return new VariableOperand(posOf(ctx), name);
     }
 
     @Override
-    public Entity visitIndexAssignableOperand(
-            FengParser.IndexAssignableOperandContext ctx) {
+    public Entity visitIndexOperand(
+            FengParser.IndexOperandContext ctx) {
         var subject = (PrimaryExpression) visit(ctx.primaryExpr());
         var index = (Expression) visit(ctx.indexOf().expression());
-        return new IndexAssignableOperand(posOf(ctx), subject, index);
+        return new IndexOperand(posOf(ctx), subject, index);
     }
 
     @Override
-    public Entity visitMemberAssignableOperand(
-            FengParser.MemberAssignableOperandContext ctx) {
+    public Entity visitMemberOperand(
+            FengParser.MemberOperandContext ctx) {
         var subject = (PrimaryExpression) visit(ctx.primaryExpr());
         var field = identifier(ctx.memberOf().member);
-        return new FieldAssignableOperand(posOf(ctx), subject, field);
+        return new FieldOperand(posOf(ctx), subject, field);
     }
 
     @Override
     public Entity visitAssignments(FengParser.AssignmentsContext ctx) {
-        var operands = this.<AssignableOperand>visitList(ctx.operands.assignableOperand());
-        var values = (Tuple) visit(ctx.tuple());
+        var operands = this.<Operand>visitList(ctx.operands().operand());
+        var tuple = (Tuple) visit(ctx.tuple());
         var copy = ctx.op.getType() == FengParser.COPY;
-        return new AssignmentsStatement(posOf(ctx), operands, values, copy);
+        if (copy) return unsupported("copy");
+        return new AssignmentsStatement(posOf(ctx), operands, tuple.values(), copy);
     }
 
     @Override
@@ -1178,11 +1140,11 @@ final class SourceParseVisitor
             case FengParser.ASSIGN_OR -> BinaryOperator.OR;
             default -> throw new UnsupportedOperationException("unreachable branch");
         };
-        var operand = (AssignableOperand) visit(ctx.assignableOperand());
+        var operand = (Operand) visit(ctx.operand());
         var value = (Expression) visit(ctx.expression());
         var rhs = new BinaryExpression(posOf(opCtx), binOp, operand.rhs(), value);
         return new AssignmentsStatement(posOf(ctx), List.of(operand),
-                new ArrayTuple(value.pos(), List.of(rhs)), false);
+                List.of(rhs), false);
     }
 
     @Override
@@ -1196,20 +1158,19 @@ final class SourceParseVisitor
     @Override
     public Entity visitTuple(FengParser.TupleContext ctx) {
         var values = parseExpressions(ctx.values);
-        if (values.size() == 1) {
-            var v = values.getFirst();
-            if (v instanceof CallExpression ce)
-                return new ReturnTuple(posOf(ctx), ce);
-        }
-        return new ArrayTuple(posOf(ctx), values);
+        return new Tuple(posOf(ctx), values);
     }
 
     // statement: commons
 
-    private Statement unscope(Statement s) {
-        if (s instanceof BlockStatement bs)
-            return bs.unscope();
-        return s;
+    private Statement scope(Statement s) {
+        if (s instanceof BlockStatement)
+            return s;
+        return new BlockStatement(s.pos(), List.of(s));
+    }
+
+    private BlockStatement noScope(BlockStatement s) {
+        return new BlockStatement(s.pos(), s.list(), false);
     }
 
     @Override
@@ -1230,8 +1191,8 @@ final class SourceParseVisitor
     public Entity visitIfStatement(FengParser.IfStatementContext ctx) {
         var init = this.<Statement>visitOptional(ctx.init);
         var condition = (Expression) visit(ctx.expression());
-        var yes = unscope((Statement) visit(ctx.yes));
-        var not = this.<Statement>visitOptional(ctx.not).map(this::unscope);
+        var yes = (Statement) visit(ctx.yes);
+        var not = this.<Statement>visitOptional(ctx.not);
         return new IfStatement(posOf(ctx), init, condition, yes, not);
     }
 
@@ -1242,7 +1203,7 @@ final class SourceParseVisitor
             FengParser.UnaryForStatementContext ctx) {
         var condition = (Expression) visit(ctx.expression());
         var body = (Statement) visit(ctx.statement());
-        return new ConditionalForStatement(posOf(ctx), unscope(body),
+        return new ConditionalForStatement(posOf(ctx), body,
                 Optional.empty(), condition, Optional.empty());
     }
 
@@ -1257,7 +1218,7 @@ final class SourceParseVisitor
             return syntax("can't declare variable here: %s", updater.pos());
         }
         var body = (Statement) visit(ctx.statement());
-        return new ConditionalForStatement(posOf(ctx), unscope(body),
+        return new ConditionalForStatement(posOf(ctx), body,
                 Optional.of(initializer), condition,
                 Optional.of(updater));
     }
@@ -1269,7 +1230,7 @@ final class SourceParseVisitor
         var arguments = identifiers(iterator.identifierList());
         var source = (Expression) visit(iterator.expression());
         var body = (Statement) visit(ctx.statement());
-        return new IterableForStatement(posOf(ctx), unscope(body),
+        return new IterableForStatement(posOf(ctx), body,
                 arguments, source);
     }
 
@@ -1306,7 +1267,7 @@ final class SourceParseVisitor
                 Declare.CONST, name, Lazy.nil(), Lazy.nil());
         var typeSet = this.<TypeDeclarer>visitList(ctx.catchTypeSet().typeDeclarer());
         var body = (BlockStatement) visit(ctx.blockStatement());
-        return new CatchClause(posOf(ctx), variable, typeSet, body.unscope());
+        return new CatchClause(posOf(ctx), variable, typeSet, body);
     }
 
     @Override
@@ -1316,7 +1277,7 @@ final class SourceParseVisitor
         var tryBody = (BlockStatement) visit(preCtx.blockStatement());
         var catchClause = this.<CatchClause>visitList(preCtx.catchClause());
         catchClause.add((CatchClause) visit(ctx.catchClause()));
-        return new TryStatement(posOf(ctx), tryBody.unscope(),
+        return new TryStatement(posOf(ctx), tryBody,
                 catchClause, Optional.empty());
     }
 
@@ -1327,23 +1288,27 @@ final class SourceParseVisitor
         var tryBody = (BlockStatement) visit(preCtx.blockStatement());
         var catchClause = this.<CatchClause>visitList(preCtx.catchClause());
         var finalBody = this.<BlockStatement>visitOptional(ctx.finallyClause().blockStatement());
-        return new TryStatement(posOf(ctx), tryBody.unscope(), catchClause, finalBody);
+        return new TryStatement(posOf(ctx), tryBody, catchClause, finalBody);
     }
 
     @Override
     public Entity visitReturnStatement(FengParser.ReturnStatementContext ctx) {
-        var result = this.<Tuple>visitOptional(ctx.result);
+        var result = this.<Expression>visitOptional(ctx.result);
         return new ReturnStatement(posOf(ctx), result);
     }
 
     @Override
     public Entity visitContinueStatement(FengParser.ContinueStatementContext ctx) {
-        return new ContinueStatement(posOf(ctx), identifierOptional(ctx.label));
+        var label = identifierOptional(ctx.label);
+        if (label.has()) return unsupported("continue label");
+        return new ContinueStatement(posOf(ctx), label);
     }
 
     @Override
     public Entity visitBreakStatement(FengParser.BreakStatementContext ctx) {
-        return new BreakStatement(posOf(ctx), identifierOptional(ctx.label));
+        var label = identifierOptional(ctx.label);
+        if (label.has()) return unsupported("break label");
+        return new BreakStatement(posOf(ctx), label);
     }
 
     @Override
@@ -1376,16 +1341,24 @@ final class SourceParseVisitor
     // procedure: start
     //
 
-    private ParameterSet parseParameters(FengParser.ParametersSetContext ctx) {
-        if (ctx == null) return new ParameterSet();
+    private VariableParameterSet parseParameters(FengParser.ParametersSetContext ctx) {
+        var params = new IdentifierTable<Variable>();
+
+        if (ctx == null) return new VariableParameterSet(params);
 
         var ps = ctx.parameters();
         if (ps == null) {
             var types = parseTypeDeclarerList(ctx.typeDeclarerList());
-            return new UnnamedParameterSet(types);
+            for (int i = 0, typesSize = types.size(); i < typesSize; i++) {
+                var td = types.get(i);
+                var name = new Identifier(td.pos(), "feng$unnamedParameter" + i);
+                var v = new Variable(td.pos(), Modifier.empty(),
+                        Declare.CONST, name, Lazy.of(td), Lazy.nil());
+                params.add(name, v);
+            }
+            return new VariableParameterSet(params);
         }
 
-        var params = new IdentifierTable<Variable>();
         for (var pc : ps.parameter()) {
             var modifier = parseModifier(pc.modifier());
             var type = (TypeDeclarer) visit(pc.typeDeclarer());
@@ -1399,20 +1372,16 @@ final class SourceParseVisitor
         return new VariableParameterSet(params);
     }
 
-    private List<TypeDeclarer> parseReturnSet(FengParser.ReturnSetContext ctx) {
-        if (ctx == null) return List.of();
+    private Optional<TypeDeclarer> parseReturnSet(FengParser.ReturnSetContext ctx) {
+        if (ctx == null) return Optional.empty();
         if (ctx.current != null) {
             mustInMethod(posOf(ctx.current));
             methodReturnThis = true;
-            return List.of();
+            return Optional.empty();
         }
 
-        var tdCtx = ctx.typeDeclarer();
-        if (tdCtx != null) {
-            var type = (TypeDeclarer) visit(tdCtx);
-            return List.of(type);
-        }
-        return parseTypeDeclarerList(ctx.typeDeclarerList());
+        var type = (TypeDeclarer) visit(ctx.typeDeclarer());
+        return Optional.of(type);
     }
 
     @Override
@@ -1433,7 +1402,7 @@ final class SourceParseVisitor
         var l = Set.copyOf(labels.keySet());
         labels = null;
         return new Procedure(posOf(ctx), prototype,
-                body.unscope(), l);
+                noScope(body), l);
     }
 
 

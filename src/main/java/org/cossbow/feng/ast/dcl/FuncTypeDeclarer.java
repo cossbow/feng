@@ -12,12 +12,12 @@ import org.cossbow.feng.util.Optional;
 public class FuncTypeDeclarer extends TypeDeclarer {
     private final Prototype prototype;
     private final TypeArguments generic;
-    private final Optional<Method> method;
+    private final Optional<? extends Method> method;
 
     public FuncTypeDeclarer(Position pos,
                             Prototype prototype,
                             TypeArguments generic,
-                            Optional<Method> method) {
+                            Optional<? extends Method> method) {
         super(pos);
         this.prototype = prototype;
         this.generic = generic;
@@ -38,7 +38,7 @@ public class FuncTypeDeclarer extends TypeDeclarer {
         return generic;
     }
 
-    public Optional<Method> method() {
+    public Optional<? extends Method> method() {
         return method;
     }
 
@@ -49,7 +49,7 @@ public class FuncTypeDeclarer extends TypeDeclarer {
             return false;
 
         return prototype.equals(t.prototype)
-                || generic.equals(t.generic);
+                && generic.equals(t.generic);
     }
 
     @Override
@@ -57,5 +57,14 @@ public class FuncTypeDeclarer extends TypeDeclarer {
         int result = prototype.hashCode();
         result = 31 * result + generic.hashCode();
         return result;
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        if (generic.isEmpty())
+            return prototype.toString();
+        return generic.toString() + prototype;
     }
 }

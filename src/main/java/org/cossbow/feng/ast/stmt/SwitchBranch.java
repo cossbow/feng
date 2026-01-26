@@ -19,6 +19,10 @@ public class SwitchBranch extends Branch {
         return constants;
     }
 
+    public void constants(List<Expression> constants) {
+        this.constants = constants;
+    }
+
     //
 
 }

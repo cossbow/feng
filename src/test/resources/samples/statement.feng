@@ -12,7 +12,7 @@ func commons() {
 
 // if..else
 
-func checkIfStatement(code int) *rom {
+func checkIfStatement(code int) [*]uint8 {
     if (c < 0) throw new(OutBoundError, 0);
 
     if (var c=code; c == 0) return "SUCCESS";

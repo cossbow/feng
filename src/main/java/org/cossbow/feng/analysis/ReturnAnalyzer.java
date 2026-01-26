@@ -37,10 +37,10 @@ public class ReturnAnalyzer {
     public boolean check(List<Statement> list) {
         var found = false;
         for (var s : list) {
-            if (check(s)) {
-                found = true;
-            } else if (found) {
+            if (found) {
                 semantic("unreachable statement: %s", s.pos());
+            } else if (check(s)) {
+                found = true;
             }
         }
         return found;
@@ -67,6 +67,13 @@ public class ReturnAnalyzer {
     }
 
     public boolean check(IfStatement s) {
+        if (s.cond().has()) {
+            if (s.cond().must().value()) {
+                return check(s.yes());
+            } else {
+                return check(s.not());
+            }
+        }
         return check(s.yes()) && check(s.not());
     }
 

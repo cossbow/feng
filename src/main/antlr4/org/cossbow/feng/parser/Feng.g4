@@ -126,7 +126,7 @@ structureFields
     ;
 // structure field: bitfield must be constant expression
 structureField
-    : name=Identifier (COLON expression)?
+    : name=Identifier ('(' expression ')')?
     ;
 definedStructureFieldType
     : definedType
@@ -234,7 +234,6 @@ parameter
     ;
 returnSet
     : typeDeclarer
-    | '(' typeDeclarerList ')'
     | current=THIS
     ;
 
@@ -264,18 +263,18 @@ macroVariable
 
 // assignment
 assignments
-    : operands=assignableOperands op=(ASSIGN|COPY) tuple
+    : operands op=(ASSIGN|COPY) tuple
     ;
-assignableOperands
-    : assignableOperand (COMMA assignableOperand)*
+operands
+    : operand (COMMA operand)*
     ;
 //
 // assignable on left hand side
 //
-assignableOperand
-    : symbol                # VariableAssignableOperand
-    | primaryExpr indexOf   # IndexAssignableOperand
-    | primaryExpr memberOf  # MemberAssignableOperand
+operand
+    : symbol                # VariableOperand
+    | primaryExpr indexOf   # IndexOperand
+    | primaryExpr memberOf  # MemberOperand
     ;
 
 
@@ -293,7 +292,7 @@ assignedDeclaration
     : declaredNames typeDeclarer? ASSIGN tuple
     ;
 declaredNames
-    : modifier declare=(LET|VAR|CONST) identifierList
+    : modifier declare=(VAR|CONST) identifierList
     ;
 
 
@@ -308,11 +307,11 @@ typeDeclarer
     | arrayTypeDeclarer
     ;
 arrayTypeDeclarer
-    : '[' arrayType? ']' typeDeclarer
+    : '[' arrayType ']' typeDeclarer
     ;
 arrayType
     : len=expression
-    | kind=(MUL|BITAND) required=NOT? immutable=HASH?
+    | refer
     ;
 primaryTypeDeclarer
     : definedTypeDeclarer
@@ -454,7 +453,7 @@ finallyClause
 
 
 assignmentOperation
-    : assignableOperand assignmentOperator expression
+    : operand assignmentOperator expression
     ;
 assignmentOperator
     : op=( ASSIGN_AND
@@ -485,7 +484,7 @@ declarationStatement
 
 // statement: return
 returnStatement
-    : RETURN result=tuple? SEMI
+    : RETURN result=expression? SEMI
     ;
 // statement: loop control
 continueStatement
@@ -560,6 +559,7 @@ operandExpr
     | FUNC procedure            # LambdaExpression
     | '(' expression ')'        # ParenExpression
     | new                       # NewExpression
+    | closure                   # ClosureExpression
     | sizeof                    # SizeofExpression
     ;
 
@@ -571,6 +571,12 @@ referExpr
 argumentSet
     : '(' args=expressionList? ')'
     ;
+
+// closure
+closure
+    : '{' statementList expression SEMI '}'
+    ;
+
 
 expressionList
     : expression (COMMA expression)*
@@ -723,6 +729,10 @@ NilLiteral                          : 'nil';
 //
 // Keywords
 //
+// name of this language
+FENG1            : 'Feng' ;
+FENG2            : 'feng' ;
+FENG3            : 'FENG' ;
 // Keywords: export & import
 EXPORT          : 'export' ;
 IMPORT          : 'import' ;

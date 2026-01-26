@@ -2,15 +2,17 @@ package org.cossbow.feng.ast.var;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
+import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.ReferExpression;
 import org.cossbow.feng.ast.gen.TypeArguments;
+import org.cossbow.feng.util.Lazy;
 
-public class VariableAssignableOperand extends AssignableOperand {
+public class VariableOperand extends Operand {
     private final Symbol symbol;
 
-    public VariableAssignableOperand(Position pos,
-                                     Symbol symbol) {
+    public VariableOperand(Position pos,
+                           Symbol symbol) {
         super(pos);
         this.symbol = symbol;
     }
@@ -24,6 +26,11 @@ public class VariableAssignableOperand extends AssignableOperand {
         return new ReferExpression(pos(), symbol, TypeArguments.EMPTY);
     }
 
+    private final Lazy<Variable> variable = Lazy.nil();
+
+    public Lazy<Variable> variable() {
+        return variable;
+    }
     //
 
     @Override

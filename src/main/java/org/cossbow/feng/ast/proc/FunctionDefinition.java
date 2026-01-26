@@ -48,6 +48,6 @@ public class FunctionDefinition extends Definition {
 
     @Override
     public String toString() {
-        return procedure.toString();
+        return "func " + symbol() + procedure;
     }
 }

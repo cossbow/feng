@@ -19,7 +19,7 @@ public class StructureParseTest extends BaseParseTest {
         for (var domain : domains) {
             var name = randTypeSymbol(32);
             var code = "%s %s{}".formatted(domain, name);
-            var def = (StructureDefinition) doParseFirstDef(code);
+            var def = (StructureDefinition) doParseType(code, name);
             Assertions.assertEquals(name, def.symbol());
             Assertions.assertSame(domain, def.domain());
             Assertions.assertTrue(def.fields().isEmpty());
@@ -29,7 +29,7 @@ public class StructureParseTest extends BaseParseTest {
 
     IdentifierTable<StructureField> parseFields(String names) {
         var code = "struct Foo { %s }".formatted(names);
-        var def = (StructureDefinition) doParseFirstDef(code);
+        var def = (StructureDefinition) doParseType(code, "Foo");
         return def.fields();
     }
 
@@ -60,12 +60,15 @@ public class StructureParseTest extends BaseParseTest {
 
     @Test
     public void testFieldBit() {
-        for (int i = 1; i < 64; i++) {
-            var fields = parseFields("a:%d int64;".formatted(i));
-            var field = fields.get(identifier("a"));
-            Assertions.assertEquals(identifier("a"), field.name());
-            var bf = field.bitfield().must();
-            Assertions.assertEquals(BigInteger.valueOf(i), integer(bf).value());
+        String[] types = {"int", "A", "[2]int", "struct{}", "[3]struct{}"};
+        for (var t : types) {
+            for (int i = 1; i < 64; i++) {
+                var fields = parseFields("a(%d) %s;".formatted(i, t));
+                var field = fields.get(identifier("a"));
+                Assertions.assertEquals(identifier("a"), field.name());
+                var bf = field.bitfield().must();
+                Assertions.assertEquals(BigInteger.valueOf(i), integer(bf).value());
+            }
         }
     }
 
@@ -74,7 +77,7 @@ public class StructureParseTest extends BaseParseTest {
         var a = randVarName(8);
         var bit = ThreadLocalRandom.current().nextInt(0, 64) + 1;
         var b = randVarName(8);
-        var fields = parseFields("%s:%d, %s int64;".formatted(a, bit, b));
+        var fields = parseFields("%s(%d), %s int64;".formatted(a, bit, b));
         var af = fields.get(a);
         Assertions.assertEquals(a, af.name());
         var bitfield = af.bitfield().must();
@@ -116,7 +119,7 @@ public class StructureParseTest extends BaseParseTest {
 
         var dt = ((DerivedTypeDeclarer) f.type()).derivedType();
         Assertions.assertTrue(dt.symbol().module().none());
-        var def = (StructureDefinition) src.table().unnamedTypes.get(dt.symbol().name());
+        var def = (StructureDefinition) src.table().namedTypes.get(dt.symbol().name());
         Assertions.assertEquals(1, def.fields().size());
         var bf = def.fields().get(b);
         Assertions.assertEquals(b, bf.name());

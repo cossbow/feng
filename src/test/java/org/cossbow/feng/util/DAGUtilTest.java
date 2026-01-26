@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 
 import java.util.Set;
@@ -34,7 +35,7 @@ public class DAGUtilTest {
         }
     }
 
-    static Optional<A> checkA(A master) {
+    static List<A> checkA(A master) {
         return DAGUtil.checkCyclic(master, a -> a.slaves);
     }
 
@@ -50,18 +51,18 @@ public class DAGUtilTest {
         a2.slaves.add(a4);
         a3.slaves.add(a4);
         var r = checkA(a1);
-        Assertions.assertTrue(r.none());
+        Assertions.assertTrue(r.isEmpty());
         System.out.println("-----------------");
 
         a4.slaves.add(a1);
         r = checkA(a1);
-        Assertions.assertTrue(r.has());
+        Assertions.assertFalse(r.isEmpty());
         System.out.println("-----------------");
 
         a4.slaves.remove(a1);
         a3.slaves.add(a1);
         r = checkA(a1);
-        Assertions.assertTrue(r.has());
+        Assertions.assertFalse(r.isEmpty());
         System.out.println("-----------------");
     }
 

@@ -15,4 +15,8 @@ public class CallStatement extends Statement {
     public CallExpression call() {
         return call;
     }
+
+    public void call(CallExpression call) {
+        this.call = call;
+    }
 }

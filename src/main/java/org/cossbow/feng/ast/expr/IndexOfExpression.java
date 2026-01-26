@@ -2,7 +2,7 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 
-public class IndexOfExpression extends PrimaryExpression {
+public class IndexOfExpression extends NestedExpression {
     private PrimaryExpression subject;
     private Expression index;
 

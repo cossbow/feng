@@ -1,9 +1,11 @@
 package org.cossbow.feng.ast;
 
 import org.cossbow.feng.ast.attr.Modifier;
+import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.util.ErrorUtil;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 abstract
 public class TypeDefinition extends Definition {
@@ -22,10 +24,6 @@ public class TypeDefinition extends Definition {
         return domain;
     }
 
-    public <D extends TypeDefinition> boolean same(D o) {
-        return symbol().equals(o.symbol());
-    }
-
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof TypeDefinition t))
@@ -41,6 +39,23 @@ public class TypeDefinition extends Definition {
             return ErrorUtil.unsupported("generic");
         return symbol().hashCode();
     }
+
+    //
+
+    private final int typeId = TypeIdGenerator.getAndIncrement();
+
+    public int typeId() {
+        return typeId;
+    }
+
+    static final AtomicInteger TypeIdGenerator;
+
+    static {
+        TypeIdGenerator = new AtomicInteger(1);
+        Primitive.INT.type();
+    }
+
+    //
 
     @Override
     public String toString() {

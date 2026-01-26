@@ -1,27 +1,23 @@
 package org.cossbow.feng.analysis;
 
+import org.cossbow.feng.ast.Scope;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.dcl.Variable;
-import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.Stack;
-import org.cossbow.feng.visit.ClassSymbolContext;
 import org.cossbow.feng.visit.LocalSymbolContext;
 import org.cossbow.feng.visit.SymbolContext;
 
-import java.util.function.Supplier;
+import java.util.List;
+import java.util.stream.Stream;
 
 public class StackedContext implements SymbolContext {
     private final Stack<SymbolContext> stack = new Stack<>();
 
     public StackedContext(SymbolContext root) {
         stack.push(root);
-    }
-
-    public void enterScope(ClassDefinition cd) {
-        stack.push(new ClassSymbolContext(stack.peek(), cd));
     }
 
     public void enterScope() {
@@ -32,8 +28,9 @@ public class StackedContext implements SymbolContext {
         return stack.peek();
     }
 
-    public void exitScope() {
-        stack.pop();
+    public void exitScope(Scope scope) {
+        var ctx = stack.pop();
+        scope.stack(List.copyOf(ctx.scope()));
     }
 
     @Override
@@ -55,4 +52,15 @@ public class StackedContext implements SymbolContext {
     public void putVar(Variable variable) {
         getScope().putVar(variable);
     }
+
+    @Override
+    public List<Variable> scope() {
+        return getScope().scope();
+    }
+
+    @Override
+    public Stream<Variable> local() {
+        return getScope().local();
+    }
+
 }

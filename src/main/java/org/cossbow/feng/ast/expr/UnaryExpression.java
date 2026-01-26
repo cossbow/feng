@@ -22,4 +22,11 @@ public class UnaryExpression extends Expression {
     public Expression operand() {
         return operand;
     }
+
+    //
+
+    @Override
+    public String toString() {
+        return operator.toString() + operand;
+    }
 }

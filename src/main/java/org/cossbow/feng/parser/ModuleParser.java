@@ -7,12 +7,20 @@ import org.cossbow.feng.util.Constants;
 import org.cossbow.feng.util.ErrorUtil;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ModuleParser {
+
+    private final Charset charset;
+
+    public ModuleParser(Charset charset) {
+        this.charset = charset;
+    }
 
     private FModule parse(List<Path> list) throws IOException {
         var table = new ParseSymbolTable();
@@ -21,8 +29,9 @@ public class ModuleParser {
             try (var is = Files.newInputStream(f)) {
                 var fn = f.getFileName().toString();
                 if (!fn.endsWith(Constants.SRC_EXT)) continue;
-                var cs = CharStreams.fromStream(is);
-                var pr = new SourceParser(fn, table).parse(cs);
+
+                var cs = CharStreams.fromStream(is, charset);
+                var pr = new SourceParser(fn, charset, table).parse(cs);
                 if (!pr.errors().isEmpty())
                     ErrorUtil.syntax("parse error: %s", pr.errors());
                 sources.add(pr.root());

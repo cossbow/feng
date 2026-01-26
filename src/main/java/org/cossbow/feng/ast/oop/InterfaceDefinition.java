@@ -8,6 +8,9 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.util.Lazy;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class InterfaceDefinition extends ObjectDefinition {
     private IdentifierTable<InterfaceMethod> methods;
     private SymbolTable<DerivedType> parts;
@@ -40,7 +43,12 @@ public class InterfaceDefinition extends ObjectDefinition {
 
     //
 
-    private transient IdentifierTable<InterfaceMethod> all = new IdentifierTable<>();
+    private final List<InterfaceDefinition> deps = new ArrayList<>();
+    private final IdentifierTable<InterfaceMethod> all = new IdentifierTable<>();
+
+    public List<InterfaceDefinition> deps() {
+        return deps;
+    }
 
     public IdentifierTable<InterfaceMethod> all() {
         return all;

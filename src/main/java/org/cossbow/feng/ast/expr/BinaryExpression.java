@@ -28,5 +28,10 @@ public class BinaryExpression extends Expression {
         return right;
     }
 
+    //
 
+    @Override
+    public String toString() {
+        return left + operator.code + right;
+    }
 }

@@ -26,4 +26,11 @@ public class Field extends Entity {
     public boolean immutable() {
         return false;
     }
+
+    //
+
+    @Override
+    public String toString() {
+        return name + " " + type;
+    }
 }

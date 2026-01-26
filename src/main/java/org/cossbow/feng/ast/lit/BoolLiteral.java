@@ -26,8 +26,8 @@ public class BoolLiteral extends Literal {
     }
 
     @Override
-    public Optional<Primitive.Kind> compatible() {
-        return Optional.of(Primitive.Kind.BOOL);
+    public Optional<Primitive> compatible() {
+        return Optional.of(Primitive.BOOL);
     }
 
     @Override

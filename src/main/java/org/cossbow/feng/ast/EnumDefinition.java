@@ -1,15 +1,20 @@
 package org.cossbow.feng.ast;
 
 import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.dcl.*;
+import org.cossbow.feng.ast.dcl.LiteralTypeDeclarer;
+import org.cossbow.feng.ast.dcl.Primitive;
+import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.expr.Expression;
-import org.cossbow.feng.ast.gen.MemType;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.ast.lit.IntegerLiteral;
+import org.cossbow.feng.ast.lit.Literal;
+import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
-import java.util.Objects;
+import java.util.function.Function;
+
+import static java.nio.charset.StandardCharsets.US_ASCII;
 
 public class EnumDefinition extends TypeDefinition {
     private IdentifierTable<Value> values;
@@ -25,6 +30,10 @@ public class EnumDefinition extends TypeDefinition {
 
     public IdentifierTable<Value> values() {
         return values;
+    }
+
+    public Value ofId(int id) {
+        return values.getValue(id);
     }
 
     public static final class Value extends Entity {
@@ -65,17 +74,15 @@ public class EnumDefinition extends TypeDefinition {
         }
 
         @Override
-        public boolean equals(Object obj) {
-            if (obj == this) return true;
-            if (obj == null || obj.getClass() != this.getClass()) return false;
-            var that = (Value) obj;
-            return Objects.equals(this.name, that.name) &&
-                    Objects.equals(this.init, that.init);
+        public boolean equals(Object o) {
+            if (!(o instanceof Value t))
+                return false;
+            return name.equals(t.name);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(name, init);
+            return name.hashCode();
         }
 
 
@@ -92,16 +99,40 @@ public class EnumDefinition extends TypeDefinition {
 
     //
 
-    public Optional<EnumField> getField(Identifier name) {
-        var td = switch (name.value()) {
-            case "id", "value" -> Primitive.INT.declarer(name.pos());
-            case "name" -> new MemTypeDeclarer(pos(), new MemType(pos(), true,
-                    Optional.empty()), new Refer(pos(),
-                    ReferKind.STRONG, false, false));
+    public Optional<Function<Value, Literal>> field(Identifier name) {
+        Function<Value, Literal> f = switch (name.value()) {
+            case "id" -> v -> new IntegerLiteral(v.pos(), v.id);
+            case "value" -> v -> new IntegerLiteral(v.pos(), v.val);
+            case "name" -> v -> new StringLiteral(v.pos(),
+                    US_ASCII, v.name.value().getBytes());
             case null, default -> null;
         };
-        if (td == null) return Optional.empty();
-        return Optional.of(new EnumField(pos(), name, td, this));
+        return Optional.of(f);
+    }
+
+    //
+
+    public static final String TokenFieldId = "id";
+    public static final String TokenFieldValue = "value";
+    public static final String TokenFieldName = "name";
+
+    public Optional<EnumField> getField(Identifier name) {
+        var f = switch (name.value()) {
+            case TokenFieldId -> IdField;
+            case TokenFieldValue -> ValueField;
+            case TokenFieldName -> NameField;
+            case null, default -> null;
+        };
+        return Optional.of(f);
+    }
+
+    private final EnumField IdField = makeField(TokenFieldId, Primitive.INT.declarer(pos()));
+    private final EnumField ValueField = makeField(TokenFieldValue, Primitive.INT.declarer(pos()));
+    private final EnumField NameField = makeField(TokenFieldName, new LiteralTypeDeclarer(pos(),
+            new StringLiteral(pos(), US_ASCII, TokenFieldName.getBytes(US_ASCII))));
+
+    private EnumField makeField(String name, TypeDeclarer td) {
+        return new EnumField(pos(), new Identifier(pos(), name), td, this);
     }
 
     public static class EnumField extends Field {
@@ -115,9 +146,6 @@ public class EnumDefinition extends TypeDefinition {
             this.definition = definition;
         }
 
-        public EnumDefinition definition() {
-            return definition;
-        }
     }
 
 }

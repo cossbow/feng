@@ -1,18 +1,18 @@
 package org.cossbow.feng.ast.stmt;
 
-import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Variable;
+import org.cossbow.feng.ast.expr.Expression;
 
 import java.util.List;
 
 public class DeclarationStatement extends Statement {
     private List<Variable> variables;
-    private Optional<Tuple> init;
+    private List<Expression> init;
 
     public DeclarationStatement(Position pos,
                                 List<Variable> variables,
-                                Optional<Tuple> init) {
+                                List<Expression> init) {
         super(pos);
         this.variables = variables;
         this.init = init;
@@ -22,7 +22,7 @@ public class DeclarationStatement extends Statement {
         return variables;
     }
 
-    public Optional<Tuple> init() {
+    public List<Expression> init() {
         return init;
     }
 

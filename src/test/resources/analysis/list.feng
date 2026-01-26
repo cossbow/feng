@@ -12,11 +12,13 @@ class Queue {
     var head,tail *Node;
 
     func push(value *Object) {
+        var t = tail;
         var n = newNode(value);
-        tail.next = n;
         tail = n;
-        if (head == nil) {
+        if (t == nil) {
             head = n;
+        } else {
+            t.next = n;
         }
     }
 
@@ -30,21 +32,25 @@ class Queue {
     func isEmpty() bool {
         return head == nil;
     }
+
+    func release() {
+    }
 }
 
 class Data {
     var value int;
 }
 
-func test() {
+func test(n int) int {
     var queue = new(Queue);
-    for (var i = 0; i < 100; i+=1) {
+    for (var i = 0; i < n; i+=1) {
         queue.push(new(Data, {value=i}));
     }
 
     var c = 0;
-    for (queue.isEmpty()) {
+    for (!queue.isEmpty()) {
         var v = queue.poll()?(*Data);
         c += v.value;
     }
+    return c;
 }

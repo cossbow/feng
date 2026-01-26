@@ -50,6 +50,13 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
         }
     }
 
+    public Optional<V> tryAdd(K key, V value) {
+        var n = table.get(key);
+        if (n != null) return Optional.of(n.value);
+        add(key, value);
+        return Optional.empty();
+    }
+
     public V get(K key) {
         var node = table.get(key);
         if (node != null) {
@@ -82,8 +89,8 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
         return Collections.unmodifiableList(nodes);
     }
 
-    public List<K> keys() {
-        return new PhantomKeyList();
+    public Set<K> keys() {
+        return table.keySet();
     }
 
     public List<V> values() {
@@ -144,19 +151,6 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
         @Override
         public V get(int index) {
             return nodes.get(index).value;
-        }
-
-        @Override
-        public int size() {
-            return nodes.size();
-        }
-    }
-
-    class PhantomKeyList extends AbstractList<K> {
-
-        @Override
-        public K get(int index) {
-            return nodes.get(index).key;
         }
 
         @Override

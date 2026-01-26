@@ -30,4 +30,16 @@ public class Definition extends Entity {
     public TypeParameters generic() {
         return generic;
     }
+
+    //
+
+    private volatile boolean builtin;
+
+    public boolean builtin() {
+        return builtin;
+    }
+
+    public void builtin(boolean builtin) {
+        this.builtin = builtin;
+    }
 }

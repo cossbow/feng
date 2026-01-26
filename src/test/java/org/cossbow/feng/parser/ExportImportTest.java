@@ -1,16 +1,23 @@
 package org.cossbow.feng.parser;
 
 
-import org.cossbow.feng.ast.*;
-import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.util.Optional;
+import org.cossbow.feng.ast.BinaryOperator;
+import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.NewArrayType;
-import org.cossbow.feng.ast.dcl.NewDerivedType;
+import org.cossbow.feng.ast.dcl.NewDefinedType;
 import org.cossbow.feng.ast.expr.BinaryExpression;
 import org.cossbow.feng.ast.expr.NewExpression;
+import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.oop.ClassDefinition;
-import org.cossbow.feng.ast.stmt.*;
+import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.ast.stmt.AssignmentsStatement;
+import org.cossbow.feng.ast.stmt.CallStatement;
+import org.cossbow.feng.ast.stmt.DeclarationStatement;
+import org.cossbow.feng.ast.stmt.Statement;
+import org.cossbow.feng.util.Optional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -126,9 +133,9 @@ public class ExportImportTest extends BaseParseTest {
         var im = makeImports(type, param);
         var code = "var a = new(%s`%s`);".formatted(type, param);
         var ds = (DeclarationStatement) parseLocal(im, code);
-        var e = ((ArrayTuple) ds.init().must()).values().getFirst();
+        var e = ds.init().getFirst();
         var n = (NewExpression) e;
-        var t = ((NewDerivedType) n.type()).type();
+        var t = (DerivedType) ((NewDefinedType) n.type()).type();
         Assertions.assertEquals(type, t.symbol());
         Assertions.assertEquals(param,
                 typeName(t.generic().arguments().getFirst()));
@@ -141,7 +148,7 @@ public class ExportImportTest extends BaseParseTest {
         var im = makeImports(index, type);
         var code = "var a = new([%s]%s);".formatted(index, type);
         var ds = (DeclarationStatement) parseLocal(im, code);
-        var e = ((ArrayTuple) ds.init().must()).values().getFirst();
+        var e = ds.init().getFirst();
         var n = (NewExpression) e;
         var t = (NewArrayType) n.type();
         Assertions.assertEquals(index, varName(t.length()));
@@ -157,8 +164,7 @@ public class ExportImportTest extends BaseParseTest {
             var im = makeImports(a, b);
             var code = "r=%s%s%s;".formatted(a, o, b);
             var as = (AssignmentsStatement) parseLocal(im, code);
-            var be = (BinaryExpression) ((ArrayTuple) as.tuple())
-                    .values().getFirst();
+            var be = (BinaryExpression) (as.values()).getFirst();
             Assertions.assertEquals(op, be.operator());
             Assertions.assertEquals(a, varName(be.left()));
             Assertions.assertEquals(b, varName(be.right()));

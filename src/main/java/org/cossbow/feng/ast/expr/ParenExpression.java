@@ -14,4 +14,16 @@ public class ParenExpression extends PrimaryExpression {
     public Expression child() {
         return child;
     }
+
+    @Override
+    public boolean unbound() {
+        return child.unbound();
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        return "(" + child + ")";
+    }
 }

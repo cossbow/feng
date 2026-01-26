@@ -14,7 +14,7 @@ public class Literal extends Entity {
     abstract
     public String type();
 
-    public Optional<Primitive.Kind> compatible() {
+    public Optional<Primitive> compatible() {
         return Optional.empty();
     }
 

@@ -11,6 +11,9 @@ public class Method extends Entity {
     }
 
     abstract
+    public Identifier name();
+
+    abstract
     public Prototype prototype();
 
     abstract

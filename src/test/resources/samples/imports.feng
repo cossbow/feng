@@ -12,7 +12,7 @@ class Win`T h$R | t$Tee & u$Rest` : b$Sys (b$Boot,b$Init) {
     var b*h$Device;
 }
 struct Dos {
-    id:2 b$Hash;
+    id(2) b$Hash;
 }
 func test`T h$R | t$Tee & u$Rest`(b &b$Boot) {
     b$add();

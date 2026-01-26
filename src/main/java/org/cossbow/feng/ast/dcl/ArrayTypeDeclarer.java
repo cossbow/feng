@@ -7,7 +7,7 @@ import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.util.Optional;
 
 import java.math.BigInteger;
-import java.util.Map;
+import java.util.Objects;
 
 public class ArrayTypeDeclarer extends TypeDeclarer
         implements Referable {
@@ -43,6 +43,10 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         return length;
     }
 
+    public void length(Optional<Expression> length) {
+        this.length = length;
+    }
+
     public Optional<Refer> refer() {
         return refer;
     }
@@ -53,29 +57,32 @@ public class ArrayTypeDeclarer extends TypeDeclarer
 
     //
 
-    private volatile BigInteger lenValue;
+    private Long len;
 
-    public BigInteger lenValue() {
-        return lenValue;
+    public long len() {
+        return len;
     }
 
-    public void lenValue(BigInteger lv) {
-        this.lenValue = lv;
+    public void len(long len) {
+        this.len = len;
     }
 
     public boolean isEmpty() {
-        return lenValue.equals(BigInteger.ZERO);
+        return len == null || len == 0;
     }
 
     //
 
     public Optional<ArrayField> getField(Identifier name) {
-        var primitive = innerFields.get(name.value());
-        if (primitive == null) return Optional.empty();
+        if (LengthField.name().equals(name))
+            return Optional.of(LengthField);
 
-        return Optional.of(new ArrayField(pos(), name,
-                primitive.declarer(pos()), this));
+        return Optional.empty();
     }
+
+    public final ArrayField LengthField = new ArrayField(pos(),
+            new Identifier(pos(), "length"),
+            Primitive.INT.declarer(pos()), this);
 
     public static class ArrayField extends Field {
         private final ArrayTypeDeclarer master;
@@ -93,9 +100,6 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         }
     }
 
-    static final Map<String, Primitive> innerFields = Map.of(
-            "length", Primitive.INT
-    );
 
     //
 
@@ -104,7 +108,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         if (!(o instanceof ArrayTypeDeclarer t))
             return false;
         return element.equals(t.element) &&
-                length.equals(t.length) &&
+                (literal || Objects.equals(len, t.len)) &&
                 refer.equals(t.refer);
     }
 

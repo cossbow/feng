@@ -3,27 +3,29 @@ package org.cossbow.feng.ast.proc;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.util.Optional;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class Prototype extends Entity {
-    private ParameterSet parameterSet;
-    private List<TypeDeclarer> returnSet;
+    private VariableParameterSet parameterSet;
+    private Optional<TypeDeclarer> returnSet;
 
     public Prototype(Position pos,
-                     ParameterSet parameterSet,
-                     List<TypeDeclarer> returnSet) {
+                     VariableParameterSet parameterSet,
+                     Optional<TypeDeclarer> returnSet) {
         super(pos);
         this.parameterSet = parameterSet;
         this.returnSet = returnSet;
     }
 
-    public ParameterSet parameterSet() {
+    public VariableParameterSet parameterSet() {
         return parameterSet;
     }
 
-    public List<TypeDeclarer> returnSet() {
+    public Optional<TypeDeclarer> returnSet() {
         return returnSet;
     }
 
@@ -45,6 +47,8 @@ public class Prototype extends Entity {
 
     @Override
     public String toString() {
-        return "(" + parameterSet + ") " + returnSet;
+        if (returnSet.none())
+            return "(" + parameterSet + ") ";
+        return "(" + parameterSet + ") " + returnSet.get();
     }
 }

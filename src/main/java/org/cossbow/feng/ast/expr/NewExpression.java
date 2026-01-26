@@ -28,4 +28,17 @@ public class NewExpression extends PrimaryExpression {
     public boolean isFinal() {
         return true;
     }
+
+    @Override
+    public boolean unbound() {
+        return true;
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        if (arg.none()) return "new(" + type + ")";
+        return "new(" + type + ", " + arg.get() + ")";
+    }
 }

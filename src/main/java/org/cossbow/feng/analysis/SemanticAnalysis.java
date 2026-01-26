@@ -5,20 +5,22 @@ import org.cossbow.feng.ast.attr.AttributeDefinition;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
-import org.cossbow.feng.ast.gen.*;
-import org.cossbow.feng.ast.lit.BoolLiteral;
-import org.cossbow.feng.ast.lit.FloatLiteral;
-import org.cossbow.feng.ast.lit.IntegerLiteral;
-import org.cossbow.feng.ast.lit.NilLiteral;
+import org.cossbow.feng.ast.gen.DerivedType;
+import org.cossbow.feng.ast.gen.PrimitiveType;
+import org.cossbow.feng.ast.gen.TypeArguments;
+import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
-import org.cossbow.feng.ast.var.FieldAssignableOperand;
-import org.cossbow.feng.ast.var.IndexAssignableOperand;
-import org.cossbow.feng.ast.var.VariableAssignableOperand;
+import org.cossbow.feng.ast.var.FieldOperand;
+import org.cossbow.feng.ast.var.IndexOperand;
+import org.cossbow.feng.ast.var.Operand;
+import org.cossbow.feng.ast.var.VariableOperand;
 import org.cossbow.feng.dag.DAGGraph;
+import org.cossbow.feng.layout.LayoutTool;
 import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
@@ -26,96 +28,57 @@ import org.cossbow.feng.util.Stack;
 import org.cossbow.feng.visit.EntityVisitor;
 import org.cossbow.feng.visit.SymbolContext;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.stream.Stream;
 
-import static org.cossbow.feng.ast.dcl.ReferKind.*;
+import static java.nio.charset.StandardCharsets.US_ASCII;
+import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
+import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
+import static org.cossbow.feng.util.CommonUtil.subtract;
 import static org.cossbow.feng.util.DAGUtil.bfsVisit;
-import static org.cossbow.feng.util.DAGUtil.checkCyclic;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     private final StackedContext context;
-    private final TypeDeducer typeDeducer;
-    private final ConstValueChecker constChecker;
-    private final TypeTool typeTool;
+
+    private final LiteralComputer computer = new LiteralComputer();
+    private final ReturnAnalyzer analyzer = new ReturnAnalyzer();
 
     public SemanticAnalysis(SymbolContext parent) {
         context = new StackedContext(parent);
-        typeDeducer = new TypeDeducer(context);
-        constChecker = new ConstValueChecker(context);
-        typeTool = new TypeTool(context);
     }
 
     //
 
-    private Expression compute(Expression e) {
-        return new ConstExprComputer(context).visit(e);
+    private <Key> DAGGraph<Key> makeDAG(Collection<Key> nodes,
+                                        Iterable<Groups.G2<Key, Key>> edges) {
+        var dag = DAGGraph.make(nodes, edges);
+        var c = dag.checkCyclic();
+        if (c.isEmpty()) return dag;
+        return semantic("cyclic dependence: %s", c);
     }
 
-    private Optional<LiteralExpression> tryComputeConst(Expression e) {
-        var res = compute(e);
-        if (res instanceof LiteralExpression le)
-            return Optional.of(le);
-        return Optional.empty();
-    }
+    //
 
-    private Optional<IntegerLiteral> tryComputeConstInteger(Expression e) {
-        var res = compute(e);
-        if (res instanceof LiteralExpression le)
-            return le.asInteger();
-        return Optional.empty();
-    }
 
-    private LiteralExpression computeConst(Expression e) {
-        var res = compute(e);
-        if (res instanceof LiteralExpression le)
-            return le;
-        return semantic("require const value: %s", e.pos());
-    }
-
-    private IntegerLiteral computeConstInteger(Expression e) {
-        var r = computeConst(e);
-        if (r.literal() instanceof IntegerLiteral il)
-            return il;
-        return semantic("require const integer: %s", e.pos());
-    }
-
-    private void visitInterface(IdentifierTable<TypeDefinition> types) {
+    private List<EnumDefinition>
+    visitEnum(IdentifierTable<TypeDefinition> types) {
+        var enums = new ArrayList<EnumDefinition>();
         for (var t : types) {
-            if (t instanceof InterfaceDefinition id) visit(id);
+            if (t instanceof EnumDefinition ed) {
+                visit(ed);
+                enums.add(ed);
+            }
         }
-    }
-
-    private void visitClass(IdentifierTable<TypeDefinition> types) {
-        for (var t : types) {
-            if (t instanceof ClassDefinition cd) visit(cd);
-        }
-    }
-
-    private void visitEnum(IdentifierTable<TypeDefinition> types) {
-        for (var t : types) {
-            if (t instanceof EnumDefinition ed) visit(ed);
-        }
-    }
-
-    private void visitStructure(IdentifierTable<TypeDefinition> types) {
-        for (var t : types) {
-            if (t instanceof StructureDefinition sd) visit(sd);
-        }
+        return enums;
     }
 
     private void visitFunc(IdentifierTable<TypeDefinition> types) {
         for (var t : types) {
             if (t instanceof PrototypeDefinition fd) visit(fd);
-        }
-    }
-
-    private void visitMem(IdentifierTable<TypeDefinition> types) {
-        for (var t : types) {
-            if (t instanceof MemDefinition md) visit(md);
         }
     }
 
@@ -142,7 +105,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                         deps.add(v.get());
                         break;
                     }
-                    semantic("var not declared: %s", e.symbol());
+                    semantic("undeclared or unavailable: %s", e.symbol());
                 }
                 case BinaryExpression e -> {
                     q.add(e.left());
@@ -161,39 +124,72 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return deps;
     }
 
-    private Optional<DAGGraph<GlobalVariable>> visitGlobalVariable(
-            IdentifierTable<GlobalVariable> global) {
-        if (global.isEmpty()) return Optional.empty();
+
+    private Optional<DAGGraph<GlobalVariable>>
+    globalGraph(Collection<GlobalVariable> list) {
+        if (list.isEmpty()) return Optional.empty();
+
+        var gvs = new IdentifierTable<GlobalVariable>(list.size());
+        for (var gv : list) gvs.add(gv.name(), gv);
+
         var edges = new ArrayList<Groups.G2<GlobalVariable, GlobalVariable>>();
-        for (var gv : global) {
+        for (var gv : list) {
             if (gv.value().none()) continue;
-            var cyc = checkCyclic(gv, v -> {
-                return searchDependencies(global, v.value().must());
-            });
-            if (cyc.has()) semantic("cyclic init: %s", cyc.get().symbol());
-            var deps = searchDependencies(global, gv.value().must());
+            var deps = searchDependencies(gvs, gv.value().must());
             for (var dep : deps) edges.add(Groups.g2(dep, gv));
         }
-        var dag = new DAGGraph<>(global.values(), edges);
-        dag.bfs(this::visit);
+        var dag = makeDAG(gvs.values(), edges);
         return Optional.of(dag);
+    }
+
+    private void globalVarInferType(IdentifierTable<GlobalVariable> variables) {
+        var dag = globalGraph(variables.values());
+        if (dag.none()) return;
+        dag.get().bfs(gv -> {
+            if (gv.type().has()) {
+                visit(gv.type().must());
+                return;
+            }
+            var g = optimize(gv.value().must());
+            gv.value().set(g.a());
+            gv.type().set(g.b());
+        });
+    }
+
+    private Optional<DAGGraph<GlobalVariable>>
+    globalVarInit(Collection<GlobalVariable> list) {
+        var dag = globalGraph(list);
+        if (dag.none()) return dag;
+        dag.get().bfs(this::visit);
+        return dag;
+    }
+
+    private boolean isConstPrimitive(Variable v) {
+        return v.declare() == Declare.CONST &&
+                v.type().match(t ->
+                        t instanceof PrimitiveTypeDeclarer ||
+                                t instanceof LiteralTypeDeclarer);
     }
 
     public Entity visit(Source s) {
         var tab = s.table();
 
-        var dagVars = visitGlobalVariable(tab.variables);
-        if ((dagVars.has())) tab.dagVars.set(dagVars.get());
+        globalVarInferType(tab.variables);
+        var constValues = tab.variables
+                .stream().filter(this::isConstPrimitive).toList();
+        tab.dagConst = globalVarInit(constValues);
 
-        visitEnum(tab.namedTypes);
-        visitStructure(tab.namedTypes);
-        visitMem(tab.namedTypes);
-        visitInterface(tab.namedTypes);
-        visitClass(tab.namedTypes);
+        tab.enumList = visitEnum(tab.namedTypes);
+        tab.dagStructures = visitStructures(tab.namedTypes);
+        tab.dagInterfaces = visitInterfaces(tab.namedTypes);
+        tab.dagClasses = visitClasses(tab.namedTypes);
+
+        var rest = subtract(tab.variables.values(), constValues);
+        tab.dagVars = globalVarInit(rest);
+
         visitFunc(tab.namedTypes);
+        tab.dagClasses.use(this::visitMethods);
         visitAttribute(tab.namedTypes);
-
-        for (var t : tab.unnamedTypes) visit(t);
 
         for (var f : tab.namedFunctions) visit(f);
 
@@ -207,24 +203,22 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return semantic("const must init: %s", gv.pos());
         }
 
-        var et = typeDeducer.visit(gv.value().must());
+        var g = optimize(gv.value().must());
         if (gv.type().has()) {
-            if (!assignable(gv.type().must(), et, Optional.empty()))
+            if (!assignable(gv.type().must(), g.b(), Optional.empty()))
                 return semantic("can't assign init value: %s",
-                        et.pos());
+                        gv.pos());
         } else {
-            gv.type().set(et);
+            gv.type().set(g.b());
         }
 
-        var e = compute(gv.value().must());
-        if (!e.isFinal()) {
+        if (!g.a().isFinal()) {
             return semantic("require final value: %s%s",
                     gv.name(), gv.pos());
         }
-        gv.value().set(e);
+        gv.value().set(g.a());
 
         visit((Variable) gv);
-        visit(gv.value().must());
         return gv;
     }
 
@@ -244,28 +238,13 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public TypeDefinition visit(DerivedType dt) {
-        if (!dt.generic().isEmpty())
-            return unsupported("generic");
+        visit(dt.generic());
         var type = context.findType(dt.symbol());
         if (type.none())
-            return semantic("type %s not defined", dt.symbol());
-        if (!type.get().generic().isEmpty())
-            return unsupported("generic");
+            return semantic("type %s not defined: %s",
+                    dt.symbol(), dt.pos());
+        visit(type.get().generic());
         return type.get();
-    }
-
-    @Override
-    public Entity visit(MemType t) {
-        if (t.mapped().none()) return t;
-
-        visit(t.mapped().get());
-
-        return t;
-    }
-
-    @Override
-    public Entity visit(PrimitiveType t) {
-        return t;
     }
 
     //
@@ -281,17 +260,20 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return EntityVisitor.super.visit(td);
     }
 
-    public Entity visit(VoidTypeDeclarer e) {
-        return e;
-    }
-
     public TypeDefinition visit(DerivedTypeDeclarer td) {
         var dt = visit(td.derivedType());
         var r = td.refer();
         visit(r);
 
-        if (dt instanceof ClassDefinition)
+        if (dt instanceof StructureDefinition) return dt;
+
+        if (dt instanceof ClassDefinition cd) {
+            if (cd.resource() && r.none()) {
+                return semantic("resource-class %s must be refer: %s",
+                        cd.symbol(), td.pos());
+            }
             return dt;
+        }
 
         if (dt instanceof InterfaceDefinition) {
             if (r.has()) return dt;
@@ -314,14 +296,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     public Entity visit(ArrayTypeDeclarer td) {
         visit(td.element());
         if (td.length().has()) {
-            var i = computeConstInteger(td.length().get());
-            if (i.value().compareTo(BigInteger.ZERO) < 0) {
-                return semantic("array length require >= 0: %s",
-                        td.length().get().pos());
-            }
-            td.lenValue(i.value());
-        }
-        if (!td.refer().none()) {
+            var l = td.length().get();
+            var s = calcSize(l);
+            td.length(Optional.of(new LiteralExpression(l.pos(), s)));
+            td.len(s.value().longValue());
+        } else {
+            assert td.refer().has();
             visit(td.refer().get());
         }
         return td;
@@ -333,41 +313,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return td;
     }
 
-    private boolean checkMappable(DerivedTypeDeclarer dtd) {
-        if (dtd.refer().has()) return
-                semantic("can't map refer: %s", dtd.pos());
-        var type = visit(dtd.derivedType());
-        if (type instanceof StructureDefinition) return true;
-        return semantic("can't map %s: %s", type, dtd.pos());
-    }
-
-    private boolean checkMappable(ArrayTypeDeclarer td) {
-        if (td.refer().has()) return
-                semantic("can't map refer: %s", td.pos());
-        return checkMappable(td.element());
-    }
-
-    private boolean checkMappable(TypeDeclarer td) {
-        return switch (td) {
-            case PrimitiveTypeDeclarer ignored -> true;
-            case DerivedTypeDeclarer dtd -> checkMappable(dtd);
-            case ArrayTypeDeclarer atd -> checkMappable(atd);
-            case null -> unreachable();
-            default -> semantic("can't map type %s", td.pos());
-        };
-    }
-
-    public Entity visit(MemTypeDeclarer mtd) {
-        if (mtd.mapped().none()) return mtd;
-        var map = mtd.mapped().get();
-        visit(map);
-        if (checkMappable(map)) {
-            checkMapArraySize(map, true, true);
-            return mtd;
-        }
-        return semantic("can't map type %s", map.pos());
-    }
-
     public Entity visit(PrimitiveTypeDeclarer ptd) {
         return ptd;
     }
@@ -376,9 +321,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return ltd;
     }
 
-    public Entity visit(TupleTypeDeclarer ttd) {
-        ttd.tuple().forEach(this::visit);
-        return ttd;
+    public Entity visit(ObjectTypeDeclarer otd) {
+        return otd;
     }
 
     public Entity visit(TypeParameters e) {
@@ -386,43 +330,36 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return unsupported("generic");
     }
 
-    public Entity visit(TypeDefinition def) {
-        visit(def.modifier());
-        visit(def.generic());
-        EntityVisitor.super.visit(def);
-        return def;
-    }
-
-    public Entity visit(PrimitiveDefinition e) {
-        return e;
-    }
-
     // structure define
 
-    public Entity visit(StructureDefinition def) {
-        if (!def.generic().isEmpty())
-            return unsupported("generic");
-
-        var cyc = checkCyclic(def, d -> {
-            var deps = d.fields().stream().map(StructureField::type)
-                    .map(this::structFieldType)
-                    .filter(Optional::has)
-                    .map(Optional::get).toList();
-            d.initDeps().set(deps);
-            return deps;
-        });
-        if (cyc.has()) return semantic("%s cyclic extends: %s",
-                def.symbol(), cyc.must().symbol());
-        for (var f : def.fields())
-            visit(f);
-
-        return def;
+    private Stream<TypeDeclarer> structureDepSizeof(Expression root) {
+        var list = new ArrayList<TypeDeclarer>();
+        var q = new ArrayDeque<Expression>();
+        q.add(root);
+        while (!q.isEmpty()) {
+            var c = q.poll();
+            switch (c) {
+                case SizeofExpression e -> list.add(e.type());
+                case BinaryExpression e -> {
+                    q.add(e.left());
+                    q.add(e.right());
+                }
+                case UnaryExpression e -> q.add(e.operand());
+                case ParenExpression e -> q.add(e.child());
+                case ReferExpression e -> {
+                }
+                case LiteralExpression e -> {
+                }
+                default -> semantic("can't use %s: %s", c, c.pos());
+            }
+        }
+        return list.stream();
     }
 
-    private Optional<StructureDefinition> structFieldType(TypeDeclarer td) {
+    private Stream<StructureDefinition> structureInitDeps(TypeDeclarer td) {
         if (td instanceof PrimitiveTypeDeclarer ptd) {
             if (!ptd.primitive().isBool())
-                return Optional.empty();
+                return Stream.empty();
             return semantic("require integer or float: %s", ptd.pos());
         }
 
@@ -435,53 +372,78 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
             var def = visit(dtd.derivedType());
             if (def instanceof StructureDefinition sd)
-                return Optional.of(sd);
+                return Stream.of(sd);
 
             return semantic("structure field type can't be %s: %s",
                     dtd.derivedType(), td.pos());
         }
 
         if (td instanceof ArrayTypeDeclarer atd) {
-            if (atd.refer().has()) {
+            if (atd.refer().has())
                 return semantic("can't be reference");
-            }
-            var i = computeConstInteger(atd.length().must());
-            if (i.value().compareTo(BigInteger.ZERO) < 0) {
-                return semantic("can't be negative: %s",
-                        atd.length().get().pos());
-            }
-            atd.lenValue(i.value());
-            return structFieldType(atd.element());
+
+            var l = atd.length().must();
+            var sizeof = structureDepSizeof(l);
+            var element = Stream.of(atd.element());
+            return Stream.concat(element, sizeof).flatMap(this::structureInitDeps);
         }
 
         return semantic("illegal type: %s%s", td, td.pos());
     }
 
-    private int structBitfield(PrimitiveTypeDeclarer td, Expression bf) {
-        var il = computeConstInteger(bf);
-
-        var v = il.value().intValue();
-        if (0 < v && v <= td.primitive().width)
-            return v;
-
-        return semantic("bitfield must in range [1,64]: %s", bf.pos());
-    }
-
-    public Entity visit(StructureField sf) {
-        illegalPhantom(sf.type());
-        structFieldType(sf.type());
-
-        sf.bitfield().use(bf -> {
-            if (sf.type() instanceof PrimitiveTypeDeclarer ptd) {
-                var i = structBitfield(ptd, bf);
-                sf.bitfieldValue(i);
-                return;
-            }
-            semantic("bitfield only for primitive: %s", bf.pos());
+    public Optional<DAGGraph<StructureDefinition>>
+    visitStructures(IdentifierTable<TypeDefinition> types) {
+        var all = new ArrayList<StructureDefinition>(types.size());
+        var edges = new ArrayList<Groups.G2<StructureDefinition, StructureDefinition>>();
+        for (var def : types) {
+            if (!(def instanceof StructureDefinition sd))
+                continue;
+            sd.fields().stream().map(StructureField::type)
+                    .flatMap(this::structureInitDeps)
+                    .forEach(d -> edges.add(Groups.g2(d, sd)));
+            all.add(sd);
+        }
+        if (all.isEmpty()) return Optional.empty();
+        var dag = makeDAG(all, edges);
+        var layoutTool = new LayoutTool(context);
+        dag.bfs(sd -> {
+            if (sd.builtin()) return;
+            computeConst(sd);
+            var layout = layoutTool.buildLayout(sd);
+            sd.layout().set(layout);
         });
-
-        return sf;
+        return Optional.of(dag);
     }
+
+    private void computeConst(StructureDefinition sd) {
+        for (var sf : sd.fields()) {
+            computeBitfield(sf);
+            computeConst(sf.type());
+        }
+    }
+
+    private void computeBitfield(StructureField sf) {
+        if (sf.bitfield().none()) {
+            return;
+        }
+
+        var bf = sf.bitfield().get();
+        if (!(sf.type() instanceof PrimitiveTypeDeclarer ptd
+                && ptd.primitive().isInteger())) {
+            semantic("bitfield must be integer: %s", bf.pos());
+            return;
+        }
+
+        var v = calcSize(bf).value().intValue();
+        if (v > 0 && v <= ptd.primitive().width) {
+            sf.bits(v);
+            return;
+        }
+
+        semantic("field width must in range [1,%s]: %s",
+                ptd.primitive().width, bf.pos());
+    }
+
 
     // enum
 
@@ -492,7 +454,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             if (v.init().none()) {
                 continue;
             }
-            var il = computeConstInteger(v.init().must());
+            var il = calcInteger(v.init().must());
             v.init().set(new LiteralExpression(il.pos(), il));
             v.val(il.value().intValue());
         }
@@ -502,12 +464,57 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     //
 
-    private int compatible(Prototype l, Prototype r) {
+    private static Optional<Primitive>
+    primitiveKind(TypeDeclarer td) {
+        if (td instanceof PrimitiveTypeDeclarer ptd)
+            return Optional.of(ptd.primitive());
+        if (td instanceof LiteralTypeDeclarer ltd)
+            return ltd.literal().compatible();
+        return Optional.empty();
+    }
+
+    private void computeConst(TypeDeclarer td) {
+        while (td instanceof ArrayTypeDeclarer atd) {
+            atd.length().use(e -> {
+                var len = calcSize(e);
+                atd.len(len.value().longValue());
+            });
+            td = atd.element();
+        }
+    }
+
+    private static boolean isInteger(TypeDeclarer td) {
+        if (td instanceof PrimitiveTypeDeclarer ptd)
+            return ptd.primitive().isInteger();
+
+        if (td instanceof LiteralTypeDeclarer ltd)
+            return ltd.literal() instanceof IntegerLiteral;
+
+        return false;
+    }
+
+    //
+
+    private int checkCompatible(Prototype l, Prototype r) {
         if (!l.parameterSet().equals(r.parameterSet()))
             return 1;
-        if (!assignable(l.returnSet(), r.returnSet(), List.of()))
+        var lr = l.returnSet();
+        var rr = r.returnSet();
+        if (lr.none() != rr.none())
+            return 2;
+        if (lr.none()) return 0;
+        if (!assignable(lr.get(), rr.get(), Optional.empty(), true))
             return 2;
         return 0;
+    }
+
+    private boolean compatible(Prototype l, Prototype r) {
+        var re = checkCompatible(l, r);
+        return switch (re) {
+            case 1 -> semantic("parameters not same: %s", r.pos());
+            case 2 -> semantic("returns not compatible: %s", r.pos());
+            default -> true;
+        };
     }
 
     // class define
@@ -517,8 +524,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             IdentifierTable<ClassField> allFields,
             IdentifierTable<ClassMethod> allMethods) {
         // 检查同名属性
-        for (var pf : parent.fields()) {
-            var cf = allFields.tryGet(pf.name());
+        for (var pf : parent.allFields()) {
+            var cf = child.fields().tryGet(pf.name());
             if (cf.none()) {
                 allFields.add(pf.name(), pf);
                 continue;
@@ -529,8 +536,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
 
         // 检查方法覆盖是否兼容
-        for (var pm : parent.methods()) {
-            var o = allMethods.tryGet(pm.name());
+        for (var pm : parent.allMethods()) {
+            var o = child.methods().tryGet(pm.name());
             if (o.none()) {
                 allMethods.add(pm.name(), pm);
                 continue;
@@ -543,53 +550,58 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             }
             var pp = pm.func().prototype();
             var cp = cm.func().prototype();
-            var re = compatible(pp, cp);
-            switch (re) {
-                case 1 -> semantic("parameters not same: %s", cp.pos());
-                case 2 -> semantic("returns not compatible: %s", cp.pos());
-            }
+            compatible(pp, cp);
+            pm.override().add(cm);
         }
 
     }
 
-    private ClassDefinition findParent(DerivedType t) {
+    private ClassDefinition findClass(DerivedType t) {
         var dt = visit(t);
         if (dt instanceof ClassDefinition pcd)
             return pcd;
         return semantic("require class: %s", dt.symbol());
     }
 
+    private void checkResource(ClassDefinition cd) {
+        var res = cd.allMethods().tryGet(ClassDefinition.ReleaseName);
+        if (res.none()) return;
+        var m = res.get();
+        if (!m.prototype().parameterSet().isEmpty()) {
+            semantic("release method can't has parameter");
+        }
+        if (m.prototype().returnSet().has()) {
+            semantic("release method can't has return");
+        }
+        cd.resource(true);
+    }
+
     private void checkAllInherits(ClassDefinition cd) {
+        if (cd.builtin()) return;
         var allFields = new IdentifierTable<>(cd.fields().nodes());
         var allMethods = new IdentifierTable<>(cd.methods().nodes());
-        var set = new HashSet<Symbol>();
-        var c = cd;
-        while (c.inherit().has()) {
-            if (!set.add(c.symbol()))
-                semantic("inherit in cyclic: %s%s", c.symbol(), c.pos());
-
-            var parent = findParent(c.inherit().must());
-            cd.parent().setIfNone(parent);
-            checkInherit(parent, cd, allFields, allMethods);
-            c = parent;
+        if (cd.parent().has()) {
+            checkInherit(cd.parent().must(), cd, allFields, allMethods);
+        }
+        for (var c = cd.parent(); c.has(); c = c.must().parent()) {
+            cd.ancestors().add(c.must());
         }
         cd.allFields().addAll(allFields);
         cd.allMethods().addAll(allMethods);
+        checkResource(cd);
     }
 
     private void checkImplList(InterfaceDefinition id, ClassDefinition cd) {
         for (var im : id.all()) {
-            var cm = cd.allMethods().tryGet(im.name());
-            if (cm.none()) {
+            var o = cd.allMethods().tryGet(im.name());
+            if (o.none()) {
                 semantic("%s unimplement method: %s%s",
                         cd.symbol(), im.name(), im.pos());
                 return;
             }
-            var re = compatible(im.prototype(), cm.must().prototype());
-            switch (re) {
-                case 1 -> semantic("unimplement method: %s", im.pos());
-                case 2 -> semantic("returns not consistent: %s", im.pos());
-            }
+            var cm = o.must();
+            compatible(im.prototype(), cm.prototype());
+            im.impls().add(cm);
         }
     }
 
@@ -606,8 +618,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     private Optional<ClassDefinition>
     getClassTypeField(TypeDeclarer t) {
-        assert enterClass != null;
-
         if (t instanceof DerivedTypeDeclarer ctd) {
             if (ctd.refer().has())
                 return Optional.empty();
@@ -627,49 +637,72 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return Optional.empty();
     }
 
-    private void checkAcyclicInit(ClassDefinition cd) {
-        var cyc = checkCyclic(cd, d -> {
-            var inherit = d.inherit().stream().map(this::findParent);
-            var fields = d.fields().stream().map(ClassField::type)
-                    .map(this::getClassTypeField).flatMap(Optional::stream);
-            var initDeps = Stream.concat(inherit, fields).toList();
-            d.initDeps().set(initDeps);
-            return initDeps;
-        });
-        if (cyc.none()) return;
-        semantic("cyclic init: %s",
-                cyc.must().symbol());
+    private List<ClassDefinition> findInitDeps(ClassDefinition cd) {
+        var inherit = cd.inherit().stream().map(this::findClass)
+                .peek(p -> cd.parent().setIfNone(p));
+        var fields = cd.fields().stream().map(ClassField::type)
+                .map(this::getClassTypeField).flatMap(Optional::stream);
+        return Stream.concat(inherit, fields).toList();
     }
 
-    private volatile ClassDefinition enterClass;
-    private volatile ClassMethod enterMethod;
+    private Optional<DAGGraph<ClassDefinition>>
+    visitClasses(IdentifierTable<TypeDefinition> types) {
+        var all = new ArrayList<ClassDefinition>(types.size());
+        var edges = new ArrayList<Groups.G2<ClassDefinition, ClassDefinition>>();
+        for (var t : types) {
+            if (!(t instanceof ClassDefinition cd)) continue;
+            var deps = findInitDeps(cd);
+            for (var dep : deps) edges.add(Groups.g2(dep, cd));
+            all.add(cd);
+        }
+        if (all.isEmpty()) return Optional.empty();
+        var dag = makeDAG(all, edges);
+        dag.bfs(this::checkAllInherits);
+        dag.bfs(this::checkImplList);
+        dag.bfs(this::visitClass);
+        dag.bfs(cd -> new UpdaterAnalyzer().analyse(cd));
+        return Optional.of(dag);
+    }
 
-    public Entity visit(ClassDefinition cd) {
+    private void visitMethods(DAGGraph<ClassDefinition> dag) {
+        dag.bfs(this::visitMethod);
+    }
+
+    private ClassDefinition enterClass;
+    private ClassMethod enterMethod;
+
+    private void visitClass(ClassDefinition cd) {
+        if (cd.builtin()) return;
+
         assert enterClass == null;
         enterClass = cd;
-        context.enterScope(cd);
-        if (!cd.generic().isEmpty())
-            return unsupported("generic");
 
-        checkAcyclicInit(cd);
-        checkAllInherits(cd);
-        checkImplList(cd);
+        if (!cd.generic().isEmpty()) {
+            unsupported("generic");
+            return;
+        }
 
         for (var f : cd.fields()) visit(f);
-        for (var m : cd.methods()) visit(m);
 
-        if (!cd.macros().isEmpty())
-            unsupported("macro");
-        context.exitScope();
         enterClass = null;
-        return cd;
     }
 
     public Entity visit(ClassField cf) {
         assert enterClass != null;
-        illegalPhantom(cf.type());
         visit(cf.type());
         return cf;
+    }
+
+    public void visitMethod(ClassDefinition cd) {
+        assert enterClass == null;
+        enterClass = cd;
+
+        for (var m : cd.methods()) visit(m);
+
+        if (!cd.macros().isEmpty())
+            unsupported("macro");
+
+        enterClass = null;
     }
 
     public Entity visit(ClassMethod cm) {
@@ -684,12 +717,32 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return cm;
     }
 
+    private CurrentExpression newThis(Position pos) {
+        var ce = new CurrentExpression(pos, enterClass.symbol(),
+                enterMethod.name(), true);
+        var g = optimize(ce);
+        ce.resultType.set(g.b());
+        return ce;
+    }
+
+    private MemberOfExpression wrapThis(Symbol s, Field f) {
+        assert s.module().none();
+        return new MemberOfExpression(s.pos(), newThis(s.pos()),
+                s.name(), TypeArguments.EMPTY, f);
+    }
+
+    private MemberOfExpression wrapThis(ReferExpression e, ClassMethod m) {
+        assert e.symbol().module().none();
+        return new MemberOfExpression(e.pos(), newThis(e.pos()),
+                e.symbol().name(), e.generic(), m);
+    }
+
     private List<InterfaceDefinition>
     findParts(InterfaceDefinition def) {
         return def.parts().stream().map(p -> {
             var t = visit(p);
             if (t instanceof InterfaceDefinition id) return id;
-            return semantic("require interface: %s");
+            return semantic("component must be interface: %s", p.pos());
         }).toList();
     }
 
@@ -707,19 +760,35 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return Optional.empty();
     }
 
+    private Optional<DAGGraph<InterfaceDefinition>>
+    visitInterfaces(IdentifierTable<TypeDefinition> types) {
+        var all = new ArrayList<InterfaceDefinition>(types.size());
+        var edges = new ArrayList<Groups.G2<InterfaceDefinition, InterfaceDefinition>>();
+        for (var t : types) {
+            if (!(t instanceof InterfaceDefinition id)) continue;
+
+            var parts = findParts(id);
+            for (var part : parts) {
+                edges.add(Groups.g2(part, id));
+            }
+            id.deps().addAll(parts);
+            all.add(id);
+        }
+        if (all.isEmpty()) return Optional.empty();
+        var dag = makeDAG(all, edges);
+        dag.bfs(this::visit);
+        return Optional.of(dag);
+    }
+
     public Entity visit(InterfaceDefinition def) {
+        if (def.builtin()) return def;
         if (!def.generic().isEmpty()) return unsupported("generic");
 
         for (var m : def.methods()) visit(m);
 
-        var cyc = checkCyclic(def, this::findParts);
-        if (cyc.has()) return semantic("cyclic init: %s",
-                cyc.must().symbol());
-
-
         var all = new HashMap<Identifier, InterfaceMethod>();
         for (var m : def.methods()) all.put(m.name(), m);
-        bfsVisit(def, this::findParts, (d, p) -> {
+        bfsVisit(def, InterfaceDefinition::deps, (d, p) -> {
             if (d == null) return;
             var c = compatible(p, all);
             if (c.none()) return;
@@ -753,7 +822,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return fd;
     }
 
-    private volatile Procedure enterProc;
+    private Procedure enterProc;
 
     public Entity visit(Procedure proc) {
         assert enterProc == null;
@@ -762,44 +831,24 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         visit(proc.prototype(), true);
         visit(proc.body());
         checkAllPathReturn(proc);
-        context.exitScope();
+        context.exitScope(proc);
         enterProc = null;
         return proc;
     }
 
     private void checkAllPathReturn(Procedure proc) {
-        if (proc.prototype().returnSet().isEmpty()) return;
-        var analyzer = new ReturnAnalyzer();
         if (analyzer.check(proc.body()))
             return;
+        if (proc.prototype().returnSet().none()) return;
 
         semantic("missing return statement: %s",
                 enterProc.pos());
     }
 
     public Entity visit(Prototype prot, boolean addVar) {
-        visit(prot.parameterSet(), addVar);
-        for (var td : prot.returnSet()) {
-            visit(td);
-        }
+        visit((VariableParameterSet) prot.parameterSet(), addVar);
+        visit(prot.returnSet());
         return prot;
-    }
-
-    private void visit(ParameterSet ps, boolean addVar) {
-        switch (ps) {
-            case UnnamedParameterSet ups -> visit(ups);
-            case VariableParameterSet vps -> visit(vps, addVar);
-            case null -> unreachable();
-            default -> {
-            }
-        }
-    }
-
-    private void visit(UnnamedParameterSet ps) {
-        for (var td : ps.types()) {
-            enablePhantom = true;
-            visit(td);
-        }
     }
 
     private void visit(VariableParameterSet ps, boolean addVar) {
@@ -812,160 +861,162 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     //
 
+    private boolean enablePhantom(Expression e) {
+        return switch (e) {
+            case IndexOfExpression ee -> enablePhantom(ee);
+            case LiteralExpression ee -> enablePhantom(ee);
+            case MemberOfExpression ee -> enablePhantom(ee);
+            case ParenExpression ee -> enablePhantom(ee.child());
+            case ReferExpression ee -> enablePhantom(ee);
+            case VariableExpression ee -> enablePhantom(ee.variable());
+            case AssertExpression ee -> false;
+            case SizeofExpression ee -> false;
+            case NewExpression ee -> false;
+            case CurrentExpression ee -> true;
+            default -> semantic("can't refer: %s", e.pos());
+        };
+    }
+
+    private boolean enablePhantom(Variable v) {
+        var isConst = v.declare() == Declare.CONST;
+        var isRefer = v.type().must().maybeRefer().has();
+        return isConst == isRefer;
+    }
+
+    private boolean enablePhantom(ReferExpression e) {
+        if (!e.generic().isEmpty()) return unsupported("generic");
+        var v = context.findVar(e.symbol());
+        if (v.none()) return semantic("not declared: %s", e.pos());
+
+        return enablePhantom(v.get());
+    }
+
+    private boolean enablePhantom(IndexOfExpression e) {
+        var g = optimize(e.subject());
+        if (!(g.b() instanceof ArrayTypeDeclarer atd))
+            return unreachable();
+        return !atd.refer().has() && enablePhantom(e.subject());
+    }
+
+    private boolean enablePhantom(MemberOfExpression e) {
+        if (e.field().none()) {
+            return semantic("operable field not found %s: %s",
+                    e.member(), e.member().pos());
+        }
+        var f = e.field().get();
+        var able = f.type().maybeRefer().has() == f.immutable();
+        return enablePhantom(e.subject()) == able;
+    }
+
+    private boolean enablePhantom(LiteralExpression e) {
+        return e.literal() instanceof StringLiteral
+                || e.literal() instanceof NilLiteral;
+    }
+
+    private boolean enablePhantom(Optional<Expression> re) {
+        if (re.none()) return true;
+        if (enablePhantom(re.get()))
+            return true;
+        return semantic("can't use phantom reference: %s", re.get().pos());
+    }
+
+    //
+
     public Entity visit(BlockStatement bs) {
         if (bs.newScope()) context.enterScope();
         for (var s : bs.list())
             visit(s);
-        if (bs.newScope()) context.exitScope();
+        if (bs.newScope()) context.exitScope(bs);
         return bs;
     }
 
-    private void checkVoidType(TypeDeclarer td) {
-        if (td instanceof ArrayTypeDeclarer atd)
-            td = atd.element();
-        if (td instanceof VoidTypeDeclarer)
-            semantic("can't deduce type: %s", td.pos());
-    }
+    private boolean initializable(
+            StructureDefinition sd,
+            ObjectTypeDeclarer odt, ObjectExpression oe) {
+        var fields = sd.fields();
+        var obj = oe.entries();
 
-    private void initVar(List<Variable> variables, Tuple init) {
-        visit(init);
-        var td = typeDeducer.visit(init);
-        var types = td.tuple();
-        if (types.size() != variables.size()) {
-            semantic("unaligned declaration: %s", init.pos());
-            return;
-        }
-        for (int i = 0; i < variables.size(); i++) {
-            var v = variables.get(i);
-            var t = types.get(i);
-
-            if (init instanceof ArrayTuple at)
-                v.value().set(compute(at.values().get(i)));
-
-            if (v.type().none()) {
-                checkVoidType(t);
-                // aotu set type
-                v.type().set(t);
-            } else {
-                // check type
-                if (!assignable(v.type().must(), t, v.value().get())) {
-                    semantic("incompatible, can't init : %s", v.pos());
-                    return;
-                }
-            }
-
-        }
-    }
-
-    public Entity visit(DeclarationStatement ds) {
-        if (ds.init().has()) {
-            initVar(ds.variables(), ds.init().must());
-        } else {
-            for (var v : ds.variables()) {
-                if (v.declare() != Declare.CONST)
-                    continue;
-                return semantic("const must init: %s", v.pos());
-            }
-        }
-        for (var v : ds.variables()) {
-            assert v.type().has();
-            enablePhantom = true;
-            visit(v);
-            context.putVar(v);
-        }
-        return ds;
-    }
-
-    private <F extends Field> boolean initializable(
-            HaveFields<F> ld, ObjectTypeDeclarer od) {
-        var obj = od.entries();
-
-        for (var node : obj.nodes()) {
-            var fo = ld.fields().tryGet(node.key());
-            if (fo.none())
-                return semantic("unknown field %s%s",
-                        node.key(), node.key().pos());
-
-            var able = assignable(fo.get().type(), node.value(), Optional.empty());
-            if (!able) return false;
-        }
-
-        for (F f : ld.fields()) {
-            if (f.immutable() && !obj.exists(f.name()))
+        var keys = new ArrayList<Identifier>();
+        for (var f : fields) {
+            var o = obj.tryGet(f.name());
+            if (o.none()) {
+                if (!f.immutable()) continue;
                 return semantic("const field must init: %s",
-                        od.pos());
+                        oe.pos());
+            }
+
+            var v = o.get();
+            var t = odt.entries().get(f.name());
+            var able = assignable(f.type(), t, o);
+            if (!able) return semantic(
+                    "incompatible field '%s' and value '%s': %s",
+                    f.name(), v, v.pos());
+            keys.add(f.name());
+        }
+
+        oe.initStack.add(keys);
+        return true;
+    }
+
+    private boolean initializable(
+            ClassDefinition cd,
+            ObjectTypeDeclarer odt, ObjectExpression oe) {
+        for (Identifier k : oe.entries().keys()) {
+            if (cd.allFields().exists(k)) continue;
+            return semantic("unknown field '%s': %s", k, k.pos());
+        }
+
+        var initKeys = new HashSet<>(oe.entries().keys());
+        var def = cd;
+        while (true) {
+            var keys = new ArrayList<Identifier>();
+            for (var f : def.fields()) {
+                var o = oe.entries().tryGet(f.name());
+                if (o.none()) {
+                    if (!f.immutable()) continue;
+                    return semantic("const field must init: %s",
+                            oe.pos());
+                }
+                var v = o.get();
+                var t = odt.entries().get(f.name());
+                var able = assignable(f.type(), t, o);
+                if (!able) return semantic(
+                        "incompatible field '%s' and value '%s': %s",
+                        f.name(), v, v.pos());
+                keys.add(f.name());
+            }
+            oe.initStack.add(keys);
+            keys.forEach(initKeys::remove);
+            if (initKeys.isEmpty()) break;
+            if (def.parent().none()) break;
+            def = def.parent().must();
+            if (def == ClassDefinition.ObjectClass) break;
         }
 
         return true;
     }
 
     private boolean initializable(
-            DerivedTypeDeclarer l, ObjectTypeDeclarer o) {
+            DerivedTypeDeclarer l,
+            ObjectTypeDeclarer o, ObjectExpression oe) {
+        if (oe.entries().isEmpty()) return true;
+
         var lt = visit(l.derivedType());
 
         if (lt instanceof StructureDefinition def)
-            return initializable(def, o);
+            return initializable(def, o, oe);
 
         if (lt instanceof ClassDefinition def)
-            return initializable(def, o);
+            return initializable(def, o, oe);
 
         return false;
-    }
-
-    private boolean assignable(
-            StructureDefinition l, StructureDefinition r) {
-        return l.equals(r);
-    }
-
-    private boolean
-    assignable(ArrayTypeDeclarer l, ArrayTypeDeclarer r,
-               Optional<Expression> re) {
-        if (l.literal()) // Not: [literal] = ??
-            return semantic("literal can't assign: %s", l.pos());
-
-        var elOk = assignable(l.element(), r.element(),
-                Optional.empty(), false);
-
-        if (l.refer().none()) {
-            var llen = computeConstInteger(l.length().must());
-
-            if (r.refer().has()) return false; // Not: [value] = [refer]
-
-            if (r.literal()) {
-                if (r.isEmpty()) return true; // Yes: [value] = [literal]
-                // Yes: check index out of bounds
-                if (llen.value().compareTo(r.lenValue()) < 0)
-                    return semantic("index out of bound: %s", r.pos());
-                return elOk;
-            }
-
-            // Yes: must both equals-length and same-type-element
-            var rlen = computeConstInteger(r.length().must());
-            return llen.equals(rlen) && elOk;
-        }
-
-        if (r.literal()) return false; // Not: [refer] = [literal]
-
-        if (!elOk)
-            return false; // Not: element not same
-
-        var lr = l.refer().get();
-
-        if (lr.kind() == PHANTOM) {
-            checkEnablePhantom(re);
-            return true;
-        }
-
-        return lr.kind() == STRONG && r.refer().has() &&
-                r.refer().get().isKind(STRONG);
-
     }
 
     private boolean assignable(ClassDefinition l, ClassDefinition r) {
         visit(l.generic());
         visit(r.generic());
 
-        if (r.same(l)) return true;
+        if (r.equals(l)) return true;
         return r.parent().match(p -> assignable(l, p));
     }
 
@@ -1003,13 +1054,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return false;
     }
 
-    private boolean assignable(TypeDefinition l, TypeDefinition r, boolean covariant) {
-        if (l instanceof StructureDefinition ls) {
-            if (r instanceof StructureDefinition rs)
-                return assignable(ls, rs);
-            return false;
-        }
-
+    private boolean assignable(
+            ObjectDefinition l, ObjectDefinition r,
+            boolean covariant) {
         if (!covariant) return l.equals(r);
 
         if (l instanceof ClassDefinition lc) {
@@ -1030,106 +1077,256 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return false;
     }
 
-    private void checkEnablePhantom(Optional<Expression> re) {
-        if (re.none()) return;
-        if (new PhantomChecker(context).checkEnable(re.get()))
-            return;
-        semantic("can't use phantom reference: %s", re.get().pos());
-    }
 
     private boolean
     assignable(DerivedTypeDeclarer l, DerivedTypeDeclarer r,
-               Optional<Expression> re, boolean covariant) {
+               boolean covariant) {
         visit(l.derivedType().generic());
         visit(r.derivedType().generic());
 
         var lt = visit(l.derivedType());
         var rt = visit(r.derivedType());
-        if (l.refer().none())
-            return r.refer().none() && lt.equals(rt);
-
-        var lr = l.refer().get();
-
-        if (lr.kind() == PHANTOM) {
-            checkEnablePhantom(re);
-            return assignable(lt, rt, covariant);
-        }
-        if (lr.kind() == STRONG) {
-            return r.refer().has() &&
-                    r.refer().get().isKind(STRONG)
-                    && assignable(lt, rt, covariant);
-        }
-
-        return unreachable();
-    }
-
-    private boolean assignable(
-            PrimitiveTypeDeclarer l, LiteralTypeDeclarer r) {
-        if (l.primitive().isInteger()) {
-            return r.literal() instanceof IntegerLiteral;
-        }
-
-        if (l.primitive().isFloat()) {
-            return r.literal() instanceof FloatLiteral;
-        }
-
-        if (l.primitive().isBool()) {
-            return r.literal() instanceof BoolLiteral;
-        }
-
+        if (lt instanceof ObjectDefinition lo &&
+                rt instanceof ObjectDefinition ro)
+            return assignable(lo, ro, covariant);
         return false;
     }
 
-    private boolean assignable(
+    private boolean compatible(
             DerivedTypeDeclarer l, FuncTypeDeclarer r) {
         visit(r.generic());
-
-        var dt = visit(l.derivedType());
-        if (!(dt instanceof PrototypeDefinition pd))
-            return false;
-
-        visit(pd.generic());
-
-        var re = compatible(pd.prototype(), r.prototype());
-        return switch (re) {
-            case 1 -> semantic("parameters not match: %s", r.pos());
-            case 2 -> semantic("returns not consistent: %s", r.pos());
-            default -> true;
-        };
+        var ldt = visit(l.derivedType());
+        return ldt instanceof PrototypeDefinition lpd &&
+                compatible(lpd.prototype(), r.prototype());
     }
 
-    private boolean assignable(
-            MemTypeDeclarer l, TypeDeclarer r, Optional<Expression> re) {
-        if (r instanceof LiteralTypeDeclarer lit) {
-            if (lit.isNil())
-                return true;
+    private boolean compatible(
+            FuncTypeDeclarer l, DerivedTypeDeclarer r) {
+        visit(l.generic());
+        var rt = visit(r.derivedType());
+        return rt instanceof PrototypeDefinition rd &&
+                compatible(l.prototype(), rd.prototype());
+    }
 
-            if (lit.isString()) {
-                if (l.readonly())
-                    return !l.ref().isKind(PHANTOM);
+    private boolean referable(Refer lr, Optional<Refer> r,
+                              Optional<Expression> re) {
+        if (lr.kind() == PHANTOM) {
+            return enablePhantom(re);
+        }
+        assert lr.kind() == STRONG;
 
-                return semantic("refer string-literal must rom: %s",
-                        lit.pos());
+        if (!r.has()) {
+            return semantic("strong-refer can't refer value: %s", lr.pos());
+        }
+        if (r.get().isKind(PHANTOM)) {
+            return semantic("phantom-reference can't deliver to strong-reference: %s", lr.pos());
+        }
+
+        return true;
+    }
+
+    private boolean assignRefer(TypeDeclarer l, LiteralTypeDeclarer rt) {
+        assert l.maybeRefer().has();
+        if (rt.isNil()) return true;
+        if (rt.isString()) {
+            if (!(l instanceof ArrayTypeDeclarer la))
+                return false;
+
+            if (!(la.element() instanceof PrimitiveTypeDeclarer lp))
+                return false;
+
+            return lp.primitive() == Primitive.UINT8 &&
+                    la.refer().get().isKind(STRONG);
+        }
+        return false;
+    }
+
+    private boolean convertible(TypeDeclarer td, boolean mustValue) {
+        if (td instanceof PrimitiveTypeDeclarer)
+            return true;
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            var type = visit(dtd.derivedType());
+            return type instanceof StructureDefinition;
+        }
+        if (td instanceof ArrayTypeDeclarer atd) {
+            if (mustValue && atd.refer().has())
+                return false;
+            return convertible(atd.element(), true);
+        }
+        return false;
+    }
+
+    private long typeSize(TypeDeclarer td) {
+        if (td instanceof PrimitiveTypeDeclarer ptd)
+            return ptd.primitive().size();
+
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            var type = visit(dtd.derivedType());
+            if (type instanceof StructureDefinition sd)
+                return sd.layout().must().size();
+        }
+
+        return semantic("unsupported sizeof(%s): %s", td, td.pos());
+    }
+
+    private long unitSize(TypeDeclarer td) {
+        if (td instanceof ArrayTypeDeclarer atd) {
+            return unitSize(atd.element());
+        }
+        return typeSize(td);
+    }
+
+    public long estimateSize(TypeDeclarer td) {
+        if (!(td instanceof ArrayTypeDeclarer atd))
+            return typeSize(td);
+
+        if (atd.refer().has())
+            return semantic("can't get size of %s: %s", td, td.pos());
+
+        var es = estimateSize(atd.element());
+        var len = calcInteger(atd.length().must());
+        return len.value().longValue() * es;
+    }
+
+    // convertable types: struct/union/primitive/[]struct/[]union/[]primitive
+    private boolean checkBounds(TypeDeclarer l, TypeDeclarer r) {
+        var lu = unitSize(l);
+        l.unit(lu);
+        if (r instanceof ArrayTypeDeclarer ra && ra.refer().has()) {
+            // r is [*]E or [&]E
+            var ru = estimateSize(ra.element());
+            ra.unit(ru);
+            return true; // runtime checking
+        }
+
+        // r is [N]E or E or *E or &E
+        var rs = estimateSize(r);
+        if (lu <= rs) {
+            return true;
+        }
+
+        return semantic("out of bounds: from %s%s to %s%s",
+                l, l.pos(), r, r.pos());
+    }
+
+    private boolean assignRefer(TypeDeclarer l, TypeDeclarer r,
+                                Optional<Expression> re, boolean covariant) {
+        var lRef = l.maybeRefer();
+        assert lRef.has();
+
+        if (r instanceof LiteralTypeDeclarer rt)
+            return assignRefer(l, rt);
+
+        // throw out exception
+        if (!referable(lRef.get(), r.maybeRefer(), re))
+            return false;
+
+        if (convertible(l, false) && convertible(r, false))
+            return checkBounds(l, r);
+
+        // Objects
+        if (r instanceof DerivedTypeDeclarer rd) {
+            if (l instanceof DerivedTypeDeclarer ld)
+                return assignable(ld, rd, covariant);
+        }
+
+        // Arrays
+        if (r instanceof ArrayTypeDeclarer ra) {
+            if (l instanceof ArrayTypeDeclarer la) {
+                return assignable(la.element(), ra.element(),
+                        Optional.empty(), false);
             }
-
-            return semantic("only can be nil or refer string-literal: %s",
-                    lit.pos());
         }
 
-        if (r instanceof MemTypeDeclarer mr) {
-            checkEnablePhantom(re);
-            return l.readonly() || !mr.readonly();
-        }
+        return semantic("%s can't refer %s: %s", l, r, l.pos());
+    }
+
+    private boolean assignValue(TypeDeclarer l, LiteralTypeDeclarer rt) {
+        assert l.maybeRefer().none();
+
+        var lit = rt.literal();
+        if (rt.isInteger())
+            return l instanceof PrimitiveTypeDeclarer ptd
+                    && ptd.primitive().isInteger();
+
+        if (rt.isFloat())
+            return l instanceof PrimitiveTypeDeclarer ptd
+                    && ptd.primitive().isFloat();
+
+        if (rt.isBool())
+            return l instanceof PrimitiveTypeDeclarer ptd
+                    && ptd.primitive().isBool();
 
         return false;
     }
 
-    private boolean assignable(
-            FuncTypeDeclarer l, DerivedTypeDeclarer r,
+    private boolean assignValue(
+            ArrayTypeDeclarer l, ArrayTypeDeclarer r) {
+        assert l.refer().none();
+
+        if (r.refer().has()) return false; // Not: [value] = [refer]
+
+        var elOk = assignable(l.element(), r.element(),
+                Optional.empty(), false);
+        var lLen = calcInteger(l.length().must());
+
+        if (r.literal()) { // Yes: [value] = [literal]
+            if (r.element() instanceof VoidTypeDeclarer) return true;
+            // Yes: check index out of bounds
+            if (lLen.value().longValue() < r.len())
+                return semantic("index out of bound: %s", r.pos());
+            return elOk;
+        }
+
+        // Yes: must both equals-length and same-type-element
+        var rLen = calcInteger(r.length().must());
+        return lLen.equals(rLen) && elOk;
+    }
+
+    private boolean assignValue(
+            TypeDeclarer l, TypeDeclarer r,
             Optional<Expression> re) {
-        var td = visit(r.derivedType());
-        if (td instanceof PrototypeDefinition pd) {
-            return l.prototype().equals(pd.prototype());
+        assert l.maybeRefer().none();
+        // primitive check by .equals();
+
+        if (r instanceof LiteralTypeDeclarer rt)
+            return assignValue(l, rt);
+
+        if (r instanceof ObjectTypeDeclarer ro) {
+            if (l instanceof DerivedTypeDeclarer ld)
+                return initializable(ld, ro,
+                        (ObjectExpression) re.must());
+        }
+
+        if (r instanceof ArrayTypeDeclarer ra) {
+            if (l instanceof ArrayTypeDeclarer la) {
+                return assignValue(la, ra);
+            }
+        }
+
+        if (r instanceof FuncTypeDeclarer rf) {
+            if (l instanceof DerivedTypeDeclarer ld)
+                return compatible(ld, rf);
+            if (l instanceof FuncTypeDeclarer lf)
+                return compatible(lf.prototype(),
+                        rf.prototype());
+        }
+
+        if (r instanceof DerivedTypeDeclarer rd) {
+            if (l instanceof DerivedTypeDeclarer ld) {
+                return ld.derivedType().equals(rd.derivedType()) &&
+                        (rd.refer().none() || re.match(e ->
+                                e instanceof CurrentExpression));
+            }
+            if (l instanceof FuncTypeDeclarer lf)
+                return compatible(lf, rd);
+        }
+
+        if (r instanceof EnumTypeDeclarer rd) {
+            if (l instanceof DerivedTypeDeclarer ld) {
+                var def = visit(ld.derivedType());
+                return def.equals(rd.def());
+            }
         }
 
         return false;
@@ -1143,49 +1340,10 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         if (l.equals(r)) return true;
 
-        if (l instanceof PrimitiveTypeDeclarer pl) {
-            r = r.unmap();
-            if (r instanceof PrimitiveTypeDeclarer pr)
-                return pl.primitive() == pr.primitive();
-            if (r instanceof LiteralTypeDeclarer lit)
-                return assignable(pl, lit);
-        }
+        var lr = l.maybeRefer();
+        if (lr.none()) return assignValue(l, r, re);
 
-        if (l instanceof MemTypeDeclarer ml) {
-            return assignable(ml, r, re);
-        }
-
-        if (l instanceof ArrayTypeDeclarer al) {
-            if (r instanceof ArrayTypeDeclarer ar)
-                return assignable(al, ar, re);
-            if (r instanceof LiteralTypeDeclarer lit)
-                return lit.literal() instanceof NilLiteral
-                        && al.refer().has();
-        }
-
-        if (l instanceof FuncTypeDeclarer fl) {
-            if (r instanceof FuncTypeDeclarer fr)
-                return fl.prototype().equals(fr.prototype())
-                        && fl.generic().equals(fr.generic());
-            if (r instanceof DerivedTypeDeclarer fr)
-                return assignable(fl, fr, re);
-        }
-
-        if (l instanceof DerivedTypeDeclarer dl) {
-            if (r instanceof DerivedTypeDeclarer dr)
-                return assignable(dl, dr, re, covariant);
-            if (r instanceof ObjectTypeDeclarer o)
-                return initializable(dl, o);
-            if (r instanceof FuncTypeDeclarer f)
-                return assignable(dl, f);
-            if (dl.refer().has()) {
-                if (r instanceof LiteralTypeDeclarer lit) {
-                    return lit.literal() instanceof NilLiteral;
-                }
-            }
-        }
-
-        return false;
+        return assignRefer(l, r, re, covariant);
     }
 
     private boolean assignable(
@@ -1206,28 +1364,89 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             var r = right.get(i);
             var e = es.isEmpty() ? null : es.get(i);
             if (!assignable(l, r, Optional.of(e)))
-                return false;
+                return semantic("incompatible %s = %s: %s", l, r, l.pos());
         }
 
         return true;
     }
 
     public Entity visit(AssignmentsStatement as) {
+        var operands = new ArrayList<Operand>(as.operands().size());
         var left = new ArrayList<TypeDeclarer>(as.operands().size());
         for (var ao : as.operands()) {
-            var td = (TypeDeclarer) visit(ao);
-            left.add(td);
+            var g = optimize(ao);
+            operands.add(g.a());
+            left.add(g.b());
         }
+        as.operands(operands);
 
-        visit(as.tuple());
-        var right = typeDeducer.visit(as.tuple()).tuple();
-        if (assignable(left, right, List.of())) return as;
+        var g = optimize(as.values());
+        if (assignable(left, g.b(), g.a())) {
+            as.values(g.a());
+            return as;
+        }
 
         return semantic("type not compatible: %s", as.pos());
     }
 
+    private void checkDefinedType(TypeDeclarer td) {
+        if (td instanceof ArrayTypeDeclarer atd)
+            td = atd.element();
+        if (td instanceof ObjectTypeDeclarer ||
+                td instanceof VoidTypeDeclarer)
+            semantic("can't deduce type: %s", td.pos());
+    }
+
+    private void initVar(List<Variable> variables, List<Expression> init) {
+        var ig = optimize(init);
+        for (int i = 0; i < variables.size(); i++) {
+            var v = variables.get(i);
+            var t = ig.b().get(i);
+            v.value().set(ig.a().get(i));
+
+            if (v.type().none()) {
+                checkDefinedType(t);
+                // auto set type
+                if (t instanceof LiteralTypeDeclarer ltd) {
+                    var p = ltd.literal().compatible();
+                    if (p.has()) t = p.get().declarer(t.pos());
+                }
+                v.type().set(t);
+            } else {
+                // check type
+                var l = v.type().must();
+                if (!assignable(l, t, v.value().get())) {
+                    semantic("incompatible, %s can't assign %s : %s",
+                            l, t, t.pos());
+                    return;
+                }
+            }
+
+        }
+    }
+
+    public Entity visit(DeclarationStatement ds) {
+        if (!ds.init().isEmpty()) {
+            initVar(ds.variables(), ds.init());
+        } else {
+            for (var v : ds.variables()) {
+                if (v.declare() != Declare.CONST)
+                    continue;
+                return semantic("const must init: %s", v.pos());
+            }
+        }
+        for (var v : ds.variables()) {
+            assert v.type().has();
+            enablePhantom = true;
+            visit(v);
+            context.putVar(v);
+        }
+        return ds;
+    }
+
     public Entity visit(CallStatement e) {
-        visit(e.call());
+        var g = optimize(e.call());
+        e.call((CallExpression) g.a());
         return e;
     }
 
@@ -1266,37 +1485,22 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         context.enterScope();
         EntityVisitor.super.visit(e);
         visit(e.body());
-        context.exitScope();
+        context.exitScope(e);
         loopStack.pop();
         return e;
     }
 
-    private void requireBool(Expression e) {
-        var td = typeDeducer.visit(e);
-        if (typeDeducer.isBool(td))
-            return;
-
-        semantic("condition must be bool");
-    }
-
-    private Optional<BoolLiteral> tryComputeBool(Expression e) {
-        var ce = compute(e);
-        if (!(ce instanceof LiteralExpression le))
-            return Optional.empty();
-        if (le.literal() instanceof BoolLiteral bl)
-            return Optional.of(bl);
-        return unreachable();
-    }
-
     public Entity visit(ConditionalForStatement e) {
         e.initializer().use(this::visit);
-        requireBool(e.condition());
-        var ce = tryComputeBool(e.condition());
-        if (ce.has()) {
-            e.cond().set(ce.get());
-        } else {
-            visit(e.condition());
-        }
+        var cg = optimize(e.condition());
+        e.condition(cg.a());
+        if (!cg.b().isBool())
+            return semantic("condition must be bool: %s",
+                    e.condition().pos());
+
+        if (cg.a() instanceof LiteralExpression le)
+            e.cond().set((BoolLiteral) le.literal());
+
         e.updater().use(this::visit);
         return e;
     }
@@ -1307,23 +1511,21 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return semantic("can't over 2 receivers: %s",
                     args.get(2).pos());
 
-        var v = args.getFirst();
-        var ev = new Variable(v.pos(), Modifier.empty(), Declare.CONST,
-                v, Lazy.of(atd.element()), Lazy.nil());
-        context.putVar(ev);
-
-        if (args.size() < 2) return e;
+        if (args.size() < 2) {
+            context.putVar(Variable.newArg(args.getFirst(), atd.element()));
+            return e;
+        }
 
         var i = args.getLast();
-        var iv = new Variable(i.pos(), Modifier.empty(), Declare.CONST,
-                i, Lazy.of(Primitive.INT.declarer(i.pos())), Lazy.nil());
-        context.putVar(iv);
+        context.putVar(Variable.newArg(i, Primitive.INT.declarer(i.pos())));
+        context.putVar(Variable.newArg(args.getFirst(), atd.element()));
         return e;
     }
 
     private Entity forIterable(IterableForStatement e, EnumDefinition ed) {
-        if (e.arguments().size() != 1)
-            return semantic("can only be 1 receiver: %s");
+        if (e.arguments().size() > 1)
+            return semantic("can only be 1 receiver: %s",
+                    e.arguments().get(1).pos());
         var a = e.arguments().getFirst();
         var t = new DerivedTypeDeclarer(a.pos(), new DerivedType(a.pos(),
                 ed.symbol(), TypeArguments.EMPTY), Optional.empty());
@@ -1334,24 +1536,23 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     private Entity forIterable(IterableForStatement e, DefinitionDeclarer dtd) {
-        if (dtd.definition() instanceof EnumDefinition ed)
+        if (dtd.def() instanceof EnumDefinition ed)
             return forIterable(e, ed);
         return semantic("no iterable implement %s: %s",
-                dtd.definition(), e.iterable().pos());
+                dtd.def(), e.iterable().pos());
     }
 
     public Entity visit(IterableForStatement e) {
-        visit(e.iterable());
-        var type = typeDeducer.visit(e.iterable());
-
-        if (type instanceof ArrayTypeDeclarer atd)
+        var g = optimize(e.iterable());
+        e.iterable(g.a());
+        if (g.b() instanceof ArrayTypeDeclarer atd)
             return forIterable(e, atd);
 
-        if (type instanceof DefinitionDeclarer dtd)
+        if (g.b() instanceof DefinitionDeclarer dtd)
             return forIterable(e, dtd);
 
         return semantic("no iterable implement %s: %s",
-                type, e.iterable().pos());
+                g.b(), e.iterable().pos());
 
     }
 
@@ -1363,38 +1564,61 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     public Entity visit(IfStatement e) {
         context.enterScope();
         e.init().use(this::visit);
-        requireBool(e.condition());
-        visit(e.condition());
+
+        var g = optimize(e.condition());
+        if (!g.b().isBool()) {
+            return semantic("if condition must be bool: %s",
+                    e.condition().pos());
+        }
+        e.condition(g.a());
+        if (g.a() instanceof LiteralExpression le)
+            e.cond().set((BoolLiteral) le.literal());
+
         visit(e.yes());
         e.not().use(this::visit);
-        context.exitScope();
+        context.exitScope(e);
         return e;
     }
 
     public Entity visit(ReturnStatement e) {
-        visit(e.result());
         assert enterProc != null;
-        var rs = enterProc.prototype().returnSet();
-        if (rs.isEmpty()) {
+        e.procedure().set(enterProc);
+        e.local(context.local().toList());
+        var prot = enterProc.prototype();
+        var pr = prot.returnSet();
+        if (pr.none()) {
             if (e.result().none()) return e;
             return semantic("no result types");
         }
         if (e.result().none())
             return semantic("has result types");
 
-        var tp = typeDeducer.visit(e.result().get()).tuple();
-        if (assignable(rs, tp, List.of())) return e;
+        var er = e.result().get();
+        var g = optimize(er);
+        e.result(Optional.of(g.a()));
+        if (assignable(pr.get(), g.b(), e.result(), true)) return e;
         return semantic("return not compatible: %s", e.pos());
     }
 
     private void checkConstantInteger(SwitchStatement s) {
-        var set = new UniqueTable<IntegerLiteral, IntegerLiteral>();
+        var set = new HashMap<IntegerLiteral, IntegerLiteral>();
         for (var b : s.branches()) {
+            var constants = new ArrayList<Expression>(b.constants().size());
             for (var c : b.constants()) {
-                var il = computeConstInteger(c);
-                set.add(il, il);
-                continue;
+                var o = tryCalcInteger(c);
+                if (o.none()) {
+                    semantic("constants must be const integer: %s", c.pos());
+                    continue;
+                }
+                var old = set.putIfAbsent(o.get(), o.get());
+                if (old != null) {
+                    semantic("duplicate constants '%s': %s <--> %s",
+                            c, c.pos(), old.pos());
+                    continue;
+                }
+                constants.add(new LiteralExpression(c.pos(), o.get()));
             }
+            b.constants(constants);
         }
         if (s.defaultBranch().has()) return;
         semantic("enum integer must add 'default': %s", s.pos());
@@ -1407,7 +1631,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             for (var c : b.constants()) {
                 if (c instanceof ReferExpression le) {
                     if (!le.generic().isEmpty()) {
-                        unsupported("generic");
+                        semantic("must be enum: %s", le.pos());
                         return;
                     }
                     if (le.symbol().module().none()) {
@@ -1425,13 +1649,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             }
         }
 
-        var except = type.values().stream()
-                .map(EnumDefinition.Value::name)
-                .filter(v -> !set.exists(v))
-                .toList();
+        var except = subtract(type.values().keys(), set.keys());
         if (except.isEmpty()) {
-            if (s.defaultBranch().none())
-                return;
+            if (s.defaultBranch().none()) return;
             semantic("'default' was unreachable when all covered: %s",
                     s.defaultBranch().get().pos());
         } else {
@@ -1445,37 +1665,46 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         context.enterScope();
         visit(e.init());
 
-        var td = typeDeducer.visit(e.value());
-        if (td instanceof PrimitiveTypeDeclarer ptd) {
-            if (!ptd.primitive().isInteger())
-                return semantic("must be integer: %s", e.value().pos());
-            checkConstantInteger(e);
-        } else if (td instanceof DerivedTypeDeclarer dtd) {
+        var cv = e.value();
+        var g = optimize(cv);
+        e.value(g.a());
+        boolean ok = false;
+        if (g.b() instanceof PrimitiveTypeDeclarer ptd) {
+            if (ptd.primitive().isInteger()) {
+                checkConstantInteger(e);
+                ok = true;
+            }
+        } else if (g.b() instanceof DerivedTypeDeclarer dtd) {
             var dt = visit(dtd.derivedType());
-            if (!(dt instanceof EnumDefinition ed))
-                return semantic("must be enum: %s", e.value().pos());
-            checkConstantEnum(e, ed);
-        } else {
+            if (dt instanceof EnumDefinition ed) {
+                checkConstantEnum(e, ed);
+                ok = true;
+            }
+        }
+        if (!ok) {
             return semantic("value require integer or enum: %s",
-                    e.value().pos());
+                    cv.pos());
         }
 
         for (var br : e.branches()) visit(br.body());
 
         e.defaultBranch().use(br -> visit(br.body()));
 
-        context.exitScope();
+        context.exitScope(e);
         return e;
     }
 
     public Entity visit(ThrowStatement e) {
-        return visit(e.exception());
+        assert enterProc != null;
+        e.procedure().set(enterProc);
+        e.local(context.local().toList());
+        var g = optimize(e.exception());
+        e.exception(g.a());
+        return e;
     }
 
     public Entity visit(TryStatement e) {
-        context.enterScope();
         visit(e.body());
-        context.exitScope();
         visit(e.catchClauses());
         visit(e.finallyClause());
         return e;
@@ -1495,421 +1724,1150 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         visit(e.typeSet());
         context.putVar(e.argument());
         visit(e.body());
-        context.exitScope();
+        context.exitScope(e);
         return e;
     }
 
 
     //
 
-    public Entity visit(IndexAssignableOperand io) {
-        var td = typeDeducer.visit(io.subject());
-        var isRef = td.maybeRefer();
-        if (td instanceof MemTypeDeclarer mtd) {
-            if (mtd.mapped().none())
-                return semantic("must map type before use: %s", io.pos());
-            td = mtd.mapped().get();
-        }
-        if (!(td instanceof ArrayTypeDeclarer atd))
-            return semantic("require array: %s", io.pos());
-        if (isRef.has()) {
-            if (isRef.get().immutable())
-                return semantic("immutable array: %s", io.pos());
-        } else {
-            if (constChecker.visit(io.subject())) {
-                return semantic("immutable array");
-            }
-        }
-
-        var it = typeDeducer.visit(io.index());
-        if (it instanceof PrimitiveTypeDeclarer ptd) {
-            if (ptd.primitive().isInteger())
-                return atd.element();
-        } else if (it instanceof LiteralTypeDeclarer ltd) {
-            if (ltd.literal() instanceof IntegerLiteral) {
-                return atd.element();
-            }
-        }
-
-        return semantic("forbidden index operate: %s", io.pos());
-    }
-
-    public Entity visit(FieldAssignableOperand e) {
-        var g2 = typeTool.getField(e.subject(), e.field());
-        if (g2.none()) return semantic("field not defined: %s",
-                e.field().pos());
-
-        var s = g2.must().a();
-        var f = g2.must().b();
-        if (f instanceof StructureField sf) {
-            if (s instanceof MemTypeDeclarer mtd) {
-                if (!mtd.readonly())
-                    return sf.type();
-                return semantic("rom can't write: %s", e.pos());
-            }
-
-            var im = constChecker.visit(e.subject());
-            if (im) return semantic("const variable: %s", e.pos());
-            return sf.type();
-        }
-
-        if (f instanceof ClassField cf) {
-            if (cf.declare() == Declare.CONST)
-                return semantic("const field: %s", e.field().pos());
-
-            if (s.maybeRefer().has()) return cf.type();
-
-            var im = constChecker.visit(e.subject());
-            if (im) return semantic("const variable: %s", e.pos());
-
-            return cf.type();
-        }
-
+    private boolean checkConst(Expression e) {
+        if (e instanceof PrimaryExpression pe)
+            return checkConst(pe);
         return unreachable();
     }
 
-    public Entity visit(VariableAssignableOperand vo) {
+    private boolean checkConst(MemberOfExpression e) {
+        var g = optimize((Expression) e);
+        var isValue = g.b().maybeRefer().none();
+        var f = ((MemberOfExpression) g.a()).field();
+        if (f.none()) {
+            return semantic("operable field not found %s: %s",
+                    e.member(), e.member().pos());
+        }
+
+        if (f.get().type().maybeRefer().has()) return false;
+        if (f.get() instanceof ClassField cf) {
+            if (cf.declare() == Declare.CONST) return true;
+        }
+        return isValue && checkConst(e.subject());
+    }
+
+    private boolean checkConst(CallExpression e) {
+        var g = optimize(e);
+        if (g.b() instanceof VoidTypeDeclarer) {
+            return semantic("callable %s has no return: %s",
+                    e.callee(), e.pos());
+        }
+        var ref = g.b().maybeRefer();
+        return ref.none() || ref.get().immutable();
+    }
+
+    private boolean checkConst(Variable v) {
+        var isValue = v.type().must().maybeRefer().none();
+        return isValue && (v.declare() == Declare.CONST);
+    }
+
+    private boolean checkConst(ReferExpression e) {
+        var o = context.findVar(e.symbol());
+        if (o.none()) return semantic("%s not declared", e.symbol());
+        return checkConst(o.get());
+    }
+
+    private boolean checkConst(AssertExpression e) {
+        var im = e.type().maybeRefer().match(Refer::immutable);
+        return im || checkConst(e.subject());
+    }
+
+    private boolean checkConst(PrimaryExpression e) {
+        return switch (e) {
+            case CallExpression ee -> checkConst(ee);
+            case IndexOfExpression ee -> checkConst(ee.subject());
+            case MemberOfExpression ee -> checkConst(ee);
+            case ParenExpression ee -> checkConst(ee.child());
+            case ReferExpression ee -> checkConst(ee);
+            case VariableExpression ee -> checkConst(ee.variable());
+            case AssertExpression ee -> checkConst(ee);
+            case NewExpression ee -> false;
+            case CurrentExpression ee -> false;
+            case ObjectExpression ee -> true;
+            case ArrayExpression ee -> true;
+            case SizeofExpression ee -> true;
+            case LiteralExpression ee -> true;
+            case null, default -> unreachable();
+        };
+    }
+
+    private Groups.G2<Operand, TypeDeclarer> optimize(Operand o) {
+        Groups.G2<Operand, TypeDeclarer> g = switch (o) {
+            case IndexOperand io -> optimize(io);
+            case FieldOperand fo -> optimize(fo);
+            case VariableOperand vo -> optimize(vo);
+            case null, default -> unreachable();
+        };
+        g.a().type.set(g.b());
+        return g;
+    }
+
+    private Groups.G2<Operand, TypeDeclarer> optimize(IndexOperand io) {
+        var ig = optimize(io.index());
+        if (ig.b() instanceof PrimitiveTypeDeclarer ptd) {
+            if (!ptd.primitive().isInteger()) {
+                return semantic("index require integer: %s", io.index().pos());
+            }
+        } else if (ig.b() instanceof LiteralTypeDeclarer ltd) {
+            if (!ltd.isInteger()) {
+                return semantic("index require integer: %s", io.index().pos());
+            }
+        }
+
+        var sg = optimize(io.subject());
+        if (!(sg.b() instanceof ArrayTypeDeclarer td)) {
+            return semantic("require array: %s", io.pos());
+        }
+        if (td.refer().has()) {
+            if (td.refer().get().immutable()) {
+                return semantic("immutable array: %s", io.pos());
+            }
+        } else {
+            if (checkConst(sg.a())) {
+                return semantic("immutable array: %s", io.pos());
+            }
+        }
+
+        var n = new IndexOperand(io.pos(), (PrimaryExpression) sg.a(), ig.a());
+        return Groups.g2(n, td.element());
+    }
+
+    private Groups.G2<Operand, TypeDeclarer> optimize(FieldOperand fo) {
+        var name = fo.field();
+
+        var sg = optimize(fo.subject());
+        var td = sg.b();
+        if (td instanceof VoidTypeDeclarer)
+            return unreachable();
+
+        if (!(td instanceof DerivedTypeDeclarer dtd))
+            return semantic("illegal operand %s: %s", name, fo.pos());
+        if (!dtd.derivedType().generic().isEmpty()) return unreachable();
+
+        var def = visit(dtd.derivedType());
+        Optional<? extends Field> of = switch (def) {
+            case StructureDefinition sd -> sd.fields().tryGet(name);
+            case ClassDefinition cd -> cd.allFields().tryGet(name);
+            case null, default -> semantic("%s have no any field: %s",
+                    def, fo.pos());
+        };
+
+        if (of.none())
+            return semantic("field %s not defined: %s", name, name.pos());
+        var f = of.get();
+
+        var n = new FieldOperand(fo.pos(), (PrimaryExpression) sg.a(), name);
+        var g = Groups.<Operand, TypeDeclarer>g2(n, f.type());
+
+        if (f instanceof ClassField cf && cf.declare() == Declare.CONST)
+            return semantic("immutable field: %s", name.pos());
+
+        if (td.maybeRefer().has()) return g;
+        var im = checkConst(sg.a());
+        if (!im) return g;
+        return semantic("immutable operand: %s", fo.pos());
+    }
+
+    private Groups.G2<Operand, TypeDeclarer> optimize(VariableOperand vo) {
         var s = vo.symbol();
         var v = context.findVar(s);
-        if (v.none())
-            return semantic("%s is not declared", s);
+        if (v.has()) {
+            if (v.get().declare() == Declare.VAR) {
+                vo.variable().set(v);
+                return Groups.g2(vo, v.get().type().must());
+            }
 
-        var var = v.get();
-        if (var.declare() == Declare.CONST)
-            return semantic("%s is const operand", s);
+            return semantic("immutable operand %s: %s", s, s.pos());
+        }
 
-        visit(var);
-        return var.type().must();
+        if (enterClass != null && s.module().none()) {
+            var f = enterClass.allFields().tryGet(s.name());
+            if (f.has()) {
+                if (f.get().declare() == Declare.CONST)
+                    return semantic("immutable operand %s: %s", s, s.pos());
+                var n = new FieldOperand(vo.pos(), newThis(s.pos()), s.name());
+                return Groups.g2(n, f.get().type());
+            }
+        }
+        return semantic("undefined operand %s: %s", s, s.pos());
+    }
+
+    private Expression defaultValue(TypeDeclarer t, Entity v) {
+        if (t.maybeRefer().has()) {
+            var e = new LiteralExpression(new NilLiteral(v.pos()));
+            e.resultType.set(t);
+            return e;
+        }
+
+        Expression e;
+        if (t instanceof DerivedTypeDeclarer dtd) {
+            var def = visit(dtd.derivedType());
+            if (def instanceof ClassDefinition ||
+                    def instanceof StructureDefinition) {
+                e = new ObjectExpression(v.pos());
+            } else if (def instanceof EnumDefinition ed) {
+                e = new EnumValueExpression(v.pos(),
+                        ed, ed.values().getValue(0));
+            } else if (def instanceof PrototypeDefinition) {
+                e = new LiteralExpression(new NilLiteral(v.pos()));
+            } else {
+                return unreachable();
+            }
+        } else if (t instanceof PrimitiveTypeDeclarer ptd) {
+            var lit = switch (ptd.primitive().kind) {
+                case INTEGER -> new IntegerLiteral(v.pos(), 0);
+                case FLOAT -> new FloatLiteral(v.pos(), BigDecimal.ZERO);
+                case BOOL -> new BoolLiteral(v.pos(), false);
+            };
+            e = new LiteralExpression(v.pos(), lit);
+        } else if (t instanceof FuncTypeDeclarer) {
+            e = new LiteralExpression(new NilLiteral(v.pos()));
+        } else if (t instanceof ArrayTypeDeclarer) {
+            e = new ArrayExpression(v.pos(), List.of());
+        } else {
+            return unreachable();
+        }
+        e.resultType.set(t);
+        return e;
     }
 
     public Entity visit(Variable v) {
         visit(v.type().must());
         visit(v.modifier());
+        if (v.value().has()) return v;
+        var t = v.type().must();
+        var dv = defaultValue(t, v);
+        v.defVal().set(dv);
+
         return v;
     }
 
     //
+    // expression and tuple
+    //
 
 
-    public Entity visit(ArrayTuple e) {
-        for (var v : e.values()) visit(v);
-        return e;
+    public Groups.G2<List<Expression>, List<TypeDeclarer>>
+    optimize(List<Expression> list) {
+        var vs = new ArrayList<Expression>(list.size());
+        var ts = new ArrayList<TypeDeclarer>(list.size());
+        for (var v : list) {
+            var g = optimize(v);
+            if (g.b() instanceof DefinitionDeclarer) {
+                return semantic("require value, not type %s: %s",
+                        g.b(), v.pos());
+            }
+            vs.add(g.a());
+            ts.add(g.b());
+        }
+        return Groups.g2(vs, ts);
     }
 
-    public Entity visit(ReturnTuple e) {
-        visit(e.call());
-        return e;
+    public Groups.G2<Expression, TypeDeclarer> optimize(Expression e) {
+        Groups.G2<Expression, TypeDeclarer> g = switch (e) {
+            case BinaryExpression ee -> optimize(ee);
+            case UnaryExpression ee -> optimize(ee);
+            case ArrayExpression ee -> optimize(ee);
+            case AssertExpression ee -> optimize(ee);
+            case SizeofExpression ee -> optimize(ee);
+            case CallExpression ee -> optimize(ee);
+            case ConvertExpression ee -> optimize(ee);
+            case CurrentExpression ee -> optimize(ee);
+            case IndexOfExpression ee -> optimize(ee);
+            case LambdaExpression ee -> optimize(ee);
+            case LiteralExpression ee -> optimize(ee);
+            case MemberOfExpression ee -> optimize(ee);
+            case NewExpression ee -> optimize(ee);
+            case ObjectExpression ee -> optimize(ee);
+            case PairsExpression ee -> optimize(ee);
+            case ParenExpression ee -> optimize(ee);
+            case ReferExpression ee -> optimize(ee);
+            case ClosureExpression ee -> optimize(ee);
+            case VariableExpression ee -> Groups.g2(ee,
+                    ee.variable().type().must());
+            case null, default -> unreachable();
+        };
+        g.a().resultType.set(g.b());
+        g.a().expectCallable(e.expectCallable());
+        return g;
     }
 
-    public Entity visit(BinaryExpression e) {
-        visit(e.left());
-        visit(e.right());
-        return typeDeducer.visit(e);
+    private Groups.G2<Expression, TypeDeclarer>
+    optimize(BinaryExpression e,
+             LiteralExpression l,
+             LiteralExpression r) {
+        var op = e.operator();
+        var lv = l.literal();
+        var rv = r.literal();
+        if (lv instanceof IntegerLiteral ill &&
+                rv instanceof IntegerLiteral irl) {
+            var lit = computer.calc(op, ill, irl);
+            var td = lit instanceof IntegerLiteral ?
+                    Primitive.INT : Primitive.BOOL;
+            return Groups.g2(new LiteralExpression(e.pos(), lit),
+                    td.declarer(e.pos()));
+        }
+
+        if (lv instanceof FloatLiteral fll &&
+                rv instanceof FloatLiteral frl) {
+            var lit = computer.calc(op, fll, frl);
+            var td = lit instanceof FloatLiteral ?
+                    Primitive.FLOAT : Primitive.BOOL;
+            return Groups.g2(new LiteralExpression(e.pos(), lit),
+                    td.declarer(e.pos()));
+        }
+
+        if (lv instanceof BoolLiteral bll &&
+                rv instanceof BoolLiteral brl)
+            return Groups.g2(new LiteralExpression(e.pos(),
+                            computer.calc(op, bll, brl)),
+                    Primitive.BOOL.declarer(e.pos()));
+
+        if (lv instanceof StringLiteral sll &&
+                rv instanceof StringLiteral srl) {
+            var lit = computer.calc(op, sll, srl);
+            var td = new LiteralTypeDeclarer(e.pos(), lit);
+            return Groups.g2(new LiteralExpression(e.pos(), lit), td);
+        }
+
+        if (lv instanceof NilLiteral a &&
+                rv instanceof NilLiteral b) {
+            var lit = computer.calc(op, a, b);
+            var td = new LiteralTypeDeclarer(e.pos(), lit);
+            return Groups.g2(new LiteralExpression(e.pos(), lit), td);
+        }
+
+        return semantic("not support %s %s %s: %s", l, op, r, e.pos());
     }
 
-    public Entity visit(UnaryExpression e) {
-        visit(e.operand());
-        return typeDeducer.visit(e);
+
+    private Optional<TypeDeclarer> primitiveBinOp(
+            TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
+        var lk = primitiveKind(l);
+        var rk = primitiveKind(r);
+        if (lk.none() || rk.none())
+            return Optional.empty();
+
+        Primitive.Kind lp = lk.must().kind, rp = rk.must().kind;
+        if (lp != rp)
+            return semantic("require same type: %s", e.pos());
+
+        var op = e.operator();
+        switch (lp) {
+            case INTEGER -> {
+                if (BinaryOperator.SetMath.contains(op) ||
+                        BinaryOperator.SetBits.contains(op))
+                    return Optional.of(l);
+                if (BinaryOperator.SetRel.contains(op))
+                    return Optional.of(Primitive.BOOL.declarer(e.pos()));
+            }
+            case FLOAT -> {
+                if (BinaryOperator.SetMath.contains(op))
+                    return Optional.of(l);
+                if (BinaryOperator.SetRel.contains(op))
+                    return Optional.of(Primitive.BOOL.declarer(e.pos()));
+            }
+            case BOOL -> {
+                if (BinaryOperator.SetLogic.contains(op))
+                    return Optional.of(l);
+            }
+        }
+        return Optional.empty();
     }
 
-    public Entity visit(AssertExpression e) {
-        visit(e.subject());
-        var st = typeDeducer.visit(e.subject());
-        var sr = st.maybeRefer();
-        if (sr.none()) return semantic(
-                "require a refer: %s", e.subject().pos());
+    private Groups.G2<Expression, TypeDeclarer> checkNilBinOp(
+            Groups.G2<Expression, TypeDeclarer> g, BinaryExpression e) {
+        if (g.b().maybeRefer().none())
+            return semantic("nil must compare to a reference: %s", e.pos());
 
-        var et = e.type();
-        var er = et.maybeRefer();
+        if (e.operator() != BinaryOperator.EQ &&
+                e.operator() != BinaryOperator.NE)
+            return semantic("nil can't %s a reference: %s",
+                    e.operator(), e.pos());
+
+        boolean nil = e.operator() == BinaryOperator.EQ;
+        var t = new PrimitiveTypeDeclarer(e.pos(), Primitive.BOOL, Optional.empty());
+        var n = new IsNilExpression(e.pos(), g.a(), nil);
+        return Groups.g2(n, t);
+    }
+
+    private Optional<EnumDefinition> findEnum(TypeDeclarer td) {
+        if (td instanceof EnumTypeDeclarer etd)
+            return Optional.of(etd.def());
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            var def = visit(dtd.derivedType());
+            if (def instanceof EnumDefinition ed)
+                return Optional.of(ed);
+        }
+        return Optional.empty();
+    }
+
+    private boolean enumBinOp(
+            TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
+        var le = findEnum(l);
+        if (le.none()) return false;
+        var re = findEnum(r);
+        if (re.none()) return false;
+
+        return le.get().equals(re.get());
+    }
+
+    private boolean objectBinOp(
+            DerivedTypeDeclarer l, DerivedTypeDeclarer r,
+            BinaryExpression e) {
+        visit(l.derivedType().generic());
+        visit(r.derivedType().generic());
+        var lt = visit(l.derivedType());
+        var rt = visit(r.derivedType());
+        if (lt instanceof ObjectDefinition lo &&
+                rt instanceof ObjectDefinition ro)
+            return assignable(lo, ro, true) ||
+                    assignable(ro, lo, true);
+        return false;
+    }
+
+    private boolean referCompare(
+            TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
+        if (convertible(l, false) &&
+                convertible(r, false)) {
+            return true; // primitive, structure, and it's array
+        }
+        if (l instanceof DerivedTypeDeclarer ld &&
+                r instanceof DerivedTypeDeclarer rd) {
+            return objectBinOp(ld, rd, e);
+        }
+        if (l instanceof ArrayTypeDeclarer la &&
+                r instanceof ArrayTypeDeclarer ra) {
+            return assignable(la.element(), ra.element(),
+                    Optional.empty(), false);
+        }
+        return false;
+    }
+
+    private Optional<TypeDeclarer> derivedTypeBinOp(
+            TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
+        if (e.operator() != BinaryOperator.EQ &&
+                e.operator() != BinaryOperator.NE)
+            return Optional.empty();
+
+        Optional<TypeDeclarer> ret = Optional.of(
+                Primitive.BOOL.declarer(e.pos()));
+
+        if (enumBinOp(l, r, e)) return ret;
+
+        var lr = l.maybeRefer();
+        var rr = r.maybeRefer();
+        if (lr.none() && rr.none()) // value type, directly compare
+            return l.equals(r) ? ret : Optional.empty();
+
+        if (lr.has() || rr.has()) {
+            if (referCompare(l, r, e))
+                return ret;
+            if (l.isNil() || r.isNil())
+                return ret;
+        }
+
+        return Optional.empty();
+    }
+
+    public Groups.G2<Expression, TypeDeclarer>
+    optimize(BinaryExpression e) {
+        var l = optimize(e.left());
+        var r = optimize(e.right());
+        if (l.a() instanceof LiteralExpression le &&
+                r.a() instanceof LiteralExpression re) {
+            return optimize(e, le, re);
+        }
+
+        if (l.b().isNil()) return checkNilBinOp(r, e);
+        if (r.b().isNil()) return checkNilBinOp(l, e);
+
+        var n = new BinaryExpression(e.pos(), e.operator(), l.a(), r.a());
+        var t = primitiveBinOp(l.b(), r.b(), e);
+        if (t.none()) t = derivedTypeBinOp(l.b(), r.b(), e);
+        if (t.has()) return Groups.g2(n, t.get());
+
+        return semantic("not support %s %s %s: %s",
+                l.b(), e.operator(), r.b(), e.pos());
+    }
+
+    private Groups.G2<Expression, TypeDeclarer>
+    optimize(UnaryExpression e, LiteralExpression le) {
+        var op = e.operator();
+        var l = le.literal();
+        if (l instanceof IntegerLiteral il) {
+            var r = switch (op) {
+                case POSITIVE -> il.value();
+                case NEGATIVE -> il.value().negate();
+                case INVERT -> il.value().not();
+            };
+            var n = new LiteralExpression(e.pos(),
+                    new IntegerLiteral(il.pos(),
+                            r, il.radix()));
+            return Groups.g2(n, Primitive.INT.declarer(e.pos()));
+        }
+
+        if (l instanceof FloatLiteral fl) {
+            BigDecimal r = switch (op) {
+                case POSITIVE -> fl.value();
+                case NEGATIVE -> fl.value().negate();
+                case INVERT -> semantic(
+                        "float not support %s: %s",
+                        op, e.pos());
+            };
+            var n = new LiteralExpression(e.pos(),
+                    new FloatLiteral(fl.pos(), r));
+            return Groups.g2(n, Primitive.FLOAT.declarer(e.pos()));
+        }
+
+        if (l instanceof BoolLiteral bl) {
+            if (op == UnaryOperator.INVERT) {
+                var n = new LiteralExpression(e.pos(),
+                        bl.not());
+                return Groups.g2(n, Primitive.BOOL.declarer(e.pos()));
+            }
+        }
+
+        return unsupported("%s not support: %s",
+                l.type(), op);
+    }
+
+    public Groups.G2<Expression, TypeDeclarer> optimize(UnaryExpression e) {
+        var o = optimize(e.operand());
+        if (o.a() instanceof LiteralExpression le) {
+            return optimize(e, le);
+        }
+        var n = new UnaryExpression(e.pos(), e.operator(), o.a());
+        return Groups.g2(n, o.b());
+    }
+
+    private ObjectDefinition getObject(TypeDeclarer td) {
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            var t = visit(dtd.derivedType());
+            if (t instanceof ObjectDefinition cd)
+                return cd;
+        }
+        return semantic("require class or interface: %s", td.pos());
+    }
+
+    public Groups.G2<Expression, TypeDeclarer> optimize(AssertExpression e) {
+        var g = optimize(e.subject());
+        if (!(g.b() instanceof DerivedTypeDeclarer srcType)) {
+            return semantic("assert can't used for %s: %s", g.b(), e.type());
+        }
+        var sr = srcType.refer();
+        if (sr.none()) {
+            return semantic("require a refer: %s", e.subject().pos());
+        }
+
+        var dstType = e.type();
+        var er = dstType.maybeRefer();
         if (er.none()) return semantic(
                 "type must refer: %s", e.type().pos());
 
         if (sr.get().kind() != er.get().kind()) return
                 semantic("can't change refer kind from '%s' to '%s': %s",
-                        st, et, e.type().pos());
+                        srcType, dstType, e.type().pos());
 
-        var sot = typeTool.getObject(st);
-        var eot = typeTool.getObject(et);
-        if (sot.none() || eot.none())
-            return semantic("require class or interface refer: %s",
-                    e.pos());
-
-        if (assignable(eot.get(), sot.get(), true))
-            return e;
-        if (assignable(sot.get(), eot.get(), true))
-            return e;
+        var n = new AssertExpression(e.pos(),
+                (PrimaryExpression) g.a(), e.type());
+        var srcDef = getObject(srcType);
+        var tgtDef = getObject(dstType);
+        if (assignable(tgtDef, srcDef, true)) {
+            return Groups.g2(n, dstType);
+        }
+        if (assignable(srcDef, tgtDef, true)) {
+            e.needCheck(true);
+            return Groups.g2(n, dstType);
+        }
 
         return semantic("inconvertible types %s to %s: %s",
-                st, et, e.pos());
+                srcType, dstType, e.pos());
     }
 
-    @Override
-    public Entity visit(SizeofExpression se) {
+    public Groups.G2<Expression, TypeDeclarer> optimize(SizeofExpression se) {
         enablePhantom = true;
         visit(se.type());
-        return se;
+
+        var size = estimateSize(se.type());
+        se.size(size);
+        var n = new LiteralExpression(se.pos(), new IntegerLiteral(se.pos(), size));
+        return Groups.g2(n, Primitive.INT.declarer(se.pos()));
     }
 
-    private Entity checkConvertor(
-            ConvertorTypeDeclarer ctd, CallExpression e) {
-        // explicit convert
-        if (e.arguments().size() != 1)
-            return semantic("convert : %s", e.pos());
-        var a = e.arguments().getFirst();
-        var td = typeDeducer.visit(a);
-        if (td instanceof PrimitiveTypeDeclarer atd) {
-            if (ctd.primitive().isBool() == atd.primitive().isBool())
-                return e;
-        } else if (td instanceof LiteralTypeDeclarer lit) {
-            if (ctd.primitive().isInteger() &&
-                    lit.literal() instanceof IntegerLiteral)
-                return e;
-
-            if (ctd.primitive().isFloat() &&
-                    lit.literal() instanceof FloatLiteral)
-                return e;
-
-            if (ctd.primitive().isBool() &&
-                    lit.literal() instanceof BoolLiteral)
-                return e;
-        }
-
-        return semantic("can't convert: %s", a.pos());
-    }
-
-    public Entity visit(CallExpression e) {
-        visit(e.callee());
-        e.arguments().forEach(this::visit);
-
-        var td = typeDeducer.getCallable(e.callee());
-
+    private Optional<Prototype> checkCallee(TypeDeclarer td) {
         if (td instanceof FuncTypeDeclarer ftd) {
-            if (!ftd.generic().isEmpty())
-                return unsupported("generic");
+            return Optional.of(ftd.prototype());
+        }
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            var def = visit(dtd.derivedType());
+            if (def instanceof PrototypeDefinition pd) {
+                return Optional.of(pd.prototype());
+            }
+        }
+        return Optional.empty();
+    }
 
-            var left = ftd.prototype().parameterSet().types();
-            var right = typeDeducer.visit(e.arguments());
-            if (assignable(left, right, e.arguments())) return e;
+    public Groups.G2<Expression, TypeDeclarer> optimize(CallExpression e) {
+        var call = e.callee();
+        var args = e.arguments();
+
+        call.expectCallable(true);
+        var g = optimize(call);
+        var op = checkCallee(g.b());
+        if (op.none()) {
+            return semantic("%s not callable: %s", call, e.pos());
+        }
+
+        var rg = optimize(args);
+        var left = op.get().parameterSet().types();
+        if (!assignable(left, rg.b(), rg.a()))
             return semantic("arguments not compatible");
-        }
 
-        if (td instanceof ConvertorTypeDeclarer ctd) {
-            return checkConvertor(ctd, e);
-        }
+        call = (PrimaryExpression) g.a();
+        var n = new CallExpression(e.pos(), call, rg.a());
+        n.prototype().set(op);
+        if (op.get().returnSet().none())
+            return Groups.g2(n, new VoidTypeDeclarer(op.get().pos()));
 
-        return unreachable();
+        return Groups.g2(n, op.get().returnSet().get());
     }
 
-    public Entity visit(CurrentExpression e) {
-        return e;
+    public Groups.G2<Expression, TypeDeclarer> optimize(ConvertExpression e) {
+        // explicit convert
+        var p = e.primitive();
+        var g = optimize(e.operand());
+        if (g.a() instanceof LiteralExpression le) {
+            // 字面量直接转换
+            var td = p.declarer(e.pos());
+            if (p.isBool()) {
+                // `bool`不能与其他转换
+                if (le.literal() instanceof BoolLiteral bl) {
+                    var n = new LiteralExpression(e.pos(), bl);
+                    return Groups.g2(n, td);
+                }
+            } else if (p.isInteger()) {
+                // 转到整数
+                if (le.literal() instanceof IntegerLiteral il) {
+                    return g;
+                } else if (le.literal() instanceof FloatLiteral fl) {
+                    var n = new LiteralExpression(e.pos(), fl.toInteger());
+                    return Groups.g2(n, td);
+                }
+            } else if (p.isFloat()) {
+                // 转到浮点数
+                if (le.literal() instanceof FloatLiteral fl) {
+                    return g;
+                } else if (le.literal() instanceof IntegerLiteral il) {
+                    var n = new LiteralExpression(e.pos(), il.toFloat());
+                    return Groups.g2(n, td);
+                }
+            }
+        } else if (g.b() instanceof PrimitiveTypeDeclarer td) {
+            // 基本类型就返回转换表达式：`bool`
+            if (e.primitive().isBool() == td.primitive().isBool()) {
+                if (e.primitive().isBool()) {
+                    // `bool`省略表达式
+                    return Groups.g2(g.a(), g.b());
+                }
+                // 数值需要转
+                var n = new ConvertExpression(e.pos(), e.primitive(), g.a());
+                return Groups.g2(n, e.primitive().declarer(e.pos()));
+            }
+        }
+
+        return semantic("can't convert: %s", e.operand().pos());
     }
 
+    public Groups.G2<Expression, TypeDeclarer> optimize(CurrentExpression e) {
+        // 必定是在类的方法里
+        var dt = new DerivedType(e.pos(), e.type(), TypeArguments.EMPTY);
+        var ref = new Refer(e.pos(), PHANTOM, false, false);
+        var td = new DerivedTypeDeclarer(e.pos(), dt, Optional.of(ref));
+        return Groups.g2(e, td);
+    }
 
-    public Entity visit(IndexOfExpression e) {
-        visit(e.subject());
-        visit(e.index());
+    public Groups.G2<Expression, TypeDeclarer> optimize(IndexOfExpression e) {
+        var sg = optimize(e.subject());
+        var ig = optimize(e.index());
 
-        var it = typeDeducer.visit(e.index());
-        if (!typeDeducer.isInteger(it)) {
+        if (!isInteger(ig.b()))
             return semantic("index require integer: %s", e.pos());
-        }
-        var idx = tryComputeConstInteger(e.index());
-        idx.use(i -> {
-            if (i.compareTo(0) >= 0) return;
-            semantic("negative index: %s", e.index().pos());
-        });
 
-        var st = typeDeducer.visit(e.subject());
-        if (st instanceof DefinitionDeclarer dtd) {
-            if (dtd.definition() instanceof EnumDefinition ed) {
-                idx.use(i -> {
-                    if (i.compareTo(ed.values().size()) < 0)
-                        return;
-                    semantic("index out of bounds: %s", e.pos());
-                });
-                return e;
+        IntegerLiteral idx = null;
+        if (ig.a() instanceof LiteralExpression lit) {
+            idx = (IntegerLiteral) lit.literal();
+            if (idx.compareTo(0) < 0) {
+                return semantic("negative index: %s", e.index().pos());
+            }
+        }
+
+        if (sg.b() instanceof DefinitionDeclarer dtd) {
+            if (dtd.def() instanceof EnumDefinition ed) {
+                Expression n;
+                if (idx != null) {
+                    if (idx.compareTo(ed.values().size()) >= 0) {
+                        return semantic("index out of bounds: %s", e.pos());
+                    }
+                    var ev = ed.ofId(idx.value().intValue());
+                    n = new EnumValueExpression(e.pos(), ed, ev);
+                } else {
+                    n = new EnumIdExpression(e.pos(), ed, ig.a());
+                }
+                var td = new EnumTypeDeclarer(e.pos(), ed);
+                return Groups.g2(n, td);
             }
             return semantic("only enum type can use index: %s", e.pos());
         }
 
-        if (st instanceof MemTypeDeclarer mtd) {
-            if (mtd.mapped().none())
-                return semantic("must map type before use: %s", e.pos());
-            st = mtd.mapped().get();
-        }
-        if (st instanceof ArrayTypeDeclarer atd) {
-            var len = atd.length().flat(this::tryComputeConstInteger);
-            len.coexist(idx, (l, i) -> {
-                if (l.compareTo(i) > 0) return;
-                semantic("index out of bounds: %s", e.pos());
-            });
-            return e;
+        if (sg.b() instanceof ArrayTypeDeclarer atd) {
+            var a = (PrimaryExpression) sg.a();
+            if (atd.length().has() && idx != null) {
+                if (idx.compareTo(atd.len()) >= 0) {
+                    return semantic("index out of bounds: %s", e.pos());
+                }
+            }
+            var ie = ig.a();
+            if (idx != null) {
+                ie = new LiteralExpression(e.pos(), idx);
+            }
+            var n = new IndexOfExpression(e.pos(), a, ie);
+            return Groups.g2(n, atd.element());
         }
 
         return semantic("%s not implement index: %s",
-                st, e.subject().pos());
+                sg.b(), e.subject().pos());
     }
 
-    public Entity visit(LambdaExpression e) {
+    public Groups.G2<Expression, TypeDeclarer> optimize(LambdaExpression e) {
         return unsupported("lambda");
     }
 
-    public Entity visit(LiteralExpression e) {
-        return e;
+    public Groups.G2<Expression, TypeDeclarer> optimize(LiteralExpression e) {
+        return Groups.g2(e, new LiteralTypeDeclarer(e.pos(), e.literal()));
     }
 
-    public Entity visit(MemberOfExpression e) {
+    private Groups.G2<Expression, TypeDeclarer>
+    optimizeEnum(MemberOfExpression e, EnumDefinition ed) {
+        var name = e.member();
+        var v = ed.values().tryGet(name);
+        if (v.none()) {
+            return semantic("%s.%s not define: %s",
+                    ed, name, name.pos());
+        }
+        // 转换成枚举类型
+        var n = new EnumValueExpression(e.pos(), ed, v.get());
+        var td = new EnumTypeDeclarer(e.pos(), ed);
+        return Groups.g2(n, td);
+    }
+
+    private Groups.G2<Expression, TypeDeclarer>
+    optimizeArray(Expression s, ArrayTypeDeclarer atd, Identifier name) {
+        var af = atd.getField(name);
+        if (af.has()) {
+            var td = Primitive.INT.declarer(s.pos());
+            if (atd.length().has()) {
+                var lit = new IntegerLiteral(s.pos(), atd.len());
+                var n = new LiteralExpression(s.pos(), lit);
+                return Groups.g2(n, td);
+            }
+            var n = new ArrayLenExpression(s.pos(), atd);
+            return Groups.g2(n, td);
+        }
+        return semantic("array has no field %s: %s",
+                name, name.pos());
+    }
+
+    private Groups.G2<Expression, TypeDeclarer>
+    optimizeMember(PrimaryExpression s, TypeDefinition def,
+                   Identifier name, TypeArguments generic) {
+        if (def instanceof StructureDefinition sd) {
+            var f = sd.field(name);
+            if (f.has()) {
+                var n = new MemberOfExpression(s.pos(), s, name, generic, f.get());
+                return Groups.g2(n, f.get().type());
+            }
+        } else if (def instanceof ClassDefinition cd) {
+            if (s.expectCallable()) {
+                var m = cd.allMethods().tryGet(name);
+                if (m.has()) {
+                    var n = new MemberOfExpression(s.pos(), s, name, generic);
+                    var td = new FuncTypeDeclarer(s.pos(), m.get().prototype(),
+                            generic, m);
+                    return Groups.g2(n, td);
+                }
+            } else {
+                var f = cd.allFields().tryGet(name);
+                if (f.has()) {
+                    var n = new MemberOfExpression(s.pos(), s, name, generic, f.get());
+                    return Groups.g2(n, f.get().type());
+                }
+            }
+        } else if (def instanceof InterfaceDefinition id) {
+            var m = id.all().tryGet(name);
+            if (m.has()) {
+                var n = new MemberOfExpression(s.pos(), s, name, generic);
+                var td = new FuncTypeDeclarer(s.pos(), m.get().prototype(),
+                        generic, m);
+                return Groups.g2(n, td);
+            }
+        } else if (def instanceof EnumDefinition ed) {
+            var f = ed.getField(name);
+            if (f.has()) {
+                var n = new MemberOfExpression(s.pos(), s, name, generic);
+                return Groups.g2(n, f.get().type());
+            }
+        }
+
+        return semantic("member '%s'.'%s' not defined: %s", def, name, s.pos());
+    }
+
+    private Groups.G2<Expression, TypeDeclarer>
+    optimizeEnumValue(EnumValueExpression eve, EnumTypeDeclarer etd, Identifier name) {
+        var o = etd.def().getField(name);
+        if (o.none()) return semantic("%s has no field %s: %s",
+                etd.def(), name, name.pos());
+
+        var v = eve.value();
+        switch (name.value()) {
+            case EnumDefinition.TokenFieldId -> {
+                var lit = new IntegerLiteral(v.pos(), v.id());
+                var n = new LiteralExpression(v.pos(), lit);
+                var td = Primitive.INT.declarer(name.pos());
+                return Groups.g2(n, td);
+            }
+            case EnumDefinition.TokenFieldValue -> {
+                var lit = new IntegerLiteral(v.pos(), v.val());
+                var n = new LiteralExpression(v.pos(), lit);
+                var td = Primitive.INT.declarer(name.pos());
+                return Groups.g2(n, td);
+            }
+            case EnumDefinition.TokenFieldName -> {
+                var lit = new StringLiteral(v.pos(), US_ASCII, v.name().value().getBytes());
+                var n = new LiteralExpression(v.pos(), lit);
+                var td = new LiteralTypeDeclarer(v.pos(), lit);
+                return Groups.g2(n, td);
+            }
+        }
+        return semantic("%s has no field %s: %s",
+                etd.def(), name, name.pos());
+    }
+
+    public Groups.G2<Expression, TypeDeclarer> optimize(MemberOfExpression e) {
         if (!e.generic().isEmpty()) return unsupported("generic");
-        visit(e.subject());
+        var sg = optimize(e.subject());
 
-        var f = typeTool.getField(e.subject(), e.member());
-        if (f.has()) return f.must().b();
+        if (sg.b() instanceof DefinitionDeclarer dtd) {
+            if (!(dtd.def() instanceof EnumDefinition ed))
+                return semantic("%s not support use member: %s", dtd, e.pos());
+            return optimizeEnum(e, ed);
+        }
 
-        var m = typeTool.getMethod(e.subject(), e.member());
-        if (m.has()) return m.get();
+        if (sg.b() instanceof ArrayTypeDeclarer atd) {
+            return optimizeArray(sg.a(), atd, e.member());
+        }
 
-        var ev = typeTool.getEnum(e.subject(), e.member());
-        if (ev.has()) return ev.must().b();
+        if (sg.b() instanceof DerivedTypeDeclarer dtd) {
+            var def = visit(dtd.derivedType());
+            var s = (PrimaryExpression) sg.a();
+            s.expectCallable(e.expectCallable());
+            return optimizeMember(s, def, e.member(), e.generic());
+        }
 
-        return semantic("member '%s' not defined: %s", e.member(), e.pos());
+        if (sg.b() instanceof EnumTypeDeclarer etd) {
+            return optimizeEnumValue((EnumValueExpression) sg.a(), etd, e.member());
+        }
+
+        return semantic("member '%s' not defined: %s",
+                e.member(), e.pos());
     }
 
-    public Entity visit(NewArrayType e) {
+
+    public TypeDeclarer optimize(NewArrayType e) {
         visit(e.element());
-        visit(e.length());
-        visit(e.element());
-        var td = typeDeducer.visit(e.length());
-        if ((td instanceof PrimitiveTypeDeclarer ptd &&
-                ptd.primitive().isInteger()) ||
-                (td instanceof LiteralTypeDeclarer ltd &&
-                        ltd.literal() instanceof IntegerLiteral)) {
-            return e;
+
+        var ref = new Refer(e.pos(), STRONG, false, false);
+        var lg = optimize(e.length());
+        if (lg.b() instanceof PrimitiveTypeDeclarer ptd &&
+                ptd.primitive().isInteger() ||
+                lg.b() instanceof LiteralTypeDeclarer ltd &&
+                        ltd.isInteger()) {
+            return new ArrayTypeDeclarer(e.pos(), e.element(),
+                    Optional.empty(), Optional.of(ref));
         }
 
         return semantic("array length must be integer: %s",
                 e.length().pos());
     }
 
-    public Entity visit(NewDerivedType e) {
-        var def = visit(e.type());
-        if (def instanceof ClassDefinition)
-            return e;
-        return semantic("require class: %s", e.type().pos());
+    public TypeDeclarer optimize(NewDefinedType e) {
+        var ref = new Refer(e.pos(), STRONG, false, false);
+        if (e.type() instanceof PrimitiveType pt) {
+            return new PrimitiveTypeDeclarer(e.pos(),
+                    pt.primitive(), Optional.of(ref));
+        }
+        if (e.type() instanceof DerivedType dt) {
+            var def = visit(dt);
+            if (def instanceof StructureDefinition ||
+                    def instanceof ClassDefinition) {
+                return new DerivedTypeDeclarer(e.pos(), dt,
+                        Optional.of(ref));
+            }
+        }
+        return semantic("can't new type %s: %s",
+                e.type(), e.type().pos());
     }
 
-    private void checkMapArraySize(
-            TypeDeclarer td, boolean flexible, boolean isTop) {
-        if (td instanceof ArrayTypeDeclarer atd) {
-            if (atd.length().none() && (!isTop || !flexible)) {
-                semantic("require array length: %s",
-                        td.pos());
-                return;
-            }
+    public TypeDeclarer optimize(NewType e) {
+        return switch (e) {
+            case NewArrayType ee -> optimize(ee);
+            case NewDefinedType ee -> optimize(ee);
+            case null, default -> unreachable();
+        };
+    }
 
-            if (atd.length().has()) {
-                var len = atd.length().get();
-                var lit = computeConstInteger(len);
-                if (lit.value().compareTo(BigInteger.ZERO) < 0) {
-                    semantic("array length must >0: %s", len.pos());
-                    return;
+    public boolean newInitializable(
+            NewExpression e, TypeDeclarer dstType,
+            TypeDeclarer argType, Expression arg) {
+        if (e.type() instanceof NewDefinedType ndt) {
+            if (ndt.type() instanceof PrimitiveType pt) {
+                if (argType instanceof PrimitiveTypeDeclarer ptd) {
+                    // 初始化检查
+                    return pt.primitive() == ptd.primitive();
+                } else if (argType instanceof LiteralTypeDeclarer ltd) {
+                    return ltd.literal().compatible()
+                            .match(k -> k.kind == pt.primitive().kind);
                 }
-                atd.lenValue(lit.value());
+            } else if (ndt.type() instanceof DerivedType dt) {
+                var dtd = (DerivedTypeDeclarer) dstType;
+                // 定义类型检查
+                if (argType instanceof DerivedTypeDeclarer atd) {
+                    return dt.equals(atd.derivedType());
+                } else if (argType instanceof ObjectTypeDeclarer atd) {
+                    // 对象初始化表达式
+                    return initializable(dtd, atd, (ObjectExpression) arg);
+                }
             }
-
-            checkMapArraySize(atd.element(), flexible, false);
-            return;
-        }
-
-        if (td instanceof DerivedTypeDeclarer dtd) {
-            for (var atd : dtd.derivedType().generic().arguments()) {
-                checkMapArraySize(atd, flexible, false);
+        } else if (e.type() instanceof NewArrayType nat) {
+            if (argType instanceof ArrayTypeDeclarer atd) {
+                return assignable(nat.element(), atd.element(), Optional.empty());
             }
-            return;
         }
 
-        if (td instanceof PrimitiveTypeDeclarer) return;
-
-        unreachable();
+        return false;
     }
 
-    public Entity visit(NewMemType e) {
-        if (e.mapped().none()) return e;
-        if (checkMappable(e.mapped().get())) {
-            checkMapArraySize(e.mapped().get(), false, true);
-            return e;
+    public Groups.G2<Expression, TypeDeclarer> optimize(NewExpression e) {
+        var dstType = optimize(e.type());
+        var ea = e.arg().map(this::optimize);
+        if (ea.none()) {
+            var n = new NewExpression(e.pos(), e.type(), Optional.empty());
+            return Groups.g2(n, dstType);
         }
-        return semantic("can't map type %s", e.pos());
+        var ag = ea.get();
+        var arg = ag.a();
+        var argType = ag.b();
+        var n = new NewExpression(e.pos(), e.type(), Optional.of(arg));
+
+        if (newInitializable(e, dstType, argType, arg)) {
+            return Groups.g2(n, dstType);
+        }
+
+        return semantic("new-type %s and init-type %s not match: %s",
+                e.type(), argType, arg.pos());
     }
 
-    public Entity visit(NewExpression e) {
-        visit(e.type());
-        e.arg().use(this::visit);
-        if (e.arg().none()) return e;
-        var arg = e.arg().get();
 
-        if (e.type() instanceof NewMemType) {
-            var right = typeDeducer.visit(arg);
-            if (typeDeducer.isInteger(right)) return e;
-            return semantic("ram length must integer: %s", arg.pos());
+    private Groups.G2<Prototype, PrimaryExpression>
+    findCallable(ReferExpression re) {
+        visit(re.generic());
+        var s = re.symbol();
+
+        var ov = context.findVar(s);
+        if (ov.has()) {
+            var prot = checkCallee(ov.get().type().must());
+            if (prot.has()) return Groups.g2(prot.get(), re);
         }
 
-        var argType = typeDeducer.visit(arg);
+        var od = context.findFunc(s);
+        if (od.has()) return Groups.g2(od.get().prototype(), re);
 
-        if (e.type() instanceof NewDerivedType ndt) {
-            if (argType instanceof DerivedTypeDeclarer dtd) {
-                if (ndt.type().equals(dtd.derivedType()))
-                    return e;
+        if (s.module().none() && enterClass != null) {
+            var om = enterClass.allMethods().tryGet(s.name());
+            if (om.has()) {
+                var n = wrapThis(re, om.get());
+                return Groups.g2(om.get().prototype(), n);
             }
-            if (argType instanceof ObjectTypeDeclarer otd) {
-                var etd = (DerivedTypeDeclarer) typeDeducer.visit(ndt);
-                if (initializable(etd, otd))
-                    return e;
+            var of = enterClass.allFields().tryGet(s.name());
+            if (of.has()) {
+                var prot = checkCallee(of.get().type());
+                if (prot.has()) return Groups.g2(prot.get(), re);
             }
-            return semantic("init '%s' not match new type %s: %s",
-                    arg, e.type(), arg.pos());
         }
 
-        if (!(argType instanceof ArrayTypeDeclarer atd)) {
-            return semantic("init '%s' not match array type: %s",
-                    arg, arg.pos());
+        return semantic("func/method %s not found: %s",
+                s, re.pos());
+    }
+
+    public Groups.G2<Expression, TypeDeclarer> findVariable(ReferExpression re) {
+        var s = re.symbol();
+        var o = context.findVar(s);
+        if (o.has()) {
+            var v = o.get();
+            if (v.declare() == Declare.CONST &&
+                    v.value().match(e -> e instanceof LiteralExpression))
+                return Groups.g2(v.value().must(), v.type().must());
+            var n = new VariableExpression(re.pos(), v);
+            return Groups.g2(n, v.type().must());
         }
-        var nat = (NewArrayType) e.type();
-        if (assignable(nat.element(), atd.element(), Optional.of(arg)))
-            return e;
 
-        return semantic("new type and init type not match");
+        var f = context.findFunc(s);
+        if (f.has()) {
+            var td = new FuncTypeDeclarer(re.pos(), f.get().prototype(),
+                    re.generic());
+            return Groups.g2(re, td);
+        }
+
+        var t = context.findType(s);
+        if (t.has()) {
+            var td = new DefinitionDeclarer(s.pos(), t.get());
+            return Groups.g2(re, td);
+        }
+
+        if (enterClass != null && s.module().none()) {
+            var of = enterClass.allFields().tryGet(s.name());
+            if (of.has()) {
+                return Groups.g2(wrapThis(re.symbol(), of.get()), of.get().type());
+            }
+        }
+
+        return semantic("undefined symbol '%s': %s", s, s.pos());
     }
 
-    public Entity visit(ArrayExpression ae) {
-        visit(ae.elements());
-        return ae;
+    public Groups.G2<Expression, TypeDeclarer> optimize(ReferExpression e) {
+        visit(e.generic());
+
+        if (e.expectCallable()) {
+            var g = findCallable(e);
+            var td = new FuncTypeDeclarer(e.pos(), g.a(), e.generic());
+            return Groups.g2(e, td);
+        }
+
+        return findVariable(e);
     }
 
-    public Entity visit(ObjectExpression obj) {
-        for (var e : obj.entries())
-            visit(e);
-        return obj;
+    public Groups.G2<Expression, TypeDeclarer> optimize(ArrayExpression e) {
+
+        var es = e.elements();
+        if (es.isEmpty()) {
+            var l = new LiteralExpression(e.pos(), new IntegerLiteral(e.pos(), 0));
+            var t = new ArrayTypeDeclarer(e.pos(), new VoidTypeDeclarer(e.pos()),
+                    Optional.of(l), Optional.empty(), true);
+            return Groups.g2(e, t);
+        }
+
+        var values = new ArrayList<Expression>(e.elements().size());
+        TypeDeclarer type = null;
+        var i = 0;
+        for (var v : es) {
+            var g = optimize(v);
+            values.add(g.a());
+            if (type == null) {
+                type = g.b();
+            } else {
+                if (!assignable(type, g.b(), Optional.of(g.a()))) {
+                    return semantic("incompatible type of elements %s <--> %s: %s",
+                            es.getFirst(), es.get(i), es.get(i).pos());
+                }
+            }
+            i++;
+        }
+
+        var length = new IntegerLiteral(e.pos(), es.size());
+        var le = new LiteralExpression(e.pos(), length);
+        var atd = new ArrayTypeDeclarer(e.pos(), type,
+                Optional.of(le), Optional.empty(), true);
+        atd.len(es.size());
+
+        var n = new ArrayExpression(e.pos(), values);
+        return Groups.g2(n, atd);
     }
 
-    public Entity visit(PairsExpression e) {
+    public Groups.G2<Expression, TypeDeclarer> optimize(ObjectExpression oe) {
+        var entries = new IdentifierTable<Expression>(oe.entries().size());
+        var types = new IdentifierTable<TypeDeclarer>(oe.entries().size());
+        for (var n : oe.entries().nodes()) {
+            var g = optimize(n.value());
+            entries.add(n.key(), g.a());
+            types.add(n.key(), g.b());
+        }
+        var n = new ObjectExpression(oe.pos(), entries);
+        var t = new ObjectTypeDeclarer(oe.pos(), types);
+        return Groups.g2(n, t);
+    }
+
+    public Groups.G2<Expression, TypeDeclarer> optimize(ParenExpression e) {
+        return optimize(e.child());
+    }
+
+    private Groups.G2<Expression, TypeDeclarer> optimize(ClosureExpression e) {
+        return unsupported("closure");
+    }
+
+    public Groups.G2<Expression, TypeDeclarer> optimize(PairsExpression e) {
         return unsupported("pairs");
     }
 
-    public Entity visit(ParenExpression e) {
-        return visit(e.child());
+    private Optional<Literal> tryCalcConst(Expression s) {
+        var g = optimize(s);
+        if (g.a() instanceof LiteralExpression le) {
+            return Optional.of(le.literal());
+        }
+        return Optional.empty();
     }
 
-    public Entity visit(ReferExpression e) {
-        if (!e.generic().isEmpty())
-            return unsupported("generic");
+    private Optional<IntegerLiteral> tryCalcInteger(Expression s) {
+        var g = optimize(s);
+        if (g.a() instanceof LiteralExpression le &&
+                le.literal() instanceof IntegerLiteral il) {
+            return Optional.of(il);
+        }
+        return Optional.empty();
+    }
 
-        return typeDeducer.visit(e);
+    private Optional<IntegerLiteral> tryCalcSize(Expression s) {
+        var g = optimize(s);
+        if (g.a() instanceof LiteralExpression le &&
+                le.literal() instanceof IntegerLiteral il &&
+                il.value().compareTo(BigInteger.ZERO) >= 0) {
+            return Optional.of(il);
+        }
+        return Optional.empty();
+    }
+
+    private IntegerLiteral calcInteger(Expression e) {
+        var v = tryCalcInteger(e);
+        if (v.has()) return v.get();
+        return semantic("require integer: %s", e);
+    }
+
+    private IntegerLiteral calcSize(Expression e) {
+        var size = tryCalcSize(e);
+        if (size.has()) return size.get();
+        return semantic("require non-negative integer: %s", e);
     }
 
     // attribute
 
 
     public Entity visit(AttributeDefinition ad) {
-        return ad;
+        return unsupported("attribute");
     }
 }

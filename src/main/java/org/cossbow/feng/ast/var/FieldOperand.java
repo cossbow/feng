@@ -7,13 +7,13 @@ import org.cossbow.feng.ast.expr.MemberOfExpression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 import org.cossbow.feng.ast.gen.TypeArguments;
 
-public class FieldAssignableOperand extends AssignableOperand {
+public class FieldOperand extends Operand {
     private final PrimaryExpression subject;
     private final Identifier field;
 
-    public FieldAssignableOperand(Position pos,
-                                  PrimaryExpression subject,
-                                  Identifier field) {
+    public FieldOperand(Position pos,
+                        PrimaryExpression subject,
+                        Identifier field) {
         super(pos);
         this.subject = subject;
         this.field = field;

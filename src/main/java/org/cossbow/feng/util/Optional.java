@@ -39,6 +39,11 @@ public class Optional<T> {
         if (has()) user.accept(value);
     }
 
+    public void use(Consumer<T> present, Runnable absent) {
+        if (has()) present.accept(value);
+        else absent.run();
+    }
+
     public T must() {
         if (none()) {
             throw new NoSuchElementException("No value present");
@@ -55,15 +60,6 @@ public class Optional<T> {
         return has() ? Stream.of(value) : Stream.empty();
     }
 
-    public <R> Optional<R> flat(Function<T, Optional<R>> f) {
-        if (none()) return empty();
-        return f.apply(value);
-    }
-
-    public void coexist(Optional<T> o, BiConsumer<T, T> u) {
-        if (has() && o.has())
-            u.accept(value, o.value);
-    }
 
     //
 
@@ -92,7 +88,7 @@ public class Optional<T> {
 
     @Override
     public String toString() {
-        if (value == null) return "";
+        if (value == null) return "nil";
         return value.toString();
     }
 

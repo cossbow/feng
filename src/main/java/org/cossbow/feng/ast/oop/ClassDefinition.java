@@ -9,10 +9,10 @@ import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
+import java.util.ArrayList;
 import java.util.List;
 
-public class ClassDefinition extends ObjectDefinition
-        implements HaveFields<ClassField> {
+public class ClassDefinition extends ObjectDefinition {
     private Optional<DerivedType> inherit;
     private SymbolTable<DerivedType> impl;
     private IdentifierTable<ClassField> fields;
@@ -60,15 +60,25 @@ public class ClassDefinition extends ObjectDefinition
         return macros;
     }
 
+    public Optional<ClassField> field(Identifier name) {
+        return fields.tryGet(name);
+    }
+
     //
 
-    private transient Lazy<ClassDefinition> parent = Lazy.nil();
-    private transient IdentifierTable<InterfaceDefinition> interfaces = new IdentifierTable<>();
-    private transient IdentifierTable<ClassField> allFields = new IdentifierTable<>();
-    private transient IdentifierTable<ClassMethod> allMethods = new IdentifierTable<>();
+    private Lazy<ClassDefinition> parent = Lazy.nil();
+    private List<ClassDefinition> ancestors = new ArrayList<>();
+    private IdentifierTable<InterfaceDefinition> interfaces = new IdentifierTable<>();
+    private IdentifierTable<ClassField> allFields = new IdentifierTable<>();
+    private IdentifierTable<ClassMethod> allMethods = new IdentifierTable<>();
+    private volatile boolean resource;
 
     public Lazy<ClassDefinition> parent() {
         return parent;
+    }
+
+    public List<ClassDefinition> ancestors() {
+        return ancestors;
     }
 
     public IdentifierTable<InterfaceDefinition> interfaces() {
@@ -83,6 +93,14 @@ public class ClassDefinition extends ObjectDefinition
         return allMethods;
     }
 
+    public boolean resource() {
+        return resource;
+    }
+
+    public void resource(boolean resource) {
+        this.resource = resource;
+    }
+
     //
 
     private final Lazy<List<ClassDefinition>> initDeps = Lazy.nil();
@@ -92,6 +110,9 @@ public class ClassDefinition extends ObjectDefinition
     }
 
     // static
+
+    public static final Identifier ReleaseName = new Identifier(
+            Position.ZERO, "release");
 
     public static final Identifier ObjectName = new Identifier(
             Position.ZERO, "Object");
@@ -107,4 +128,8 @@ public class ClassDefinition extends ObjectDefinition
                     TypeParameters.empty(), Optional.empty(),
                     new SymbolTable<>(), new IdentifierTable<>(),
                     new IdentifierTable<>(), new MacroTable());
+
+    static {
+        ObjectClass.builtin(true);
+    }
 }

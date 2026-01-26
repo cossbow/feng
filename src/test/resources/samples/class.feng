@@ -1,12 +1,12 @@
 
 interface Codec {
-    encode(*Object) *ram;
-    decode(*ram) *Object;
+    encode(*Object) [*]uint8;
+    decode([*]uint8) *Object;
 }
 
 interface Storage {
-    read(*ram) (*ram, int);
-    write(*ram, *ram) int;
+    read([*]uint8) ([*]uint8, int);
+    write([*]uint8, [*]uint8) int;
 }
 
 export

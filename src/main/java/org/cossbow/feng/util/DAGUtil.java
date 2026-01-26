@@ -1,10 +1,7 @@
 package org.cossbow.feng.util;
 
-import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.*;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 final
@@ -12,30 +9,56 @@ public class DAGUtil {
     private DAGUtil() {
     }
 
-    private static <A> Optional<A> checkCyclic(
-            A master, HashMap<A, Boolean> visited,
-            Function<A, Iterable<A>> slaveOf) {
-        visited.put(master, Boolean.FALSE);
-        for (var slave : slaveOf.apply(master)) {
-            var stat = visited.get(slave);
-
-            if (Boolean.FALSE == stat)
-                return Optional.of(slave);
-
-            if (stat == Boolean.TRUE)
-                continue;
-
-            var r = checkCyclic(slave, visited, slaveOf);
-            if (r.has()) return r;
+    private static class CyclicPath<A> extends ArrayList<A> {
+        @Override
+        public String toString() {
+            if (isEmpty()) return "()";
+            var sb = new StringBuilder();
+            sb.append('(');
+            var first = true;
+            for (A a : this) {
+                if (first) {
+                    first = false;
+                } else {
+                    sb.append(" -> ");
+                }
+                sb.append(a);
+            }
+            sb.append(')');
+            return sb.toString();
         }
-        visited.put(master, Boolean.TRUE);
-        return Optional.empty();
     }
 
-    public static <A> Optional<A> checkCyclic(
+    private static <A> boolean checkCyclic(
+            A master, HashMap<A, Boolean> visited,
+            Function<A, Iterable<A>> slaveOf,
+            ArrayList<A> path) {
+        visited.put(master, Boolean.FALSE);
+        path.add(master);
+        for (var slave : slaveOf.apply(master)) {
+            var stat = visited.get(slave);
+            if (Boolean.FALSE == stat) {
+                return true;
+            }
+
+            if (stat == Boolean.TRUE) {
+                continue;
+            }
+            var r = checkCyclic(slave, visited, slaveOf, path);
+            if (r) return true;
+        }
+        path.removeLast();
+        visited.put(master, Boolean.TRUE);
+        return false;
+    }
+
+    public static <A> List<A> checkCyclic(
             A master, Function<A, Iterable<A>> slaveOf) {
         var set = new HashMap<A, Boolean>();
-        return checkCyclic(master, set, slaveOf);
+        var path = new CyclicPath<A>();
+        var re = checkCyclic(master, set, slaveOf, path);
+        if (!re) return List.of();
+        return path;
     }
 
 

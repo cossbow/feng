@@ -6,4 +6,8 @@ public interface Referable {
 
     Optional<Refer> refer();
 
+    default boolean isKind(ReferKind kind) {
+        return refer().match(r -> r.isKind(kind));
+    }
+
 }

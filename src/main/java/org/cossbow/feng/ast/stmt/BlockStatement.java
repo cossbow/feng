@@ -1,10 +1,14 @@
 package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.Scope;
+import org.cossbow.feng.ast.dcl.Variable;
+import org.cossbow.feng.util.Stack;
 
+import java.util.ArrayList;
 import java.util.List;
 
-public class BlockStatement extends Statement {
+public class BlockStatement extends Statement implements Scope {
     private final List<Statement> list;
     private final boolean newScope;
 
@@ -47,8 +51,14 @@ public class BlockStatement extends Statement {
 
     //
 
-    public BlockStatement unscope() {
-        return new BlockStatement(pos(), list, false);
+    private volatile List<Variable> stack = List.of();
+
+    public List<Variable> stack() {
+        return stack;
     }
 
+    @Override
+    public void stack(List<Variable> variables) {
+        stack = variables;
+    }
 }

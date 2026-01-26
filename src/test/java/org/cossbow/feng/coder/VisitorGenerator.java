@@ -35,20 +35,20 @@ public class VisitorGenerator {
         var sb = new StringBuilder("package org.cossbow.feng.visit;\n\n");
         for (var p : pkgs) sb.append("import ").append(p).append(".*;\n");
         sb.append("import static org.cossbow.feng.util.ErrorUtil.*;\n");
-        sb.append("\npublic class ").append(rootName).append(" {\n\n");
+        sb.append("\npublic interface ").append(rootName).append(" {\n\n");
         visitClass(root, ci -> {
             var name = ci.getSimpleName();
             if (!ci.isAbstract()) {
                 if (makeDef)
-                    sb.append("\tpublic ").append(returnType).append(" visit(")
+                    sb.append("\tdefault ").append(returnType).append(" visit(")
                             .append(name).append(" e) { return unreachable(); }\n\n");
                 else
-                    sb.append("\tpublic ").append(returnType).append(" visit(")
+                    sb.append("\tdefault ").append(returnType).append(" visit(")
                             .append(name).append(" e);\n\n");
                 return;
             }
 
-            sb.append("\tpublic ").append(returnType).append(" visit(").
+            sb.append("\tdefault ").append(returnType).append(" visit(").
                     append(name).append(" e) {\n");
             sb.append("\t\treturn switch (e) {\n");
             for (var ch : ci.getSubclasses().directOnly()) {
@@ -79,7 +79,7 @@ public class VisitorGenerator {
     }
 
     public static void main(String[] args) throws IOException {
-        genForType(PrimaryExpression.class, "ImmutableChecker", "boolean", true);
+        genForType(Statement.class, "StatementVisitor", "R", true);
     }
 
 }

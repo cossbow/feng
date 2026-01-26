@@ -8,7 +8,8 @@ import org.cossbow.feng.ast.dcl.Variable;
 import java.util.AbstractList;
 import java.util.List;
 
-public class VariableParameterSet extends ParameterSet {
+final
+public class VariableParameterSet {
     private IdentifierTable<Variable> variables;
 
     public VariableParameterSet(IdentifierTable<Variable> variables) {
@@ -19,19 +20,24 @@ public class VariableParameterSet extends ParameterSet {
         return variables;
     }
 
-    @Override
     public List<TypeDeclarer> types() {
         return new PhantomList();
     }
 
-    @Override
     public TypeDeclarer getType(int i) {
         return variables.getValue(i).type().must();
     }
 
-    @Override
+    public Identifier getName(int i) {
+        return variables.getValue(i).name();
+    }
+
     public int size() {
         return variables.size();
+    }
+
+    public boolean isEmpty() {
+        return size() == 0;
     }
 
     public Variable get(Identifier name) {

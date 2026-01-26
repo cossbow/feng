@@ -8,7 +8,7 @@ import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
 import org.cossbow.feng.ast.stmt.AssignmentsStatement;
-import org.cossbow.feng.ast.var.FieldAssignableOperand;
+import org.cossbow.feng.ast.var.FieldOperand;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -24,13 +24,13 @@ public class MacroParseTest extends BaseParseTest {
 
     private MacroTable interfaceMacro(String c) {
         var code = "interface A{macro %s}".formatted(c);
-        var def = (InterfaceDefinition) doParseFirstDef(code);
+        var def = (InterfaceDefinition) doParseType(code, "A");
         return (def.macros());
     }
 
     private MacroTable classMacro(String c) {
         var code = "class A{macro %s}".formatted(c);
-        var def = (ClassDefinition) doParseFirstDef(code);
+        var def = (ClassDefinition) doParseType(code, "A");
         return (def.macros());
     }
 
@@ -50,9 +50,9 @@ public class MacroParseTest extends BaseParseTest {
             Assertions.assertEquals(name, proc.name());
             checkIds(List.of(left, right, result), proc.params());
             var stmt = (AssignmentsStatement) proc.body().getFirst();
-            var operand = (FieldAssignableOperand) stmt.operands().getFirst();
+            var operand = (FieldOperand) stmt.operands().getFirst();
             Assertions.assertEquals(symbol(result), varName(operand.subject()));
-            var bin = (BinaryExpression) first(stmt.tuple());
+            var bin = (BinaryExpression) (stmt.values().getFirst());
             Assertions.assertEquals(symbol(left),
                     varName(((MemberOfExpression) bin.left()).subject()));
             Assertions.assertEquals(symbol(right),

@@ -23,6 +23,13 @@ public class ArrayExpression extends PrimaryExpression {
     }
 
     @Override
+    public boolean unbound() {
+        return true;
+    }
+
+    //
+
+    @Override
     public String toString() {
         return elements.toString();
     }

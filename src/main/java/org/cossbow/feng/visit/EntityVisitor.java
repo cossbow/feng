@@ -22,10 +22,10 @@ import org.cossbow.feng.ast.proc.PrototypeDefinition;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
-import org.cossbow.feng.ast.var.AssignableOperand;
-import org.cossbow.feng.ast.var.FieldAssignableOperand;
-import org.cossbow.feng.ast.var.IndexAssignableOperand;
-import org.cossbow.feng.ast.var.VariableAssignableOperand;
+import org.cossbow.feng.ast.var.FieldOperand;
+import org.cossbow.feng.ast.var.IndexOperand;
+import org.cossbow.feng.ast.var.Operand;
+import org.cossbow.feng.ast.var.VariableOperand;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
@@ -79,10 +79,9 @@ public interface EntityVisitor<R> {
 			case Prototype ee -> visit(ee);
 			case CatchClause ee -> visit(ee);
 			case Statement ee -> visit(ee);
-			case SwitchBranch ee -> visit(ee);
 			case Tuple ee -> visit(ee);
 			case StructureField ee -> visit(ee);
-			case AssignableOperand ee -> visit(ee);
+			case Operand ee -> visit(ee);
 			case null, default -> unreachable();
 		};
 	}
@@ -143,17 +142,14 @@ public interface EntityVisitor<R> {
 	default R visit(NewType e) {
 		return switch (e) {
 			case NewArrayType ee -> visit(ee);
-			case NewDerivedType ee -> visit(ee);
-			case NewMemType ee -> visit(ee);
+			case NewDefinedType ee -> visit(ee);
 			case null, default -> unreachable();
 		};
 	}
 
 	default R visit(NewArrayType e) { return unreachable(); }
 
-	default R visit(NewDerivedType e) { return unreachable(); }
-
-	default R visit(NewMemType e) { return unreachable(); }
+	default R visit(NewDefinedType e) { return unreachable(); }
 
 	default R visit(Refer e) { return unreachable(); }
 
@@ -163,10 +159,9 @@ public interface EntityVisitor<R> {
 			case DerivedTypeDeclarer ee -> visit(ee);
 			case FuncTypeDeclarer ee -> visit(ee);
 			case ConvertorTypeDeclarer ee -> visit(ee);
-			case MemTypeDeclarer ee -> visit(ee);
 			case PrimitiveTypeDeclarer ee -> visit(ee);
 			case LiteralTypeDeclarer ee -> visit(ee);
-			case TupleTypeDeclarer ee -> visit(ee);
+			case ObjectTypeDeclarer ee -> visit(ee);
 			case VoidTypeDeclarer ee -> visit(ee);
 			case null, default -> unreachable();
 		};
@@ -178,15 +173,13 @@ public interface EntityVisitor<R> {
 
 	default R visit(FuncTypeDeclarer e) { return unreachable(); }
 
-	default R visit(MemTypeDeclarer e) { return unreachable(); }
-
 	default R visit(PrimitiveTypeDeclarer e) { return unreachable(); }
 
 	default R visit(ConvertorTypeDeclarer e) { return unreachable(); }
 
 	default R visit(LiteralTypeDeclarer e) { return unreachable(); }
 
-	default R visit(TupleTypeDeclarer e) { return unreachable(); }
+	default R visit(ObjectTypeDeclarer e) { return unreachable(); }
 
 	default R visit(VoidTypeDeclarer e) { return unreachable(); }
 
@@ -258,15 +251,12 @@ public interface EntityVisitor<R> {
 	default R visit(DefinedType e) {
 		return switch (e) {
 			case DerivedType t -> visit(t);
-			case MemType t -> visit(t);
 			case PrimitiveType t -> visit(t);
 			case null, default -> unreachable();
 		};
 	}
 
 	default R visit(DerivedType e) { return unreachable(); }
-
-	default R visit(MemType e) { return unreachable(); }
 
 	default R visit(PrimitiveType e) { return unreachable(); }
 
@@ -366,6 +356,7 @@ public interface EntityVisitor<R> {
 			case SwitchStatement ee -> visit(ee);
 			case ThrowStatement ee -> visit(ee);
 			case TryStatement ee -> visit(ee);
+			case SwitchBranch ee -> visit(ee);
 			case null, default -> unreachable();
 		};
 	}
@@ -410,34 +401,22 @@ public interface EntityVisitor<R> {
 
 	default R visit(SwitchBranch e) { return unreachable(); }
 
-	default R visit(Tuple e) {
-		return switch (e) {
-			case ArrayTuple ee -> visit(ee);
-			case ReturnTuple ee -> visit(ee);
-			case null, default -> unreachable();
-		};
-	}
-
-	default R visit(ArrayTuple e) { return unreachable(); }
-
-	default R visit(ReturnTuple e) { return unreachable(); }
-
 	default R visit(StructureField e) { return unreachable(); }
 
-	default R visit(AssignableOperand e) {
+	default R visit(Operand e) {
 		return switch (e) {
-			case IndexAssignableOperand ee -> visit(ee);
-			case FieldAssignableOperand ee -> visit(ee);
-			case VariableAssignableOperand ee -> visit(ee);
+			case IndexOperand ee -> visit(ee);
+			case FieldOperand ee -> visit(ee);
+			case VariableOperand ee -> visit(ee);
 			case null, default -> unreachable();
 		};
 	}
 
-	default R visit(IndexAssignableOperand e) { return unreachable(); }
+	default R visit(IndexOperand e) { return unreachable(); }
 
-	default R visit(FieldAssignableOperand e) { return unreachable(); }
+	default R visit(FieldOperand e) { return unreachable(); }
 
-	default R visit(VariableAssignableOperand e) { return unreachable(); }
+	default R visit(VariableOperand e) { return unreachable(); }
 
 }
 

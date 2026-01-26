@@ -4,9 +4,11 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.util.Optional;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 
-public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral> {
+public class IntegerLiteral extends Literal
+        implements Comparable<IntegerLiteral> {
     private final BigInteger value;
     private final transient int radix;
 
@@ -16,6 +18,16 @@ public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral
         super(pos);
         this.value = value;
         this.radix = radix;
+    }
+
+    public IntegerLiteral(Position pos,
+                          BigInteger value) {
+        this(pos, value, 10);
+    }
+
+    public IntegerLiteral(Position pos,
+                          long value) {
+        this(pos, BigInteger.valueOf(value), 10);
     }
 
     public BigInteger value() {
@@ -42,9 +54,15 @@ public class IntegerLiteral extends Literal implements Comparable<IntegerLiteral
     //
 
     @Override
-    public Optional<Primitive.Kind> compatible() {
-        return Optional.of(Primitive.Kind.INTEGER);
+    public Optional<Primitive> compatible() {
+        return Optional.of(Primitive.INT);
     }
+
+    public FloatLiteral toFloat() {
+        return new FloatLiteral(pos(), new BigDecimal(value));
+    }
+
+    //
 
     @Override
     public boolean equals(Object o) {

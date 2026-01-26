@@ -1,5 +1,6 @@
 package org.cossbow.feng.visit;
 
+import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.dcl.Primitive;
@@ -8,6 +9,10 @@ import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
 
 public class GlobalSymbolContext implements SymbolContext {
 
@@ -24,10 +29,7 @@ public class GlobalSymbolContext implements SymbolContext {
         var pd = Primitive.findType(symbol.name().value());
         if (pd.has()) return Optional.of(pd.get());
 
-        var td = gst.namedTypes.tryGet(symbol.name());
-        if (td.has()) return td;
-
-        return gst.unnamedTypes.tryGet(symbol.name());
+        return gst.namedTypes.tryGet(symbol.name());
     }
 
     @Override
@@ -45,6 +47,16 @@ public class GlobalSymbolContext implements SymbolContext {
 
     @Override
     public void putVar(Variable variable) {
+    }
+
+    @Override
+    public List<Variable> scope() {
+        return new ArrayList<>(gst.variables.values());
+    }
+
+    @Override
+    public Stream<Variable> local() {
+        return Stream.empty();
     }
 
     private void checkModule(Symbol symbol) {

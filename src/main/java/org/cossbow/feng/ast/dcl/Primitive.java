@@ -1,5 +1,6 @@
 package org.cossbow.feng.ast.dcl;
 
+import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.util.Optional;
 
@@ -9,6 +10,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public enum Primitive {
+    BYTE("byte", Kind.INTEGER, 8),
     INT("int", Kind.INTEGER, 64),
     INT8("int8", Kind.INTEGER, 8),
     INT16("int16", Kind.INTEGER, 16),
@@ -35,6 +37,27 @@ public enum Primitive {
         this.width = width;
     }
 
+    public PrimitiveTypeDeclarer declarer(
+            Position pos, Optional<Refer> ref) {
+        return new PrimitiveTypeDeclarer(pos, this, ref);
+    }
+
+    public PrimitiveTypeDeclarer declarer(Position pos) {
+        return declarer(pos, Optional.empty());
+    }
+
+    public PrimitiveDefinition type() {
+        return PrimitiveDefinition.types.get(this);
+    }
+
+    public int size() {
+        return width >> 3;
+    }
+
+    public int align() {
+        return size();
+    }
+
     public boolean isInteger() {
         return kind == Kind.INTEGER;
     }
@@ -47,13 +70,11 @@ public enum Primitive {
         return kind == Kind.BOOL;
     }
 
-    public PrimitiveTypeDeclarer declarer(Position pos) {
-        return new PrimitiveTypeDeclarer(pos, this);
+    public boolean isNumber() {
+        return kind != Kind.BOOL;
     }
 
-    public PrimitiveDefinition type(){
-        return PrimitiveDefinition.types.get(this);
-    }
+    //
 
     @Override
     public String toString() {
@@ -68,10 +89,14 @@ public enum Primitive {
         return Optional.of(CodeMap.get(code));
     }
 
+    public static Optional<Primitive> ofCode(Identifier id) {
+        return ofCode(id.value());
+    }
+
     public static Optional<PrimitiveDefinition> findType(String name) {
         var p = CodeMap.get(name);
         if (p == null) return Optional.empty();
-        return Optional.of(PrimitiveDefinition.types.get(p));
+        return Optional.of(p.type());
     }
 
     static {

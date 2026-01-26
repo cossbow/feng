@@ -6,6 +6,10 @@ import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.util.Lazy;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+
 public class ClassMethod extends Method implements Exportable {
     private boolean export;
     private Identifier name;
@@ -52,10 +56,31 @@ public class ClassMethod extends Method implements Exportable {
 
     //
 
-    private transient Lazy<ClassDefinition> master = Lazy.nil();
+    private final Lazy<ClassDefinition> master = Lazy.nil();
+    private final List<ClassMethod> override = new ArrayList<>();
+    private boolean updater;
 
     public Lazy<ClassDefinition> master() {
         return master;
+    }
+
+    public List<ClassMethod> override() {
+        return override;
+    }
+
+    public void seeOverride(Consumer<ClassMethod> user) {
+        for (var m : override) {
+            user.accept(m);
+            m.seeOverride(user);
+        }
+    }
+
+    public boolean updater() {
+        return updater;
+    }
+
+    public void updater(boolean updater) {
+        this.updater = updater;
     }
 
     //
@@ -63,6 +88,8 @@ public class ClassMethod extends Method implements Exportable {
 
     @Override
     public String toString() {
-        return name.value() + func;
+        if (master.none())
+            return name.value() + func;
+        return master.must().symbol() + "$" + name.value() + func;
     }
 }

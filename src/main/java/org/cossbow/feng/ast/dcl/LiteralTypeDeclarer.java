@@ -45,7 +45,7 @@ public class LiteralTypeDeclarer extends TypeDeclarer {
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof LiteralTypeDeclarer t)) return false;
-        return literal.getClass().equals(t.literal.getClass());
+        return literal.getClass() == t.literal.getClass();
     }
 
     @Override
@@ -58,6 +58,6 @@ public class LiteralTypeDeclarer extends TypeDeclarer {
 
     @Override
     public String toString() {
-        return literal.toString();
+        return literal.getClass().getSimpleName() + ":" + literal;
     }
 }

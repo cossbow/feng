@@ -7,6 +7,8 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.util.Lazy;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class Variable extends Entity {
     private final Modifier modifier;
     private final Declare declare;
@@ -47,6 +49,33 @@ public class Variable extends Entity {
     public Lazy<Expression> value() {
         return value;
     }
+
+    public Expression requireValue() {
+        return value.has() ? value.must() : defVal.must();
+    }
+
+    private final Lazy<Expression> defVal = Lazy.nil();
+    private final int id = IdGenerator.getAndIncrement();
+
+    public Lazy<Expression> defVal() {
+        return defVal;
+    }
+
+    public int id() {
+        return id;
+    }
+
+    //
+
+    public static Variable newArg(Identifier name, TypeDeclarer type) {
+        return new Variable(name.pos(), Modifier.empty(), Declare.CONST,
+                name, Lazy.of(type), Lazy.nil());
+    }
+
+    //
+
+    private static final AtomicInteger IdGenerator =
+            new AtomicInteger(1);
 
     //
 

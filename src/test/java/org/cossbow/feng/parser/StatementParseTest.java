@@ -3,14 +3,14 @@ package org.cossbow.feng.parser;
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Symbol;
-import org.cossbow.feng.ast.dcl.NewDerivedType;
+import org.cossbow.feng.ast.dcl.NewDefinedType;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.BinaryExpression;
 import org.cossbow.feng.ast.expr.CallExpression;
 import org.cossbow.feng.ast.expr.NewExpression;
-import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.stmt.*;
-import org.cossbow.feng.ast.var.VariableAssignableOperand;
+import org.cossbow.feng.ast.var.VariableOperand;
 import org.cossbow.feng.err.SyntaxException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -33,7 +33,7 @@ public class StatementParseTest extends BaseParseTest {
     }
 
     Statement parseStmt(String code) {
-        var f = (FunctionDefinition) doParseFirstDef("func main() {" + code + " }");
+        var f = doParseFunc("func main() {" + code + " }", "main");
         return f.procedure().body().list().getFirst();
     }
 
@@ -57,10 +57,9 @@ public class StatementParseTest extends BaseParseTest {
             var b = symbol(randVarName(8));
             var code = a + operator(op) + "=" + b + ";";
             var stmt = (AssignmentsStatement) parseStmt(code);
-            var operand = (VariableAssignableOperand) stmt.operands().getFirst();
+            var operand = (VariableOperand) stmt.operands().getFirst();
             Assertions.assertEquals(a, operand.symbol());
-            var value = (BinaryExpression) ((ArrayTuple) stmt.tuple())
-                    .values().getFirst();
+            var value = (BinaryExpression) stmt.values().getFirst();
             Assertions.assertEquals(b, varName(value.right()));
             Assertions.assertSame(op, value.operator());
         }
@@ -165,7 +164,7 @@ public class StatementParseTest extends BaseParseTest {
 
         var dcl = (DeclarationStatement) stmt.init().must();
         Assertions.assertEquals(a, dcl.variables().getFirst().name());
-        var init = (CallExpression) first(dcl.init().must());
+        var init = (CallExpression) (dcl.init().getFirst());
         Assertions.assertEquals(symbol("goods"), varName(init.callee()));
         Assertions.assertTrue(init.arguments().isEmpty());
 
@@ -217,7 +216,7 @@ public class StatementParseTest extends BaseParseTest {
         Assertions.assertEquals(i, varName(cond.left()));
         Assertions.assertEquals(n, varName(cond.right()));
         var assign = (AssignmentsStatement) stmt.body();
-        var lhs = (VariableAssignableOperand) assign.operands().getFirst();
+        var lhs = (VariableOperand) assign.operands().getFirst();
         Assertions.assertEquals(i, lhs.symbol());
     }
 
@@ -241,7 +240,7 @@ public class StatementParseTest extends BaseParseTest {
         Assertions.assertEquals(symbol(i), varName(call.arguments().getFirst()));
 
         var aop = ((AssignmentsStatement) stmt.updater().must());
-        var left = ((VariableAssignableOperand) aop.operands().getFirst());
+        var left = ((VariableOperand) aop.operands().getFirst());
         Assertions.assertEquals(symbol(i), left.symbol());
     }
 
@@ -277,7 +276,8 @@ public class StatementParseTest extends BaseParseTest {
         var stmt = (ThrowStatement) parseStmt(code);
         var newExpr = (NewExpression) stmt.exception();
         Assertions.assertTrue(newExpr.arg().none());
-        Assertions.assertEquals(type, ((NewDerivedType) newExpr.type()).type().symbol());
+        var dt = (DerivedType) ((NewDefinedType) newExpr.type()).type();
+        Assertions.assertEquals(type, dt.symbol());
     }
 
     @Test
@@ -337,15 +337,17 @@ public class StatementParseTest extends BaseParseTest {
 
     @Test
     public void testReturn() {
-        for (int i = 0; i < 10; i++) {
-            var symbols = anyNames(RandVarSymbol, 8, i);
-            var code = "return " + idList(symbols) + ";";
+        {
+            var code = "return ;";
             var stmt = (ReturnStatement) parseStmt(code);
-            if (i == 0) {
-                Assertions.assertTrue(stmt.result().none());
-                continue;
-            }
-            checkIds(symbols, ((ArrayTuple) stmt.result().get()).values(), BaseParseTest::varName);
+            Assertions.assertTrue(stmt.result().none());
+        }
+        {
+            var name = randVarSymbol(15);
+            var code = "return %s;".formatted(name);
+            var stmt = (ReturnStatement) parseStmt(code);
+            Assertions.assertTrue(stmt.result().has());
+            Assertions.assertEquals(name, varName(stmt.result().get()));
         }
     }
 

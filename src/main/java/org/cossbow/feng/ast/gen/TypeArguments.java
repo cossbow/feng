@@ -53,6 +53,7 @@ public class TypeArguments extends Entity {
 
     @Override
     public String toString() {
+        if (arguments.isEmpty()) return "";
         return '`' + arguments.stream().map(Object::toString)
                 .collect(Collectors.joining(", "))
                 + '`';

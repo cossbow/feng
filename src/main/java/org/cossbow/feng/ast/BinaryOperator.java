@@ -49,4 +49,5 @@ public enum BinaryOperator {
     public static final Set<BinaryOperator> SetRel = EnumSet.of(EQ, NE, GT, LT, LE, GE);
     public static final Set<BinaryOperator> SetLogic = EnumSet.of(EQ, NE, AND, OR, BITAND, BITOR);
 
+    public static final Set<BinaryOperator> SetEquals = EnumSet.of(EQ, NE);
 }
