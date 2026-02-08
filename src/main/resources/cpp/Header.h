@@ -70,113 +70,14 @@ R *Feng$assert(T *p, uint32_t targetTypeId) {
 }
 
 template<typename T>
-struct Feng$Pointer {
-	Feng$Type type;
-	T *t;
-
-	T *get() {
-		return t;
-	}
-
-	bool isNil() {
-		return t == nullptr;
-	}
-
-	T *operator->() {
-		return t;
-	}
-};
-
-template<typename T>
 static T *Feng$inc(T *p);
+
+static void *Feng$inc(void *p) {
+	return Feng$inc<void>(p);
+}
 
 template<typename T>
 static void Feng$dec(T *p);
-
-template<typename T>
-struct Feng$Refer {
-	T *t = nullptr;
-
-	~Feng$Refer() {
-		Feng$dec(t);
-	}
-
-	void redirect(Feng$Refer<T> &&o) {
-		redirect(o.t);
-	}
-
-	void redirect(Feng$Refer<T> &o) {
-		redirect(o.t);
-	}
-
-	void redirect(T *o) {
-		if (t == o) return;
-		T *s = Feng$inc(o);
-		Feng$dec(this->t);
-		this->t = s;
-	}
-
-	Feng$Refer<T> share() {
-		return {.t = Feng$inc(t)};
-	}
-
-	T *get() {
-		return t;
-	}
-
-	bool isNil() {
-		return t == nullptr;
-	}
-
-	T *operator->() {
-		return t;
-	}
-};
-
-template<typename T>
-Feng$Pointer<T> Feng$borrow(T *t) {
-	return {.type=Feng$typeOf(t), .t=t};
-}
-
-template<typename T>
-Feng$Pointer<T> Feng$borrow(T &t) {
-	return {.type=Feng$typeOf(&t), .t=&t};
-}
-
-template<typename T>
-Feng$Pointer<T> Feng$borrow(Feng$Refer<T> &r) {
-	return {.type=Feng$typeOf(r.t), .t=r.t};
-}
-
-template<typename T, typename R>
-Feng$Pointer<R> Feng$cast(Feng$Pointer<T> &p) {
-	return {.t=(R *) (void *) p.t, .type=p.type};
-}
-
-template<typename T, typename R>
-Feng$Refer<R> Feng$cast(Feng$Refer<T> &r) {
-	return {.t=Feng$inc((R *) (void *) r.t)};
-}
-
-template<typename T, typename R>
-Feng$Refer<R> Feng$cast(Feng$Refer<T> &&r) {
-	return {.t=Feng$inc((R *) (void *) r.t)};
-}
-
-template<typename T, typename R>
-Feng$Pointer<R> *Feng$assert(Feng$Pointer<T> &p, uint32_t targetTypeId) {
-	return {.t=Feng$inc(Feng$assert(p.t, targetTypeId)), .type=p.type};
-}
-
-template<typename T, typename R>
-Feng$Refer<R> *Feng$assert(Feng$Refer<T> &p, uint32_t targetTypeId) {
-	return {.t=Feng$inc(Feng$assert(p.t, targetTypeId)), .type=p.type};
-}
-
-template<typename T, typename R>
-Feng$Refer<R> *Feng$assert(Feng$Refer<T> &&p, uint32_t targetTypeId) {
-	return {.t=Feng$inc(Feng$assert(p.t, targetTypeId)), .type=p.type};
-}
 
 #ifdef FENG_DEBUG_MEMORY
 static std::list<Feng$Header *> objects;
@@ -205,7 +106,7 @@ static void *Feng$new(int64_t size, uint32_t domain, uint32_t typeId) {
 template<typename T>
 static void Feng$del(Feng$Header *fh, T *p) {
 	// 最后一个 shared_ptr，可以销毁对象
-	if constexpr (requires(T& t) { t.Feng$release(); } ) {
+	if constexpr (requires { p->Feng$release(); }) {
 		p->Feng$release();
 	}
 #ifdef FENG_DEBUG_MEMORY

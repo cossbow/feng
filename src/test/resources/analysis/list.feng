@@ -26,6 +26,9 @@ class Queue {
         var n = head;
         if (n == nil) return nil;
         head = n.next;
+        if (head == nil) {
+            tail = nil;
+        }
         return n.value;
     }
 

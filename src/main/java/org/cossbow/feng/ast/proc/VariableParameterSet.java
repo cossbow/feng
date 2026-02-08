@@ -7,6 +7,7 @@ import org.cossbow.feng.ast.dcl.Variable;
 
 import java.util.AbstractList;
 import java.util.List;
+import java.util.Objects;
 
 final
 public class VariableParameterSet {
@@ -44,6 +45,18 @@ public class VariableParameterSet {
         return variables.get(name);
     }
 
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof VariableParameterSet t)) return false;
+
+        return types().equals(t.types());
+    }
+
+    @Override
+    public int hashCode() {
+        return types().hashCode();
+    }
 
     class PhantomList extends AbstractList<TypeDeclarer> {
 

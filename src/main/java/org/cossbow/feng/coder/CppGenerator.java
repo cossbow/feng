@@ -23,6 +23,7 @@ import org.cossbow.feng.ast.var.VariableOperand;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.Optional;
+import org.cossbow.feng.util.RepeatList;
 import org.cossbow.feng.visit.SymbolContext;
 
 import java.io.BufferedReader;
@@ -373,6 +374,10 @@ public class CppGenerator {
             return visit(v);
         }
 
+        if (v instanceof LiteralExpression le &&
+                le.literal() instanceof NilLiteral) {
+            return write('(').write(t).write(")Feng$inc(").visit(v).write(')');
+        }
         return write("Feng$inc(").visit(v).write(')');
     }
 
@@ -430,10 +435,6 @@ public class CppGenerator {
         return write('(').write(e.primitive()).write(')');
     }
 
-    public CppGenerator write(LiteralTypeDeclarer e) {
-        return visit(e.literal());
-    }
-
     private CppGenerator write(TypeDeclarer e) {
         return switch (e) {
             case ArrayTypeDeclarer ee -> write(ee);
@@ -441,7 +442,6 @@ public class CppGenerator {
             case FuncTypeDeclarer ee -> write(ee);
             case ConvertorTypeDeclarer ee -> write(ee);
             case PrimitiveTypeDeclarer ee -> write(ee);
-            case LiteralTypeDeclarer ee -> write(ee);
             case null, default -> unreachable();
         };
     }
@@ -795,8 +795,12 @@ public class CppGenerator {
         };
     }
 
-    private void writeStmts(List<Statement> list) {
-        visit(list);
+    private void wrapBraces(Statement s) {
+        if (s instanceof BlockStatement) {
+            visit(s);
+            return;
+        }
+        write('{').newLine().visit(s).write('}').newLine();
     }
 
     public CppGenerator visit(BlockStatement bs) {
@@ -914,8 +918,9 @@ public class CppGenerator {
             if (r.get().isKind(PHANTOM)) {
                 return visit(o).write(" = ").visit(v);
             }
-            return write("Feng$inc(").visit(v).write("),Feng$dec(")
-                    .visit(o).write(')');
+            write("Feng$dec(").visit(o).write("),").visit(o);
+            if (v.unbound()) return write('=').visit(v);
+            return write("=Feng$inc(").visit(v).write(')');
         }
 
         var cd = findClass(t);
@@ -962,7 +967,7 @@ public class CppGenerator {
             write(';');
             fs.updater().use(this::writeForStmt);
             write(')');
-            visit(fs.body());
+            wrapBraces(fs.body());
             write('}');
         }
         return this;
@@ -990,9 +995,9 @@ public class CppGenerator {
         write("if(");
         visit(is.condition());
         write(')');
-        visit(is.yes());
+        wrapBraces(is.yes());
         is.not().use(s -> {
-            write(" else ").visit(s);
+            write(" else ").wrapBraces(s);
         });
         if (is.init().has()) {
             write('}');
@@ -1131,7 +1136,9 @@ public class CppGenerator {
 
     public CppGenerator visit(ArrayExpression e) {
         write('{');
-//        writeValues(e.elements(), e.result.must());
+        var types = new RepeatList<>(e.resultType.must(),
+                e.elements().size());
+        writeValues(e.elements(), types);
         write('}');
         return this;
     }
@@ -1141,9 +1148,9 @@ public class CppGenerator {
         var dst = findType(t);
         if (src.equals(dst)) return visit(v);
 
-        return write("Feng$cast<").visit(src.symbol())
-                .write(',').visit(dst.symbol())
-                .write(">(").visit(v).write(')');
+        return write("Feng$assert<").visit(src.symbol())
+                .write(',').visit(dst.symbol()).write(">(")
+                .visit(v).write(',').typeId(dst).write(')');
     }
 
     public CppGenerator visit(AssertExpression e) {
@@ -1292,15 +1299,18 @@ public class CppGenerator {
 
     private boolean objectInit(
             IdentifierTable<Expression> entries,
-            Iterator<List<Identifier>> stack) {
+            Iterator<List<Field>> stack) {
         if (!stack.hasNext()) return false;
-        var names = stack.next();
+        var fields = stack.next();
         write('{');
         if (objectInit(entries, stack)) write(',');
-        for (var name : names) {
-            var v = entries.get(name);
-            write('.').write(name.value()).write('=');
-            visit(v).write(',');
+        boolean first = true;
+        for (var f : fields) {
+            if (first) first = false;
+            else write(',');
+            var v = entries.get(f.name());
+            write('.').write(f.name()).write('=')
+                    .writeValue(v, f.type(), false);
         }
         write('}');
         return true;

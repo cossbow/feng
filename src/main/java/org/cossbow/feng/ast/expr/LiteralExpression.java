@@ -24,7 +24,12 @@ public class LiteralExpression extends PrimaryExpression {
         return true;
     }
 
+    @Override
+    public boolean unbound() {
+        return true;
+    }
 
+    //
     @Override
     public String toString() {
         return literal.toString();

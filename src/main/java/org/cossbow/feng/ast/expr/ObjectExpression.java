@@ -1,5 +1,6 @@
 package org.cossbow.feng.ast.expr;
 
+import org.cossbow.feng.ast.Field;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.IdentifierTable;
@@ -37,7 +38,7 @@ public class ObjectExpression extends PrimaryExpression {
         return true;
     }
 
-    public final List<List<Identifier>> initStack = new ArrayList<>();
+    public final List<List<Field>> initStack = new ArrayList<>();
 
     //
 

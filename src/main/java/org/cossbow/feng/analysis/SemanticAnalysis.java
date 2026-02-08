@@ -205,7 +205,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         var g = optimize(gv.value().must());
         if (gv.type().has()) {
-            if (!assignable(gv.type().must(), g.b(), Optional.empty()))
+            if (!assignable(gv.type().must(), g.b(), Optional.of(g.a())))
                 return semantic("can't assign init value: %s",
                         gv.pos());
         } else {
@@ -398,8 +398,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         for (var def : types) {
             if (!(def instanceof StructureDefinition sd))
                 continue;
-            sd.fields().stream().map(StructureField::type)
-                    .flatMap(this::structureInitDeps)
+            var a = sd.fields().stream()
+                    .map(StructureField::type);
+            var b = sd.fields().stream()
+                    .flatMap(sf -> sf.bitfield().stream())
+                    .flatMap(this::structureDepSizeof);
+            Stream.concat(a, b).flatMap(this::structureInitDeps)
                     .forEach(d -> edges.add(Groups.g2(d, sd)));
             all.add(sd);
         }
@@ -930,15 +934,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return bs;
     }
 
-    private boolean initializable(
-            StructureDefinition sd,
+    private <F extends Field> List<Field> checkInitField(
+            IdentifierTable<F> fields,
             ObjectTypeDeclarer odt, ObjectExpression oe) {
-        var fields = sd.fields();
-        var obj = oe.entries();
-
-        var keys = new ArrayList<Identifier>();
+        var keys = new ArrayList<Field>();
         for (var f : fields) {
-            var o = obj.tryGet(f.name());
+            var o = oe.entries().tryGet(f.name());
             if (o.none()) {
                 if (!f.immutable()) continue;
                 return semantic("const field must init: %s",
@@ -951,9 +952,15 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             if (!able) return semantic(
                     "incompatible field '%s' and value '%s': %s",
                     f.name(), v, v.pos());
-            keys.add(f.name());
+            keys.add(f);
         }
+        return keys;
+    }
 
+    private boolean initializable(
+            StructureDefinition sd,
+            ObjectTypeDeclarer odt, ObjectExpression oe) {
+        var keys = checkInitField(sd.fields(), odt, oe);
         oe.initStack.add(keys);
         return true;
     }
@@ -969,22 +976,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         var initKeys = new HashSet<>(oe.entries().keys());
         var def = cd;
         while (true) {
-            var keys = new ArrayList<Identifier>();
-            for (var f : def.fields()) {
-                var o = oe.entries().tryGet(f.name());
-                if (o.none()) {
-                    if (!f.immutable()) continue;
-                    return semantic("const field must init: %s",
-                            oe.pos());
-                }
-                var v = o.get();
-                var t = odt.entries().get(f.name());
-                var able = assignable(f.type(), t, o);
-                if (!able) return semantic(
-                        "incompatible field '%s' and value '%s': %s",
-                        f.name(), v, v.pos());
-                keys.add(f.name());
-            }
+            var keys = checkInitField(def.fields(), odt, oe);
             oe.initStack.add(keys);
             keys.forEach(initKeys::remove);
             if (initKeys.isEmpty()) break;
@@ -1234,7 +1226,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (r instanceof ArrayTypeDeclarer ra) {
             if (l instanceof ArrayTypeDeclarer la) {
                 return assignable(la.element(), ra.element(),
-                        Optional.empty(), false);
+                        re, false);
             }
         }
 
@@ -1261,13 +1253,37 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     private boolean assignValue(
-            ArrayTypeDeclarer l, ArrayTypeDeclarer r) {
+            ArrayTypeDeclarer l, ArrayTypeDeclarer r,
+            Optional<Expression> re) {
         assert l.refer().none();
 
         if (r.refer().has()) return false; // Not: [value] = [refer]
 
-        var elOk = assignable(l.element(), r.element(),
-                Optional.empty(), false);
+        if (re.has()) {
+            if (re.must() instanceof ArrayExpression ae) {
+                var i = 0;
+                for (var ev : ae.elements()) {
+                    if (assignable(l.element(), r.element(),
+                            Optional.of(ev), false)) {
+                        i++;
+                        continue;
+                    }
+                    return semantic(
+                            "array element at %d not match type %s: %s",
+                            i, l.element(), ev.pos());
+                }
+            } else {
+                if (!assignable(l.element(), r.element(),
+                        Optional.empty(), false))
+                    return false;
+            }
+        } else {
+            var elOk = assignable(l.element(), r.element(),
+                    Optional.empty(), false);
+            if (!elOk) return false;
+        }
+
+
         var lLen = calcInteger(l.length().must());
 
         if (r.literal()) { // Yes: [value] = [literal]
@@ -1275,12 +1291,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             // Yes: check index out of bounds
             if (lLen.value().longValue() < r.len())
                 return semantic("index out of bound: %s", r.pos());
-            return elOk;
+            return true;
         }
 
         // Yes: must both equals-length and same-type-element
         var rLen = calcInteger(r.length().must());
-        return lLen.equals(rLen) && elOk;
+        return lLen.equals(rLen);
     }
 
     private boolean assignValue(
@@ -1300,7 +1316,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         if (r instanceof ArrayTypeDeclarer ra) {
             if (l instanceof ArrayTypeDeclarer la) {
-                return assignValue(la, ra);
+                return assignValue(la, ra, re);
             }
         }
 
@@ -2657,7 +2673,22 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             }
         } else if (e.type() instanceof NewArrayType nat) {
             if (argType instanceof ArrayTypeDeclarer atd) {
-                return assignable(nat.element(), atd.element(), Optional.empty());
+                var net = nat.element();
+                var aet = atd.element();
+                if (!(arg instanceof ArrayExpression ae))
+                    return assignable(net, aet, Optional.empty());
+
+                var i = 0;
+                for (var ev : ae.elements()) {
+                    if (assignable(net, aet, Optional.of(ev))) {
+                        i++;
+                        continue;
+                    }
+                    return semantic(
+                            "array element at %d not match type %s: %s",
+                            i, nat.element(), ev.pos());
+                }
+                return true;
             }
         }
 

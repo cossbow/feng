@@ -1997,10 +1997,17 @@ public class SemanticAnalysisTest {
     @Test
     public void testStatementReturnPath2() {
         checkSucc("func f()int{if(true){return 1;}else{return 0;}}");
-        checkFail("func f()int{if(true){return 1;}else{}}");
-        checkFail("func f()int{if(true){return 1;}}");
+        checkSucc("func f()int{if(true){return 1;}else{}}");
+        checkFail("func f()int{if(false){return 1;}else{}}");
+        checkSucc("func f()int{if(true){return 1;}}");
         checkFail("func f()int{if(true){}else{return 0;}}");
         checkFail("func f()int{if(true){}}");
+
+        checkSucc("func f(c bool)int{if(c){return 1;}else{return 0;}}");
+        checkFail("func f(c bool)int{if(c){return 1;}else{}}");
+        checkFail("func f(c bool)int{if(c){return 1;}}");
+        checkFail("func f(c bool)int{if(c){}else{return 0;}}");
+        checkFail("func f(c bool)int{if(c){}}");
     }
 
     @Test
