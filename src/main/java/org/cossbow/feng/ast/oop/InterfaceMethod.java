@@ -52,14 +52,14 @@ public class InterfaceMethod extends Method {
         return returnThis;
     }
 
-    private transient Lazy<InterfaceDefinition> master = Lazy.nil();
+    public final Lazy<InterfaceDefinition> master = Lazy.nil();
     private final List<ClassMethod> impls = new ArrayList<>();
 
-    public Lazy<InterfaceDefinition> master() {
-        return master;
+    public InterfaceDefinition master() {
+        return master.must();
     }
 
-    public List<ClassMethod> impls() {
+    public List<ClassMethod> override() {
         return impls;
     }
 }

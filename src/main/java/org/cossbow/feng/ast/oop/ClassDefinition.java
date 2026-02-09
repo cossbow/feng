@@ -68,7 +68,7 @@ public class ClassDefinition extends ObjectDefinition {
 
     private Lazy<ClassDefinition> parent = Lazy.nil();
     private List<ClassDefinition> ancestors = new ArrayList<>();
-    private IdentifierTable<InterfaceDefinition> interfaces = new IdentifierTable<>();
+    private List<InterfaceDefinition> interfaces = new ArrayList<>();
     private IdentifierTable<ClassField> allFields = new IdentifierTable<>();
     private IdentifierTable<ClassMethod> allMethods = new IdentifierTable<>();
     private volatile boolean resource;
@@ -81,7 +81,7 @@ public class ClassDefinition extends ObjectDefinition {
         return ancestors;
     }
 
-    public IdentifierTable<InterfaceDefinition> interfaces() {
+    public List<InterfaceDefinition> interfaces() {
         return interfaces;
     }
 

@@ -655,7 +655,7 @@ final class SourceParseVisitor
         var def = new InterfaceDefinition(posOf(ctx),
                 modifier, symbol, generic, methods, parts, macros);
         for (InterfaceMethod m : methods)
-            m.master().set(def);
+            m.master.set(def);
         return def;
     }
 
@@ -778,7 +778,7 @@ final class SourceParseVisitor
         var def = new ClassDefinition(posOf(ctx), modifier, symbol,
                 generic, inherit, impl, fields, methods, macros);
         for (var f : fields) f.master().set(def);
-        for (var m : methods) m.master().set(def);
+        for (var m : methods) m.master.set(def);
 
         enterClassSymbol = null;
         return def;

@@ -43,7 +43,6 @@ public class CatchClause extends Statement implements Scope {
         return stack;
     }
 
-    @Override
     public void stack(List<Variable> variables) {
         stack = variables;
     }

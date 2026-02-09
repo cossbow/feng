@@ -47,7 +47,6 @@ public class Procedure extends Entity implements Scope {
         return stack;
     }
 
-    @Override
     public void stack(List<Variable> variables) {
         stack = variables;
     }

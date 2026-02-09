@@ -56,12 +56,12 @@ public class ClassMethod extends Method implements Exportable {
 
     //
 
-    private final Lazy<ClassDefinition> master = Lazy.nil();
+    public final Lazy<ClassDefinition> master = Lazy.nil();
     private final List<ClassMethod> override = new ArrayList<>();
     private boolean updater;
 
-    public Lazy<ClassDefinition> master() {
-        return master;
+    public ClassDefinition master() {
+        return master.must();
     }
 
     public List<ClassMethod> override() {

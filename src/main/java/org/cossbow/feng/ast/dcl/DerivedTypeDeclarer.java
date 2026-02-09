@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.gen.DerivedType;
+import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
 public class DerivedTypeDeclarer extends TypeDeclarer
@@ -25,6 +26,8 @@ public class DerivedTypeDeclarer extends TypeDeclarer
     public Optional<Refer> refer() {
         return refer;
     }
+
+    public Lazy<TypeDefinition> def = Lazy.nil();
 
     //
 

@@ -111,35 +111,34 @@ public class DAGGraph<Key> {
         return List.of();
     }
 
-    public void travel(BiConsumer<Key, Set<Key>> consumer) {
-        var traveled = new HashMap<Key, Boolean>(all.size());
-        var heads = subtract(all, reverse.keySet());
-        var queue = new ArrayDeque<>(heads);
-        for (Key head : heads) {
-            traveled.put(head, Boolean.FALSE);
+    private void useKey(Key key, Consumer<Key> user) {
+        var deps = prev(key);
+        for (Key d : deps)
+            useKey(d, user);
+        user.accept(key);
+    }
+
+    private List<Key> linear() {
+        var list = new ArrayList<Key>(all.size());
+        var set = new HashSet<Key>(all.size());
+        for (Key key : tails) {
+            useKey(key, k -> {
+                if (set.add(k)) list.add(k);
+            });
         }
-        while (!queue.isEmpty()) {
-            var ck = queue.pollLast();
-            var next = forward.get(ck);
-            consumer.accept(ck, next);
-            if (null != next && !next.isEmpty()) {
-                // 发现后继
-                for (Key nk : next) {
-                    if (traveled.putIfAbsent(nk, Boolean.FALSE) == null) {
-                        queue.addFirst(nk);
-                    }
-                }
-            }
-            traveled.put(ck, Boolean.TRUE);
+        return list;
+    }
+
+    public void visit(BiConsumer<Key, Set<Key>> user) {
+        for (Key key : linear()) {
+            user.accept(key, prev(key));
         }
     }
 
-    public void bfs(Consumer<Key> run) {
-        var task = new DAGTask<Key, Boolean>(this, (key, deps) -> {
-            run.accept(key);
-            return CompletableFuture.completedFuture(Boolean.TRUE);
-        });
-        task.results();
+    public void bfs(Consumer<Key> user) {
+        for (Key key : linear()) {
+            user.accept(key);
+        }
     }
 
     //

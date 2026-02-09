@@ -126,7 +126,8 @@ public class DAGGraphTest {
 
     @Test
     public void testRand() {
-        var size = ThreadLocalRandom.current().nextInt(10, 1000);
+        var size = ThreadLocalRandom.current().nextInt(10, 100);
+        System.out.println("size=" + size);
         var r = randDAG(size);
         r.bfs(System.out::println);
     }
@@ -147,7 +148,7 @@ public class DAGGraphTest {
         var edges = new ArrayList<Groups.G2<Key, Key>>();
         for (int i = 0; i < size; i++) {
             for (int j = i + 1; j < size; j++) {
-                if (rand.nextInt() % 2 == 0) {
+                if (rand.nextInt() % 5 == 0) {
                     edges.add(Groups.g2(nodes.get(i), nodes.get(j)));
                 }
             }

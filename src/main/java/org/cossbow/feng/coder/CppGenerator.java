@@ -8,10 +8,7 @@ import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.PrimitiveType;
 import org.cossbow.feng.ast.lit.*;
-import org.cossbow.feng.ast.oop.ClassDefinition;
-import org.cossbow.feng.ast.oop.ClassField;
-import org.cossbow.feng.ast.oop.ClassMethod;
-import org.cossbow.feng.ast.oop.InterfaceDefinition;
+import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
@@ -34,7 +31,7 @@ import java.nio.ByteBuffer;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
 import static org.cossbow.feng.util.ErrorUtil.*;
@@ -157,15 +154,26 @@ public class CppGenerator {
     private void definePre(Source src) {
         if (debug) write("#define FENG_DEBUG_MEMORY").newLine();
 
+        var ml = src.table().enumList.stream().flatMapToInt(ed ->
+                        ed.values().keys().stream().mapToInt(n -> n.value().length()))
+                .max();
+        ml.ifPresent(l -> {
+            write("#define FENG_MAX_ENUM_NAME_LEN ").write(l + 1).newLine();
+        });
+
         var max = src.table().dagClasses.must().all().stream().mapToInt(d ->
-                d.ancestors().size()).max().getAsInt();
-        write("#define FENG_MAX_INHERIT_SIZE ").write(max)
-                .newLine().newLine();
+                d.ancestors().size()).max();
+        max.ifPresent(s -> {
+            write("#define FENG_MAX_INHERIT_SIZE ").write(s).newLine().newLine();
+        });
+
+/*
         for (var d : TypeDomain.values()) {
             write("#define ").domain(d).write(' ')
                     .write(d.ordinal()).newLine();
         }
         newLine();
+*/
     }
 
     public CppGenerator visit(Source src) {
@@ -188,8 +196,12 @@ public class CppGenerator {
         visitEnums(src);
         writeComment("struct definition");
         visitStructures(src);
-        writeComment("class definition");
-        visitClasses(src);
+        writeComment("class/interface definition");
+        src.table().dagClasses.use(this::classInherit);
+        src.table().dagInterfaces.use(dag -> dag.bfs(this::declareInterface));
+        src.table().dagClasses.use(dag -> dag.bfs(this::declareClass));
+        src.table().dagInterfaces.use(dag -> dag.bfs(this::implInterface));
+        src.table().dagClasses.use(dag -> dag.bfs(this::implClass));
         newLine();
 
         writeComment("function definition");
@@ -235,15 +247,17 @@ public class CppGenerator {
     }
 
     private CppGenerator domain(TypeDomain d) {
-        return write("DOMAIN_").write(d.name());
+//        return write("DOMAIN_").write(d.name());
+        return write(d.ordinal());
     }
 
     private CppGenerator typeId(TypeDefinition def) {
-        write("TypeId_");
-        if (def instanceof PrimitiveDefinition pd) {
-            return write(pd.primitive());
-        }
-        return visit(def.symbol());
+//        write("TypeId_");
+//        if (def instanceof PrimitiveDefinition pd) {
+//            return write(pd.primitive());
+//        }
+//        return visit(def.symbol());
+        return write(def.typeId());
     }
 
     void typesMetadata(Source src) {
@@ -255,8 +269,8 @@ public class CppGenerator {
         }
         newLine();
 
+/*
         writeComment("define TypeId");
-
         write("enum TypeId {").newLine();
         for (var p : Primitive.values()) {
             var def = p.type();
@@ -271,6 +285,7 @@ public class CppGenerator {
                     .write(',').newLine();
         }
         write('}').endStmt();
+*/
     }
 
     void declareType(PrototypeDefinition def) {
@@ -283,15 +298,18 @@ public class CppGenerator {
     }
 
     void declareType(ClassDefinition def) {
-        write("class ");
-        visit(def.symbol().name());
-        endStmt();
+        write("class ").visit(def.symbol().name()).endStmt();
+    }
+
+    CppGenerator enumName(EnumDefinition ed) {
+        return write("Feng$Enum_").visit(ed.symbol());
     }
 
     void declareType(EnumDefinition def) {
     }
 
     void declareType(InterfaceDefinition def) {
+        write("class ").visit(def.symbol().name()).endStmt();
     }
 
     void declareType(TypeDefinition def) {
@@ -309,23 +327,23 @@ public class CppGenerator {
 
     void visitEnums(Source src) {
         for (var ed : src.table().enumList) {
-            // TODO
+            visitEnum(ed);
         }
+    }
+
+    void visitEnum(EnumDefinition ed) {
+        write("static Feng$Enum ").enumName(ed).write("[] = {").newLine();
+        for (EnumDefinition.Value v : ed.values()) {
+            write("{.value=").write(v.val()).write(", .name=\"")
+                    .write(v.name()).write("\"},").newLine();
+        }
+        write('}').endStmt();
     }
 
     void visitStructures(Source src) {
         var dag = src.table().dagStructures;
         if (dag.none()) return;
         dag.get().bfs(this::visit);
-    }
-
-    void visitClasses(Source src) {
-        var o = src.table().dagClasses;
-        if (o.none()) return;
-        var dag = o.get();
-        classInherit(dag);
-        dag.bfs(this::declareClass);
-        dag.bfs(this::implClass);
     }
 
     void declareFunctions(Source src) {
@@ -368,6 +386,8 @@ public class CppGenerator {
             return visit(v).write(".Feng$share()");
         }
         if (r.get().isKind(PHANTOM)) {
+            if (v.resultType.must().maybeRefer().none())
+                write('&');
             return visit(v);
         }
         if (move || v.unbound()) {
@@ -376,8 +396,10 @@ public class CppGenerator {
 
         if (v instanceof LiteralExpression le &&
                 le.literal() instanceof NilLiteral) {
-            return write('(').write(t).write(")Feng$inc(").visit(v).write(')');
+            return write('(').write(t).write(")Feng$inc(")
+                    .visit(v).write(')');
         }
+
         return write("Feng$inc(").visit(v).write(')');
     }
 
@@ -415,6 +437,10 @@ public class CppGenerator {
     }
 
     public CppGenerator write(DerivedTypeDeclarer td) {
+        var def = td.def.must();
+        if (def instanceof EnumDefinition) {
+            return write(toCType(Primitive.INT32));
+        }
         return visit(td.derivedType()).writeRefer(td);
     }
 
@@ -471,6 +497,37 @@ public class CppGenerator {
         return this;
     }
 
+    // interface definition
+
+    private void writeParents(List<DerivedType> list) {
+        if (list.isEmpty()) return;
+
+        write(":");
+        var f = true;
+        for (var dt : list) {
+            if (f) f = false;
+            else write(',');
+            write("public ").visit(dt);
+        }
+    }
+
+    void declareInterface(InterfaceDefinition id) {
+        write("class ");
+        visit(id.symbol().name());
+        writeParents(id.parts().values());
+        write(" {\n").indent();
+        write("public:\n");
+        for (var im : id.methods()) {
+            switchMethod(im);
+        }
+        write("}").endStmt();
+    }
+
+    void implInterface(InterfaceDefinition id) {
+        for (var im : id.methods()) {
+            implSwitchMethod(im);
+        }
+    }
 
     // class definition
 
@@ -483,9 +540,9 @@ public class CppGenerator {
         write("class ");
         visit(cd.symbol().name());
         write(' ');
-        cd.parent().use(pd -> {
-            write(": public ").visit(pd.symbol()).write(' ');
-        });
+        var pp = Stream.concat(cd.inherit().stream(),
+                cd.impl().stream()).toList();
+        writeParents(pp);
         write("{\n").indent();
         write("public:\n");
         for (var f : cd.fields().values())
@@ -513,6 +570,8 @@ public class CppGenerator {
             write(".size=").write(cd.ancestors().size()).write(", .table={");
             for (var a : cd.ancestors())
                 typeId(a).write(',');
+            for (var i : cd.interfaces())
+                typeId(i).write(',');
             write("}},").newLine();
         }
         write("};").newLine();
@@ -567,24 +626,24 @@ public class CppGenerator {
         return "Feng$switch_" + methodName;
     }
 
-    private void switchMethod(ClassMethod cm) {
+    private void switchMethod(Method cm) {
         if (cm.override().isEmpty()) return;
         write(switchMethodName(cm.name().value()), cm.prototype());
         endStmt();
     }
 
-    private void implSwitchMethod(ClassMethod cm) {
+    private void implSwitchMethod(Method cm) {
         if (cm.override().isEmpty()) return;
-        var token = implMethodToken(cm.master().must(),
+        var token = implMethodToken(cm.master(),
                 switchMethodName(cm.name().value()));
         write(token, cm.prototype());
         newLine();
         write('{').newLine();
         var hasReturn = cm.prototype().returnSet().has();
         var args = cm.prototype().parameterSet();
-        write("switch (Feng$typeId(this)) {").newLine();
+        write("switch (Feng$typeOf(this).id) {").newLine();
         cm.seeOverride(or -> {
-            var child = or.master().must();
+            var child = or.master();
             write("case ").typeId(child).write(':').newLine();
             if (hasReturn) write("return ");
             write("((").visit(child.symbol()).write("*)this)->");
@@ -597,11 +656,14 @@ public class CppGenerator {
             if (!hasReturn) write("break;");
             newLine();
         });
-        write("default:").newLine();
-        if (hasReturn) write("return ");
-        write(" this->").write(cm.name());
-        write('(').writeArgs(args).write(");");
-        newLine();
+
+        if (cm instanceof ClassMethod) {
+            write("default:").newLine();
+            if (hasReturn) write("return ");
+            write(" this->").write(cm.name());
+            write('(').writeArgs(args).write(");");
+            newLine();
+        }
 
         write('}').newLine();
         write('}').newLine();
@@ -621,8 +683,8 @@ public class CppGenerator {
         enterClass = null;
     }
 
-    private String implMethodToken(ClassDefinition cd, String name) {
-        return cd.symbol() + "::" + name;
+    private String implMethodToken(TypeDefinition def, String name) {
+        return def.symbol() + "::" + name;
     }
 
     public void implMethod(ClassMethod cm) {
@@ -821,7 +883,9 @@ public class CppGenerator {
 
     private CppGenerator release(Variable v) {
         var t = v.type().must();
-        if (t.maybeRefer().has()) {
+        var r = t.maybeRefer();
+        if (r.has()) {
+            if (r.get().isKind(PHANTOM)) return this;
             return write("Feng$dec(").varName(v).write(')').endStmt();
         }
         var cdo = findClass(t);
@@ -829,29 +893,53 @@ public class CppGenerator {
         return varName(v).write(".Feng$release()").endStmt();
     }
 
+    private CppGenerator release(List<Variable> list, int expectId) {
+        for (var v : list.reversed()) {
+            if (v.id() == expectId) continue;
+            release(v);
+        }
+        return this;
+    }
+
+    private Optional<Variable> findRoot(Expression e) {
+        return switch (e) {
+            case MemberOfExpression me -> findRoot(me.subject());
+            case IndexOfExpression ie -> findRoot(ie.subject());
+            case AssertExpression ae -> findRoot(ae.subject());
+            case CallExpression ce -> findRoot(ce.callee());
+            case ParenExpression ce -> findRoot(ce.child());
+            case ReferExpression re -> unreachable();
+            case null, default -> Optional.empty();
+        };
+    }
+
     public CppGenerator visit(ReturnStatement rs) {
         writeComment("release and return");
+        if (rs.result().none()) {
+            return release(rs.local(), -1)
+                    .write("return").endStmt();
+        }
+
+        var re = rs.result().get();
         var prot = rs.procedure().must().prototype();
-        if (rs.result().has()) {
-            var re = rs.result().get();
-            if (re instanceof VariableExpression ve) {
-                var rv = ve.variable();
-                for (var v : rs.local().reversed()) {
-                    if (v.id() == rv.id()) continue;
-                    release(v);
-                }
-                write("return ");
-                writeValue(ve, prot.returnSet().must(), true);
-                return endStmt();
+        var rt = prot.returnSet().must();
+
+        if (re.unbound()) {
+            release(rs.local(), -1);
+            return write("return ").writeValue(re, rt, true).endStmt();
+        }
+
+        if (re instanceof VariableExpression ve) {
+            if (rs.local().contains(ve.variable())) {
+                release(rs.local(), ve.variable().id());
+                return write("return ").writeValue(re, rt, true).endStmt();
             }
         }
 
-        for (var v : rs.local().reversed()) release(v);
-        write("return ");
-        if (rs.result().has()) {
-            writeValue(rs.result().get(), prot.returnSet().must(), false);
-        }
-        return endStmt();
+        write(rt).write(" feng$tmp = ")
+                .writeValue(re, rt, false).endStmt();
+        release(rs.local(), -1);
+        return write("return feng$tmp").endStmt();
     }
 
     public CppGenerator visit(DeclarationStatement ds) {
@@ -1054,7 +1142,7 @@ public class CppGenerator {
     // expression
 
     public CppGenerator visit(Expression e) {
-        switch (e) {
+        return switch (e) {
             case BinaryExpression ee -> visit(ee);
             case UnaryExpression ee -> visit(ee);
             case ArrayExpression ee -> visit(ee);
@@ -1072,13 +1160,16 @@ public class CppGenerator {
             case ParenExpression ee -> visit(ee);
             case ReferExpression ee -> visit(ee);
             case VariableExpression ee -> visit(ee);
+            case ClosureExpression ee -> visit(ee);
             case IsNilExpression ee -> visit(ee);
+            case EnumValueExpression ee -> visit(ee);
+            case EnumIdExpression ee -> visit(ee);
             case null, default -> unreachable();
-        }
-        return this;
+        };
     }
 
-    private CppGenerator writeValues(List<Expression> values, List<TypeDeclarer> dstTypes) {
+    private CppGenerator writeValues(
+            List<Expression> values, List<TypeDeclarer> dstTypes) {
         for (int i = 0; i < values.size(); i++) {
             if (i > 0) write(COMMA);
             writeValue(values.get(i), dstTypes.get(i), false);
@@ -1088,15 +1179,6 @@ public class CppGenerator {
 
     private CppGenerator writePow(Expression left, Expression right) {
         return unsupported("幂运算");
-    }
-
-    private CppGenerator referOperand(Expression e) {
-        var t = e.resultType.must();
-        if (t instanceof Referable r) {
-            if (r.refer().has()) write(".get()");
-        } else if (t.isNil()) {
-        }
-        return this;
     }
 
     public CppGenerator visit(BinaryExpression e) {
@@ -1127,11 +1209,7 @@ public class CppGenerator {
             default -> unreachable();
         };
 
-        visit(e.left()).referOperand(e.left());
-        write(o);
-        visit(e.right()).referOperand(e.right());
-        write(')');
-        return this;
+        return visit(e.left()).write(o).visit(e.right()).write(')');
     }
 
     public CppGenerator visit(ArrayExpression e) {
@@ -1167,11 +1245,8 @@ public class CppGenerator {
 
     public CppGenerator visit(CallExpression e) {
         visit(e.callee());
-        write('(');
-        writeValues(e.arguments(),
-                e.prototype().must().parameterSet().types());
-        write(')');
-        return this;
+        return write('(').writeValues(e.arguments(), e.prototype()
+                .must().parameterSet().types()).write(')');
     }
 
     public CppGenerator visit(IndexOfExpression e) {
@@ -1249,20 +1324,40 @@ public class CppGenerator {
         else write('.');
     }
 
+    private CppGenerator enumMember(
+            PrimaryExpression s, EnumDefinition ed, Identifier m) {
+        // TODO: check bounds
+        if (EnumDefinition.TokenFieldId.equals(m.value()))
+            return visit(s);
+        return enumName(ed).write('[').visit(s)
+                .write("].").write(m);
+    }
+
+    private CppGenerator callMethod(TypeDefinition def, Identifier member) {
+        if (def instanceof ClassDefinition cd) {
+            var cm = cd.methods().tryGet(member);
+            if (cm.match(m -> !m.override().isEmpty())) {
+                write(switchMethodName(member.value()));
+                return this;
+            }
+        } else if (def instanceof InterfaceDefinition id) {
+            return write(switchMethodName(member.value()));
+        }
+        return write(member);
+    }
+
     public CppGenerator visit(MemberOfExpression e) {
-        visit(e.subject());
         var td = (DerivedTypeDeclarer) e.subject().resultType.must();
+        var def = td.def.must();
+        if (def instanceof EnumDefinition ed) {
+            return enumMember(e.subject(), ed, e.member());
+        }
+
+        visit(e.subject());
         deRefer(td);
         if (!e.generic().isEmpty()) return unsupported("泛型");
         if (e.expectCallable()) {
-            var def = findType(td.derivedType());
-            if (def instanceof ClassDefinition cd) {
-                var cm = cd.methods().tryGet(e.member());
-                if (cm.match(m -> !m.override().isEmpty())) {
-                    write(switchMethodName(e.member().value()));
-                    return this;
-                }
-            }
+            return callMethod(def, e.member());
         }
         write(e.member());
         return this;
@@ -1270,8 +1365,13 @@ public class CppGenerator {
 
     private CppGenerator visitNew(NewDefinedType dt, NewExpression e) {
         var def = findType(dt.type());
-        write("FENG$NEW(").visit(dt.type()).write(',');
-        domain(def.domain()).write(',');
+        write("({").newLine();
+        // new
+        visit(dt.type()).write(" *feng$tmp = (").visit(dt.type());
+        write("*)Feng$new(sizeof(").visit(dt.type()).write("),");
+        domain(def.domain()).write(',').typeId(def).write(')').endStmt();
+        // init
+        write("*feng$tmp = ");
         if (e.arg().has()) {
             visit(e.arg().get());
         } else {
@@ -1281,8 +1381,11 @@ public class CppGenerator {
                 write("{}");
             }
         }
-        write(')');
-        return this;
+        endStmt();
+        // ret
+        write("feng$tmp").endStmt();
+        // end
+        return write("})");
     }
 
     private CppGenerator visitNew(NewArrayType t, NewExpression e) {
@@ -1337,7 +1440,9 @@ public class CppGenerator {
     }
 
     public CppGenerator visit(IsNilExpression e) {
-        return visit(e.subject()).write(" == nullptr");
+        visit(e.subject());
+        write(e.nil() ? '=' : '!');
+        return write("=nullptr");
     }
 
     public CppGenerator visit(ReferExpression e) {
@@ -1374,6 +1479,15 @@ public class CppGenerator {
         write(')');
         return this;
     }
+
+    private CppGenerator visit(EnumValueExpression e) {
+        return write(e.value().id());
+    }
+
+    private CppGenerator visit(EnumIdExpression e) {
+        return visit(e.index());
+    }
+
 
     //
 

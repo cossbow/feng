@@ -37,7 +37,6 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
 import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.CommonUtil.subtract;
-import static org.cossbow.feng.util.DAGUtil.bfsVisit;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class SemanticAnalysis implements EntityVisitor<Entity> {
@@ -262,6 +261,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     public TypeDefinition visit(DerivedTypeDeclarer td) {
         var dt = visit(td.derivedType());
+        td.def.set(dt);
         var r = td.refer();
         visit(r);
 
@@ -596,7 +596,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     private void checkImplList(InterfaceDefinition id, ClassDefinition cd) {
-        for (var im : id.all()) {
+        for (var im : id.allMethods) {
             var o = cd.allMethods().tryGet(im.name());
             if (o.none()) {
                 semantic("%s unimplement method: %s%s",
@@ -605,7 +605,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             }
             var cm = o.must();
             compatible(im.prototype(), cm.prototype());
-            im.impls().add(cm);
+            im.override().add(cm);
+            cd.interfaces().add(id);
         }
     }
 
@@ -613,6 +614,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         for (var dt : cd.impl()) {
             var td = visit(dt);
             if ((td instanceof InterfaceDefinition id)) {
+                id.impls.add(cd);
                 checkImplList(id, cd);
                 continue;
             }
@@ -775,7 +777,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             for (var part : parts) {
                 edges.add(Groups.g2(part, id));
             }
-            id.deps().addAll(parts);
+            id.deps.addAll(parts);
             all.add(id);
         }
         if (all.isEmpty()) return Optional.empty();
@@ -792,15 +794,14 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         var all = new HashMap<Identifier, InterfaceMethod>();
         for (var m : def.methods()) all.put(m.name(), m);
-        bfsVisit(def, InterfaceDefinition::deps, (d, p) -> {
-            if (d == null) return;
-            var c = compatible(p, all);
-            if (c.none()) return;
-            var g = c.must();
-            semantic("duplicate method %s <--> %s",
-                    g.a().pos(), g.b().pos());
-        });
-        all.forEach((k, v) -> def.all().add(k, v));
+        for (var dep : def.deps) {
+            var c = compatible(dep, all);
+            c.use(g -> {
+                semantic("duplicate method %s <--> %s",
+                        g.a().pos(), g.b().pos());
+            });
+        }
+        all.forEach(def.allMethods::add);
 
         return def;
     }
@@ -1373,7 +1374,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                                List<TypeDeclarer> right,
                                List<Expression> es) {
         if (left.size() != right.size() || (!es.isEmpty() && es.size() != left.size()))
-            return semantic("assign must align");
+            return semantic("size not match: %s", left.getFirst().pos());
 
         for (int i = 0; i < left.size(); i++) {
             var l = left.get(i);
@@ -1545,6 +1546,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         var a = e.arguments().getFirst();
         var t = new DerivedTypeDeclarer(a.pos(), new DerivedType(a.pos(),
                 ed.symbol(), TypeArguments.EMPTY), Optional.empty());
+        t.def.set(ed);
         var v = new Variable(a.pos(), Modifier.empty(), Declare.CONST, a,
                 Lazy.of(t), Lazy.nil());
         context.putVar(v);
@@ -2407,6 +2409,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         var dt = new DerivedType(e.pos(), e.type(), TypeArguments.EMPTY);
         var ref = new Refer(e.pos(), PHANTOM, false, false);
         var td = new DerivedTypeDeclarer(e.pos(), dt, Optional.of(ref));
+        td.def.set(enterClass);
         return Groups.g2(e, td);
     }
 
@@ -2527,7 +2530,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 }
             }
         } else if (def instanceof InterfaceDefinition id) {
-            var m = id.all().tryGet(name);
+            var m = id.allMethods.tryGet(name);
             if (m.has()) {
                 var n = new MemberOfExpression(s.pos(), s, name, generic);
                 var td = new FuncTypeDeclarer(s.pos(), m.get().prototype(),
@@ -2537,7 +2540,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         } else if (def instanceof EnumDefinition ed) {
             var f = ed.getField(name);
             if (f.has()) {
-                var n = new MemberOfExpression(s.pos(), s, name, generic);
+                var n = new MemberOfExpression(s.pos(), s, name, generic, f.get());
                 return Groups.g2(n, f.get().type());
             }
         }
@@ -2605,7 +2608,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 e.member(), e.pos());
     }
 
-
     public TypeDeclarer optimize(NewArrayType e) {
         visit(e.element());
 
@@ -2633,8 +2635,10 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             var def = visit(dt);
             if (def instanceof StructureDefinition ||
                     def instanceof ClassDefinition) {
-                return new DerivedTypeDeclarer(e.pos(), dt,
+                var n = new DerivedTypeDeclarer(e.pos(), dt,
                         Optional.of(ref));
+                n.def.set(def);
+                return n;
             }
         }
         return semantic("can't new type %s: %s",
@@ -2854,6 +2858,15 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     public Groups.G2<Expression, TypeDeclarer> optimize(PairsExpression e) {
         return unsupported("pairs");
+    }
+
+    private ClosureExpression closure(Expression e, TypeDeclarer t) {
+        var vn = new Identifier(e.pos(), "feng$tmp");
+        var v = new Variable(e.pos(), Modifier.empty(), Declare.CONST,
+                vn, Lazy.of(t), Lazy.of(e));
+        var ds = new DeclarationStatement(e.pos(), List.of(v), List.of(e));
+        var ne = new VariableExpression(e.pos(), v);
+        return new ClosureExpression(e.pos(), List.of(ds), ne);
     }
 
     private Optional<Literal> tryCalcConst(Expression s) {

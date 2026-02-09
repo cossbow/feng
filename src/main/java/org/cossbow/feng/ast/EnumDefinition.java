@@ -126,9 +126,9 @@ public class EnumDefinition extends TypeDefinition {
         return Optional.of(f);
     }
 
-    private final EnumField IdField = makeField(TokenFieldId, Primitive.INT.declarer(pos()));
-    private final EnumField ValueField = makeField(TokenFieldValue, Primitive.INT.declarer(pos()));
-    private final EnumField NameField = makeField(TokenFieldName, new LiteralTypeDeclarer(pos(),
+    public final EnumField IdField = makeField(TokenFieldId, Primitive.INT.declarer(pos()));
+    public final EnumField ValueField = makeField(TokenFieldValue, Primitive.INT.declarer(pos()));
+    public final EnumField NameField = makeField(TokenFieldName, new LiteralTypeDeclarer(pos(),
             new StringLiteral(pos(), US_ASCII, TokenFieldName.getBytes(US_ASCII))));
 
     private EnumField makeField(String name, TypeDeclarer td) {

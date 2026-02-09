@@ -2,11 +2,9 @@ package org.cossbow.feng.ast.oop;
 
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
-import org.cossbow.feng.util.Lazy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,14 +41,8 @@ public class InterfaceDefinition extends ObjectDefinition {
 
     //
 
-    private final List<InterfaceDefinition> deps = new ArrayList<>();
-    private final IdentifierTable<InterfaceMethod> all = new IdentifierTable<>();
+    public final List<InterfaceDefinition> deps = new ArrayList<>();
+    public final List<ClassDefinition> impls = new ArrayList<>();
+    public final IdentifierTable<InterfaceMethod> allMethods = new IdentifierTable<>();
 
-    public List<InterfaceDefinition> deps() {
-        return deps;
-    }
-
-    public IdentifierTable<InterfaceMethod> all() {
-        return all;
-    }
 }

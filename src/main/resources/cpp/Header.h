@@ -40,6 +40,14 @@ static void *Feng$toObject(Feng$Header *fh) {
 	return (((uint8_t *) fh) + sizeof(Feng$Header));
 }
 
+#ifndef FENG_MAX_ENUM_NAME_LEN
+#define FENG_MAX_ENUM_NAME_LEN 64
+#endif
+struct Feng$Enum {
+	int32_t value;
+	char name[FENG_MAX_ENUM_NAME_LEN];
+};
+
 #ifndef FENG_MAX_INHERIT_SIZE
 #define FENG_MAX_INHERIT_SIZE 64
 #endif
@@ -69,16 +77,6 @@ R *Feng$assert(T *p, uint32_t targetTypeId) {
 	return nullptr;
 }
 
-template<typename T>
-static T *Feng$inc(T *p);
-
-static void *Feng$inc(void *p) {
-	return Feng$inc<void>(p);
-}
-
-template<typename T>
-static void Feng$dec(T *p);
-
 #ifdef FENG_DEBUG_MEMORY
 static std::list<Feng$Header *> objects;
 #endif
@@ -96,12 +94,6 @@ static void *Feng$new(int64_t size, uint32_t domain, uint32_t typeId) {
 #endif
 	return Feng$toObject(fh);
 }
-
-#define FENG$NEW(type, domain, init)  ({    \
-    type *_tmp = (type *) Feng$new(sizeof(type), domain, TypeId_##type); \
-    *_tmp = init; \
-    _tmp; \
-})
 
 template<typename T>
 static void Feng$del(Feng$Header *fh, T *p) {
@@ -122,6 +114,10 @@ static T *Feng$inc(T *p) {
 	Feng$Header *fh = Feng$headerOf(p);
 	fh->refcnt.fetch_add(1, std::memory_order_relaxed);
 	return p;
+}
+
+static void *Feng$inc(void *p) {
+	return Feng$inc<void>(p);
 }
 
 template<typename T>

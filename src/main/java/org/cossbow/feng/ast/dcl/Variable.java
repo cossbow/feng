@@ -74,6 +74,18 @@ public class Variable extends Entity {
 
     //
 
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof Variable v))
+            return false;
+        return id == v.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return id;
+    }
+
     private static final AtomicInteger IdGenerator =
             new AtomicInteger(1);
 
