@@ -704,7 +704,7 @@ final class SourceParseVisitor
 
     private Optional<DerivedType> parseClassInherit(
             FengParser.ClassInheritContext ctx) {
-        if (ctx == null) return ClassDefinition.ObjectType;
+        if (ctx == null) return Optional.of(ClassDefinition.ObjectType);
 
         var dt = (DefinedType) visit(ctx);
         if (dt instanceof DerivedType der)
@@ -1163,10 +1163,10 @@ final class SourceParseVisitor
 
     // statement: commons
 
-    private Statement scope(Statement s) {
-        if (s instanceof BlockStatement)
+    private Statement noScope(Statement s) {
+        if (!(s instanceof BlockStatement bs))
             return s;
-        return new BlockStatement(s.pos(), List.of(s));
+        return new BlockStatement(s.pos(), bs.list(), false);
     }
 
     private BlockStatement noScope(BlockStatement s) {

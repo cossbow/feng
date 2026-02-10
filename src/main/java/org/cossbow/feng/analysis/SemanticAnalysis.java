@@ -606,16 +606,18 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             var cm = o.must();
             compatible(im.prototype(), cm.prototype());
             im.override().add(cm);
-            cd.interfaces().add(id);
         }
     }
 
     private void checkImplList(ClassDefinition cd) {
+        cd.parent().use(pd ->
+                cd.allImpls().addAll(pd.allImpls()));
         for (var dt : cd.impl()) {
             var td = visit(dt);
             if ((td instanceof InterfaceDefinition id)) {
-                id.impls.add(cd);
                 checkImplList(id, cd);
+                cd.allImpls().add(id);
+                id.visitParts(d -> cd.allImpls().add(d));
                 continue;
             }
             semantic("require interface: %s", dt.pos());
@@ -777,7 +779,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             for (var part : parts) {
                 edges.add(Groups.g2(part, id));
             }
-            id.deps.addAll(parts);
+            id.partDefs.addAll(parts);
             all.add(id);
         }
         if (all.isEmpty()) return Optional.empty();
@@ -794,7 +796,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         var all = new HashMap<Identifier, InterfaceMethod>();
         for (var m : def.methods()) all.put(m.name(), m);
-        for (var dep : def.deps) {
+        for (var dep : def.partDefs) {
             var c = compatible(dep, all);
             c.use(g -> {
                 semantic("duplicate method %s <--> %s",
@@ -883,9 +885,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     private boolean enablePhantom(Variable v) {
-        var isConst = v.declare() == Declare.CONST;
         var isRefer = v.type().must().maybeRefer().has();
-        return isConst == isRefer;
+        return isRefer || v.declare() != Declare.CONST;
     }
 
     private boolean enablePhantom(ReferExpression e) {
@@ -920,8 +921,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     private boolean enablePhantom(Optional<Expression> re) {
         if (re.none()) return true;
-        if (enablePhantom(re.get()))
+        if (enablePhantom(re.get())) {
+            if (re.get() instanceof VariableExpression ve) {
+                context.lockVar(ve.variable());
+            }
             return true;
+        }
         return semantic("can't use phantom reference: %s", re.get().pos());
     }
 
@@ -1053,8 +1058,13 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (!covariant) return l.equals(r);
 
         if (l instanceof ClassDefinition lc) {
-            if (r instanceof ClassDefinition rc)
+            if (l == ClassDefinition.ObjectClass) {
+                // class Object is root of all objects
+                return true;
+            }
+            if (r instanceof ClassDefinition rc) {
                 return assignable(lc, rc);
+            }
             return false;
         }
 
@@ -1539,7 +1549,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    private Entity forIterable(IterableForStatement e, EnumDefinition ed) {
+    private Entity forIterable(IterableForStatement e, DefinitionDeclarer dtd) {
+        if (!(dtd.def() instanceof EnumDefinition ed)) {
+            return semantic("no iterable implement %s: %s",
+                    dtd.def(), e.iterable().pos());
+        }
+
         if (e.arguments().size() > 1)
             return semantic("can only be 1 receiver: %s",
                     e.arguments().get(1).pos());
@@ -1551,13 +1566,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 Lazy.of(t), Lazy.nil());
         context.putVar(v);
         return e;
-    }
-
-    private Entity forIterable(IterableForStatement e, DefinitionDeclarer dtd) {
-        if (dtd.def() instanceof EnumDefinition ed)
-            return forIterable(e, ed);
-        return semantic("no iterable implement %s: %s",
-                dtd.def(), e.iterable().pos());
     }
 
     public Entity visit(IterableForStatement e) {
@@ -1895,14 +1903,17 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     private Groups.G2<Operand, TypeDeclarer> optimize(VariableOperand vo) {
         var s = vo.symbol();
-        var v = context.findVar(s);
-        if (v.has()) {
-            if (v.get().declare() == Declare.VAR) {
-                vo.variable().set(v);
-                return Groups.g2(vo, v.get().type().must());
-            }
+        var o = context.findVar(s);
+        if (o.has()) {
+            var v = o.get();
+            if (v.declare() == Declare.CONST)
+                return semantic("immutable operand %s: %s", s, s.pos());
+            if (context.isVarLocked(v))
+                return semantic("readonly operand %s: %s", s, s.pos());
 
-            return semantic("immutable operand %s: %s", s, s.pos());
+            vo.variable().set(o);
+            return Groups.g2(vo, v.type().must());
+
         }
 
         if (enterClass != null && s.module().none()) {
@@ -2269,6 +2280,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     private ObjectDefinition getObject(TypeDeclarer td) {
         if (td instanceof DerivedTypeDeclarer dtd) {
             var t = visit(dtd.derivedType());
+            dtd.def.set(t);
             if (t instanceof ObjectDefinition cd)
                 return cd;
         }
@@ -2286,13 +2298,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
 
         var dstType = e.type();
-        var er = dstType.maybeRefer();
-        if (er.none()) return semantic(
+        var dr = dstType.maybeRefer();
+        if (dr.none()) return semantic(
                 "type must refer: %s", e.type().pos());
 
-        if (sr.get().kind() != er.get().kind()) return
-                semantic("can't change refer kind from '%s' to '%s': %s",
-                        srcType, dstType, e.type().pos());
+        if (!referable(dr.get(), sr, Optional.of(g.a())))
+            return unreachable();
 
         var n = new AssertExpression(e.pos(),
                 (PrimaryExpression) g.a(), e.type());
@@ -2301,9 +2312,17 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (assignable(tgtDef, srcDef, true)) {
             return Groups.g2(n, dstType);
         }
-        if (assignable(srcDef, tgtDef, true)) {
-            e.needCheck(true);
+        if (tgtDef instanceof InterfaceDefinition ||
+                srcDef instanceof InterfaceDefinition) {
+            n.needCheck(true);
             return Groups.g2(n, dstType);
+        }
+        if (tgtDef instanceof ClassDefinition &&
+                srcDef instanceof ClassDefinition) {
+            if (assignable(srcDef, tgtDef, true)) {
+                n.needCheck(true);
+                return Groups.g2(n, dstType);
+            }
         }
 
         return semantic("inconvertible types %s to %s: %s",

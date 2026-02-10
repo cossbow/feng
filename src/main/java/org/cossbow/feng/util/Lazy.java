@@ -55,6 +55,12 @@ public class Lazy<T> {
         if (v != null) user.accept(v);
     }
 
+    public void use(Consumer<T> user, Runnable or) {
+        var v = value;
+        if (v != null) user.accept(v);
+        else or.run();
+    }
+
     //
 
     @Override

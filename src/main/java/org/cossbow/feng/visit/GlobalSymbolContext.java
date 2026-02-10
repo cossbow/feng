@@ -1,6 +1,5 @@
 package org.cossbow.feng.visit;
 
-import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.dcl.Primitive;
@@ -10,7 +9,6 @@ import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -47,11 +45,12 @@ public class GlobalSymbolContext implements SymbolContext {
 
     @Override
     public void putVar(Variable variable) {
+        ErrorUtil.unreachable();
     }
 
     @Override
     public List<Variable> scope() {
-        return new ArrayList<>(gst.variables.values());
+        return ErrorUtil.unreachable();
     }
 
     @Override

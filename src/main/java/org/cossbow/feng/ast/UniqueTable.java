@@ -144,6 +144,10 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
     //
 
     public record Node<K, V>(K key, V value) {
+        @Override
+        public String toString() {
+            return value.toString();
+        }
     }
 
     class PhantomValueList extends AbstractList<V> {

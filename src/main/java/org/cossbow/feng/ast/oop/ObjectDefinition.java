@@ -16,4 +16,7 @@ public class ObjectDefinition extends TypeDefinition {
                             TypeDomain domain) {
         super(pos, modifier, symbol, generic, domain);
     }
+
+    abstract
+    public int id() ;
 }

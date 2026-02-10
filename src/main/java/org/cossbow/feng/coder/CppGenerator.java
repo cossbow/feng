@@ -19,6 +19,7 @@ import org.cossbow.feng.ast.var.Operand;
 import org.cossbow.feng.ast.var.VariableOperand;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.parser.ParseSymbolTable;
+import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.RepeatList;
 import org.cossbow.feng.visit.SymbolContext;
@@ -28,10 +29,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
-import java.util.stream.Stream;
+import java.util.*;
 
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
 import static org.cossbow.feng.util.ErrorUtil.*;
@@ -161,10 +159,15 @@ public class CppGenerator {
             write("#define FENG_MAX_ENUM_NAME_LEN ").write(l + 1).newLine();
         });
 
-        var max = src.table().dagClasses.must().all().stream().mapToInt(d ->
-                d.ancestors().size()).max();
-        max.ifPresent(s -> {
+        var ma = src.table().dagClasses.must().all().stream()
+                .mapToInt(d -> d.ancestors().size()).max();
+        ma.ifPresent(s -> {
             write("#define FENG_MAX_INHERIT_SIZE ").write(s).newLine().newLine();
+        });
+        var mi = src.table().dagClasses.must().all().stream()
+                .mapToInt(d -> d.allImpls().size()).max();
+        mi.ifPresent(s -> {
+            write("#define FENG_MAX_IMPLS_SIZE ").write(s).newLine().newLine();
         });
 
 /*
@@ -197,7 +200,7 @@ public class CppGenerator {
         writeComment("struct definition");
         visitStructures(src);
         writeComment("class/interface definition");
-        src.table().dagClasses.use(this::classInherit);
+        src.table().dagClasses.use(this::classRelation);
         src.table().dagInterfaces.use(dag -> dag.bfs(this::declareInterface));
         src.table().dagClasses.use(dag -> dag.bfs(this::declareClass));
         src.table().dagInterfaces.use(dag -> dag.bfs(this::implInterface));
@@ -265,7 +268,7 @@ public class CppGenerator {
         writeComment("define primitives");
         for (var p : Primitive.values()) {
             write("typedef ").write(toCType(p)).write(' ')
-                    .write(p.name()).endStmt();
+                    .write(p).endStmt();
         }
         newLine();
 
@@ -377,6 +380,12 @@ public class CppGenerator {
         return declareVar(v);
     }
 
+    private CppGenerator castPtr(
+            Expression v, TypeDeclarer t) {
+        return write("((").write(t).write(')')
+                .visit(v).write(')');
+    }
+
     private CppGenerator writeValue(Expression v, TypeDeclarer t, boolean move) {
         var r = t.maybeRefer();
         if (r.none()) {
@@ -388,19 +397,18 @@ public class CppGenerator {
         if (r.get().isKind(PHANTOM)) {
             if (v.resultType.must().maybeRefer().none())
                 write('&');
-            return visit(v);
+            return castPtr(v, t);
         }
         if (move || v.unbound()) {
-            return visit(v);
+            return castPtr(v, t);
         }
 
         if (v instanceof LiteralExpression le &&
                 le.literal() instanceof NilLiteral) {
-            return write('(').write(t).write(")Feng$inc(")
-                    .visit(v).write(')');
+            return castPtr(v, t);
         }
 
-        return write("Feng$inc(").visit(v).write(')');
+        return write("Feng$inc(").castPtr(v, t).write(')');
     }
 
     private CppGenerator varName(Variable v) {
@@ -446,7 +454,7 @@ public class CppGenerator {
 
 
     public CppGenerator write(Primitive p) {
-        return write(p.name());
+        return write(CommonUtil.upperFirst(p.code));
     }
 
     public CppGenerator write(PrimitiveTypeDeclarer td) {
@@ -512,6 +520,7 @@ public class CppGenerator {
     }
 
     void declareInterface(InterfaceDefinition id) {
+        if (id.builtin()) return;
         write("class ");
         visit(id.symbol().name());
         writeParents(id.parts().values());
@@ -524,6 +533,7 @@ public class CppGenerator {
     }
 
     void implInterface(InterfaceDefinition id) {
+        if (id.builtin()) return;
         for (var im : id.methods()) {
             implSwitchMethod(im);
         }
@@ -535,14 +545,15 @@ public class CppGenerator {
     private volatile ClassMethod enterMethod;
 
     public void declareClass(ClassDefinition cd) {
+        if (cd.builtin()) return;
         assert enterClass == null;
         enterClass = cd;
         write("class ");
         visit(cd.symbol().name());
         write(' ');
-        var pp = Stream.concat(cd.inherit().stream(),
-                cd.impl().stream()).toList();
-        writeParents(pp);
+        cd.inherit().use(dt -> {
+            write(": public ").visit(dt);
+        });
         write("{\n").indent();
         write("public:\n");
         for (var f : cd.fields().values())
@@ -560,18 +571,31 @@ public class CppGenerator {
         enterClass = null;
     }
 
-    private void classInherit(DAGGraph<ClassDefinition> dag) {
-        write("const Feng$SortedTable Feng$inheritTable[] = {").newLine();
-        var list = dag.all().stream()
-                .sorted(Comparator.comparingInt(TypeDefinition::typeId))
-                .toList();
-        for (var cd : list) {
-            write("[").typeId(cd).write("] = {");
-            write(".size=").write(cd.ancestors().size()).write(", .table={");
-            for (var a : cd.ancestors())
-                typeId(a).write(',');
-            for (var i : cd.interfaces())
-                typeId(i).write(',');
+    private <O extends ObjectDefinition> List<O>
+    sortedById(Collection<O> src) {
+        var dst = new ArrayList<>(src);
+        dst.sort(Comparator.comparingInt(O::id));
+        return dst;
+    }
+
+    private void classRelation(DAGGraph<ClassDefinition> dag) {
+        write("const Feng$ClassRelation Feng$classRelations[] = {").newLine();
+
+        for (var cd : sortedById(dag.all())) {
+            writeComment(cd.toString());
+            write("[").write(cd.id()).write("] = {");
+
+            write(".inheritsSize=").write(cd.ancestors().size());
+            write(", .implsSize=").write(cd.allImpls().size());
+
+            write(", .inherits={");
+            for (var a : sortedById(cd.ancestors()))
+                write(a.id()).write(',');
+
+            write("}, .impls={");
+            for (var i : sortedById(cd.allImpls()))
+                write(i.id()).write(',');
+
             write("}},").newLine();
         }
         write("};").newLine();
@@ -627,13 +651,11 @@ public class CppGenerator {
     }
 
     private void switchMethod(Method cm) {
-        if (cm.override().isEmpty()) return;
         write(switchMethodName(cm.name().value()), cm.prototype());
         endStmt();
     }
 
     private void implSwitchMethod(Method cm) {
-        if (cm.override().isEmpty()) return;
         var token = implMethodToken(cm.master(),
                 switchMethodName(cm.name().value()));
         write(token, cm.prototype());
@@ -641,7 +663,7 @@ public class CppGenerator {
         write('{').newLine();
         var hasReturn = cm.prototype().returnSet().has();
         var args = cm.prototype().parameterSet();
-        write("switch (Feng$typeOf(this).id) {").newLine();
+        write("switch (((Object *)this)->feng$classId) {").newLine();
         cm.seeOverride(or -> {
             var child = or.master();
             write("case ").typeId(child).write(':').newLine();
@@ -674,6 +696,7 @@ public class CppGenerator {
     }
 
     public void implClass(ClassDefinition cd) {
+        if (cd.builtin()) return;
         assert enterClass == null;
         enterClass = cd;
         for (var cm : cd.methods()) {
@@ -857,14 +880,6 @@ public class CppGenerator {
         };
     }
 
-    private void wrapBraces(Statement s) {
-        if (s instanceof BlockStatement) {
-            visit(s);
-            return;
-        }
-        write('{').newLine().visit(s).write('}').newLine();
-    }
-
     public CppGenerator visit(BlockStatement bs) {
         if (bs.newScope()) write('{').newLine();
 
@@ -899,18 +914,6 @@ public class CppGenerator {
             release(v);
         }
         return this;
-    }
-
-    private Optional<Variable> findRoot(Expression e) {
-        return switch (e) {
-            case MemberOfExpression me -> findRoot(me.subject());
-            case IndexOfExpression ie -> findRoot(ie.subject());
-            case AssertExpression ae -> findRoot(ae.subject());
-            case CallExpression ce -> findRoot(ce.callee());
-            case ParenExpression ce -> findRoot(ce.child());
-            case ReferExpression re -> unreachable();
-            case null, default -> Optional.empty();
-        };
     }
 
     public CppGenerator visit(ReturnStatement rs) {
@@ -970,11 +973,8 @@ public class CppGenerator {
     }
 
     public CppGenerator visit(FieldOperand e) {
-        visit(e.subject());
         var td = (DerivedTypeDeclarer) e.subject().resultType.must();
-        deRefer(td);
-        visit(e.field());
-        return this;
+        return deRefer(e.subject(), td).visit(e.field());
     }
 
     public CppGenerator visit(AssignmentsStatement as) {
@@ -1004,11 +1004,11 @@ public class CppGenerator {
         var r = t.maybeRefer();
         if (r.has()) {
             if (r.get().isKind(PHANTOM)) {
-                return visit(o).write(" = ").visit(v);
+                return visit(o).write(" = ").castPtr(v, t);
             }
-            write("Feng$dec(").visit(o).write("),").visit(o);
-            if (v.unbound()) return write('=').visit(v);
-            return write("=Feng$inc(").visit(v).write(')');
+            write("Feng$dec(").visit(o).write(") = ");
+            if (v.unbound()) return visit(v);
+            return write("Feng$inc(").visit(v).write(')');
         }
 
         var cd = findClass(t);
@@ -1055,7 +1055,8 @@ public class CppGenerator {
             write(';');
             fs.updater().use(this::writeForStmt);
             write(')');
-            wrapBraces(fs.body());
+            visit(fs.body());
+            exitScope(fs);
             write('}');
         }
         return this;
@@ -1083,11 +1084,12 @@ public class CppGenerator {
         write("if(");
         visit(is.condition());
         write(')');
-        wrapBraces(is.yes());
+        visit(is.yes());
         is.not().use(s -> {
-            write(" else ").wrapBraces(s);
+            write(" else ").visit(s);
         });
         if (is.init().has()) {
+            exitScope(is);
             write('}');
         }
         return this;
@@ -1221,26 +1223,19 @@ public class CppGenerator {
         return this;
     }
 
-    private CppGenerator cast(Expression v, TypeDeclarer t) {
-        var src = findType(v.resultType.must());
-        var dst = findType(t);
-        if (src.equals(dst)) return visit(v);
-
-        return write("Feng$assert<").visit(src.symbol())
-                .write(',').visit(dst.symbol()).write(">(")
-                .visit(v).write(',').typeId(dst).write(')');
-    }
-
     public CppGenerator visit(AssertExpression e) {
         if (!e.needCheck())
-            return cast(e.subject(), e.type());
+            return castPtr(e.subject(), e.type());
 
-        var src = findType(e.subject().resultType.must());
-        var dst = findType(e.type());
-        return write("Feng$assert<").visit(src.symbol())
-                .write(',').visit(dst.symbol())
-                .write(">(").visit(e.subject())
-                .write(", ").typeId(dst).write(')');
+        var dst = (ObjectDefinition) findType(e.type());
+        if (dst instanceof ClassDefinition) {
+            write("Feng$inherit");
+        } else {
+            write("Feng$impl");
+        }
+        return write('<').visit(dst.symbol()).write(">(")
+                .visit(e.subject()).write(", ")
+                .write(dst.id()).write(')');
     }
 
     public CppGenerator visit(CallExpression e) {
@@ -1319,9 +1314,13 @@ public class CppGenerator {
         return visit(pd.symbol()).write("::");
     }
 
-    private void deRefer(Referable r) {
-        if (r.refer().has()) write("->");
-        else write('.');
+    private CppGenerator deRefer(Expression subject, Referable ref) {
+        if (ref.refer().has()) {
+            write("Feng$required(").visit(subject).write(")->");
+        } else {
+            write('.');
+        }
+        return this;
     }
 
     private CppGenerator enumMember(
@@ -1353,8 +1352,7 @@ public class CppGenerator {
             return enumMember(e.subject(), ed, e.member());
         }
 
-        visit(e.subject());
-        deRefer(td);
+        deRefer(e.subject(), td);
         if (!e.generic().isEmpty()) return unsupported("泛型");
         if (e.expectCallable()) {
             return callMethod(def, e.member());
@@ -1363,29 +1361,33 @@ public class CppGenerator {
         return this;
     }
 
+    private CppGenerator fieldInit(
+            TypeDefinition def, Optional<Expression> init) {
+        write('(').visit(def.symbol()).write(')');
+        if (init.has()) {
+            return visit(init.get());
+        } else {
+            return write("{}");
+        }
+    }
+
     private CppGenerator visitNew(NewDefinedType dt, NewExpression e) {
         var def = findType(dt.type());
-        write("({").newLine();
-        // new
-        visit(dt.type()).write(" *feng$tmp = (").visit(dt.type());
-        write("*)Feng$new(sizeof(").visit(dt.type()).write("),");
-        domain(def.domain()).write(',').typeId(def).write(')').endStmt();
-        // init
-        write("*feng$tmp = ");
-        if (e.arg().has()) {
-            visit(e.arg().get());
-        } else {
-            if (dt.type() instanceof PrimitiveType) {
-                write("0");
-            } else {
-                write("{}");
-            }
+        if (def instanceof ClassDefinition cd) {
+            return write("Feng$newObject<").visit(cd.symbol())
+                    .write(">(").write(cd.id()).write(',')
+                    .fieldInit(cd, e.arg()).write(')');
         }
-        endStmt();
-        // ret
-        write("feng$tmp").endStmt();
-        // end
-        return write("})");
+
+        write("Feng$newMem<").visit(def.symbol()).write(">(");
+        if (def instanceof StructureDefinition) {
+            return fieldInit(def, e.arg()).write(')');
+        }
+        if (e.arg().has()) {
+            return visit(e.arg().get()).write(')');
+        } else {
+            return write('0').write(')');
+        }
     }
 
     private CppGenerator visitNew(NewArrayType t, NewExpression e) {

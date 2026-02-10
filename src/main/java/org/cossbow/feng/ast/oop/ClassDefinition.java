@@ -11,6 +11,7 @@ import org.cossbow.feng.util.Optional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ClassDefinition extends ObjectDefinition {
     private Optional<DerivedType> inherit;
@@ -66,12 +67,17 @@ public class ClassDefinition extends ObjectDefinition {
 
     //
 
-    private Lazy<ClassDefinition> parent = Lazy.nil();
-    private List<ClassDefinition> ancestors = new ArrayList<>();
-    private List<InterfaceDefinition> interfaces = new ArrayList<>();
-    private IdentifierTable<ClassField> allFields = new IdentifierTable<>();
-    private IdentifierTable<ClassMethod> allMethods = new IdentifierTable<>();
+    private final int id = IdGenerator.incrementAndGet();
+    private final Lazy<ClassDefinition> parent = Lazy.nil();
+    private final List<ClassDefinition> ancestors = new ArrayList<>();
+    private final List<InterfaceDefinition> allImpls = new ArrayList<>();
+    private final IdentifierTable<ClassField> allFields = new IdentifierTable<>();
+    private final IdentifierTable<ClassMethod> allMethods = new IdentifierTable<>();
     private volatile boolean resource;
+
+    public int id() {
+        return id;
+    }
 
     public Lazy<ClassDefinition> parent() {
         return parent;
@@ -81,8 +87,8 @@ public class ClassDefinition extends ObjectDefinition {
         return ancestors;
     }
 
-    public List<InterfaceDefinition> interfaces() {
-        return interfaces;
+    public List<InterfaceDefinition> allImpls() {
+        return allImpls;
     }
 
     public IdentifierTable<ClassField> allFields() {
@@ -103,13 +109,9 @@ public class ClassDefinition extends ObjectDefinition {
 
     //
 
-    private final Lazy<List<ClassDefinition>> initDeps = Lazy.nil();
-
-    public Lazy<List<ClassDefinition>> initDeps() {
-        return initDeps;
-    }
-
     // static
+
+    private static final AtomicInteger IdGenerator = new AtomicInteger(0);
 
     public static final Identifier ReleaseName = new Identifier(
             Position.ZERO, "release");
@@ -118,8 +120,8 @@ public class ClassDefinition extends ObjectDefinition {
             Position.ZERO, "Object");
     public static final Symbol ObjectSymbol = new Symbol(
             Position.ZERO, ObjectName);
-    public static final Optional<DerivedType> ObjectType = Optional.of(
-            new DerivedType(Position.ZERO, ObjectSymbol, TypeArguments.EMPTY));
+    public static final DerivedType ObjectType = new DerivedType(
+            Position.ZERO, ObjectSymbol, TypeArguments.EMPTY);
 
     public static final ClassDefinition ObjectClass =
             new ClassDefinition(Position.ZERO, Modifier.empty(),

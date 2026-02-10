@@ -4,10 +4,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 
 import java.nio.file.Path;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.HexFormat;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class CommonUtil {
@@ -24,6 +21,10 @@ public class CommonUtil {
         return new Identifier(Position.ZERO, prefix + "_" + h);
     }
 
+    public static String upperFirst(String s) {
+        return s.substring(0, 1).toUpperCase() + s.substring(1);
+    }
+
     public static byte[] concat(byte[] first, byte[]... more) {
         var len = first.length;
         for (byte[] m : more) len += m.length;
@@ -35,6 +36,14 @@ public class CommonUtil {
             System.arraycopy(m, 0, buf, offset, m.length);
             offset += m.length;
         }
+        return buf;
+    }
+
+    public static <T>
+    List<T> concat(List<T> a, List<T> b) {
+        var buf = new ArrayList<T>(a.size() + b.size());
+        buf.addAll(a);
+        buf.addAll(b);
         return buf;
     }
 

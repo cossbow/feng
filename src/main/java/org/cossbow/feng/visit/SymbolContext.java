@@ -1,6 +1,5 @@
 package org.cossbow.feng.visit;
 
-import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.dcl.Variable;

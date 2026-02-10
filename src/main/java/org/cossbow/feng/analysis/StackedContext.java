@@ -30,7 +30,11 @@ public class StackedContext implements SymbolContext {
 
     public void exitScope(Scope scope) {
         var ctx = stack.pop();
-        scope.stack(List.copyOf(ctx.scope()));
+        if (!(ctx instanceof LocalSymbolContext lsc))
+            return;
+        var list = List.copyOf(lsc.scope());
+        for (var v : list) unlockVar(v);
+        scope.stack(list);
     }
 
     @Override
@@ -63,4 +67,19 @@ public class StackedContext implements SymbolContext {
         return getScope().local();
     }
 
+    public void lockVar(Variable variable) {
+        if (getScope() instanceof LocalSymbolContext lsc)
+            lsc.lockVar(variable);
+    }
+
+    public void unlockVar(Variable variable) {
+        if (getScope() instanceof LocalSymbolContext lsc)
+            lsc.unlockVar(variable);
+    }
+
+    public boolean isVarLocked(Variable variable) {
+        if (getScope() instanceof LocalSymbolContext lsc)
+            return lsc.isVarLocked(variable);
+        return false;
+    }
 }

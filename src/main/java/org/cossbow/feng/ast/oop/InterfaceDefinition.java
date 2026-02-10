@@ -8,6 +8,8 @@ import org.cossbow.feng.ast.micro.MacroTable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 public class InterfaceDefinition extends ObjectDefinition {
     private IdentifierTable<InterfaceMethod> methods;
@@ -41,8 +43,21 @@ public class InterfaceDefinition extends ObjectDefinition {
 
     //
 
-    public final List<InterfaceDefinition> deps = new ArrayList<>();
-    public final List<ClassDefinition> impls = new ArrayList<>();
+    private final int id = IdGenerator.incrementAndGet();
+    public final List<InterfaceDefinition> partDefs = new ArrayList<>();
     public final IdentifierTable<InterfaceMethod> allMethods = new IdentifierTable<>();
 
+    public int id() {
+        return id;
+    }
+
+    public void visitParts(Consumer<InterfaceDefinition> user) {
+        for (var d : partDefs) {
+            user.accept(d);
+            d.visitParts(user);
+        }
+    }
+
+    //
+    private static final AtomicInteger IdGenerator = new AtomicInteger(0);
 }

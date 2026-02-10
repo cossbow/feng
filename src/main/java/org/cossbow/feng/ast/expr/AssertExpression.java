@@ -23,7 +23,6 @@ public class AssertExpression extends PrimaryExpression {
         return type;
     }
 
-    @Override
     public boolean unbound() {
         return subject.unbound();
     }
@@ -36,5 +35,12 @@ public class AssertExpression extends PrimaryExpression {
 
     public void needCheck(boolean needCheck) {
         this.needCheck = needCheck;
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        return subject + "?(" + type + ')';
     }
 }

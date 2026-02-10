@@ -8,6 +8,7 @@ import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.util.Optional;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -19,6 +20,7 @@ public class LocalSymbolContext implements SymbolContext {
     }
 
     private final IdentifierTable<Variable> variables = new IdentifierTable<>();
+    private final HashMap<Integer, Variable> lockedVars = new HashMap<>();
 
     @Override
     public Optional<TypeDefinition> findType(Symbol symbol) {
@@ -44,13 +46,24 @@ public class LocalSymbolContext implements SymbolContext {
         variables.add(variable.name(), variable);
     }
 
-    @Override
-    public List< Variable> scope() {
+    public List<Variable> scope() {
         return new ArrayList<>(variables.values());
     }
 
     public Stream<Variable> local() {
         return Stream.concat(parent.local(), variables.stream());
+    }
+
+    public void lockVar(Variable v) {
+        lockedVars.put(v.id(), v);
+    }
+
+    public void unlockVar(Variable v) {
+        lockedVars.remove(v.id());
+    }
+
+    public boolean isVarLocked(Variable v) {
+        return lockedVars.containsKey(v.id());
     }
 
 }
