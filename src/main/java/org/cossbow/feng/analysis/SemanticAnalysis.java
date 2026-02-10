@@ -371,11 +371,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 return unsupported("generic");
 
             var def = visit(dtd.derivedType());
+            dtd.def.set(def);
             if (def instanceof StructureDefinition sd)
                 return Stream.of(sd);
 
             return semantic("structure field type can't be %s: %s",
-                    dtd.derivedType(), td.pos());
+                    def, td.pos());
         }
 
         if (td instanceof ArrayTypeDeclarer atd) {
