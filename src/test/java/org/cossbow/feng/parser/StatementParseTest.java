@@ -57,9 +57,9 @@ public class StatementParseTest extends BaseParseTest {
             var b = symbol(randVarName(8));
             var code = a + operator(op) + "=" + b + ";";
             var stmt = (AssignmentsStatement) parseStmt(code);
-            var operand = (VariableOperand) stmt.operands().getFirst();
+            var operand = (VariableOperand) stmt.operand(0);
             Assertions.assertEquals(a, operand.symbol());
-            var value = (BinaryExpression) stmt.values().getFirst();
+            var value = (BinaryExpression) stmt.value(0);
             Assertions.assertEquals(b, varName(value.right()));
             Assertions.assertSame(op, value.operator());
         }
@@ -216,7 +216,7 @@ public class StatementParseTest extends BaseParseTest {
         Assertions.assertEquals(i, varName(cond.left()));
         Assertions.assertEquals(n, varName(cond.right()));
         var assign = (AssignmentsStatement) stmt.body();
-        var lhs = (VariableOperand) assign.operands().getFirst();
+        var lhs = (VariableOperand) assign.list().getFirst().operand();
         Assertions.assertEquals(i, lhs.symbol());
     }
 
@@ -240,7 +240,7 @@ public class StatementParseTest extends BaseParseTest {
         Assertions.assertEquals(symbol(i), varName(call.arguments().getFirst()));
 
         var aop = ((AssignmentsStatement) stmt.updater().must());
-        var left = ((VariableOperand) aop.operands().getFirst());
+        var left = ((VariableOperand) aop.list().getFirst().operand());
         Assertions.assertEquals(symbol(i), left.symbol());
     }
 

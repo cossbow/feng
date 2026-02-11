@@ -32,7 +32,7 @@ public class LiteralExpression extends PrimaryExpression {
     //
     @Override
     public String toString() {
-        return literal.toString();
+        return literal.type() + ' ' + literal;
     }
 
 }

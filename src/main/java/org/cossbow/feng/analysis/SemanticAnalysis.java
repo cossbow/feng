@@ -15,10 +15,7 @@ import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
-import org.cossbow.feng.ast.var.FieldOperand;
-import org.cossbow.feng.ast.var.IndexOperand;
-import org.cossbow.feng.ast.var.Operand;
-import org.cossbow.feng.ast.var.VariableOperand;
+import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.layout.LayoutTool;
 import org.cossbow.feng.util.Groups;
@@ -1209,7 +1206,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return true;
         }
 
-        return semantic("out of bounds: from %s(size:%d):%s to %s(size:%d):%s",
+        return semantic("out of bounds: from %s(size=%d):%s to %s(size=%d):%s",
                 l, lu, l.pos(), r, rs, r.pos());
     }
 
@@ -1398,23 +1395,19 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return true;
     }
 
+    private Assignment visit(Assignment a) {
+        var og = optimize(a.operand());
+        var vg = optimize(a.value());
+        if (assignable(og.b(), vg.b(), Optional.of(vg.a()))) {
+            return new Assignment(a.pos(), og.a(), vg.a(), a.copy());
+        }
+        return semantic("incompatible %s = %s: %s",
+                a.operand(), a.value(), a.pos());
+    }
+
     public Entity visit(AssignmentsStatement as) {
-        var operands = new ArrayList<Operand>(as.operands().size());
-        var left = new ArrayList<TypeDeclarer>(as.operands().size());
-        for (var ao : as.operands()) {
-            var g = optimize(ao);
-            operands.add(g.a());
-            left.add(g.b());
-        }
-        as.operands(operands);
-
-        var g = optimize(as.values());
-        if (assignable(left, g.b(), g.a())) {
-            as.values(g.a());
-            return as;
-        }
-
-        return semantic("type not compatible: %s", as.pos());
+        var list = as.list().stream().map(this::visit).toList();
+        return new AssignmentsStatement(as.pos(), list);
     }
 
     private void checkDefinedType(TypeDeclarer td) {
@@ -1871,8 +1864,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
         var sg = optimize(fo.subject());
         var td = sg.b();
-        if (td instanceof VoidTypeDeclarer)
-            return unreachable();
+        if (td instanceof VoidTypeDeclarer) return unreachable();
 
         if (!(td instanceof DerivedTypeDeclarer dtd))
             return semantic("illegal operand %s: %s", name, fo.pos());
@@ -1889,17 +1881,15 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (of.none())
             return semantic("field %s not defined: %s", name, name.pos());
         var f = of.get();
-
-        var n = new FieldOperand(fo.pos(), (PrimaryExpression) sg.a(), name);
-        var g = Groups.<Operand, TypeDeclarer>g2(n, f.type());
-
         if (f instanceof ClassField cf && cf.declare() == Declare.CONST)
             return semantic("immutable field: %s", name.pos());
 
-        if (td.maybeRefer().has()) return g;
-        var im = checkConst(sg.a());
-        if (!im) return g;
-        return semantic("immutable operand: %s", fo.pos());
+        var im = td.maybeRefer().none() && checkConst(sg.a());
+        if (im) return semantic("immutable operand: %s", fo.pos());
+
+        var s = (PrimaryExpression) sg.a();
+        var n = new FieldOperand(fo.pos(), s, name);
+        return Groups.g2(n, f.type());
     }
 
     private Groups.G2<Operand, TypeDeclarer> optimize(VariableOperand vo) {
@@ -2384,32 +2374,37 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         var p = e.primitive();
         var g = optimize(e.operand());
         if (g.a() instanceof LiteralExpression le) {
-            // 字面量直接转换
+            // 字面量转换
             var td = p.declarer(e.pos());
-            if (p.isBool()) {
-                // `bool`不能与其他转换
-                if (le.literal() instanceof BoolLiteral bl) {
+            var lit = le.literal();
+            if (lit instanceof BoolLiteral bl) {
+                if (p == Primitive.BOOL) {
                     var n = new LiteralExpression(e.pos(), bl);
                     return Groups.g2(n, td);
                 }
-            } else if (p.isInteger()) {
-                // 转到整数
-                if (le.literal() instanceof IntegerLiteral il) {
-                    return g;
-                } else if (le.literal() instanceof FloatLiteral fl) {
-                    var n = new LiteralExpression(e.pos(), fl.toInteger());
+            } else if (lit instanceof IntegerLiteral il) {
+                if (p == Primitive.INT) {
+                    var n = new LiteralExpression(e.pos(), il);
                     return Groups.g2(n, td);
                 }
-            } else if (p.isFloat()) {
-                // 转到浮点数
-                if (le.literal() instanceof FloatLiteral fl) {
-                    return g;
-                } else if (le.literal() instanceof IntegerLiteral il) {
-                    var n = new LiteralExpression(e.pos(), il.toFloat());
+                if (p.isInteger() || p.isFloat()) {
+                    var c = new ConvertExpression(e.pos(), p, g.a());
+                    return Groups.g2(c, td);
+                }
+            } else if (lit instanceof FloatLiteral fl) {
+                if (p == Primitive.FLOAT) {
+                    var n = new LiteralExpression(e.pos(), fl);
                     return Groups.g2(n, td);
+                }
+                if (p.isFloat() || p.isInteger()) {
+                    var c = new ConvertExpression(e.pos(), p, g.a());
+                    return Groups.g2(c, td);
                 }
             }
-        } else if (g.b() instanceof PrimitiveTypeDeclarer td) {
+            return semantic("inconvertible %s(%s): %s",
+                    p, lit, e.pos());
+        }
+        if (g.b() instanceof PrimitiveTypeDeclarer td) {
             // 基本类型就返回转换表达式：`bool`
             if (e.primitive().isBool() == td.primitive().isBool()) {
                 if (e.primitive().isBool()) {
@@ -2881,23 +2876,6 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return unsupported("pairs");
     }
 
-    private ClosureExpression closure(Expression e, TypeDeclarer t) {
-        var vn = new Identifier(e.pos(), "feng$tmp");
-        var v = new Variable(e.pos(), Modifier.empty(), Declare.CONST,
-                vn, Lazy.of(t), Lazy.of(e));
-        var ds = new DeclarationStatement(e.pos(), List.of(v), List.of(e));
-        var ne = new VariableExpression(e.pos(), v);
-        return new ClosureExpression(e.pos(), List.of(ds), ne);
-    }
-
-    private Optional<Literal> tryCalcConst(Expression s) {
-        var g = optimize(s);
-        if (g.a() instanceof LiteralExpression le) {
-            return Optional.of(le.literal());
-        }
-        return Optional.empty();
-    }
-
     private Optional<IntegerLiteral> tryCalcInteger(Expression s) {
         var g = optimize(s);
         if (g.a() instanceof LiteralExpression le &&
@@ -2927,6 +2905,83 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         var size = tryCalcSize(e);
         if (size.has()) return size.get();
         return semantic("require non-negative integer: %s", e);
+    }
+
+
+    //
+
+    // split change
+    private VariableExpression makeTemp(
+            PrimaryExpression e, ArrayList<Variable> s) {
+        var vn = new Identifier(e.pos(), "feng$tmp");
+        var v = new Variable(e.pos(), Modifier.empty(), Declare.CONST,
+                vn, e.resultType, Lazy.of(e));
+        s.add(v);
+        return new VariableExpression(e.pos(), v);
+    }
+
+    private Expression splitChain(
+            Expression e, ArrayList<Variable> s) {
+        if (e instanceof PrimaryExpression pe) {
+            return splitChain(pe, s);
+        }
+        if (e instanceof BinaryExpression be) {
+            var l = splitChain(be.left(), s);
+            var r = splitChain(be.right(), s);
+            return new BinaryExpression(be.pos(),
+                    be.operator(), l, r);
+        }
+        if (e instanceof UnaryExpression ue) {
+            var o = splitChain(ue.operand(), s);
+            return new UnaryExpression(ue.pos(),
+                    ue.operator(), o);
+        }
+        return e;
+    }
+
+    private PrimaryExpression splitChain(
+            PrimaryExpression e, ArrayList<Variable> s) {
+        if (e instanceof NewExpression ee) {
+            return makeTemp(ee, s);
+        }
+        if (e instanceof CallExpression ee) {
+            var c = splitChain(ee.callee(), s);
+            return makeTemp(c, s);
+        }
+        if (e instanceof MemberOfExpression ee) {
+            var c = splitChain(ee.subject(), s);
+            return new MemberOfExpression(ee.pos(), c,
+                    ee.member(), ee.generic());
+        }
+        if (e instanceof IndexOfExpression ee) {
+            var i = splitChain(ee.index(), s);
+            var c = splitChain(ee.subject(), s);
+            return new IndexOfExpression(ee.pos(), c, i);
+        }
+        if (e instanceof AssertExpression ee) {
+            var c = splitChain(ee.subject(), s);
+            return new AssertExpression(ee.pos(), c, ee.type());
+        }
+        if (e instanceof ConvertExpression ee) {
+            var c = splitChain(ee.operand(), s);
+            return new ConvertExpression(ee.pos(),
+                    ee.primitive(), c);
+        }
+        if (e instanceof ArrayExpression ee) {
+            var list = new ArrayList<Expression>(ee.elements().size());
+            for (var el : ee.elements()) {
+                list.add(splitChain(el, s));
+            }
+            return new ArrayExpression(e.pos(), list);
+        }
+        if (e instanceof ObjectExpression ee) {
+            var es = new IdentifierTable<Expression>(ee.entries().size());
+            for (var n : ee.entries().nodes()) {
+                es.add(n.key(), splitChain(n.value(), s));
+            }
+            return new ObjectExpression(e.pos(), es);
+        }
+        return e;
     }
 
     // attribute

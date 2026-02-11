@@ -164,7 +164,7 @@ public class ExportImportTest extends BaseParseTest {
             var im = makeImports(a, b);
             var code = "r=%s%s%s;".formatted(a, o, b);
             var as = (AssignmentsStatement) parseLocal(im, code);
-            var be = (BinaryExpression) (as.values()).getFirst();
+            var be = (BinaryExpression) as.value(0);
             Assertions.assertEquals(op, be.operator());
             Assertions.assertEquals(a, varName(be.left()));
             Assertions.assertEquals(b, varName(be.right()));

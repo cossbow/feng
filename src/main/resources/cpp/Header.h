@@ -19,9 +19,6 @@ static T *Feng$required(T *p) {
 	throw NilPointer();
 }
 
-#ifndef DOMAIN_CLASS
-#define DOMAIN_CLASS 1
-#endif
 
 struct Feng$Type {
 	uint32_t classId;

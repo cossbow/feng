@@ -3,13 +3,7 @@ package org.cossbow.feng.coder;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import org.cossbow.feng.ast.Entity;
-import org.cossbow.feng.ast.dcl.TypeDeclarer;
-import org.cossbow.feng.ast.expr.Expression;
-import org.cossbow.feng.ast.expr.PrimaryExpression;
-import org.cossbow.feng.ast.lit.Literal;
-import org.cossbow.feng.ast.micro.Macro;
 import org.cossbow.feng.ast.stmt.Statement;
-import org.cossbow.feng.ast.stmt.Tuple;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

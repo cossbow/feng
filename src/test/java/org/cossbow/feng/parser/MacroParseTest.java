@@ -50,9 +50,10 @@ public class MacroParseTest extends BaseParseTest {
             Assertions.assertEquals(name, proc.name());
             checkIds(List.of(left, right, result), proc.params());
             var stmt = (AssignmentsStatement) proc.body().getFirst();
-            var operand = (FieldOperand) stmt.operands().getFirst();
+            var am = stmt.get(0);
+            var operand = (FieldOperand) am.operand();
             Assertions.assertEquals(symbol(result), varName(operand.subject()));
-            var bin = (BinaryExpression) (stmt.values().getFirst());
+            var bin = (BinaryExpression) am.value();
             Assertions.assertEquals(symbol(left),
                     varName(((MemberOfExpression) bin.left()).subject()));
             Assertions.assertEquals(symbol(right),

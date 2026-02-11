@@ -8,7 +8,7 @@ import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
-public class MemberOfExpression extends NestedExpression {
+public class MemberOfExpression extends PrimaryExpression {
     private PrimaryExpression subject;
     private Identifier member;
     private TypeArguments generic;

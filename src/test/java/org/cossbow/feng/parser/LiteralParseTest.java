@@ -14,7 +14,7 @@ public class LiteralParseTest extends BaseParseTest {
     Literal parseLiteral(String lit) {
         var stmt = "a = %s;".formatted(lit);
         var as = (AssignmentsStatement) doParseLocal(stmt);
-        var expr = (LiteralExpression) as.values().getFirst();
+        var expr = (LiteralExpression) as.value(0);
         return expr.literal();
     }
 

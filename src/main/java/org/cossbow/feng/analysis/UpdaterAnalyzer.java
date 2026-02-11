@@ -55,8 +55,8 @@ public class UpdaterAnalyzer {
     }
 
     private void analyse(AssignmentsStatement as) {
-        for (var o : as.operands()) {
-            analyse(o);
+        for (var a : as.list()) {
+            analyse(a.operand());
         }
     }
 
@@ -221,7 +221,10 @@ public class UpdaterAnalyzer {
                     enterMethod.updater(true);
                     return;
                 }
-                case NestedExpression me -> {
+                case MemberOfExpression me -> {
+                    s = me.subject();
+                }
+                case IndexOfExpression me -> {
                     s = me.subject();
                 }
                 case CallExpression ce -> {

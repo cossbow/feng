@@ -13,10 +13,7 @@ import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
-import org.cossbow.feng.ast.var.FieldOperand;
-import org.cossbow.feng.ast.var.IndexOperand;
-import org.cossbow.feng.ast.var.Operand;
-import org.cossbow.feng.ast.var.VariableOperand;
+import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.CommonUtil;
@@ -514,9 +511,9 @@ public class CppGenerator {
             visit(sf);
         }
         write('}').endStmt();
-        write("static_assert(sizeof(").write(sd.symbol().name())
-                .write(") == ").write(sd.layout().must().size())
-                .write(')');
+        write("static_assert(sizeof(struct ");
+        write(sd.symbol().name()).write(") == ");
+        write(sd.layout().must().size()).write(')');
         return endStmt();
     }
 
@@ -665,39 +662,43 @@ public class CppGenerator {
         return "Feng$switch_" + methodName;
     }
 
-    private void switchMethod(Method cm) {
-        write(switchMethodName(cm.name().value()), cm.prototype());
+    private void switchMethod(Method m) {
+        if (m.override().isEmpty()) return;
+
+        write(switchMethodName(m.name().value()), m.prototype());
         endStmt();
     }
 
-    private void implSwitchMethod(Method cm) {
-        var token = implMethodToken(cm.master(),
-                switchMethodName(cm.name().value()));
-        write(token, cm.prototype());
+    private void implSwitchMethod(Method m) {
+        if (m.override().isEmpty()) return;
+
+        var token = implMethodToken(m.master(),
+                switchMethodName(m.name().value()));
+        write(token, m.prototype());
         newLine();
         write('{').newLine();
-        var hasReturn = cm.prototype().returnSet().has();
-        var args = cm.prototype().parameterSet();
+        var hasReturn = m.prototype().returnSet().has();
+        var args = m.prototype().parameterSet();
         write("switch (((Object *)this)->feng$classId) {").newLine();
-        cm.seeOverride(or -> {
+        m.seeOverride(or -> {
             var child = or.master();
             write("case ").typeId(child).write(':').newLine();
             if (hasReturn) write("return ");
             write("((").visit(child.symbol()).write("*)this)->");
             if (or.override().isEmpty()) {
-                visit(cm.name());
+                visit(m.name());
             } else {
-                write(switchMethodName(cm.name().value()));
+                write(switchMethodName(m.name().value()));
             }
             write('(').writeArgs(args).write(");");
             if (!hasReturn) write("break;");
             newLine();
         });
 
-        if (cm instanceof ClassMethod) {
+        if (m instanceof ClassMethod) {
             write("default:").newLine();
             if (hasReturn) write("return ");
-            write(" this->").write(cm.name());
+            write(" this->").write(m.name());
             write('(').writeArgs(args).write(");");
             newLine();
         }
@@ -993,8 +994,8 @@ public class CppGenerator {
     }
 
     public CppGenerator visit(AssignmentsStatement as) {
-        for (int i = 0; i < as.operands().size(); i++) {
-            writeAssign(as.operand(i), as.value(i));
+        for (Assignment a : as.list()) {
+            writeAssign(a.operand(), a.value());
             endStmt();
         }
         return this;
@@ -1044,10 +1045,11 @@ public class CppGenerator {
             }
             write(ds.variables().getFirst());
         } else if (s instanceof AssignmentsStatement as) {
-            var size = as.operands().size();
-            for (int i = 0; i < size; i++) {
-                if (i > 0) write(',');
-                writeAssign(as.operand(i), as.value(i));
+            boolean first = true;
+            for (var a : as.list()) {
+                if (first) first = false;
+                else write(',');
+                writeAssign(a.operand(), a.value());
             }
         } else {
             unreachable();
@@ -1291,7 +1293,7 @@ public class CppGenerator {
     }
 
     public CppGenerator visit(FloatLiteral e) {
-        write(e.value().toPlainString());
+        write(e.value().toString());
         return this;
     }
 

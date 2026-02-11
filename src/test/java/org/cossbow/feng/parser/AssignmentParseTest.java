@@ -3,10 +3,7 @@ package org.cossbow.feng.parser;
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.stmt.AssignmentsStatement;
-import org.cossbow.feng.ast.var.FieldOperand;
-import org.cossbow.feng.ast.var.IndexOperand;
-import org.cossbow.feng.ast.var.Operand;
-import org.cossbow.feng.ast.var.VariableOperand;
+import org.cossbow.feng.ast.var.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -37,8 +34,9 @@ public class AssignmentParseTest extends BaseParseTest {
             var b = randVarSymbol(8);
             var code = "%s%s=%s;".formatted(lhs, operator(op), b);
             var stmt = (AssignmentsStatement) doParseLocal(code);
-            lhsTest.accept((H) stmt.operands().getFirst());
-            var v = (BinaryExpression) stmt.values().getFirst();
+            var a=stmt.list().getFirst();
+            lhsTest.accept((H) a.operand());
+            var v = (BinaryExpression) a.value();
             Assertions.assertEquals(b, varName(v.right()));
             Assertions.assertSame(op, v.operator());
         }
@@ -53,18 +51,18 @@ public class AssignmentParseTest extends BaseParseTest {
         var m = randVarName(12);
         var code = "%s, %s[%s], %s.%s= 1,2,3;".formatted(a, b, i, c, m);
         var stmt = (AssignmentsStatement) doParseLocal(code);
-        var list = stmt.operands();
+        var list = stmt.list();
 
         Assertions.assertEquals(3, list.size());
 
-        var vhls = (VariableOperand) list.get(0);
+        var vhls = (VariableOperand) list.get(0).operand();
         Assertions.assertEquals(a, vhls.symbol());
 
-        var ihls = (IndexOperand) list.get(1);
+        var ihls = (IndexOperand) list.get(1).operand();
         Assertions.assertEquals(b, varName(ihls.subject()));
         Assertions.assertEquals(i, varName(ihls.index()));
 
-        var mhls = (FieldOperand) list.get(2);
+        var mhls = (FieldOperand) list.get(2).operand();
         Assertions.assertEquals(c, varName(mhls.subject()));
         Assertions.assertEquals(m, mhls.field());
     }
@@ -73,8 +71,8 @@ public class AssignmentParseTest extends BaseParseTest {
     public void testAssignmentRight() {
         var code = "a,b,c,d,e,f,g,h,i,j = 1,2+1,-2,PI,rate(3),foo.boo,arr[11],(2),[5],{id=1};";
         var stmt = (AssignmentsStatement) doParseLocal(code);
-        var lhs = stmt.operands();
-        var rhs = stmt.values();
+        var lhs = stmt.list();
+        var rhs = stmt.list().stream().map(Assignment::value).toList();
 
         Assertions.assertEquals(10, lhs.size());
 

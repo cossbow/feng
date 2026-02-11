@@ -21,10 +21,7 @@ import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
-import org.cossbow.feng.ast.var.FieldOperand;
-import org.cossbow.feng.ast.var.IndexOperand;
-import org.cossbow.feng.ast.var.Operand;
-import org.cossbow.feng.ast.var.VariableOperand;
+import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
@@ -1108,11 +1105,21 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitAssignments(FengParser.AssignmentsContext ctx) {
+        var pos = posOf(ctx);
         var operands = this.<Operand>visitList(ctx.operands().operand());
-        var tuple = (Tuple) visit(ctx.tuple());
+        var values = ((Tuple) visit(ctx.tuple())).values();
         var copy = ctx.op.getType() == FengParser.COPY;
         if (copy) return unsupported("copy");
-        return new AssignmentsStatement(posOf(ctx), operands, tuple.values(), copy);
+        if (operands.size() != values.size()) {
+            return semantic("operands and values not aligned: %s", pos);
+        }
+
+        var list = new ArrayList<Assignment>(operands.size());
+        for (int i = 0; i < operands.size(); i++) {
+            var o = operands.get(i);
+            list.add(new Assignment(o.pos(), o, values.get(i), copy));
+        }
+        return new AssignmentsStatement(pos, list);
     }
 
     @Override
@@ -1125,7 +1132,7 @@ final class SourceParseVisitor
     public Entity visitAssignmentOperation(
             FengParser.AssignmentOperationContext ctx) {
         var opCtx = ctx.assignmentOperator().op;
-        var binOp = switch (opCtx.getType()) {
+        BinaryOperator binOp = switch (opCtx.getType()) {
             case FengParser.ASSIGN_ADD -> BinaryOperator.ADD;
             case FengParser.ASSIGN_SUB -> BinaryOperator.SUB;
             case FengParser.ASSIGN_MUL -> BinaryOperator.MUL;
@@ -1138,13 +1145,13 @@ final class SourceParseVisitor
             case FengParser.ASSIGN_RSHIFT -> BinaryOperator.RSHIFT;
             case FengParser.ASSIGN_AND -> BinaryOperator.AND;
             case FengParser.ASSIGN_OR -> BinaryOperator.OR;
-            default -> throw new UnsupportedOperationException("unreachable branch");
+            default -> unreachable();
         };
         var operand = (Operand) visit(ctx.operand());
         var value = (Expression) visit(ctx.expression());
         var rhs = new BinaryExpression(posOf(opCtx), binOp, operand.rhs(), value);
-        return new AssignmentsStatement(posOf(ctx), List.of(operand),
-                List.of(rhs), false);
+        var assign = new Assignment(operand.pos(), operand, rhs, false);
+        return new AssignmentsStatement(posOf(ctx), List.of(assign));
     }
 
     @Override

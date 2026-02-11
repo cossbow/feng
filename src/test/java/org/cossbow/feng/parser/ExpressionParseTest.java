@@ -330,7 +330,7 @@ public class ExpressionParseTest extends BaseParseTest {
     @SuppressWarnings("unchecked")
     <E extends Expression> E parseExpr(String expr) {
         var stmt = (AssignmentsStatement) doParseLocal("a = " + expr + ";");
-        return (E) stmt.values().getFirst();
+        return (E) stmt.value(0);
     }
 
     @Test
