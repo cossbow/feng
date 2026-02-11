@@ -30,9 +30,16 @@ public class PrimitiveTypeDeclarer extends TypeDeclarer
     }
 
     @Override
+    public boolean baseTypeSame(TypeDeclarer td) {
+        return td instanceof PrimitiveTypeDeclarer t
+                && primitive == t.primitive;
+    }
+
+    @Override
     public boolean equals(Object o) {
         return o instanceof PrimitiveTypeDeclarer t
-                && primitive == t.primitive;
+                && primitive == t.primitive
+                && refer.equals(t.refer);
 
     }
 

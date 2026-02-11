@@ -1209,8 +1209,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             return true;
         }
 
-        return semantic("out of bounds: from %s%s to %s%s",
-                l, l.pos(), r, r.pos());
+        return semantic("out of bounds: from %s(size:%d):%s to %s(size:%d):%s",
+                l, lu, l.pos(), r, rs, r.pos());
     }
 
     private boolean assignRefer(TypeDeclarer l, TypeDeclarer r,
@@ -2089,24 +2089,25 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         if (lp != rp)
             return semantic("require same type: %s", e.pos());
 
+        var expect = l instanceof PrimitiveTypeDeclarer ? l : r;
         var op = e.operator();
         switch (lp) {
             case INTEGER -> {
                 if (BinaryOperator.SetMath.contains(op) ||
                         BinaryOperator.SetBits.contains(op))
-                    return Optional.of(l);
+                    return Optional.of(expect);
                 if (BinaryOperator.SetRel.contains(op))
                     return Optional.of(Primitive.BOOL.declarer(e.pos()));
             }
             case FLOAT -> {
                 if (BinaryOperator.SetMath.contains(op))
-                    return Optional.of(l);
+                    return Optional.of(expect);
                 if (BinaryOperator.SetRel.contains(op))
                     return Optional.of(Primitive.BOOL.declarer(e.pos()));
             }
             case BOOL -> {
                 if (BinaryOperator.SetLogic.contains(op))
-                    return Optional.of(l);
+                    return Optional.of(expect);
             }
         }
         return Optional.empty();

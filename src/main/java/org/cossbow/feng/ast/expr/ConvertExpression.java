@@ -23,4 +23,10 @@ public class ConvertExpression extends PrimaryExpression {
         return operand;
     }
 
+    //
+
+    @Override
+    public String toString() {
+        return primitive + "(" + operand + ")";
+    }
 }

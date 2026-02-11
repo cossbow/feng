@@ -778,6 +778,19 @@ public class SemanticAnalysisTest {
     }
 
     @Test
+    public void testConvertExpression1() {
+        checkSucc("func f(){ var s int32 = 1; }");
+        checkFail("func f(){ var s int32 = 1.1; }");
+        checkSucc("func f(){ var s int32 = int32(1.1); }");
+        checkSucc("func f(a int){ var s int32 = int32(a); }");
+        checkSucc("func f(a int){ var s int32 = int32(1+a); }");
+        checkSucc("func f(a float){ var s int = int(a); }");
+        checkFail("func f(a float){ var s int = int(1+a); }");
+        checkSucc("func f(a float){ var s int = int(float(1)+a); }");
+        checkSucc("func f(a float){ var s int = int(1+int(a)); }");
+    }
+
+    @Test
     public void testIndexExpression1() {
         checkSucc("func f(a [*]int){var v=a[0];}");
         checkFail("func f(a [*]int){var v=a[true];}");

@@ -10,6 +10,10 @@ public class TypeDeclarer extends Entity {
         super(pos);
     }
 
+    public boolean baseTypeSame(TypeDeclarer td) {
+        return true;
+    }
+
     abstract public boolean equals(Object obj);
 
     abstract public int hashCode();

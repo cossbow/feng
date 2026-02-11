@@ -31,6 +31,12 @@ public class DerivedTypeDeclarer extends TypeDeclarer
 
     //
 
+    public boolean baseTypeSame(TypeDeclarer td) {
+        if (!(td instanceof DerivedTypeDeclarer t))
+            return false;
+        return derivedType.equals(t.derivedType);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof DerivedTypeDeclarer t))
