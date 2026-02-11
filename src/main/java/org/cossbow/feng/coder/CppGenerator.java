@@ -180,7 +180,7 @@ public class CppGenerator {
 */
     }
 
-    public CppGenerator visit(Source src) {
+    public CppGenerator write(Source src) {
         if (!src.imports().isEmpty()) return unsupported("import");
 
         definePre(src);
@@ -216,7 +216,7 @@ public class CppGenerator {
 
     void declareGlobalVar(Source src) {
         src.table().dagVars.use(dag -> {
-            dag.bfs(this::visit);
+            dag.bfs(this::write);
             newLine();
         });
         newLine();
@@ -297,23 +297,23 @@ public class CppGenerator {
 
     void declareType(StructureDefinition def) {
         write("struct ");
-        visit(def.symbol().name());
+        write(def.symbol().name());
         endStmt();
     }
 
     void declareType(ClassDefinition def) {
-        write("class ").visit(def.symbol().name()).endStmt();
+        write("class ").write(def.symbol().name()).endStmt();
     }
 
     CppGenerator enumName(EnumDefinition ed) {
-        return write("Feng$Enum_").visit(ed.symbol());
+        return write("Feng$Enum_").write(ed.symbol());
     }
 
     void declareType(EnumDefinition def) {
     }
 
     void declareType(InterfaceDefinition def) {
-        write("class ").visit(def.symbol().name()).endStmt();
+        write("class ").write(def.symbol().name()).endStmt();
     }
 
     void declareType(TypeDefinition def) {
@@ -347,7 +347,7 @@ public class CppGenerator {
     void visitStructures(Source src) {
         var dag = src.table().dagStructures;
         if (dag.none()) return;
-        dag.get().bfs(this::visit);
+        dag.get().bfs(this::write);
         newLine();
     }
 
@@ -376,7 +376,7 @@ public class CppGenerator {
 
     static final String STATIC = "static";
 
-    public CppGenerator visit(GlobalVariable v) {
+    public CppGenerator write(GlobalVariable v) {
         write(STATIC);
         write(' ');
         return declareVar(v);
@@ -385,18 +385,18 @@ public class CppGenerator {
     private CppGenerator castPtr(
             Expression v, TypeDeclarer t) {
         if (t.baseTypeSame(v.resultType.must()))
-            return visit(v);
+            return write(v);
         return write("((").write(t).write(')')
-                .visit(v).write(')');
+                .write(v).write(')');
     }
 
     private CppGenerator writeValue(Expression v, TypeDeclarer t, boolean move) {
         var r = t.maybeRefer();
         if (r.none()) {
-            if (findClass(t).none()) return visit(v);
-            if (move) return visit(v);
-            if (v.unbound()) return visit(v);
-            return visit(v).write(".Feng$share()");
+            if (findClass(t).none()) return write(v);
+            if (move) return write(v);
+            if (v.unbound()) return write(v);
+            return write(v).write(".Feng$share()");
         }
         if (r.get().isKind(PHANTOM)) {
             var vt = v.resultType.must();
@@ -404,10 +404,10 @@ public class CppGenerator {
                 return castPtr(v, t);
 
             if (t.baseTypeSame(vt))
-                return write('&').visit(v);
+                return write('&').write(v);
 
             return write("((").write(t).write(')')
-                    .write('&').visit(v).write(')');
+                    .write('&').write(v).write(')');
         }
         if (move || v.unbound()) {
             return castPtr(v, t);
@@ -459,7 +459,7 @@ public class CppGenerator {
         if (def instanceof EnumDefinition) {
             return write(toCType(Primitive.INT32));
         }
-        return visit(td.derivedType()).writeRefer(td);
+        return write(td.derivedType()).writeRefer(td);
     }
 
 
@@ -475,16 +475,11 @@ public class CppGenerator {
         return unreachable();
     }
 
-    public CppGenerator write(ConvertorTypeDeclarer e) {
-        return write('(').write(e.primitive()).write(')');
-    }
-
     private CppGenerator write(TypeDeclarer e) {
         return switch (e) {
             case ArrayTypeDeclarer ee -> write(ee);
             case DerivedTypeDeclarer ee -> write(ee);
             case FuncTypeDeclarer ee -> write(ee);
-            case ConvertorTypeDeclarer ee -> write(ee);
             case PrimitiveTypeDeclarer ee -> write(ee);
             case null, default -> unreachable();
         };
@@ -492,10 +487,10 @@ public class CppGenerator {
 
     //
 
-    public CppGenerator visit(StructureField sf) {
+    public CppGenerator write(StructureField sf) {
         write(sf.type());
         write(' ');
-        visit(sf.name());
+        write(sf.name());
         if (sf.bitfield().has()) {
             write(':');
             format("%d", sf.bits());
@@ -503,12 +498,12 @@ public class CppGenerator {
         return endStmt();
     }
 
-    public CppGenerator visit(StructureDefinition sd) {
+    public CppGenerator write(StructureDefinition sd) {
         write("struct ");
-        visit(sd.symbol().name());
+        write(sd.symbol().name());
         write('{').newLine();
         for (var sf : sd.fields()) {
-            visit(sf);
+            write(sf);
         }
         write('}').endStmt();
         write("static_assert(sizeof(struct ");
@@ -527,14 +522,14 @@ public class CppGenerator {
         for (var dt : list) {
             if (f) f = false;
             else write(',');
-            write("public ").visit(dt);
+            write("public ").write(dt);
         }
     }
 
     void declareInterface(InterfaceDefinition id) {
         if (id.builtin()) return;
         write("class ");
-        visit(id.symbol().name());
+        write(id.symbol().name());
         writeParents(id.parts().values());
         write(" {\n").indent();
         write("public:\n");
@@ -561,15 +556,15 @@ public class CppGenerator {
         assert enterClass == null;
         enterClass = cd;
         write("class ");
-        visit(cd.symbol().name());
+        write(cd.symbol().name());
         write(' ');
         cd.inherit().use(dt -> {
-            write(": public ").visit(dt);
+            write(": public ").write(dt);
         });
         write("{\n").indent();
         write("public:\n");
         for (var f : cd.fields().values())
-            visit(f);
+            write(f);
 
         for (var m : cd.methods().values()) {
             declareMethod(m);
@@ -614,14 +609,14 @@ public class CppGenerator {
     }
 
     private CppGenerator thisField(ClassField cf) {
-        return write("this->").visit(cf.name());
+        return write("this->").write(cf.name());
     }
 
     private void classCopy(ClassDefinition cd) {
-        visit(cd.symbol()).write("& Feng$share() {").newLine();
+        write(cd.symbol()).write("& Feng$share() {").newLine();
         if (cd.inherit().has()) {
             var pdt = cd.inherit().get();
-            visit(pdt.symbol()).write("::Feng$share()").endStmt();
+            write(pdt.symbol()).write("::Feng$share()").endStmt();
         }
         for (var cf : cd.fields()) {
             if (cf.type().maybeRefer().has()) {
@@ -637,13 +632,13 @@ public class CppGenerator {
     }
 
     private void classRelease(ClassDefinition cd) {
-        visit(cd.symbol()).write("& Feng$release() {").newLine();
+        write(cd.symbol()).write("& Feng$release() {").newLine();
         if (cd.resource()) {
             write("this->release()").endStmt();
         }
         if (cd.inherit().has()) {
             var pdt = cd.inherit().get();
-            visit(pdt.symbol()).write("::Feng$release()").endStmt();
+            write(pdt.symbol()).write("::Feng$release()").endStmt();
         }
         for (var cf : cd.fields()) {
             if (cf.type().maybeRefer().has()) {
@@ -684,9 +679,9 @@ public class CppGenerator {
             var child = or.master();
             write("case ").typeId(child).write(':').newLine();
             if (hasReturn) write("return ");
-            write("((").visit(child.symbol()).write("*)this)->");
+            write("((").write(child.symbol()).write("*)this)->");
             if (or.override().isEmpty()) {
-                visit(m.name());
+                write(m.name());
             } else {
                 write(switchMethodName(m.name().value()));
             }
@@ -740,16 +735,12 @@ public class CppGenerator {
         enterMethod = null;
     }
 
-    public CppGenerator visit(Identifier id) {
-        return write(id);
-    }
-
-    public CppGenerator visit(Symbol s) {
+    public CppGenerator write(Symbol s) {
         if (s.module().has()) {
-            visit(s.module().get());
+            write(s.module().get());
             write('$');
         }
-        visit(s.name());
+        write(s.name());
         return this;
     }
 
@@ -758,37 +749,37 @@ public class CppGenerator {
         return write(v).endStmt();
     }
 
-    public CppGenerator visit(DefinedType e) {
+    public CppGenerator write(DefinedType e) {
         return switch (e) {
-            case DerivedType t -> visit(t);
-            case PrimitiveType t -> visit(t);
+            case DerivedType t -> write(t);
+            case PrimitiveType t -> write(t);
             case null, default -> unreachable();
         };
     }
 
-    public CppGenerator visit(DerivedType dt) {
-        visit(dt.symbol());
+    public CppGenerator write(DerivedType dt) {
+        write(dt.symbol());
         if (!dt.generic().isEmpty())
             unsupported("泛型未实现");
         return this;
     }
 
-    public CppGenerator visit(PrimitiveType dt) {
+    public CppGenerator write(PrimitiveType dt) {
         return write(dt.primitive());
     }
 
-    public CppGenerator visit(ClassField cf) {
+    public CppGenerator write(ClassField cf) {
         assert enterClass != null;
         write(cf.type());
         write(' ');
-        visit(cf.name());
+        write(cf.name());
         write(";\n");
         return this;
     }
 
     private volatile FunctionDefinition enterFunc;
 
-    void write(VariableParameterSet ps) {
+    void write(ParameterSet ps) {
         var first = true;
         for (var a : ps.variables()) {
             if (first) first = false;
@@ -799,11 +790,11 @@ public class CppGenerator {
         }
     }
 
-    CppGenerator writeArgs(VariableParameterSet ps) {
+    CppGenerator writeArgs(ParameterSet ps) {
         var size = ps.size();
         for (int i = 0; i < size; i++) {
             if (i > 0) write(COMMA);
-            visit(ps.getName(i));
+            write(ps.getName(i));
             i++;
         }
         return this;
@@ -841,7 +832,7 @@ public class CppGenerator {
 
     private void write(Procedure proc) {
         write('{').newLine();
-        visit(proc.body());
+        write(proc.body());
         if (noReturn(proc.body().list()))
             exitScope(proc);
         write('}').newLine();
@@ -864,42 +855,42 @@ public class CppGenerator {
             release(v);
     }
 
-    private void visit(List<Statement> list) {
-        for (var s : list) visit(s);
+    private void write(List<Statement> list) {
+        for (var s : list) write(s);
     }
 
-    private CppGenerator visit(Statement e) {
+    private CppGenerator write(Statement e) {
         return switch (e) {
-            case AssignmentsStatement ee -> visit(ee);
-            case BlockStatement ee -> visit(ee);
-            case BreakStatement ee -> visit(ee);
-            case CallStatement ee -> visit(ee);
-            case ContinueStatement ee -> visit(ee);
-            case DeclarationStatement ee -> visit(ee);
-            case ForStatement ee -> visit(ee);
-            case GotoStatement ee -> visit(ee);
-            case IfStatement ee -> visit(ee);
-            case LabeledStatement ee -> visit(ee);
-            case ReturnStatement ee -> visit(ee);
-            case SwitchStatement ee -> visit(ee);
-            case ThrowStatement ee -> visit(ee);
-            case TryStatement ee -> visit(ee);
+            case AssignmentsStatement ee -> write(ee);
+            case BlockStatement ee -> write(ee);
+            case BreakStatement ee -> write(ee);
+            case CallStatement ee -> write(ee);
+            case ContinueStatement ee -> write(ee);
+            case DeclarationStatement ee -> write(ee);
+            case ForStatement ee -> write(ee);
+            case GotoStatement ee -> write(ee);
+            case IfStatement ee -> write(ee);
+            case LabeledStatement ee -> write(ee);
+            case ReturnStatement ee -> write(ee);
+            case SwitchStatement ee -> write(ee);
+            case ThrowStatement ee -> write(ee);
+            case TryStatement ee -> write(ee);
             case null, default -> unreachable();
         };
     }
 
-    private CppGenerator visit(ForStatement e) {
+    private CppGenerator write(ForStatement e) {
         return switch (e) {
-            case ConditionalForStatement ee -> visit(ee);
-            case IterableForStatement ee -> visit(ee);
+            case ConditionalForStatement ee -> write(ee);
+            case IterableForStatement ee -> write(ee);
             case null, default -> unreachable();
         };
     }
 
-    public CppGenerator visit(BlockStatement bs) {
+    public CppGenerator write(BlockStatement bs) {
         if (bs.newScope()) write('{').newLine();
 
-        visit(bs.list());
+        write(bs.list());
 
         if (bs.newScope()) {
             if (noReturn(bs.list())) exitScope(bs);
@@ -932,7 +923,7 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator visit(ReturnStatement rs) {
+    public CppGenerator write(ReturnStatement rs) {
         writeComment("release and return");
         if (rs.result().none()) {
             return release(rs.local(), -1)
@@ -961,39 +952,39 @@ public class CppGenerator {
         return write("return feng$tmp").endStmt();
     }
 
-    public CppGenerator visit(DeclarationStatement ds) {
+    public CppGenerator write(DeclarationStatement ds) {
         ds.variables().forEach(this::declareVar);
         return this;
     }
 
-    public CppGenerator visit(Operand e) {
+    public CppGenerator write(Operand e) {
         return switch (e) {
-            case IndexOperand ee -> visit(ee);
-            case FieldOperand ee -> visit(ee);
-            case VariableOperand ee -> visit(ee);
+            case IndexOperand ee -> write(ee);
+            case FieldOperand ee -> write(ee);
+            case VariableOperand ee -> write(ee);
             case null, default -> unreachable();
         };
     }
 
-    public CppGenerator visit(VariableOperand e) {
+    public CppGenerator write(VariableOperand e) {
         varName(e.variable().must());
         return this;
     }
 
-    public CppGenerator visit(IndexOperand e) {
-        visit(e.subject());
+    public CppGenerator write(IndexOperand e) {
+        write(e.subject());
         write('[');
-        visit(e.index());
+        write(e.index());
         write(']');
         return this;
     }
 
-    public CppGenerator visit(FieldOperand e) {
+    public CppGenerator write(FieldOperand e) {
         var td = (DerivedTypeDeclarer) e.subject().resultType.must();
-        return deRefer(e.subject(), td).visit(e.field());
+        return deRefer(e.subject(), td).write(e.field());
     }
 
-    public CppGenerator visit(AssignmentsStatement as) {
+    public CppGenerator write(AssignmentsStatement as) {
         for (Assignment a : as.list()) {
             writeAssign(a.operand(), a.value());
             endStmt();
@@ -1001,17 +992,17 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator visit(BreakStatement e) {
+    public CppGenerator write(BreakStatement e) {
         if (e.label().has()) return unsupported("break label");
         write("break;\n");
         return this;
     }
 
-    public CppGenerator visit(CallStatement e) {
+    public CppGenerator write(CallStatement e) {
         var pt = e.call().prototype().must();
         pt.returnSet().use(td -> {
         });
-        visit(e.call());
+        write(e.call());
         return endStmt();
     }
 
@@ -1020,19 +1011,19 @@ public class CppGenerator {
         var r = t.maybeRefer();
         if (r.has()) {
             if (r.get().isKind(PHANTOM)) {
-                return visit(o).write(" = ").castPtr(v, t);
+                return write(o).write(" = ").castPtr(v, t);
             }
-            write("Feng$dec(").visit(o).write(") = ");
-            if (v.unbound()) return visit(v);
-            return write("Feng$inc(").visit(v).write(')');
+            write("Feng$dec(").write(o).write(") = ");
+            if (v.unbound()) return write(v);
+            return write("Feng$inc(").write(v).write(')');
         }
 
         var cd = findClass(t);
         if (cd.none()) {
-            return visit(o).write(" = ").visit(v);
+            return write(o).write(" = ").write(v);
         }
 
-        visit(o).write(".Feng$release() = ").visit(v);
+        write(o).write(".Feng$release() = ").write(v);
         if (v.unbound()) return this;
         return write(".Feng$share()");
     }
@@ -1057,53 +1048,53 @@ public class CppGenerator {
     }
 
 
-    public CppGenerator visit(ConditionalForStatement fs) {
+    public CppGenerator write(ConditionalForStatement fs) {
         if (fs.initializer().none()) {
             write("while(");
-            visit(fs.condition());
+            write(fs.condition());
             write(')');
-            visit(fs.body());
+            write(fs.body());
         } else {
             write('{');
-            fs.initializer().use(this::visit);
+            fs.initializer().use(this::write);
             write("for(");
             write(';');
-            visit(fs.condition());
+            write(fs.condition());
             write(';');
             fs.updater().use(this::writeForStmt);
             write(')');
-            visit(fs.body());
+            write(fs.body());
             exitScope(fs);
             write('}');
         }
         return this;
     }
 
-    public CppGenerator visit(IterableForStatement s) {
+    public CppGenerator write(IterableForStatement s) {
         return unsupported("iterable for");
     }
 
-    public CppGenerator visit(ContinueStatement s) {
+    public CppGenerator write(ContinueStatement s) {
         write("continue ");
-        s.label().use(this::visit);
+        s.label().use(this::write);
         return endStmt();
     }
 
-    public CppGenerator visit(GotoStatement e) {
+    public CppGenerator write(GotoStatement e) {
         return unsupported("goto");
     }
 
-    public CppGenerator visit(IfStatement is) {
+    public CppGenerator write(IfStatement is) {
         is.init().use(s -> {
             write('{');
-            visit(s);
+            write(s);
         });
         write("if(");
-        visit(is.condition());
+        write(is.condition());
         write(')');
-        visit(is.yes());
+        write(is.yes());
         is.not().use(s -> {
-            write(" else ").visit(s);
+            write(" else ").write(s);
         });
         if (is.init().has()) {
             exitScope(is);
@@ -1112,30 +1103,30 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator visit(LabeledStatement s) {
-        visit(s.label());
+    public CppGenerator write(LabeledStatement s) {
+        write(s.label());
         write(':');
-        return visit(s.target());
+        return write(s.target());
     }
 
-    public CppGenerator visit(SwitchStatement ss) {
+    public CppGenerator write(SwitchStatement ss) {
         if (ss.init().has()) {
             write('{');
-            visit(ss.init().get());
+            write(ss.init().get());
         }
         write("switch(");
-        visit(ss.value());
+        write(ss.value());
         write("){");
         for (var br : ss.branches()) {
             for (var cs : br.constants()) {
-                write("case ").visit(cs).write(':');
+                write("case ").write(cs).write(':');
             }
-            visit(br);
+            write(br);
             write("break;").newLine();
         }
         ss.defaultBranch().use(br -> {
             write("default: ");
-            visit(br);
+            write(br);
         });
         write('}').newLine();
         if (ss.init().has()) {
@@ -1145,43 +1136,43 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator visit(Branch e) {
-        visit(e.body());
+    public CppGenerator write(Branch e) {
+        write(e.body());
         return this;
     }
 
-    public CppGenerator visit(ThrowStatement e) {
+    public CppGenerator write(ThrowStatement e) {
         return unsupported("throw");
     }
 
-    public CppGenerator visit(TryStatement e) {
+    public CppGenerator write(TryStatement e) {
         return unsupported("try..catch");
     }
 
     // expression
 
-    public CppGenerator visit(Expression e) {
+    public CppGenerator write(Expression e) {
         return switch (e) {
-            case BinaryExpression ee -> visit(ee);
-            case UnaryExpression ee -> visit(ee);
-            case ArrayExpression ee -> visit(ee);
-            case AssertExpression ee -> visit(ee);
-            case ConvertExpression ee -> visit(ee);
-            case CallExpression ee -> visit(ee);
-            case CurrentExpression ee -> visit(ee);
-            case IndexOfExpression ee -> visit(ee);
-            case LambdaExpression ee -> visit(ee);
-            case LiteralExpression ee -> visit(ee);
-            case MemberOfExpression ee -> visit(ee);
-            case NewExpression ee -> visit(ee);
-            case ObjectExpression ee -> visit(ee);
-            case PairsExpression ee -> visit(ee);
-            case ParenExpression ee -> visit(ee);
-            case ReferExpression ee -> visit(ee);
-            case VariableExpression ee -> visit(ee);
-            case IsNilExpression ee -> visit(ee);
-            case EnumValueExpression ee -> visit(ee);
-            case EnumIdExpression ee -> visit(ee);
+            case BinaryExpression ee -> write(ee);
+            case UnaryExpression ee -> write(ee);
+            case ArrayExpression ee -> write(ee);
+            case AssertExpression ee -> write(ee);
+            case ConvertExpression ee -> write(ee);
+            case CallExpression ee -> write(ee);
+            case CurrentExpression ee -> write(ee);
+            case IndexOfExpression ee -> write(ee);
+            case LambdaExpression ee -> write(ee);
+            case LiteralExpression ee -> write(ee);
+            case MemberOfExpression ee -> write(ee);
+            case NewExpression ee -> write(ee);
+            case ObjectExpression ee -> write(ee);
+            case PairsExpression ee -> write(ee);
+            case ParenExpression ee -> write(ee);
+            case ReferExpression ee -> write(ee);
+            case VariableExpression ee -> write(ee);
+            case IsNilExpression ee -> write(ee);
+            case EnumValueExpression ee -> write(ee);
+            case EnumIdExpression ee -> write(ee);
             case null, default -> unreachable();
         };
     }
@@ -1199,7 +1190,7 @@ public class CppGenerator {
         return unsupported("幂运算");
     }
 
-    public CppGenerator visit(BinaryExpression e) {
+    public CppGenerator write(BinaryExpression e) {
         write('(');
         var op = e.operator();
         if (op == BinaryOperator.POW)
@@ -1227,10 +1218,10 @@ public class CppGenerator {
             default -> unreachable();
         };
 
-        return visit(e.left()).write(o).visit(e.right()).write(')');
+        return write(e.left()).write(o).write(e.right()).write(')');
     }
 
-    public CppGenerator visit(ArrayExpression e) {
+    public CppGenerator write(ArrayExpression e) {
         write('{');
         var types = new RepeatList<>(e.resultType.must(),
                 e.elements().size());
@@ -1239,7 +1230,7 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator visit(AssertExpression e) {
+    public CppGenerator write(AssertExpression e) {
         if (!e.needCheck())
             return castPtr(e.subject(), e.type());
 
@@ -1249,65 +1240,65 @@ public class CppGenerator {
         } else {
             write("Feng$impl");
         }
-        return write('<').visit(dst.symbol()).write(">(")
-                .visit(e.subject()).write(", ")
+        return write('<').write(dst.symbol()).write(">(")
+                .write(e.subject()).write(", ")
                 .write(dst.id()).write(')');
     }
 
-    public CppGenerator visit(CallExpression e) {
-        visit(e.callee());
+    public CppGenerator write(CallExpression e) {
+        write(e.callee());
         return write('(').writeValues(e.arguments(), e.prototype()
                 .must().parameterSet().types()).write(')');
     }
 
-    public CppGenerator visit(IndexOfExpression e) {
-        visit(e.subject());
+    public CppGenerator write(IndexOfExpression e) {
+        write(e.subject());
         write('[');
-        visit(e.index());
+        write(e.index());
         write(']');
         return this;
     }
 
-    private CppGenerator visit(VariableExpression e) {
+    private CppGenerator write(VariableExpression e) {
         return varName(e.variable());
     }
 
-    public CppGenerator visit(LambdaExpression e) {
+    public CppGenerator write(LambdaExpression e) {
         return unsupported("尼玛函数");
     }
 
-    public CppGenerator visit(Literal e) {
+    public CppGenerator write(Literal e) {
         return switch (e) {
-            case BoolLiteral ee -> visit(ee);
-            case FloatLiteral ee -> visit(ee);
-            case IntegerLiteral ee -> visit(ee);
-            case NilLiteral ee -> visit(ee);
-            case StringLiteral ee -> visit(ee);
+            case BoolLiteral ee -> write(ee);
+            case FloatLiteral ee -> write(ee);
+            case IntegerLiteral ee -> write(ee);
+            case NilLiteral ee -> write(ee);
+            case StringLiteral ee -> write(ee);
             case null, default -> unreachable();
         };
     }
 
-    public CppGenerator visit(BoolLiteral e) {
+    public CppGenerator write(BoolLiteral e) {
         write(e.value() ? "true" : "false");
         return this;
     }
 
-    public CppGenerator visit(FloatLiteral e) {
+    public CppGenerator write(FloatLiteral e) {
         write(e.value().toString());
         return this;
     }
 
-    public CppGenerator visit(IntegerLiteral e) {
+    public CppGenerator write(IntegerLiteral e) {
         write(e.value().toString(e.radix()));
         return this;
     }
 
-    public CppGenerator visit(NilLiteral e) {
+    public CppGenerator write(NilLiteral e) {
         write("nullptr");
         return this;
     }
 
-    public CppGenerator visit(StringLiteral e) {
+    public CppGenerator write(StringLiteral e) {
         write('"');
         var cb = e.charset().decode(ByteBuffer.wrap(e.value()));
         for (int i = 0; i < cb.length(); i++) {
@@ -1317,22 +1308,22 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator visit(LiteralExpression e) {
-        visit(e.literal());
+    public CppGenerator write(LiteralExpression e) {
+        write(e.literal());
         return this;
     }
 
-    public CppGenerator visit(CurrentExpression e) {
+    public CppGenerator write(CurrentExpression e) {
         assert enterClass != null;
         if (e.isSelf()) return write("this");
         unsupported("super");
         var pd = enterClass.parent().must();
-        return visit(pd.symbol()).write("::");
+        return write(pd.symbol()).write("::");
     }
 
     private CppGenerator deRefer(Expression subject, Referable ref) {
         if (ref.refer().has()) {
-            write("Feng$required(").visit(subject).write(")->");
+            write("Feng$required(").write(subject).write(")->");
         } else {
             write('.');
         }
@@ -1343,8 +1334,8 @@ public class CppGenerator {
             PrimaryExpression s, EnumDefinition ed, Identifier m) {
         // TODO: check bounds
         if (EnumDefinition.TokenFieldId.equals(m.value()))
-            return visit(s);
-        return enumName(ed).write('[').visit(s)
+            return write(s);
+        return enumName(ed).write('[').write(s)
                 .write("].").write(m);
     }
 
@@ -1361,7 +1352,7 @@ public class CppGenerator {
         return write(member);
     }
 
-    public CppGenerator visit(MemberOfExpression e) {
+    public CppGenerator write(MemberOfExpression e) {
         var td = (DerivedTypeDeclarer) e.subject().resultType.must();
         var def = td.def.must();
         if (def instanceof EnumDefinition ed) {
@@ -1379,9 +1370,9 @@ public class CppGenerator {
 
     private CppGenerator fieldInit(
             TypeDefinition def, Optional<Expression> init) {
-        write('(').visit(def.symbol()).write(')');
+        write('(').write(def.symbol()).write(')');
         if (init.has()) {
-            return visit(init.get());
+            return write(init.get());
         } else {
             return write("{}");
         }
@@ -1390,17 +1381,17 @@ public class CppGenerator {
     private CppGenerator visitNew(NewDefinedType dt, NewExpression e) {
         var def = findType(dt.type());
         if (def instanceof ClassDefinition cd) {
-            return write("Feng$newObject<").visit(cd.symbol())
+            return write("Feng$newObject<").write(cd.symbol())
                     .write(">(").write(cd.id()).write(',')
                     .fieldInit(cd, e.arg()).write(')');
         }
 
-        write("Feng$newMem<").visit(def.symbol()).write(">(");
+        write("Feng$newMem<").write(def.symbol()).write(">(");
         if (def instanceof StructureDefinition) {
             return fieldInit(def, e.arg()).write(')');
         }
         if (e.arg().has()) {
-            return visit(e.arg().get()).write(')');
+            return write(e.arg().get()).write(')');
         } else {
             return write('0').write(')');
         }
@@ -1410,7 +1401,7 @@ public class CppGenerator {
         return unsupported("new array");
     }
 
-    public CppGenerator visit(NewExpression e) {
+    public CppGenerator write(NewExpression e) {
         return switch (e.type()) {
             case NewDefinedType t -> visitNew(t, e);
             case NewArrayType t -> visitNew(t, e);
@@ -1437,7 +1428,7 @@ public class CppGenerator {
         return true;
     }
 
-    public CppGenerator visit(ObjectExpression oe) {
+    public CppGenerator write(ObjectExpression oe) {
         if (oe.initStack.isEmpty())
             return write("{}");
 
@@ -1446,31 +1437,31 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator visit(PairsExpression e) {
+    public CppGenerator write(PairsExpression e) {
         return unsupported("pairs");
     }
 
-    public CppGenerator visit(ParenExpression e) {
+    public CppGenerator write(ParenExpression e) {
         write('(');
-        visit(e.child());
+        write(e.child());
         write(')');
         return this;
     }
 
-    public CppGenerator visit(IsNilExpression e) {
-        visit(e.subject());
+    public CppGenerator write(IsNilExpression e) {
+        write(e.subject());
         write(e.nil() ? '=' : '!');
         return write("=nullptr");
     }
 
-    public CppGenerator visit(ReferExpression e) {
+    public CppGenerator write(ReferExpression e) {
         if (!e.generic().isEmpty()) return unsupported("generic");
         var t = e.resultType.must();
-        visit(e.symbol());
+        write(e.symbol());
         return this;
     }
 
-    public CppGenerator visit(UnaryExpression e) {
+    public CppGenerator write(UnaryExpression e) {
         write('(');
         var op = e.operator();
         var td = e.resultType.must();
@@ -1493,22 +1484,22 @@ public class CppGenerator {
             else if (op == UnaryOperator.NEGATIVE)
                 write('-');
         }
-        visit(e.operand());
+        write(e.operand());
         write(')');
         return this;
     }
 
-    private CppGenerator visit(ConvertExpression e) {
+    private CppGenerator write(ConvertExpression e) {
         return write("((").write(e.primitive()).write(')')
-                .visit(e.operand()).write(')');
+                .write(e.operand()).write(')');
     }
 
-    private CppGenerator visit(EnumValueExpression e) {
+    private CppGenerator write(EnumValueExpression e) {
         return write(e.value().id());
     }
 
-    private CppGenerator visit(EnumIdExpression e) {
-        return visit(e.index());
+    private CppGenerator write(EnumIdExpression e) {
+        return write(e.index());
     }
 
 

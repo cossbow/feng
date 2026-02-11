@@ -20,6 +20,10 @@ public class AssignmentsStatement extends Statement {
         return list;
     }
 
+    public void list(List<Assignment> list) {
+        this.list = list;
+    }
+
     public Assignment get(int i) {
         return list.get(i);
     }

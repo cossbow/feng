@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
-import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
@@ -25,7 +24,7 @@ public class CppGeneratorTest {
         var sb = new StringBuilder("/* -------------------- */\n");
         var ctx = new GlobalSymbolContext(src.table());
         new SemanticAnalysis(ctx).visit(src);
-        new CppGenerator(src.table(), ctx, sb, true).visit(src);
+        new CppGenerator(src.table(), ctx, sb, true).write(src);
         System.out.println(sb);
         try {
             Files.write(Path.of("D:\\Users\\j30036461\\CLionProjects\\cpptest2\\unittest.cpp"),

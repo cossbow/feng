@@ -5,23 +5,19 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.util.Optional;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
 public class Prototype extends Entity {
-    private VariableParameterSet parameterSet;
+    private ParameterSet parameterSet;
     private Optional<TypeDeclarer> returnSet;
 
     public Prototype(Position pos,
-                     VariableParameterSet parameterSet,
+                     ParameterSet parameterSet,
                      Optional<TypeDeclarer> returnSet) {
         super(pos);
         this.parameterSet = parameterSet;
         this.returnSet = returnSet;
     }
 
-    public VariableParameterSet parameterSet() {
+    public ParameterSet parameterSet() {
         return parameterSet;
     }
 

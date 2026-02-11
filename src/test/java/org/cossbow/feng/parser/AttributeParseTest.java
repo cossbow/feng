@@ -8,7 +8,7 @@ import org.cossbow.feng.ast.expr.ArrayExpression;
 import org.cossbow.feng.ast.expr.ObjectExpression;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
-import org.cossbow.feng.ast.proc.VariableParameterSet;
+import org.cossbow.feng.ast.proc.ParameterSet;
 import org.cossbow.feng.ast.stmt.DeclarationStatement;
 import org.cossbow.feng.ast.stmt.TryStatement;
 import org.junit.jupiter.api.Assertions;
@@ -168,7 +168,7 @@ public class AttributeParseTest extends BaseParseTest {
     private IdentifierTable<Attribute> atParameter(CharSequence attr) {
         var code = "func test(%s a A){}".formatted(attr);
         var func = doParseFunc(code, "test");
-        var ps = (VariableParameterSet) func.procedure().prototype().parameterSet();
+        var ps = (ParameterSet) func.procedure().prototype().parameterSet();
         return ps.variables().get(identifier("a")).modifier().attributes();
     }
 

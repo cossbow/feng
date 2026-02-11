@@ -7,13 +7,12 @@ import org.cossbow.feng.ast.dcl.Variable;
 
 import java.util.AbstractList;
 import java.util.List;
-import java.util.Objects;
+import java.util.stream.Collectors;
 
-final
-public class VariableParameterSet {
+public class ParameterSet {
     private IdentifierTable<Variable> variables;
 
-    public VariableParameterSet(IdentifierTable<Variable> variables) {
+    public ParameterSet(IdentifierTable<Variable> variables) {
         this.variables = variables;
     }
 
@@ -48,7 +47,7 @@ public class VariableParameterSet {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof VariableParameterSet t)) return false;
+        if (!(o instanceof ParameterSet t)) return false;
 
         return types().equals(t.types());
     }
@@ -69,5 +68,13 @@ public class VariableParameterSet {
         public int size() {
             return variables.size();
         }
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        return variables.stream().map(Variable::toString)
+                .collect(Collectors.joining(", "));
     }
 }

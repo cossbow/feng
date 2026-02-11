@@ -24,7 +24,7 @@ public class CppGeneratorMain {
         new SemanticAnalysis(ctx).visit(source);
         try (var out = new FileOutputStream(cppFile);
              var w = new OutputStreamWriter(out)) {
-            new CppGenerator(source.table(), ctx, w, true).visit(source);
+            new CppGenerator(source.table(), ctx, w, true).write(source);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

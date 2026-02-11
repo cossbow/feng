@@ -22,7 +22,6 @@ import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.Stack;
-import org.cossbow.feng.visit.EntityVisitor;
 import org.cossbow.feng.visit.SymbolContext;
 
 import java.math.BigDecimal;
@@ -36,7 +35,7 @@ import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.CommonUtil.subtract;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
-public class SemanticAnalysis implements EntityVisitor<Entity> {
+public class SemanticAnalysis {
 
     private final StackedContext context;
 
@@ -253,14 +252,22 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         } else {
             illegalPhantom(td);
         }
-        return EntityVisitor.super.visit(td);
+        return switch (td) {
+            case ArrayTypeDeclarer ee -> visit(ee);
+            case DerivedTypeDeclarer ee -> visit(ee);
+            case FuncTypeDeclarer ee -> visit(ee);
+            case PrimitiveTypeDeclarer ee -> visit(ee);
+            case LiteralTypeDeclarer ee -> visit(ee);
+            case ObjectTypeDeclarer ee -> visit(ee);
+            case null, default -> unreachable();
+        };
     }
 
     public TypeDefinition visit(DerivedTypeDeclarer td) {
         var dt = visit(td.derivedType());
         td.def.set(dt);
         var r = td.refer();
-        visit(r);
+        if (r.has()) visit(r.get());
 
         if (dt instanceof StructureDefinition) return dt;
 
@@ -666,12 +673,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         dag.bfs(this::checkAllInherits);
         dag.bfs(this::checkImplList);
         dag.bfs(this::visitClass);
-        dag.bfs(cd -> new UpdaterAnalyzer().analyse(cd));
         return Optional.of(dag);
     }
 
     private void visitMethods(DAGGraph<ClassDefinition> dag) {
         dag.bfs(this::visitMethod);
+        dag.bfs(cd -> new UpdaterAnalyzer().analyse(cd));
     }
 
     private ClassDefinition enterClass;
@@ -704,6 +711,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         enterClass = cd;
 
         for (var m : cd.methods()) visit(m);
+
+        new UpdaterAnalyzer().analyse(cd);
 
         if (!cd.macros().isEmpty())
             unsupported("macro");
@@ -851,12 +860,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
     }
 
     public Entity visit(Prototype prot, boolean addVar) {
-        visit((VariableParameterSet) prot.parameterSet(), addVar);
-        visit(prot.returnSet());
+        visit(prot.parameterSet(), addVar);
+        if (prot.returnSet().has()) visit(prot.returnSet().get());
         return prot;
     }
 
-    private void visit(VariableParameterSet ps, boolean addVar) {
+    private void visit(ParameterSet ps, boolean addVar) {
         for (Variable v : ps.variables()) {
             enablePhantom = true;
             visit(v);
@@ -928,15 +937,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return semantic("can't use phantom reference: %s", re.get().pos());
     }
 
-    //
-
-    public Entity visit(BlockStatement bs) {
-        if (bs.newScope()) context.enterScope();
-        for (var s : bs.list())
-            visit(s);
-        if (bs.newScope()) context.exitScope(bs);
-        return bs;
-    }
+    // type check
 
     private <F extends Field> List<Field> checkInitField(
             IdentifierTable<F> fields,
@@ -1395,6 +1396,42 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return true;
     }
 
+    // statement
+
+    private final Stack<Statement> stmtStack = new Stack<>();
+
+    public Statement visit(Statement s) {
+        stmtStack.push(s);
+        s = switch (s) {
+            case AssignmentsStatement ss -> visit(ss);
+            case BlockStatement ss -> visit(ss);
+            case BreakStatement ss -> visit(ss);
+            case CallStatement ss -> visit(ss);
+            case ContinueStatement ss -> visit(ss);
+            case DeclarationStatement ss -> visit(ss);
+            case ForStatement ss -> visit(ss);
+            case GotoStatement ss -> visit(ss);
+            case IfStatement ss -> visit(ss);
+            case LabeledStatement ss -> visit(ss);
+            case ReturnStatement ss -> visit(ss);
+            case SwitchStatement ss -> visit(ss);
+            case ThrowStatement ss -> visit(ss);
+            case TryStatement ss -> visit(ss);
+            case SwitchBranch ss -> visit(ss);
+            case null, default -> unreachable();
+        };
+        stmtStack.pop();
+        return s;
+    }
+
+    public Statement visit(BlockStatement bs) {
+        if (bs.newScope()) context.enterScope();
+        for (var s : bs.list())
+            visit(s);
+        if (bs.newScope()) context.exitScope(bs);
+        return bs;
+    }
+
     private Assignment visit(Assignment a) {
         var og = optimize(a.operand());
         var vg = optimize(a.value());
@@ -1405,9 +1442,10 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
                 a.operand(), a.value(), a.pos());
     }
 
-    public Entity visit(AssignmentsStatement as) {
+    public Statement visit(AssignmentsStatement as) {
         var list = as.list().stream().map(this::visit).toList();
-        return new AssignmentsStatement(as.pos(), list);
+        as.list(list);
+        return as;
     }
 
     private void checkDefinedType(TypeDeclarer td) {
@@ -1446,7 +1484,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
     }
 
-    public Entity visit(DeclarationStatement ds) {
+    public Statement visit(DeclarationStatement ds) {
         if (!ds.init().isEmpty()) {
             initVar(ds.variables(), ds.init());
         } else {
@@ -1465,13 +1503,13 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return ds;
     }
 
-    public Entity visit(CallStatement e) {
+    public Statement visit(CallStatement e) {
         var g = optimize(e.call());
         e.call((CallExpression) g.a());
         return e;
     }
 
-    public Entity visit(LabeledStatement e) {
+    public Statement visit(LabeledStatement e) {
         return visit(e.target());
     }
 
@@ -1483,7 +1521,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         semantic("label not found: %s", label.pos());
     }
 
-    public Entity visit(BreakStatement e) {
+    public Statement visit(BreakStatement e) {
         e.label().use(this::checkLabel);
 
         if (loopStack.isEmpty())
@@ -1492,7 +1530,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    public Entity visit(ContinueStatement e) {
+    public Statement visit(ContinueStatement e) {
         e.label().use(this::checkLabel);
 
         if (loopStack.isEmpty())
@@ -1501,17 +1539,21 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    public Entity visit(ForStatement e) {
+    public Statement visit(ForStatement e) {
         loopStack.push(e);
         context.enterScope();
-        EntityVisitor.super.visit(e);
+        e = switch (e) {
+            case ConditionalForStatement ee -> visit(ee);
+            case IterableForStatement ee -> visit(ee);
+            case null, default -> unreachable();
+        };
         visit(e.body());
         context.exitScope(e);
         loopStack.pop();
         return e;
     }
 
-    public Entity visit(ConditionalForStatement e) {
+    public ForStatement visit(ConditionalForStatement e) {
         e.initializer().use(this::visit);
         var cg = optimize(e.condition());
         e.condition(cg.a());
@@ -1526,7 +1568,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    private Entity forIterable(IterableForStatement e, ArrayTypeDeclarer atd) {
+    private ForStatement forIterable(
+            IterableForStatement e, ArrayTypeDeclarer atd) {
         var args = e.arguments();
         if (args.size() > 2)
             return semantic("can't over 2 receivers: %s",
@@ -1543,7 +1586,8 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    private Entity forIterable(IterableForStatement e, DefinitionDeclarer dtd) {
+    private ForStatement forIterable(
+            IterableForStatement e, DefinitionDeclarer dtd) {
         if (!(dtd.def() instanceof EnumDefinition ed)) {
             return semantic("no iterable implement %s: %s",
                     dtd.def(), e.iterable().pos());
@@ -1562,7 +1606,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    public Entity visit(IterableForStatement e) {
+    public ForStatement visit(IterableForStatement e) {
         var g = optimize(e.iterable());
         e.iterable(g.a());
         if (g.b() instanceof ArrayTypeDeclarer atd)
@@ -1576,12 +1620,12 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
 
     }
 
-    public Entity visit(GotoStatement e) {
+    public Statement visit(GotoStatement e) {
         checkLabel(e.label());
         return e;
     }
 
-    public Entity visit(IfStatement e) {
+    public Statement visit(IfStatement e) {
         context.enterScope();
         e.init().use(this::visit);
 
@@ -1600,7 +1644,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    public Entity visit(ReturnStatement e) {
+    public Statement visit(ReturnStatement e) {
         assert enterProc != null;
         e.procedure().set(enterProc);
         e.local(context.local().toList());
@@ -1681,9 +1725,9 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         }
     }
 
-    public Entity visit(SwitchStatement e) {
+    public Statement visit(SwitchStatement e) {
         context.enterScope();
-        visit(e.init());
+        e.init().use(this::visit);
 
         var cv = e.value();
         var g = optimize(cv);
@@ -1714,7 +1758,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    public Entity visit(ThrowStatement e) {
+    public Statement visit(ThrowStatement e) {
         assert enterProc != null;
         e.procedure().set(enterProc);
         e.local(context.local().toList());
@@ -1723,14 +1767,15 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
         return e;
     }
 
-    public Entity visit(TryStatement e) {
+    public Statement visit(TryStatement e) {
         visit(e.body());
-        visit(e.catchClauses());
-        visit(e.finallyClause());
+        for (var cc : e.catchClauses())
+            visit(cc);
+        e.finallyClause().use(this::visit);
         return e;
     }
 
-    public Entity visit(CatchClause e) {
+    public Statement visit(CatchClause e) {
         context.enterScope();
         var arg = e.argument();
         if (e.typeSet().size() > 1) {
@@ -1741,7 +1786,7 @@ public class SemanticAnalysis implements EntityVisitor<Entity> {
             arg.type().set(e.typeSet().getFirst());
         }
         visit(e.argument());
-        visit(e.typeSet());
+        for (var s : e.typeSet()) visit(s);
         context.putVar(e.argument());
         visit(e.body());
         context.exitScope(e);

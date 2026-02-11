@@ -1348,10 +1348,10 @@ final class SourceParseVisitor
     // procedure: start
     //
 
-    private VariableParameterSet parseParameters(FengParser.ParametersSetContext ctx) {
+    private ParameterSet parseParameters(FengParser.ParametersSetContext ctx) {
         var params = new IdentifierTable<Variable>();
 
-        if (ctx == null) return new VariableParameterSet(params);
+        if (ctx == null) return new ParameterSet(params);
 
         var ps = ctx.parameters();
         if (ps == null) {
@@ -1363,7 +1363,7 @@ final class SourceParseVisitor
                         Declare.CONST, name, Lazy.of(td), Lazy.nil());
                 params.add(name, v);
             }
-            return new VariableParameterSet(params);
+            return new ParameterSet(params);
         }
 
         for (var pc : ps.parameter()) {
@@ -1376,7 +1376,7 @@ final class SourceParseVisitor
                 params.add(name, v);
             }
         }
-        return new VariableParameterSet(params);
+        return new ParameterSet(params);
     }
 
     private Optional<TypeDeclarer> parseReturnSet(FengParser.ReturnSetContext ctx) {
