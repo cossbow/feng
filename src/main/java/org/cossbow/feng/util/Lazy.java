@@ -26,8 +26,12 @@ public class Lazy<T> {
         this.value = value;
     }
 
-    public void set(Optional<T> value) {
-        this.value = value.get();
+    public void set(Optional<T> t) {
+        this.value = t.get();
+    }
+
+    public void set(Lazy<T> l) {
+        this.value = l.value;
     }
 
     public void setIfNone(T value) {

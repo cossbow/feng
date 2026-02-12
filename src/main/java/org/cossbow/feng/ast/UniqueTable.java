@@ -50,13 +50,6 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
         }
     }
 
-    public Optional<V> tryAdd(K key, V value) {
-        var n = table.get(key);
-        if (n != null) return Optional.of(n.value);
-        add(key, value);
-        return Optional.empty();
-    }
-
     public V get(K key) {
         var node = table.get(key);
         if (node != null) {
