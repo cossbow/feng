@@ -242,6 +242,10 @@ public class SemanticAnalysis {
         return type.get();
     }
 
+    private TypeDefinition findDef(DerivedTypeDeclarer dtd) {
+        return visit(dtd.derivedType());
+    }
+
     //
 
     private boolean enablePhantom = false;
@@ -673,12 +677,12 @@ public class SemanticAnalysis {
         dag.bfs(this::checkAllInherits);
         dag.bfs(this::checkImplList);
         dag.bfs(this::visitClass);
+        dag.bfs(cd -> new UpdaterAnalyzer().analyse(cd));
         return Optional.of(dag);
     }
 
     private void visitMethods(DAGGraph<ClassDefinition> dag) {
         dag.bfs(this::visitMethod);
-        dag.bfs(cd -> new UpdaterAnalyzer().analyse(cd));
     }
 
     private ClassDefinition enterClass;
@@ -711,8 +715,6 @@ public class SemanticAnalysis {
         enterClass = cd;
 
         for (var m : cd.methods()) visit(m);
-
-        new UpdaterAnalyzer().analyse(cd);
 
         if (!cd.macros().isEmpty())
             unsupported("macro");
@@ -861,7 +863,7 @@ public class SemanticAnalysis {
 
     public Entity visit(Prototype prot, boolean addVar) {
         visit(prot.parameterSet(), addVar);
-        if (prot.returnSet().has()) visit(prot.returnSet().get());
+        prot.returnSet().use(this::visit);
         return prot;
     }
 
@@ -937,7 +939,51 @@ public class SemanticAnalysis {
         return semantic("can't use phantom reference: %s", re.get().pos());
     }
 
-    // type check
+    //
+
+    private final Stack<Statement> stmtStack = new Stack<>();
+
+    public Statement visit(Statement s) {
+        stmtStack.push(s);
+        s = switch (s) {
+            case AssignmentsStatement ss -> visit(ss);
+            case BlockStatement ss -> visit(ss);
+            case BreakStatement ss -> visit(ss);
+            case CallStatement ss -> visit(ss);
+            case ContinueStatement ss -> visit(ss);
+            case DeclarationStatement ss -> visit(ss);
+            case ForStatement ss -> visit(ss);
+            case GotoStatement ss -> visit(ss);
+            case IfStatement ss -> visit(ss);
+            case LabeledStatement ss -> visit(ss);
+            case ReturnStatement ss -> visit(ss);
+            case SwitchStatement ss -> visit(ss);
+            case ThrowStatement ss -> visit(ss);
+            case TryStatement ss -> visit(ss);
+            case SwitchBranch ss -> visit(ss);
+            case CatchClause ss -> visit(ss);
+            case null, default -> unreachable();
+        };
+        stmtStack.pop();
+        return s;
+    }
+
+    private <S extends Statement> void visit(List<S> list) {
+        for (var s : list) visit(s);
+    }
+
+    private <S extends Statement>
+    Optional<Statement> visit(Optional<S> so) {
+        return so.map(this::visit);
+    }
+
+    public Statement visit(BlockStatement bs) {
+        if (bs.newScope()) context.enterScope();
+        for (var s : bs.list())
+            visit(s);
+        if (bs.newScope()) context.exitScope(bs);
+        return bs;
+    }
 
     private <F extends Field> List<Field> checkInitField(
             IdentifierTable<F> fields,
@@ -1143,19 +1189,24 @@ public class SemanticAnalysis {
         return false;
     }
 
-    private boolean convertible(TypeDeclarer td, boolean mustValue) {
-        if (td instanceof PrimitiveTypeDeclarer)
-            return true;
+    private boolean mappable(TypeDeclarer td, boolean mustValue) {
+        if (mustValue && td.maybeRefer().has()) {
+            return false;
+        }
+        if (td instanceof PrimitiveTypeDeclarer ptd)
+            return !ptd.primitive().isBool();
         if (td instanceof DerivedTypeDeclarer dtd) {
-            var type = visit(dtd.derivedType());
+            var type = findDef(dtd);
             return type instanceof StructureDefinition;
         }
         if (td instanceof ArrayTypeDeclarer atd) {
-            if (mustValue && atd.refer().has())
-                return false;
-            return convertible(atd.element(), true);
+            return mappable(atd.element(), true);
         }
         return false;
+    }
+
+    private boolean mappable(TypeDeclarer td) {
+        return mappable(td, false);
     }
 
     private long typeSize(TypeDeclarer td) {
@@ -1223,7 +1274,7 @@ public class SemanticAnalysis {
         if (!referable(lRef.get(), r.maybeRefer(), re))
             return false;
 
-        if (convertible(l, false) && convertible(r, false))
+        if (mappable(l) && mappable(r))
             return checkBounds(l, r);
 
         // Objects
@@ -1396,42 +1447,6 @@ public class SemanticAnalysis {
         return true;
     }
 
-    // statement
-
-    private final Stack<Statement> stmtStack = new Stack<>();
-
-    public Statement visit(Statement s) {
-        stmtStack.push(s);
-        s = switch (s) {
-            case AssignmentsStatement ss -> visit(ss);
-            case BlockStatement ss -> visit(ss);
-            case BreakStatement ss -> visit(ss);
-            case CallStatement ss -> visit(ss);
-            case ContinueStatement ss -> visit(ss);
-            case DeclarationStatement ss -> visit(ss);
-            case ForStatement ss -> visit(ss);
-            case GotoStatement ss -> visit(ss);
-            case IfStatement ss -> visit(ss);
-            case LabeledStatement ss -> visit(ss);
-            case ReturnStatement ss -> visit(ss);
-            case SwitchStatement ss -> visit(ss);
-            case ThrowStatement ss -> visit(ss);
-            case TryStatement ss -> visit(ss);
-            case SwitchBranch ss -> visit(ss);
-            case null, default -> unreachable();
-        };
-        stmtStack.pop();
-        return s;
-    }
-
-    public Statement visit(BlockStatement bs) {
-        if (bs.newScope()) context.enterScope();
-        for (var s : bs.list())
-            visit(s);
-        if (bs.newScope()) context.exitScope(bs);
-        return bs;
-    }
-
     private Assignment visit(Assignment a) {
         var og = optimize(a.operand());
         var vg = optimize(a.value());
@@ -1444,8 +1459,7 @@ public class SemanticAnalysis {
 
     public Statement visit(AssignmentsStatement as) {
         var list = as.list().stream().map(this::visit).toList();
-        as.list(list);
-        return as;
+        return new AssignmentsStatement(as.pos(), list);
     }
 
     private void checkDefinedType(TypeDeclarer td) {
@@ -1554,7 +1568,7 @@ public class SemanticAnalysis {
     }
 
     public ForStatement visit(ConditionalForStatement e) {
-        e.initializer().use(this::visit);
+        visit(e.initializer());
         var cg = optimize(e.condition());
         e.condition(cg.a());
         if (!cg.b().isBool())
@@ -1564,7 +1578,7 @@ public class SemanticAnalysis {
         if (cg.a() instanceof LiteralExpression le)
             e.cond().set((BoolLiteral) le.literal());
 
-        e.updater().use(this::visit);
+        visit(e.updater());
         return e;
     }
 
@@ -1627,7 +1641,7 @@ public class SemanticAnalysis {
 
     public Statement visit(IfStatement e) {
         context.enterScope();
-        e.init().use(this::visit);
+        visit(e.init());
 
         var g = optimize(e.condition());
         if (!g.b().isBool()) {
@@ -1639,7 +1653,7 @@ public class SemanticAnalysis {
             e.cond().set((BoolLiteral) le.literal());
 
         visit(e.yes());
-        e.not().use(this::visit);
+        visit(e.not());
         context.exitScope(e);
         return e;
     }
@@ -1727,7 +1741,7 @@ public class SemanticAnalysis {
 
     public Statement visit(SwitchStatement e) {
         context.enterScope();
-        e.init().use(this::visit);
+        if (e.init().has()) visit(e.init().get());
 
         var cv = e.value();
         var g = optimize(cv);
@@ -1769,9 +1783,8 @@ public class SemanticAnalysis {
 
     public Statement visit(TryStatement e) {
         visit(e.body());
-        for (var cc : e.catchClauses())
-            visit(cc);
-        e.finallyClause().use(this::visit);
+        visit(e.catchClauses());
+        visit(e.finallyClause());
         return e;
     }
 
@@ -1786,7 +1799,7 @@ public class SemanticAnalysis {
             arg.type().set(e.typeSet().getFirst());
         }
         visit(e.argument());
-        for (var s : e.typeSet()) visit(s);
+        for (var td : e.typeSet()) visit(td);
         context.putVar(e.argument());
         visit(e.body());
         context.exitScope(e);
@@ -2059,6 +2072,7 @@ public class SemanticAnalysis {
                     ee.variable().type().must());
             case null, default -> unreachable();
         };
+        g.b().mappable(mappable(g.b()));
         g.a().resultType.set(g.b());
         g.a().expectCallable(e.expectCallable());
         return g;
@@ -2201,8 +2215,7 @@ public class SemanticAnalysis {
 
     private boolean referCompare(
             TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
-        if (convertible(l, false) &&
-                convertible(r, false)) {
+        if (mappable(l) && mappable(r)) {
             return true; // primitive, structure, and it's array
         }
         if (l instanceof DerivedTypeDeclarer ld &&
@@ -2399,20 +2412,19 @@ public class SemanticAnalysis {
         if (op.none()) {
             return semantic("%s not callable: %s", call, e.pos());
         }
-        var prot = op.get();
 
         var rg = optimize(args);
-        var left = prot.parameterSet().types();
+        var left = op.get().parameterSet().types();
         if (!assignable(left, rg.b(), rg.a()))
             return semantic("arguments not compatible");
 
         call = (PrimaryExpression) g.a();
         var n = new CallExpression(e.pos(), call, rg.a());
         n.prototype().set(op);
-        if (prot.returnSet().none())
-            return Groups.g2(n, new VoidTypeDeclarer(prot.pos()));
+        if (op.get().returnSet().none())
+            return Groups.g2(n, new VoidTypeDeclarer(op.get().pos()));
 
-        return Groups.g2(n, prot.returnSet().get());
+        return Groups.g2(n, op.get().returnSet().get());
     }
 
     public Groups.G2<Expression, TypeDeclarer> optimize(ConvertExpression e) {
@@ -2957,172 +2969,77 @@ public class SemanticAnalysis {
     //
 
     // split change
-    private VariableExpression newTempVar(
-            PrimaryExpression e, List<Variable> s) {
+    private VariableExpression makeTemp(
+            PrimaryExpression e, ArrayList<Variable> s) {
         var vn = new Identifier(e.pos(), "feng$tmp");
-        var v = new Variable(e.pos(), Modifier.empty(),
-                Declare.CONST, vn, e.resultType, Lazy.of(e));
+        var v = new Variable(e.pos(), Modifier.empty(), Declare.CONST,
+                vn, e.resultType, Lazy.of(e));
         s.add(v);
         return new VariableExpression(e.pos(), v);
     }
 
-    private Expression tempInst(
-            Expression o, List<Variable> s) {
-        Expression t = switch (o) {
-            case BinaryExpression e -> tempInst(e, s);
-            case UnaryExpression e -> tempInst(e, s);
-            case NewExpression e -> tempInst(e, s);
-            case CallExpression e -> tempInst(e, s);
-            case MemberOfExpression e -> tempInst(e, s);
-            case IndexOfExpression e -> tempInst(e, s);
-            case AssertExpression e -> tempInst(e, s);
-            case ConvertExpression e -> tempInst(e, s);
-            case ArrayExpression e -> tempInst(e, s);
-            case ObjectExpression e -> tempInst(e, s);
-            case null, default -> unreachable();
-        };
-        t.resultType.set(o.resultType);
-        return t;
-    }
-
-    private Optional<Expression> tempInst(
-            Optional<Expression> eo, List<Variable> s) {
-        if (eo.none()) return eo;
-        var oldSize = s.size();
-        var t = tempInst(eo.get(), s);
-        return oldSize == s.size() ? eo : Optional.of(t);
-    }
-
-    private List<Expression> tempInst(
-            List<Expression> el, List<Variable> s) {
-        if (el.isEmpty()) return el;
-        var oldSize = s.size();
-        var er = new ArrayList<Expression>(el.size());
-        for (var e : el) {
-            var o = tempInst(e, s);
-            er.add(o);
+    private Expression splitChain(
+            Expression e, ArrayList<Variable> s) {
+        if (e instanceof PrimaryExpression pe) {
+            return splitChain(pe, s);
         }
-        return oldSize == s.size() ? el : er;
-    }
-
-    private BinaryExpression tempInst(
-            BinaryExpression e, List<Variable> s) {
-        var oldSize = s.size();
-        var l = tempInst(e.left(), s);
-        var r = tempInst(e.right(), s);
-        if (oldSize == s.size()) return e;
-        return new BinaryExpression(e.pos(), e.operator(), l, r);
-    }
-
-    private UnaryExpression tempInst(
-            UnaryExpression e, List<Variable> s) {
-        var oldSize = s.size();
-        var o = tempInst(e.operand(), s);
-        if (oldSize == s.size()) return e;
-        return new UnaryExpression(e.pos(), e.operator(), o);
-    }
-
-    private NewType tempInst(
-            NewType nt, List<Variable> s) {
-        if (!(nt instanceof NewArrayType nat))
-            return nt;
-        var oldSize = s.size();
-        var nl = tempInst(nat.length(), s);
-        if (oldSize == s.size()) return nt;
-        return new NewArrayType(nt.pos(), nat.element(),
-                nl, nat.immutable());
-    }
-
-    private Expression tempInst(
-            NewExpression e, List<Variable> s) {
-        var oldSize = s.size();
-        var arg = tempInst(e.arg(), s);
-        var type = tempInst(e.type(), s);
-        if (oldSize == s.size()) return newTempVar(e, s);
-
-        var n = new NewExpression(e.pos(), type, arg);
-        n.resultType.set(e.resultType);
-        return newTempVar(n, s);
-    }
-
-    private Expression tempInst(
-            CallExpression e, List<Variable> s) {
-        var oldSize = s.size();
-        var args = tempInst(e.arguments(), s);
-        var call = (PrimaryExpression) tempInst(e.callee(), s);
-
-        var rt = e.resultType.must();
-        if (oldSize != s.size()) {
-            e = new CallExpression(e.pos(), call, args);
-            e.resultType.set(rt);
+        if (e instanceof BinaryExpression be) {
+            var l = splitChain(be.left(), s);
+            var r = splitChain(be.right(), s);
+            return new BinaryExpression(be.pos(),
+                    be.operator(), l, r);
         }
-
-        if (rt.maybeRefer().has())
-            return newTempVar(e, s);
-        if (!(rt instanceof DerivedTypeDeclarer dtd))
-            return e;
-
-        var def = visit(dtd.derivedType());
-        if (def instanceof ClassDefinition)
-            return newTempVar(e, s);
-
+        if (e instanceof UnaryExpression ue) {
+            var o = splitChain(ue.operand(), s);
+            return new UnaryExpression(ue.pos(),
+                    ue.operator(), o);
+        }
         return e;
     }
 
-    private MemberOfExpression tempInst(
-            MemberOfExpression e, List<Variable> s) {
-        var oldSize = s.size();
-        var sub = (PrimaryExpression) tempInst(e.subject(), s);
-        if (oldSize == s.size()) return e;
-        return new MemberOfExpression(e.pos(), sub, e.member(),
-                e.generic(), e.field(), e.method());
-    }
-
-    private IndexOfExpression tempInst(
-            IndexOfExpression e, List<Variable> s) {
-        var oldSize = s.size();
-        var sub = (PrimaryExpression) tempInst(e.subject(), s);
-        var idx = tempInst(e.index(), s);
-        if (oldSize == s.size()) return e;
-        return new IndexOfExpression(e.pos(), sub, idx);
-    }
-
-    private AssertExpression tempInst(
-            AssertExpression e, List<Variable> s) {
-        var oldSize = s.size();
-        var sub = (PrimaryExpression) tempInst(e.subject(), s);
-        if (oldSize == s.size()) return e;
-        var n = new AssertExpression(e.pos(), sub, e.type());
-        n.needCheck(e.needCheck());
-        return n;
-    }
-
-    private ConvertExpression tempInst(
-            ConvertExpression e, List<Variable> s) {
-        var oldSize = s.size();
-        var o = tempInst(e.operand(), s);
-        if (oldSize == s.size()) return e;
-        return new ConvertExpression(e.pos(), e.primitive(), o);
-    }
-
-    private ArrayExpression tempInst(
-            ArrayExpression e, List<Variable> s) {
-        var oldSize = s.size();
-        var list = tempInst(e.elements(), s);
-        if (oldSize == s.size()) return e;
-        return new ArrayExpression(e.pos(), list);
-    }
-
-    private Expression tempInst(
-            ObjectExpression e, List<Variable> s) {
-        var oldSize = s.size();
-        var nodes = new IdentifierTable<Expression>(e.entries().size());
-        for (var on : e.entries().nodes()) {
-            var v = tempInst(on.value(), s);
-            nodes.add(on.key(), v);
+    private PrimaryExpression splitChain(
+            PrimaryExpression e, ArrayList<Variable> s) {
+        if (e instanceof NewExpression ee) {
+            return makeTemp(ee, s);
         }
-        if (oldSize == s.size()) return e;
-        return new ObjectExpression(e.pos(), nodes);
+        if (e instanceof CallExpression ee) {
+            var c = splitChain(ee.callee(), s);
+            return makeTemp(c, s);
+        }
+        if (e instanceof MemberOfExpression ee) {
+            var c = splitChain(ee.subject(), s);
+            return new MemberOfExpression(ee.pos(), c,
+                    ee.member(), ee.generic());
+        }
+        if (e instanceof IndexOfExpression ee) {
+            var i = splitChain(ee.index(), s);
+            var c = splitChain(ee.subject(), s);
+            return new IndexOfExpression(ee.pos(), c, i);
+        }
+        if (e instanceof AssertExpression ee) {
+            var c = splitChain(ee.subject(), s);
+            return new AssertExpression(ee.pos(), c, ee.type());
+        }
+        if (e instanceof ConvertExpression ee) {
+            var c = splitChain(ee.operand(), s);
+            return new ConvertExpression(ee.pos(),
+                    ee.primitive(), c);
+        }
+        if (e instanceof ArrayExpression ee) {
+            var list = new ArrayList<Expression>(ee.elements().size());
+            for (var el : ee.elements()) {
+                list.add(splitChain(el, s));
+            }
+            return new ArrayExpression(e.pos(), list);
+        }
+        if (e instanceof ObjectExpression ee) {
+            var es = new IdentifierTable<Expression>(ee.entries().size());
+            for (var n : ee.entries().nodes()) {
+                es.add(n.key(), splitChain(n.value(), s));
+            }
+            return new ObjectExpression(e.pos(), es);
+        }
+        return e;
     }
 
     // attribute

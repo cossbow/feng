@@ -24,11 +24,16 @@ public class TypeDeclarer extends Entity {
         return Optional.empty();
     }
 
-    public boolean referKind(ReferKind kind) {
-        return this instanceof Referable r && r.isKind(kind);
+    private Boolean mappable;
+    private long unit;
+
+    public boolean mappable() {
+        return mappable;
     }
 
-    private long unit;
+    public void mappable(boolean mappable) {
+        this.mappable = mappable;
+    }
 
     public long unit() {
         return unit;

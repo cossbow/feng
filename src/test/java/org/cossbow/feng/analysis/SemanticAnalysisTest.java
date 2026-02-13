@@ -1779,6 +1779,77 @@ public class SemanticAnalysisTest {
     //
 
     @Test
+    public void testMappable1() {
+        for (var a : Primitive.values()) {
+            for (var b : Primitive.values()) {
+                var code = "func f(a*%s){ var b*%s = a; }".formatted(a, b);
+                if (a.isBool() != b.isBool()) {
+                    checkFail(code);
+                } else if (a.isBool()) {
+                    checkSucc(code);
+                } else {
+                    if (a.width >= b.width) {
+                        checkSucc(code);
+                    } else {
+                        checkFail(code);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testMappabl2() {
+        checkSucc("func f(){var a [4]uint8; const b &uint32 = a;}");
+        checkSucc("func f(){var a [4]uint8; const b &uint16 = a;}");
+        checkFail("func f(){var a [4]uint8; const b &uint64 = a;}");
+        checkSucc("func f(){var a [8]uint8; const b &uint64 = a;}");
+        checkSucc("func f(){var a [9]uint8; const b &uint64 = a;}");
+    }
+
+    @Test
+    public void testMappable3() {
+        var d = "struct A{v int32;} struct B{v int64;} struct C{v1,v2 int64;} ";
+        checkSucc(d + "func f(x *A){var y *int32 = x;}");
+        checkFail(d + "func f(x *A){var y *int64 = x;}");
+        checkSucc(d + "func f(x *B){var y *int64 = x;}");
+        checkSucc(d + "func f(x *C){var y *int64 = x;}");
+
+        checkFail(d + "func f(x *A){var y *B = x;}");
+        checkSucc(d + "func f(x *B){var y *A = x;}");
+        checkFail(d + "func f(x *B){var y *C = x;}");
+        checkSucc(d + "func f(x *C){var y *B = x;}");
+
+        checkSucc(d + "func f(){var x [10]int8; const y &B = x;}");
+        checkFail(d + "func f(){var x [10]int8; const y &C = x;}");
+        checkSucc(d + "func f(){var x [16]int8; const y &C = x;}");
+        checkSucc(d + "func f(){var x [20]int8; const y &C = x;}");
+    }
+
+    @Test
+    public void testMappable4() {
+        checkSucc("func f(x *int32){ const y [*]int32 = x;}");
+        checkFail("func f(x *int32){ const y [*]*int32 = x;}");
+        checkSucc("func f(x *int32){ const y [*]uint8 = x;}");
+        checkFail("func f(x *int32){ const y [*]*uint8 = x;}");
+        var d = "struct A{v int32;} struct B{v int64;} struct C{v1,v2 int64;} ";
+        checkSucc(d + "func f(x *A){ const y [*]int32 = x;}");
+        checkFail(d + "func f(x *A){ const y [*]*int32 = x;}");
+        checkSucc(d + "func f(x *B){ const y [*]int32 = x;}");
+        checkFail(d + "func f(x *B){ const y [*]*int32 = x;}");
+        checkSucc(d + "func f(x *C){ const y [*]int32 = x;}");
+        checkFail(d + "func f(x *C){ const y [*]*int32 = x;}");
+        checkSucc(d + "func f(x *B){ const y [*]A = x;}");
+        checkFail(d + "func f(x *B){ const y [*]*A = x;}");
+        checkSucc(d + "func f(x *B){ const y [*]B = x;}");
+        checkFail(d + "func f(x *B){ const y [*]*B = x;}");
+        checkSucc(d + "func f(x *B){ const y [*]C = x;}");
+        checkFail(d + "func f(x *B){ const y [*]*C = x;}");
+    }
+
+    //
+
+    @Test
     public void testFieldInit1() {
         var d = "struct S{tag uint;} class C{var s S; var id int;} ";
         checkSucc(d + "var s S = {tag=1}; ");
