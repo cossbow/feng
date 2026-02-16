@@ -25,7 +25,7 @@ public class TypeDeclarer extends Entity {
     }
 
     private Boolean mappable;
-    private long unit;
+    private Long size;
 
     public boolean mappable() {
         return mappable;
@@ -35,12 +35,12 @@ public class TypeDeclarer extends Entity {
         this.mappable = mappable;
     }
 
-    public long unit() {
-        return unit;
+    public void size(long size) {
+        this.size = size;
     }
 
-    public void unit(long unit) {
-        this.unit = unit;
+    public Long size() {
+        return size;
     }
 
     //

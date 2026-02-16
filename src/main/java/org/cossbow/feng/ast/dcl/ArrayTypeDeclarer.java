@@ -58,6 +58,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
     //
 
     private Long len;
+    private Long unit;
 
     public long len() {
         return len;
@@ -67,8 +68,12 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         this.len = len;
     }
 
-    public boolean isEmpty() {
-        return len == null || len == 0;
+    public Long unit() {
+        return unit;
+    }
+
+    public void unit(Long unit) {
+        this.unit = unit;
     }
 
     //

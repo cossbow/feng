@@ -1243,12 +1243,57 @@ public class SemanticAnalysis {
 
     // convertable types: struct/union/primitive/[]struct/[]union/[]primitive
     private boolean checkBounds(TypeDeclarer l, TypeDeclarer r) {
+        assert l.maybeRefer().has();
+        if (r instanceof ArrayTypeDeclarer ra) {
+            if (ra.refer().has()) {
+                ra.unit(estimateSize(ra.element()));
+                if (l instanceof ArrayTypeDeclarer la) {
+                    // [*]E = [*]S
+                    // [&]E = [*]S
+                    la.unit(estimateSize(la.element()));
+                } else {
+                    // *E = [*]S
+                    // &E = [*]S
+                    l.size(typeSize(l));
+                }
+                return true;
+            } else {
+                r.size(estimateSize(r));
+                if (l instanceof ArrayTypeDeclarer la) {
+                    // [&]E = [N]S
+                    la.unit(typeSize(la.element()));
+                    return true;
+                } else {
+                    // &E = [N]S
+                    l.size(typeSize(l));
+                    return l.size() <= r.size();
+                }
+            }
+        } else {
+            r.size(typeSize(r));
+            if (l instanceof ArrayTypeDeclarer la) {
+                // [*]E = *S
+                // [&]E = *S
+                // [&]E = S
+                la.unit(estimateSize(la.element()));
+                return true;
+            } else {
+                // *E = *S
+                // &E = *S
+                // &E = S
+                l.size(typeSize(l));
+                return l.size() <= r.size();
+            }
+        }
+    }
+
+    private boolean checkBounds0(TypeDeclarer l, TypeDeclarer r) {
         var lu = unitSize(l);
-        l.unit(lu);
+//        l.unit(lu);
         if (r instanceof ArrayTypeDeclarer ra && ra.refer().has()) {
             // r is [*]E or [&]E
             var ru = estimateSize(ra.element());
-            ra.unit(ru);
+//            ra.unit(ru);
             return true; // runtime checking
         }
 
@@ -1274,8 +1319,13 @@ public class SemanticAnalysis {
         if (!referable(lRef.get(), r.maybeRefer(), re))
             return false;
 
-        if (mappable(l) && mappable(r))
-            return checkBounds(l, r);
+        if (mappable(l) && mappable(r)) {
+            if (checkBounds(l, r))
+                return true;
+
+            return semantic("out of bounds: convert %s(size=%d):%s to %s(size=%d):%s",
+                    l, l.size(), l.pos(), r, r.size(), r.pos());
+        }
 
         // Objects
         if (r instanceof DerivedTypeDeclarer rd) {
