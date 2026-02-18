@@ -421,24 +421,22 @@ public class SemanticAnalysis {
         var layoutTool = new LayoutTool(context);
         dag.bfs(sd -> {
             if (sd.builtin()) return;
-            computeConst(sd);
+            visitStructure(sd);
             var layout = layoutTool.buildLayout(sd);
             sd.layout().set(layout);
         });
         return Optional.of(dag);
     }
 
-    private void computeConst(StructureDefinition sd) {
+    private void visitStructure(StructureDefinition sd) {
         for (var sf : sd.fields()) {
-            computeBitfield(sf);
-            computeConst(sf.type());
+            visitBitfield(sf);
+            visit(sf.type());
         }
     }
 
-    private void computeBitfield(StructureField sf) {
-        if (sf.bitfield().none()) {
-            return;
-        }
+    private void visitBitfield(StructureField sf) {
+        if (sf.bitfield().none()) return;
 
         var bf = sf.bitfield().get();
         if (!(sf.type() instanceof PrimitiveTypeDeclarer ptd
@@ -484,16 +482,6 @@ public class SemanticAnalysis {
         if (td instanceof LiteralTypeDeclarer ltd)
             return ltd.literal().compatible();
         return Optional.empty();
-    }
-
-    private void computeConst(TypeDeclarer td) {
-        while (td instanceof ArrayTypeDeclarer atd) {
-            atd.length().use(e -> {
-                var len = calcSize(e);
-                atd.len(len.value().longValue());
-            });
-            td = atd.element();
-        }
     }
 
     private static boolean isInteger(TypeDeclarer td) {
@@ -1019,7 +1007,7 @@ public class SemanticAnalysis {
     private boolean initializable(
             ClassDefinition cd,
             ObjectTypeDeclarer odt, ObjectExpression oe) {
-        for (Identifier k : oe.entries().keys()) {
+        for (var k : oe.entries().keys()) {
             if (cd.allFields().exists(k)) continue;
             return semantic("unknown field '%s': %s", k, k.pos());
         }
@@ -1027,9 +1015,9 @@ public class SemanticAnalysis {
         var initKeys = new HashSet<>(oe.entries().keys());
         var def = cd;
         while (true) {
-            var keys = checkInitField(def.fields(), odt, oe);
-            oe.initStack.add(keys);
-            keys.forEach(initKeys::remove);
+            var fields = checkInitField(def.fields(), odt, oe);
+            oe.initStack.add(fields);
+            for (var f : fields) initKeys.remove(f.name());
             if (initKeys.isEmpty()) break;
             if (def.parent().none()) break;
             def = def.parent().must();
@@ -1222,13 +1210,6 @@ public class SemanticAnalysis {
         return semantic("unsupported sizeof(%s): %s", td, td.pos());
     }
 
-    private long unitSize(TypeDeclarer td) {
-        if (td instanceof ArrayTypeDeclarer atd) {
-            return unitSize(atd.element());
-        }
-        return typeSize(td);
-    }
-
     public long estimateSize(TypeDeclarer td) {
         if (!(td instanceof ArrayTypeDeclarer atd))
             return typeSize(td);
@@ -1237,11 +1218,10 @@ public class SemanticAnalysis {
             return semantic("can't get size of %s: %s", td, td.pos());
 
         var es = estimateSize(atd.element());
-        var len = calcInteger(atd.length().must());
-        return len.value().longValue() * es;
+        return atd.len() * es;
     }
 
-    // convertable types: struct/union/primitive/[]struct/[]union/[]primitive
+    // convertible types: struct/union/primitive/[]struct/[]union/[]primitive
     private boolean checkBounds(TypeDeclarer l, TypeDeclarer r) {
         assert l.maybeRefer().has();
         if (r instanceof ArrayTypeDeclarer ra) {
@@ -1261,7 +1241,7 @@ public class SemanticAnalysis {
                 r.size(estimateSize(r));
                 if (l instanceof ArrayTypeDeclarer la) {
                     // [&]E = [N]S
-                    la.unit(typeSize(la.element()));
+                    la.unit(estimateSize(la.element()));
                     return true;
                 } else {
                     // &E = [N]S
@@ -1285,26 +1265,6 @@ public class SemanticAnalysis {
                 return l.size() <= r.size();
             }
         }
-    }
-
-    private boolean checkBounds0(TypeDeclarer l, TypeDeclarer r) {
-        var lu = unitSize(l);
-//        l.unit(lu);
-        if (r instanceof ArrayTypeDeclarer ra && ra.refer().has()) {
-            // r is [*]E or [&]E
-            var ru = estimateSize(ra.element());
-//            ra.unit(ru);
-            return true; // runtime checking
-        }
-
-        // r is [N]E or E or *E or &E
-        var rs = estimateSize(r);
-        if (lu <= rs) {
-            return true;
-        }
-
-        return semantic("out of bounds: from %s(size=%d):%s to %s(size=%d):%s",
-                l, lu, l.pos(), r, rs, r.pos());
     }
 
     private boolean assignRefer(TypeDeclarer l, TypeDeclarer r,
@@ -1347,7 +1307,6 @@ public class SemanticAnalysis {
     private boolean assignValue(TypeDeclarer l, LiteralTypeDeclarer rt) {
         assert l.maybeRefer().none();
 
-        var lit = rt.literal();
         if (rt.isInteger())
             return l instanceof PrimitiveTypeDeclarer ptd
                     && ptd.primitive().isInteger();
@@ -1394,20 +1353,14 @@ public class SemanticAnalysis {
             if (!elOk) return false;
         }
 
-
-        var lLen = calcInteger(l.length().must());
-
-        if (r.literal()) { // Yes: [value] = [literal]
+        if (r.literal()) {
             if (r.element() instanceof VoidTypeDeclarer) return true;
-            // Yes: check index out of bounds
-            if (lLen.value().longValue() < r.len())
+            if (l.len() < r.len()) {
                 return semantic("index out of bound: %s", r.pos());
+            }
             return true;
         }
-
-        // Yes: must both equals-length and same-type-element
-        var rLen = calcInteger(r.length().must());
-        return lLen.equals(rLen);
+        return l.len().longValue() == r.len().longValue();
     }
 
     private boolean assignValue(
@@ -1549,6 +1502,10 @@ public class SemanticAnalysis {
     }
 
     public Statement visit(DeclarationStatement ds) {
+        for (var v : ds.variables()) {
+            enablePhantom = true;
+            v.type().use(this::visit);
+        }
         if (!ds.init().isEmpty()) {
             initVar(ds.variables(), ds.init());
         } else {
@@ -1733,18 +1690,14 @@ public class SemanticAnalysis {
         for (var b : s.branches()) {
             var constants = new ArrayList<Expression>(b.constants().size());
             for (var c : b.constants()) {
-                var o = tryCalcInteger(c);
-                if (o.none()) {
-                    semantic("constants must be const integer: %s", c.pos());
-                    continue;
-                }
-                var old = set.putIfAbsent(o.get(), o.get());
+                var lit = calcInteger(c);
+                var old = set.putIfAbsent(lit, lit);
                 if (old != null) {
                     semantic("duplicate constants '%s': %s <--> %s",
                             c, c.pos(), old.pos());
                     continue;
                 }
-                constants.add(new LiteralExpression(c.pos(), o.get()));
+                constants.add(new LiteralExpression(c.pos(), lit));
             }
             b.constants(constants);
         }
@@ -2993,25 +2946,19 @@ public class SemanticAnalysis {
         return Optional.empty();
     }
 
-    private Optional<IntegerLiteral> tryCalcSize(Expression s) {
-        var g = optimize(s);
-        if (g.a() instanceof LiteralExpression le &&
-                le.literal() instanceof IntegerLiteral il &&
-                il.value().compareTo(BigInteger.ZERO) >= 0) {
-            return Optional.of(il);
-        }
-        return Optional.empty();
-    }
-
     private IntegerLiteral calcInteger(Expression e) {
         var v = tryCalcInteger(e);
         if (v.has()) return v.get();
-        return semantic("require integer: %s", e);
+        return semantic("require integer: %s %s", e, e.pos());
     }
 
     private IntegerLiteral calcSize(Expression e) {
-        var size = tryCalcSize(e);
-        if (size.has()) return size.get();
+        var g = optimize(e);
+        if (g.a() instanceof LiteralExpression le &&
+                le.literal() instanceof IntegerLiteral il &&
+                il.value().compareTo(BigInteger.ZERO) >= 0) {
+            return il;
+        }
         return semantic("require non-negative integer: %s", e);
     }
 

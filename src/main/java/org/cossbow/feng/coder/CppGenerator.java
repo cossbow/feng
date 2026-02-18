@@ -433,9 +433,26 @@ public class CppGenerator {
 
     // type declarer
 
-    public CppGenerator write(ArrayTypeDeclarer td) {
-        unsupported("array");
+    private String arrayName(ArrayTypeDeclarer td) {
+        var s = new StringBuilder("Array");
+        var t = td;
+        while (true) {
+            s.append('_').append(td.len());
+            if (!(t.element() instanceof ArrayTypeDeclarer atd)) {
+                break;
+            }
+            t = atd;
+        }
+        s.append('_').append(t.element().toString());
+        return s.toString();
+    }
 
+    private void writeArrayType() {
+
+    }
+
+    public CppGenerator write(ArrayTypeDeclarer td) {
+        System.out.printf("%s: %s\n", td, arrayName(td));
         write("struct Array_");
         write(td.element());
         if (td.length().has()) {

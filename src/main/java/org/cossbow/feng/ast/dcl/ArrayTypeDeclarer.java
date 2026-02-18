@@ -60,7 +60,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
     private Long len;
     private Long unit;
 
-    public long len() {
+    public Long len() {
         return len;
     }
 
@@ -127,7 +127,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
     @Override
     public int hashCode() {
         int result = element.hashCode();
-        result = 31 * result + length.hashCode();
+        result = 31 * result + Objects.hashCode(len);
         result = 31 * result + refer.hashCode();
         return result;
     }
@@ -139,7 +139,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         if (refer.has())
             return "[" + refer.get() + "]" + element;
         if (length.has())
-            return "[" + length.get() + "]" + element;
+            return "[" + len + "]" + element;
         return "[]" + element;
     }
 
