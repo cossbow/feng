@@ -14,25 +14,15 @@ public class ArrayTypeDeclarer extends TypeDeclarer
     private TypeDeclarer element;
     private Optional<Expression> length;
     private Optional<Refer> refer;
-    private boolean literal;
-
-    public ArrayTypeDeclarer(Position pos,
-                             TypeDeclarer element,
-                             Optional<Expression> length,
-                             Optional<Refer> refer,
-                             boolean literal) {
-        super(pos);
-        this.element = element;
-        this.length = length;
-        this.refer = refer;
-        this.literal = literal;
-    }
 
     public ArrayTypeDeclarer(Position pos,
                              TypeDeclarer element,
                              Optional<Expression> length,
                              Optional<Refer> refer) {
-        this(pos, element, length, refer, false);
+        super(pos);
+        this.element = element;
+        this.length = length;
+        this.refer = refer;
     }
 
     public TypeDeclarer element() {
@@ -49,10 +39,6 @@ public class ArrayTypeDeclarer extends TypeDeclarer
 
     public Optional<Refer> refer() {
         return refer;
-    }
-
-    public boolean literal() {
-        return literal;
     }
 
     //
@@ -112,7 +98,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         if (!(td instanceof ArrayTypeDeclarer t))
             return false;
         return element.equals(t.element) &&
-                (literal || Objects.equals(len, t.len));
+                Objects.equals(len, t.len);
     }
 
     @Override
@@ -120,7 +106,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         if (!(o instanceof ArrayTypeDeclarer t))
             return false;
         return element.equals(t.element) &&
-                (literal || Objects.equals(len, t.len)) &&
+                Objects.equals(len, t.len) &&
                 refer.equals(t.refer);
     }
 

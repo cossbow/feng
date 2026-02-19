@@ -27,6 +27,7 @@ import org.cossbow.feng.visit.SymbolContext;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
@@ -85,7 +86,7 @@ public class SemanticAnalysis {
 
     private Set<GlobalVariable> searchDependencies(
             IdentifierTable<GlobalVariable> global,
-            Expression expr) {
+            Expression expr, Set<Symbol> inited) {
         var deps = new HashSet<GlobalVariable>();
         var q = new ArrayDeque<Expression>();
         q.add(expr);
@@ -93,11 +94,14 @@ public class SemanticAnalysis {
             var c = q.poll();
             switch (c) {
                 case ReferExpression e -> {
-                    if (e.symbol().module().has())
-                        break;
-                    var v = global.tryGet(e.symbol().name());
-                    if (v.has()) {
-                        deps.add(v.get());
+                    if (e.symbol().module().none()) {
+                        var v = global.tryGet(e.symbol().name());
+                        if (v.has()) {
+                            deps.add(v.get());
+                            break;
+                        }
+                    }
+                    if (inited.contains(e.symbol())) {
                         break;
                     }
                     semantic("undeclared or unavailable: %s", e.symbol());
@@ -121,7 +125,8 @@ public class SemanticAnalysis {
 
 
     private Optional<DAGGraph<GlobalVariable>>
-    globalGraph(Collection<GlobalVariable> list) {
+    globalGraph(Collection<GlobalVariable> list,
+                Set<Symbol> inited) {
         if (list.isEmpty()) return Optional.empty();
 
         var gvs = new IdentifierTable<GlobalVariable>(list.size());
@@ -129,33 +134,44 @@ public class SemanticAnalysis {
 
         var edges = new ArrayList<Groups.G2<GlobalVariable, GlobalVariable>>();
         for (var gv : list) {
-            if (gv.value().none()) continue;
-            var deps = searchDependencies(gvs, gv.value().must());
+            if (gv.init().none()) continue;
+            var deps = searchDependencies(gvs, gv.init().must(), inited);
             for (var dep : deps) edges.add(Groups.g2(dep, gv));
         }
         var dag = makeDAG(gvs.values(), edges);
         return Optional.of(dag);
     }
 
-    private void globalVarInferType(IdentifierTable<GlobalVariable> variables) {
-        var dag = globalGraph(variables.values());
+    private void globalVarInferType(
+            IdentifierTable<GlobalVariable> variables) {
+        var dag = globalGraph(variables.values(), Set.of());
         if (dag.none()) return;
         dag.get().bfs(gv -> {
             if (gv.type().has()) {
                 visit(gv.type().must());
                 return;
             }
-            var g = optimize(gv.value().must());
+            var g = optimize(gv.init().must());
             gv.value().set(g.a());
-            gv.type().set(g.b());
+            if (g.b() instanceof LiteralTypeDeclarer lit) {
+                var t = lit.literal().compatible();
+                if (t.none()) {
+                    semantic("can't infer type: %s", gv.pos());
+                    return;
+                }
+                gv.type().set(t.must().declarer(lit.pos()));
+            } else {
+                gv.type().set(g.b());
+            }
         });
     }
 
     private Optional<DAGGraph<GlobalVariable>>
-    globalVarInit(Collection<GlobalVariable> list) {
-        var dag = globalGraph(list);
+    globalVarInit(Collection<GlobalVariable> list,
+                  Set<Symbol> inited) {
+        var dag = globalGraph(list, inited);
         if (dag.none()) return dag;
-        dag.get().bfs(this::visit);
+        dag.get().bfs(gv -> visit(gv, gv.init().get()));
         return dag;
     }
 
@@ -171,8 +187,9 @@ public class SemanticAnalysis {
 
         globalVarInferType(tab.variables);
         var constValues = tab.variables
-                .stream().filter(this::isConstPrimitive).toList();
-        tab.dagConst = globalVarInit(constValues);
+                .stream().filter(this::isConstPrimitive)
+                .collect(Collectors.toSet());
+        tab.dagConst = globalVarInit(constValues, Set.of());
 
         tab.enumList = visitEnum(tab.namedTypes);
         tab.dagStructures = visitStructures(tab.namedTypes);
@@ -180,7 +197,9 @@ public class SemanticAnalysis {
         tab.dagClasses = visitClasses(tab.namedTypes);
 
         var rest = subtract(tab.variables.values(), constValues);
-        tab.dagVars = globalVarInit(rest);
+        tab.dagVars = globalVarInit(rest, constValues.stream()
+                .map(GlobalVariable::symbol)
+                .collect(Collectors.toSet()));
 
         visitFunc(tab.namedTypes);
         tab.dagClasses.use(this::visitMethods);
@@ -189,32 +208,6 @@ public class SemanticAnalysis {
         for (var f : tab.namedFunctions) visit(f);
 
         return s;
-    }
-
-    public Entity visit(GlobalVariable gv) {
-        if (gv.value().none()) {
-            if (gv.declare() != Declare.CONST)
-                return visit((Variable) gv);
-            return semantic("const must init: %s", gv.pos());
-        }
-
-        var g = optimize(gv.value().must());
-        if (gv.type().has()) {
-            if (!assignable(gv.type().must(), g.b(), Optional.of(g.a())))
-                return semantic("can't assign init value: %s",
-                        gv.pos());
-        } else {
-            gv.type().set(g.b());
-        }
-
-        if (!g.a().isFinal()) {
-            return semantic("require final value: %s%s",
-                    gv.name(), gv.pos());
-        }
-        gv.value().set(g.a());
-
-        visit((Variable) gv);
-        return gv;
     }
 
     public Entity visit(Modifier m) {
@@ -301,6 +294,8 @@ public class SemanticAnalysis {
         }
     }
 
+    private final Set<ArrayTypeDeclarer> arrays = new HashSet<>();
+
     public Entity visit(ArrayTypeDeclarer td) {
         visit(td.element());
         if (td.length().has()) {
@@ -309,8 +304,7 @@ public class SemanticAnalysis {
             td.length(Optional.of(new LiteralExpression(l.pos(), s)));
             td.len(s.value().longValue());
         } else {
-            assert td.refer().has();
-            visit(td.refer().get());
+            visit(td.refer().must());
         }
         return td;
     }
@@ -856,9 +850,10 @@ public class SemanticAnalysis {
     }
 
     private void visit(ParameterSet ps, boolean addVar) {
-        for (Variable v : ps.variables()) {
+        for (var v : ps.variables()) {
+            visit(v.modifier());
             enablePhantom = true;
-            visit(v);
+            visit(v.type().must());
             if (addVar) context.putVar(v);
         }
     }
@@ -1353,7 +1348,7 @@ public class SemanticAnalysis {
             if (!elOk) return false;
         }
 
-        if (r.literal()) {
+        if (re.match(e -> e instanceof ArrayExpression)) {
             if (r.element() instanceof VoidTypeDeclarer) return true;
             if (l.len() < r.len()) {
                 return semantic("index out of bound: %s", r.pos());
@@ -1473,53 +1468,54 @@ public class SemanticAnalysis {
             semantic("can't deduce type: %s", td.pos());
     }
 
-    private void initVar(List<Variable> variables, List<Expression> init) {
-        var ig = optimize(init);
-        for (int i = 0; i < variables.size(); i++) {
-            var v = variables.get(i);
-            var t = ig.b().get(i);
-            v.value().set(ig.a().get(i));
-
-            if (v.type().none()) {
-                checkDefinedType(t);
-                // auto set type
-                if (t instanceof LiteralTypeDeclarer ltd) {
-                    var p = ltd.literal().compatible();
-                    if (p.has()) t = p.get().declarer(t.pos());
-                }
-                v.type().set(t);
-            } else {
-                // check type
-                var l = v.type().must();
-                if (!assignable(l, t, v.value().get())) {
-                    semantic("incompatible, %s can't assign %s : %s",
-                            l, t, t.pos());
-                    return;
-                }
+    private void initVar(Variable var, Expression e) {
+        var g = optimize(e);
+        var.value().set(g.a());
+        var t = g.b();
+        if (var.type().has()) {
+            var l = var.type().must();
+            // check type
+            if (assignable(l, t, Optional.of(g.a()))) return;
+            semantic("incompatible, %s can't assign %s : %s",
+                    l, t, t.pos());
+        } else {
+            checkDefinedType(t);
+            // auto set type
+            if (t instanceof LiteralTypeDeclarer ltd) {
+                var p = ltd.literal().compatible();
+                if (p.has()) t = p.get().declarer(t.pos());
             }
+            var.type().set(t);
+        }
+    }
 
+    private void visit(Variable v, Optional<Expression> init) {
+        visit(v.modifier());
+        v.type().use(t -> {
+            enablePhantom = true;
+            visit(t);
+        });
+        if (init.none()) {
+            if (v.declare() == Declare.CONST) {
+                semantic("const must init: %s", v.pos());
+                return;
+            }
+            var v0 = defaultValue(v.type().must(), v);
+            v.defVal().set(v0);
+        } else {
+            initVar(v, init.must());
         }
     }
 
     public Statement visit(DeclarationStatement ds) {
+        var i = 0;
         for (var v : ds.variables()) {
-            enablePhantom = true;
-            v.type().use(this::visit);
-        }
-        if (!ds.init().isEmpty()) {
-            initVar(ds.variables(), ds.init());
-        } else {
-            for (var v : ds.variables()) {
-                if (v.declare() != Declare.CONST)
-                    continue;
-                return semantic("const must init: %s", v.pos());
-            }
-        }
-        for (var v : ds.variables()) {
-            assert v.type().has();
-            enablePhantom = true;
-            visit(v);
+            var init = ds.init().isEmpty() ?
+                    Optional.<Expression>empty() :
+                    Optional.of(ds.init().get(i));
+            visit(v, init);
             context.putVar(v);
+            i++;
         }
         return ds;
     }
@@ -1793,17 +1789,17 @@ public class SemanticAnalysis {
 
     public Statement visit(CatchClause e) {
         context.enterScope();
-        var arg = e.argument();
+        var v = e.argument();
+        visit(v.modifier());
         if (e.typeSet().size() > 1) {
             // TODO: 推导
             return unsupported("catch multi types: %s",
                     e.typeSet().get(1).pos());
         } else {
-            arg.type().set(e.typeSet().getFirst());
+            v.type().set(e.typeSet().getFirst());
         }
-        visit(e.argument());
         for (var td : e.typeSet()) visit(td);
-        context.putVar(e.argument());
+        context.putVar(v);
         visit(e.body());
         context.exitScope(e);
         return e;
@@ -2019,16 +2015,6 @@ public class SemanticAnalysis {
         return e;
     }
 
-    public Entity visit(Variable v) {
-        visit(v.type().must());
-        visit(v.modifier());
-        if (v.value().has()) return v;
-        var t = v.type().must();
-        var dv = defaultValue(t, v);
-        v.defVal().set(dv);
-
-        return v;
-    }
 
     //
     // expression and tuple
@@ -2876,12 +2862,11 @@ public class SemanticAnalysis {
     }
 
     public Groups.G2<Expression, TypeDeclarer> optimize(ArrayExpression e) {
-
         var es = e.elements();
         if (es.isEmpty()) {
             var l = new LiteralExpression(e.pos(), new IntegerLiteral(e.pos(), 0));
             var t = new ArrayTypeDeclarer(e.pos(), new VoidTypeDeclarer(e.pos()),
-                    Optional.of(l), Optional.empty(), true);
+                    Optional.of(l), Optional.empty());
             return Groups.g2(e, t);
         }
 
@@ -2905,7 +2890,7 @@ public class SemanticAnalysis {
         var length = new IntegerLiteral(e.pos(), es.size());
         var le = new LiteralExpression(e.pos(), length);
         var atd = new ArrayTypeDeclarer(e.pos(), type,
-                Optional.of(le), Optional.empty(), true);
+                Optional.of(le), Optional.empty());
         atd.len(es.size());
 
         var n = new ArrayExpression(e.pos(), values);
