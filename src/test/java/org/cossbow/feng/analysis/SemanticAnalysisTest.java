@@ -1490,6 +1490,8 @@ public class SemanticAnalysisTest {
         checkFail(d + "func f(s [&]*B){var r [&]*A = s;}");
         checkFail(d + "func f(s [*]*A){var r [*]*I = s;}");
         checkFail(d + "func f(s [&]*A){var r [&]*I = s;}");
+
+        checkSucc(d + "func f(s [&]*A){var r [3]*I; r[2] = s[0];}");
     }
 
     @Test
@@ -1502,6 +1504,22 @@ public class SemanticAnalysisTest {
         checkFail("func f(i float){var a [4]int; a[i]=0;}");
     }
 
+    @Test
+    public void testArray13() {
+        var d = "class P{} class C:P(I){} interface I{} struct S{} enum E{A,} func F(); ";
+        checkSucc(d + "func f(){var a [2]int = [0]; }");
+        checkSucc(d + "func f(){var a [2]C = [{}]; }");
+        checkSucc(d + "func f(){var a [2]S = [{}]; }");
+        checkSucc(d + "func f(){var a [2]E = [E.A]; }");
+        checkSucc(d + "func f(){var a [2]F = [f]; }");
+        checkSucc(d + "func f(){var a [2]func() = [f]; }");
+
+        checkSucc(d + "func f(){var a [2]*int = [new(int)]; }");
+        checkSucc(d + "func f(){var a [2]*C = [new(C)]; }");
+        checkSucc(d + "func f(){var a [2]*P = [new(C)]; }");
+        checkSucc(d + "func f(){var a [2]*I = [new(C)]; }");
+        checkSucc(d + "func f(){var a [2]*S = [new(S)]; }");
+    }
 
     @Test
     public void testDeclareMultiArray1() {

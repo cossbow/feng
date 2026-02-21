@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
+import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class CppGenerator {
@@ -255,15 +256,6 @@ public class CppGenerator {
         return write(d.ordinal());
     }
 
-    private CppGenerator typeId(TypeDefinition def) {
-//        write("TypeId_");
-//        if (def instanceof PrimitiveDefinition pd) {
-//            return write(pd.primitive());
-//        }
-//        return visit(def.symbol());
-        return write(def.typeId());
-    }
-
     void typesMetadata(Source src) {
         newLine();
         writeComment("define primitives");
@@ -342,6 +334,63 @@ public class CppGenerator {
                     .write(v.name()).write("\"},").newLine();
         }
         write('}').endStmt().newLine();
+    }
+
+    CppGenerator arrayRefer(Refer ref) {
+        var strong = ref.isKind(STRONG);
+        if (strong) {
+            write('S');
+        } else {
+            write('P');
+        }
+        return write('R');
+    }
+
+    CppGenerator arrayElementName(TypeDeclarer td) {
+        if (td instanceof ArrayTypeDeclarer atd) {
+            return arrayElementName(atd);
+        }
+        var r = td.maybeRefer();
+        if (r.has())
+            arrayRefer(r.get()).write('_');
+        if (td instanceof PrimitiveTypeDeclarer ptd) {
+            return write(ptd.primitive());
+        }
+        if (td instanceof FuncTypeDeclarer ftd) {
+            return write("func");
+        }
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            return write(dtd.derivedType());
+        }
+        return unreachable();
+    }
+
+    CppGenerator arrayElementName(ArrayTypeDeclarer td) {
+        var r = td.refer();
+        if (r.has()) {
+            arrayRefer(r.get());
+        } else {
+            write(td.len());
+        }
+        write('_');
+        return arrayElementName(td.element());
+    }
+
+    CppGenerator arrayName(ArrayTypeDeclarer td) {
+        write("Feng$Array_");
+        return arrayElementName(td);
+    }
+
+    void writeArrayDefinition(ArrayTypeDeclarer td) {
+        assert td.refer().none();
+        write("struct ").arrayName(td).write('{').newLine();
+        write(td.element()).write(" values[").write(td.len())
+                .write(']').endStmt();
+        write('}').endStmt();
+    }
+
+    void defineArrays(Definition def) {
+        def.arrays().forEach(this::writeArrayDefinition);
     }
 
     void visitStructures(Source src) {
@@ -433,37 +482,8 @@ public class CppGenerator {
 
     // type declarer
 
-    private String arrayName(ArrayTypeDeclarer td) {
-        var s = new StringBuilder("Array");
-        var t = td;
-        while (true) {
-            s.append('_').append(td.len());
-            if (!(t.element() instanceof ArrayTypeDeclarer atd)) {
-                break;
-            }
-            t = atd;
-        }
-        s.append('_').append(t.element().toString());
-        return s.toString();
-    }
-
-    private void writeArrayType() {
-
-    }
-
     public CppGenerator write(ArrayTypeDeclarer td) {
-        System.out.printf("%s: %s\n", td, arrayName(td));
-        write("struct Array_");
-        write(td.element());
-        if (td.length().has()) {
-            write('[');
-            format("%d", td.len());
-            write(']');
-        } else {
-            unsupported("array reference");
-        }
-
-        return this;
+        return arrayName(td);
     }
 
     private CppGenerator writeRefer(TypeDeclarer td) {
@@ -516,6 +536,7 @@ public class CppGenerator {
     }
 
     public CppGenerator write(StructureDefinition sd) {
+        defineArrays(sd);
         write("struct ");
         write(sd.symbol().name());
         write('{').newLine();
@@ -545,6 +566,7 @@ public class CppGenerator {
 
     void declareInterface(InterfaceDefinition id) {
         if (id.builtin()) return;
+        defineArrays(id);
         write("class ");
         write(id.symbol().name());
         writeParents(id.parts().values());
@@ -570,6 +592,7 @@ public class CppGenerator {
 
     public void declareClass(ClassDefinition cd) {
         if (cd.builtin()) return;
+        defineArrays(cd);
         assert enterClass == null;
         enterClass = cd;
         write("class ");
@@ -694,7 +717,7 @@ public class CppGenerator {
         write("switch (((Object *)this)->feng$classId) {").newLine();
         m.seeOverride(or -> {
             var child = or.master();
-            write("case ").typeId(child).write(':').newLine();
+            write("case ").write(child.id()).write(':').newLine();
             if (hasReturn) write("return ");
             write("((").write(child.symbol()).write("*)this)->");
             if (or.override().isEmpty()) {
@@ -838,6 +861,7 @@ public class CppGenerator {
     }
 
     public void implFunc(FunctionDefinition fd) {
+        defineArrays(fd);
         assert enterFunc == null;
         enterFunc = fd;
         var proc = fd.procedure();

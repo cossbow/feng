@@ -186,18 +186,10 @@ static T *&Feng$dec(T *&p) {
 }
 
 
-template<typename T>
-struct Feng$FixedArray {
-	Feng$Type type;
-	uint32_t size;
-	T elements[0];
-};
-
-template<typename T>
-struct Feng$ReferArray {
-	Feng$Type type;
-	uint32_t size;
-	T elements[0];
+template<typename E>
+struct Feng$ArrayRefer {
+	E *start;
+	int64_t size;
 };
 
 

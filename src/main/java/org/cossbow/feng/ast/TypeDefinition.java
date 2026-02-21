@@ -1,11 +1,8 @@
 package org.cossbow.feng.ast;
 
 import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.util.ErrorUtil;
-
-import java.util.concurrent.atomic.AtomicInteger;
 
 abstract
 public class TypeDefinition extends Definition {
@@ -38,21 +35,6 @@ public class TypeDefinition extends Definition {
         if (!generic().isEmpty())
             return ErrorUtil.unsupported("generic");
         return symbol().hashCode();
-    }
-
-    //
-
-    private final int typeId = TypeIdGenerator.getAndIncrement();
-
-    public int typeId() {
-        return typeId;
-    }
-
-    static final AtomicInteger TypeIdGenerator;
-
-    static {
-        TypeIdGenerator = new AtomicInteger(1);
-        Primitive.INT.type();
     }
 
     //

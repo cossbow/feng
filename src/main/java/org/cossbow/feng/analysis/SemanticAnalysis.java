@@ -182,6 +182,14 @@ public class SemanticAnalysis {
                                 t instanceof LiteralTypeDeclarer);
     }
 
+    private Set<ArrayTypeDeclarer> valueArrayAll = new HashSet<>();
+    private Set<ArrayTypeDeclarer> valueArrays = new LinkedHashSet<>();
+
+    private void collectArray(Definition def) {
+        def.arrays(List.copyOf(valueArrays));
+        valueArrays.clear();
+    }
+
     public Entity visit(Source s) {
         var tab = s.table();
 
@@ -249,6 +257,7 @@ public class SemanticAnalysis {
         } else {
             illegalPhantom(td);
         }
+        td.mappable(mappable(td));
         return switch (td) {
             case ArrayTypeDeclarer ee -> visit(ee);
             case DerivedTypeDeclarer ee -> visit(ee);
@@ -294,8 +303,6 @@ public class SemanticAnalysis {
         }
     }
 
-    private final Set<ArrayTypeDeclarer> arrays = new HashSet<>();
-
     public Entity visit(ArrayTypeDeclarer td) {
         visit(td.element());
         if (td.length().has()) {
@@ -306,6 +313,9 @@ public class SemanticAnalysis {
         } else {
             visit(td.refer().must());
         }
+        // collect value array
+        if (td.refer().none() && valueArrayAll.add(td))
+            valueArrays.add(td);
         return td;
     }
 
@@ -399,6 +409,7 @@ public class SemanticAnalysis {
         var all = new ArrayList<StructureDefinition>(types.size());
         var edges = new ArrayList<Groups.G2<StructureDefinition, StructureDefinition>>();
         for (var def : types) {
+            if (def.builtin()) continue;
             if (!(def instanceof StructureDefinition sd))
                 continue;
             var a = sd.fields().stream()
@@ -426,6 +437,7 @@ public class SemanticAnalysis {
         for (var sf : sd.fields()) {
             visitBitfield(sf);
             visit(sf.type());
+            collectArray(sd);
         }
     }
 
@@ -683,6 +695,7 @@ public class SemanticAnalysis {
 
         for (var f : cd.fields()) visit(f);
 
+        collectArray(cd);
         enterClass = null;
     }
 
@@ -796,6 +809,7 @@ public class SemanticAnalysis {
         }
         all.forEach(def.allMethods::add);
 
+        collectArray(def);
         return def;
     }
 
@@ -808,6 +822,7 @@ public class SemanticAnalysis {
     public Entity visit(PrototypeDefinition pd) {
         visit(pd.generic());
         visit(pd.prototype(), false);
+        collectArray(pd);
         return pd;
     }
 
@@ -817,6 +832,7 @@ public class SemanticAnalysis {
         visit(fd.generic());
         visit(fd.modifier());
         visit(fd.procedure());
+        collectArray(fd);
         return fd;
     }
 
@@ -1329,7 +1345,7 @@ public class SemanticAnalysis {
                 var i = 0;
                 for (var ev : ae.elements()) {
                     if (assignable(l.element(), r.element(),
-                            Optional.of(ev), false)) {
+                            Optional.of(ev), true)) {
                         i++;
                         continue;
                     }
@@ -1476,8 +1492,8 @@ public class SemanticAnalysis {
             var l = var.type().must();
             // check type
             if (assignable(l, t, Optional.of(g.a()))) return;
-            semantic("incompatible, %s can't assign %s : %s",
-                    l, t, t.pos());
+            semantic("incompatible, %s:%s can't assign %s:%s",
+                    l, l.pos(), t, t.pos());
         } else {
             checkDefinedType(t);
             // auto set type
