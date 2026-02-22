@@ -1,10 +1,15 @@
 package org.cossbow.feng.ast;
 
+import org.cossbow.feng.ast.dcl.ArrayTypeDeclarer;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.util.Lazy;
 
-public class GlobalVariable extends Variable {
+import java.util.ArrayList;
+import java.util.List;
+
+public class GlobalVariable extends Variable
+        implements DependValueArray {
     private final Symbol symbol;
     private final Lazy<Expression> init;
 
@@ -21,6 +26,16 @@ public class GlobalVariable extends Variable {
     public Lazy<Expression> init() {
         return init;
     }
+
+    //
+
+    private final List<ArrayTypeDeclarer> arrays = new ArrayList<>();
+
+    public List<ArrayTypeDeclarer> arrays() {
+        return arrays;
+    }
+
+    //
 
     @Override
     public boolean equals(Object o) {

@@ -28,10 +28,6 @@ public class ParameterSet {
         return variables.getValue(i).type().must();
     }
 
-    public Identifier getName(int i) {
-        return variables.getValue(i).name();
-    }
-
     public int size() {
         return variables.size();
     }
@@ -40,9 +36,7 @@ public class ParameterSet {
         return size() == 0;
     }
 
-    public Variable get(Identifier name) {
-        return variables.get(name);
-    }
+
 
 
     @Override

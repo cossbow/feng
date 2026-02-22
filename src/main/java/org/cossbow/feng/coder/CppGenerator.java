@@ -194,8 +194,8 @@ public class CppGenerator {
         writeComment("function definition");
         declareFunctions(src);
 
-        writeComment("global variable");
-        declareGlobalVar(src);
+        writeComment("global const");
+        declareGlobalVar(src.table().dagConst);
 
         writeComment("enum definition");
         visitEnums(src);
@@ -209,14 +209,17 @@ public class CppGenerator {
         src.table().dagClasses.use(dag -> dag.bfs(this::implClass));
         newLine();
 
+        writeComment("global variable");
+        declareGlobalVar(src.table().dagVars);
+
         writeComment("function definition");
         visitFunctions(src.table());
 
         return this;
     }
 
-    void declareGlobalVar(Source src) {
-        src.table().dagVars.use(dag -> {
+    void declareGlobalVar(Optional<DAGGraph<GlobalVariable>> vars) {
+        vars.use(dag -> {
             dag.bfs(this::write);
             newLine();
         });
@@ -377,8 +380,11 @@ public class CppGenerator {
     }
 
     CppGenerator arrayName(ArrayTypeDeclarer td) {
-        write("Feng$Array_");
-        return arrayElementName(td);
+        if (td.refer().none()) {
+            return write("Feng$Array_").arrayElementName(td);
+        }
+        return write("Feng$ArrayRefer<")
+                .write(td.element()).write('>');
     }
 
     void writeArrayDefinition(ArrayTypeDeclarer td) {
@@ -389,8 +395,8 @@ public class CppGenerator {
         write('}').endStmt();
     }
 
-    void defineArrays(Definition def) {
-        def.arrays().forEach(this::writeArrayDefinition);
+    void defineArrays(DependValueArray dva) {
+        dva.arrays().forEach(this::writeArrayDefinition);
     }
 
     void visitStructures(Source src) {
@@ -409,6 +415,7 @@ public class CppGenerator {
     }
 
     void declareFunction(FunctionDefinition fd) {
+        defineArrays(fd);
         write(fd.symbol().name(), fd.procedure().prototype());
         endStmt();
     }
@@ -426,6 +433,7 @@ public class CppGenerator {
     static final String STATIC = "static";
 
     public CppGenerator write(GlobalVariable v) {
+        defineArrays(v);
         write(STATIC);
         write(' ');
         return declareVar(v);
@@ -762,6 +770,7 @@ public class CppGenerator {
     }
 
     public void implMethod(ClassMethod cm) {
+        defineArrays(cm.func());
         assert enterClass != null;
         assert enterMethod == null;
         enterMethod = cm;
@@ -831,11 +840,11 @@ public class CppGenerator {
     }
 
     CppGenerator writeArgs(ParameterSet ps) {
-        var size = ps.size();
-        for (int i = 0; i < size; i++) {
-            if (i > 0) write(COMMA);
-            write(ps.getName(i));
-            i++;
+        var first = true;
+        for (var v : ps.variables()) {
+            if (first) first = false;
+            else write(COMMA);
+            varName(v);
         }
         return this;
     }
@@ -861,7 +870,6 @@ public class CppGenerator {
     }
 
     public void implFunc(FunctionDefinition fd) {
-        defineArrays(fd);
         assert enterFunc == null;
         enterFunc = fd;
         var proc = fd.procedure();
@@ -1350,6 +1358,11 @@ public class CppGenerator {
     }
 
     public CppGenerator write(LiteralExpression e) {
+        var rt = e.resultType.must();
+        if (rt instanceof ArrayTypeDeclarer atd
+                && atd.refer().has()) {
+            return write("{}");
+        }
         write(e.literal());
         return this;
     }
@@ -1427,7 +1440,13 @@ public class CppGenerator {
                     .fieldInit(cd, e.arg()).write(')');
         }
 
-        write("Feng$newMem<").write(def.symbol()).write(">(");
+        write("Feng$newMem<");
+        if (def instanceof PrimitiveDefinition pd) {
+            write(pd.primitive());
+        } else {
+            write(def.symbol());
+        }
+        write(">(");
         if (def instanceof StructureDefinition) {
             return fieldInit(def, e.arg()).write(')');
         }

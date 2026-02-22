@@ -142,6 +142,30 @@ public class SemanticAnalysis {
         return Optional.of(dag);
     }
 
+    private TypeDeclarer fromLiteral(TypeDeclarer td) {
+        if (td instanceof LiteralTypeDeclarer ltd) {
+            var p = ltd.literal().compatible();
+            if (p.has())
+                return p.must().declarer(td.pos());
+
+            return semantic("auto type-infer can't support %s: %s",
+                    td, td.pos());
+        } else if (td instanceof ArrayTypeDeclarer atd) {
+            var ntd = fromLiteral(atd.element());
+            var na = new ArrayTypeDeclarer(atd.pos(), ntd,
+                    atd.length(), atd.refer());
+            na.len(atd.len());
+            na.unit(atd.unit());
+            visit(na);
+            return na;
+        } else if (td instanceof ObjectTypeDeclarer ||
+                td instanceof VoidTypeDeclarer) {
+            return semantic("can't infer type from %s: %s",
+                    td, td.pos());
+        }
+        return td;
+    }
+
     private void globalVarInferType(
             IdentifierTable<GlobalVariable> variables) {
         var dag = globalGraph(variables.values(), Set.of());
@@ -149,20 +173,13 @@ public class SemanticAnalysis {
         dag.get().bfs(gv -> {
             if (gv.type().has()) {
                 visit(gv.type().must());
+                collectArray(gv);
                 return;
             }
             var g = optimize(gv.init().must());
             gv.value().set(g.a());
-            if (g.b() instanceof LiteralTypeDeclarer lit) {
-                var t = lit.literal().compatible();
-                if (t.none()) {
-                    semantic("can't infer type: %s", gv.pos());
-                    return;
-                }
-                gv.type().set(t.must().declarer(lit.pos()));
-            } else {
-                gv.type().set(g.b());
-            }
+            gv.type().set(fromLiteral(g.b()));
+            collectArray(gv);
         });
     }
 
@@ -185,8 +202,8 @@ public class SemanticAnalysis {
     private Set<ArrayTypeDeclarer> valueArrayAll = new HashSet<>();
     private Set<ArrayTypeDeclarer> valueArrays = new LinkedHashSet<>();
 
-    private void collectArray(Definition def) {
-        def.arrays(List.copyOf(valueArrays));
+    private void collectArray(DependValueArray dva) {
+        dva.arrays().addAll(valueArrays);
         valueArrays.clear();
     }
 
@@ -668,15 +685,15 @@ public class SemanticAnalysis {
         }
         if (all.isEmpty()) return Optional.empty();
         var dag = makeDAG(all, edges);
+        dag.bfs(this::visitClass);
         dag.bfs(this::checkAllInherits);
         dag.bfs(this::checkImplList);
-        dag.bfs(this::visitClass);
         dag.bfs(cd -> new UpdaterAnalyzer().analyse(cd));
         return Optional.of(dag);
     }
 
     private void visitMethods(DAGGraph<ClassDefinition> dag) {
-        dag.bfs(this::visitMethod);
+        dag.bfs(this::implMethod);
     }
 
     private ClassDefinition enterClass;
@@ -695,6 +712,8 @@ public class SemanticAnalysis {
 
         for (var f : cd.fields()) visit(f);
 
+        declareMethod(cd);
+
         collectArray(cd);
         enterClass = null;
     }
@@ -705,7 +724,15 @@ public class SemanticAnalysis {
         return cf;
     }
 
-    public void visitMethod(ClassDefinition cd) {
+    public void declareMethod(ClassDefinition cd) {
+        for (var m : cd.methods()) {
+            visit(m.generic());
+            visit(m.func().modifier());
+            visit(m.func().prototype(), false);
+        }
+    }
+
+    public void implMethod(ClassDefinition cd) {
         assert enterClass == null;
         enterClass = cd;
 
@@ -720,12 +747,12 @@ public class SemanticAnalysis {
     public Entity visit(ClassMethod cm) {
         assert enterClass != null;
         assert enterMethod == null;
+
         enterMethod = cm;
-        if (!cm.func().generic().isEmpty())
-            unsupported("generic");
-        visit(cm.func().modifier());
         visit(cm.func().procedure());
         enterMethod = null;
+
+        collectArray(cm.func());
         return cm;
     }
 
@@ -1473,15 +1500,8 @@ public class SemanticAnalysis {
 
     public Statement visit(AssignmentsStatement as) {
         var list = as.list().stream().map(this::visit).toList();
-        return new AssignmentsStatement(as.pos(), list);
-    }
-
-    private void checkDefinedType(TypeDeclarer td) {
-        if (td instanceof ArrayTypeDeclarer atd)
-            td = atd.element();
-        if (td instanceof ObjectTypeDeclarer ||
-                td instanceof VoidTypeDeclarer)
-            semantic("can't deduce type: %s", td.pos());
+        as.list(list);
+        return as;
     }
 
     private void initVar(Variable var, Expression e) {
@@ -1495,12 +1515,7 @@ public class SemanticAnalysis {
             semantic("incompatible, %s:%s can't assign %s:%s",
                     l, l.pos(), t, t.pos());
         } else {
-            checkDefinedType(t);
-            // auto set type
-            if (t instanceof LiteralTypeDeclarer ltd) {
-                var p = ltd.literal().compatible();
-                if (p.has()) t = p.get().declarer(t.pos());
-            }
+            t = fromLiteral(t);
             var.type().set(t);
         }
     }

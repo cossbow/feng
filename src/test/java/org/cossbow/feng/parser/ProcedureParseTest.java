@@ -67,7 +67,7 @@ public class ProcedureParseTest extends BaseParseTest {
             }
             var code = "(%s)".formatted(String.join(",", paramsSet));
             var prototype = parsePrototype(code);
-            var params = (ParameterSet) prototype.parameterSet();
+            var params = prototype.parameterSet().variables();
             Assertions.assertEquals(expectParams.size(), params.size());
             for (var expect : expectParams) {
                 var variable = params.get(expect.a());
@@ -85,7 +85,7 @@ public class ProcedureParseTest extends BaseParseTest {
         for (int size = 1; size <= 16; size++) {
             var expectTypes = anyNames(RandTypeSymbol, 12, size);
             var prototype = parsePrototype("(%s)".formatted(idList(expectTypes)));
-            var params = (ParameterSet) prototype.parameterSet();
+            var params = prototype.parameterSet();
             Assertions.assertEquals(expectTypes.size(), params.size());
             for (int i = 0; i < size; i++) {
                 Assertions.assertEquals(expectTypes.get(i),

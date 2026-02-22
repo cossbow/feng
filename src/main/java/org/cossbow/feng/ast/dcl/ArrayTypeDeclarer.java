@@ -105,16 +105,18 @@ public class ArrayTypeDeclarer extends TypeDeclarer
     public boolean equals(Object o) {
         if (!(o instanceof ArrayTypeDeclarer t))
             return false;
-        return element.equals(t.element) &&
-                Objects.equals(len, t.len) &&
-                refer.equals(t.refer);
+        return element.equals(t.element) && (refer.none()
+                ? len.equals(t.len)
+                : refer.equals(t.refer));
     }
 
     @Override
     public int hashCode() {
         int result = element.hashCode();
-        result = 31 * result + Objects.hashCode(len);
-        result = 31 * result + refer.hashCode();
+        if (refer.none())
+            result = 31 * result + len.hashCode();
+        else
+            result = 31 * result + refer.hashCode();
         return result;
     }
 

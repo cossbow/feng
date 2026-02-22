@@ -155,6 +155,20 @@ public class SemanticAnalysisTest {
     }
 
     @Test
+    public void testClassOverride5() {
+        var def = "class A{ func f(s [2]int) {} } ";
+        checkSucc(def + "class B:A{ func f(s [2]int) {} }");
+        checkFail(def + "class B:A{ func f(s [3]int) {} }");
+    }
+
+    @Test
+    public void testClassOverride6() {
+        var def = "class A{ func f() [2]int {return [];} } ";
+        checkSucc(def + "class B:A{ func f() [2]int {return [];} }");
+        checkFail(def + "class B:A{ func f() [3]int {return [];} }");
+    }
+
+    @Test
     public void testClassResource1() {
         var def = "class A{func release(){}} ";
         checkSucc(def + "func f(a *A) {}");
@@ -245,10 +259,18 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testClassImpl4() {
-        var def = "interface I { get() int; } ";
-        checkFail(def + "class F (I) {}");
-        checkSucc(def + "class F (I) { func get() int { return 0; } }");
-        checkFail(def + "class F (I) { func get() int8 { return 0; } }");
+        var d = "interface I { get() int; } ";
+        checkFail(d + "class F (I) {}");
+        checkSucc(d + "class F (I) { func get() int { return 0; } }");
+        checkFail(d + "class F (I) { func get() int8 { return 0; } }");
+
+        d = "interface I { get() [2]int; } ";
+        checkSucc(d + "class F (I) { func get() [2]int { return []; } }");
+        checkFail(d + "class F (I) { func get() [3]int { return []; } }");
+
+        d = "interface I { get([2]int); } ";
+        checkSucc(d + "class F (I) { func get([2]int) {} }");
+        checkFail(d + "class F (I) { func get([3]int) {} }");
     }
 
     @Test
