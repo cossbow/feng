@@ -147,7 +147,15 @@ public class SemanticAnalysis {
             var p = ltd.literal().compatible();
             if (p.has())
                 return p.must().declarer(td.pos());
-
+            if (ltd.literal() instanceof StringLiteral sl) {
+                var etd = Primitive.UINT8.declarer(sl.pos());
+                var ref = new Refer(sl.pos(), STRONG, false, true);
+                var atd = new ArrayTypeDeclarer(td.pos(), etd,
+                        Optional.empty(), Optional.of(ref));
+                atd.len(sl.length());
+                atd.unit((long) Primitive.UINT8.size());
+                return atd;
+            }
             return semantic("auto type-infer can't support %s: %s",
                     td, td.pos());
         } else if (td instanceof ArrayTypeDeclarer atd) {
@@ -274,7 +282,6 @@ public class SemanticAnalysis {
         } else {
             illegalPhantom(td);
         }
-        td.mappable(mappable(td));
         return switch (td) {
             case ArrayTypeDeclarer ee -> visit(ee);
             case DerivedTypeDeclarer ee -> visit(ee);
@@ -1305,8 +1312,11 @@ public class SemanticAnalysis {
         }
     }
 
+    private int arrayReferDim = 0;
+
     private boolean assignRefer(TypeDeclarer l, TypeDeclarer r,
-                                Optional<Expression> re, boolean covariant) {
+                                Optional<Expression> re,
+                                boolean covariant) {
         var lRef = l.maybeRefer();
         assert lRef.has();
 
@@ -1317,7 +1327,8 @@ public class SemanticAnalysis {
         if (!referable(lRef.get(), r.maybeRefer(), re))
             return false;
 
-        if (mappable(l) && mappable(r)) {
+        if (mappable(l, arrayReferDim > 0) &&
+                mappable(r, arrayReferDim > 0)) {
             if (checkBounds(l, r))
                 return true;
 
@@ -1334,8 +1345,18 @@ public class SemanticAnalysis {
         // Arrays
         if (r instanceof ArrayTypeDeclarer ra) {
             if (l instanceof ArrayTypeDeclarer la) {
-                return assignable(la.element(), ra.element(),
-                        re, false);
+                if (la.element().equals(ra.element())) {
+                    return true;
+                }
+                if (la.element() instanceof DerivedTypeDeclarer ldt &&
+                        ra.element() instanceof DerivedTypeDeclarer rdt) {
+                    return assignable(ldt, rdt, false);
+                }
+//                arrayReferDim++;
+//                var a = assignable(la.element(), ra.element(),
+//                        re, false);
+//                arrayReferDim--;
+//                return a;
             }
         }
 
@@ -1515,7 +1536,11 @@ public class SemanticAnalysis {
             semantic("incompatible, %s:%s can't assign %s:%s",
                     l, l.pos(), t, t.pos());
         } else {
-            t = fromLiteral(t);
+            if (g.a() instanceof ArrayExpression ||
+                    g.a() instanceof ObjectExpression ||
+                    g.a() instanceof LiteralExpression) {
+                t = fromLiteral(t);
+            }
             var.type().set(t);
         }
     }
@@ -2092,7 +2117,6 @@ public class SemanticAnalysis {
                     ee.variable().type().must());
             case null, default -> unreachable();
         };
-        g.b().mappable(mappable(g.b()));
         g.a().resultType.set(g.b());
         g.a().expectCallable(e.expectCallable());
         return g;

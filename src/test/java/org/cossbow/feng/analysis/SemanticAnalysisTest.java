@@ -981,7 +981,7 @@ public class SemanticAnalysisTest {
     @Test
     public void testLiteral6() {
         checkSucc("func f() { const a=\"true\"; const c [*]uint8 = a; }");
-        checkFail("func f() { const a=\"true\"; const c [&]uint8 = a; }");
+        checkSucc("func f() { const a=\"true\"; const c [&]uint8 = a; }");
     }
 
     //
@@ -1885,6 +1885,20 @@ public class SemanticAnalysisTest {
         checkFail(d + "func f(x *B){ const y [*]*B = x;}");
         checkSucc(d + "func f(x *B){ const y [*]C = x;}");
         checkFail(d + "func f(x *B){ const y [*]*C = x;}");
+    }
+
+    @Test
+    public void testMappable5() {
+        checkSucc("func f(a [*]*int){var v [*]*int = a;}");
+        checkFail("func f(a [*]*int){var v [*]*int8 = a;}");
+        var d = "struct S{} interface I{} class C{} enum E{T,} func F(); ";
+        checkFail(d + "func f(a [*]S){var v [*]*int = a;}");
+        checkFail(d + "func f(a [*]*S){var v [*]*int = a;}");
+        checkFail(d + "func f(a [*]*I){var v [*]*int = a;}");
+        checkFail(d + "func f(a [*]C){var v [*]*int = a;}");
+        checkFail(d + "func f(a [*]*C){var v [*]*int = a;}");
+        checkFail(d + "func f(a [*]E){var v [*]*int = a;}");
+        checkFail(d + "func f(a [*]F){var v [*]*int = a;}");
     }
 
     //

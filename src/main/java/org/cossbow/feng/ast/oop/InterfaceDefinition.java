@@ -43,7 +43,7 @@ public class InterfaceDefinition extends ObjectDefinition {
 
     //
 
-    private final int id = IdGenerator.incrementAndGet();
+    private final int id = IdGenerator.getAndIncrement();
     public final List<InterfaceDefinition> partDefs = new ArrayList<>();
     public final IdentifierTable<InterfaceMethod> allMethods = new IdentifierTable<>();
 

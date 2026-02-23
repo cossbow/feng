@@ -161,15 +161,18 @@ public class CppGenerator {
             write("#define FENG_MAX_ENUM_NAME_LEN ").write(l + 1).newLine();
         });
 
-        var ma = src.table().dagClasses.must().all().stream()
-                .mapToInt(d -> d.ancestors().size()).max();
-        ma.ifPresent(s -> {
-            write("#define FENG_MAX_INHERIT_SIZE ").write(s).newLine().newLine();
-        });
-        var mi = src.table().dagClasses.must().all().stream()
-                .mapToInt(d -> d.allImpls().size()).max();
-        mi.ifPresent(s -> {
-            write("#define FENG_MAX_IMPLS_SIZE ").write(s).newLine().newLine();
+        write("#define FENG_MAX_CLASS_NUM ").write(ClassDefinition.maxId()).newLine();
+        src.table().dagClasses.use(cg -> {
+            var ma = cg.all().stream()
+                    .mapToInt(d -> d.ancestors().size()).max();
+            ma.ifPresent(s -> {
+                write("#define FENG_MAX_INHERIT_SIZE ").write(s).newLine();
+            });
+            var mi = cg.all().stream()
+                    .mapToInt(d -> d.allImpls().size()).max();
+            mi.ifPresent(s -> {
+                write("#define FENG_MAX_IMPLS_SIZE ").write(s).newLine();
+            });
         });
 
 /*
@@ -239,6 +242,9 @@ public class CppGenerator {
     private TypeDefinition findType(TypeDeclarer td) {
         if (td instanceof DerivedTypeDeclarer dtd) {
             return findType(dtd.derivedType());
+        }
+        if (td instanceof PrimitiveTypeDeclarer ptd) {
+            return ptd.primitive().type();
         }
         return unreachable();
     }
@@ -441,8 +447,21 @@ public class CppGenerator {
 
     private CppGenerator castPtr(
             Expression v, TypeDeclarer t) {
-        if (t.baseTypeSame(v.resultType.must()))
-            return write(v);
+        var rt = v.resultType.must();
+        if (t.baseTypeSame(rt)) return write(v);
+        if (t instanceof ArrayTypeDeclarer at) {
+            if (rt instanceof ArrayTypeDeclarer art) {
+                return write("Feng$mapA2A<").write(art.element()).write(',')
+                        .write(at.element()).write(">(").write(v).write(')');
+            } else {
+                return write("Feng$mapU2A<").baseTypeSymbol(rt).write(',')
+                        .write(at.element()).write(">(").write(v).write(')');
+            }
+        }
+        if (rt instanceof ArrayTypeDeclarer art) {
+            return write("Feng$mapA2U<").write(art.element()).write(',')
+                    .baseTypeSymbol(t).write(">(").write(v).write(')');
+        }
         return write("((").write(t).write(')')
                 .write(v).write(')');
     }
@@ -475,7 +494,12 @@ public class CppGenerator {
             return castPtr(v, t);
         }
 
-        return write("Feng$inc(").castPtr(v, t).write(')');
+        if (t instanceof ArrayTypeDeclarer) {
+            write("Feng$incAR(");
+        } else {
+            write("Feng$inc(");
+        }
+        return castPtr(v, t).write(')');
     }
 
     private CppGenerator varName(Variable v) {
@@ -506,7 +530,6 @@ public class CppGenerator {
         }
         return write(td.derivedType()).writeRefer(td);
     }
-
 
     public CppGenerator write(Primitive p) {
         return write(CommonUtil.upperFirst(p.code));
@@ -634,11 +657,12 @@ public class CppGenerator {
     }
 
     private void classRelation(DAGGraph<ClassDefinition> dag) {
-        write("const Feng$ClassRelation Feng$classRelations[] = {").newLine();
+        write("const Feng$ClassRelation Feng$classRelations[FENG_MAX_CLASS_NUM] = {")
+                .newLine();
 
         for (var cd : sortedById(dag.all())) {
             writeComment(cd.toString());
-            write("[").write(cd.id()).write("] = {");
+            write('{');
 
             write(".inheritsSize=").write(cd.ancestors().size());
             write(", .implsSize=").write(cd.allImpls().size());
@@ -667,8 +691,14 @@ public class CppGenerator {
             write(pdt.symbol()).write("::Feng$share()").endStmt();
         }
         for (var cf : cd.fields()) {
-            if (cf.type().maybeRefer().has()) {
-                write("Feng$inc(").thisField(cf).write(')').endStmt();
+            var ft = cf.type();
+            if (ft.maybeRefer().has()) {
+                if (ft instanceof ArrayTypeDeclarer) {
+                    write("Feng$incAR(");
+                } else {
+                    write("Feng$inc(");
+                }
+                thisField(cf).write(')').endStmt();
                 continue;
             }
             if (findClass(cf.type()).has()) {
@@ -689,8 +719,14 @@ public class CppGenerator {
             write(pdt.symbol()).write("::Feng$release()").endStmt();
         }
         for (var cf : cd.fields()) {
-            if (cf.type().maybeRefer().has()) {
-                write("Feng$dec(").thisField(cf).write(')').endStmt();
+            var ft = cf.type();
+            if (ft.maybeRefer().has()) {
+                if (ft instanceof ArrayTypeDeclarer) {
+                    write("Feng$decAR(");
+                } else {
+                    write("Feng$dec(");
+                }
+                thisField(cf).write(')').endStmt();
                 continue;
             }
             if (findClass(cf.type()).has()) {
@@ -798,19 +834,20 @@ public class CppGenerator {
         return write(v).endStmt();
     }
 
-    public CppGenerator write(DefinedType e) {
-        return switch (e) {
-            case DerivedType t -> write(t);
-            case PrimitiveType t -> write(t);
-            case null, default -> unreachable();
-        };
-    }
-
     public CppGenerator write(DerivedType dt) {
         write(dt.symbol());
         if (!dt.generic().isEmpty())
             unsupported("泛型未实现");
         return this;
+    }
+
+    private CppGenerator baseTypeSymbol(TypeDeclarer td) {
+        if (td instanceof PrimitiveTypeDeclarer ptd) {
+            return write(ptd.primitive());
+        } else if (td instanceof DerivedTypeDeclarer dtd) {
+            return write(dtd.derivedType());
+        }
+        return unreachable();
     }
 
     public CppGenerator write(PrimitiveType dt) {
@@ -957,7 +994,12 @@ public class CppGenerator {
         var r = t.maybeRefer();
         if (r.has()) {
             if (r.get().isKind(PHANTOM)) return this;
-            return write("Feng$dec(").varName(v).write(')').endStmt();
+            if (t instanceof ArrayTypeDeclarer) {
+                write("Feng$decAR(");
+            } else {
+                write("Feng$dec(");
+            }
+            return varName(v).write(')').endStmt();
         }
         var cdo = findClass(t);
         if (cdo.none()) return this;
@@ -1062,9 +1104,19 @@ public class CppGenerator {
             if (r.get().isKind(PHANTOM)) {
                 return write(o).write(" = ").castPtr(v, t);
             }
-            write("Feng$dec(").write(o).write(") = ");
+            if (t instanceof ArrayTypeDeclarer) {
+                write("Feng$decAR(");
+            } else {
+                write("Feng$dec(");
+            }
+            write(o).write(") = ");
             if (v.unbound()) return write(v);
-            return write("Feng$inc(").write(v).write(')');
+            if (t instanceof ArrayTypeDeclarer) {
+                write("Feng$incAR(");
+            } else {
+                write("Feng$inc(");
+            }
+            return castPtr(v, t).write(')');
         }
 
         var cd = findClass(t);
@@ -1458,7 +1510,13 @@ public class CppGenerator {
     }
 
     private CppGenerator visitNew(NewArrayType t, NewExpression e) {
-        return unsupported("new array");
+        write("Feng$newArray<").write(t.element())
+                .write(">(").write(t.length());
+        e.arg().use(a -> {
+            // TODO
+            // write(',').write(a);
+        });
+        return write(')');
     }
 
     public CppGenerator write(NewExpression e) {

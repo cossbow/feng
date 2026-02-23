@@ -67,7 +67,7 @@ public class ClassDefinition extends ObjectDefinition {
 
     //
 
-    private final int id = IdGenerator.incrementAndGet();
+    private final int id = IdGenerator.getAndIncrement();
     private final Lazy<ClassDefinition> parent = Lazy.nil();
     private final List<ClassDefinition> ancestors = new ArrayList<>();
     private final List<InterfaceDefinition> allImpls = new ArrayList<>();
@@ -112,6 +112,10 @@ public class ClassDefinition extends ObjectDefinition {
     // static
 
     private static final AtomicInteger IdGenerator = new AtomicInteger(0);
+
+    public static int maxId() {
+        return IdGenerator.get();
+    }
 
     public static final Identifier ReleaseName = new Identifier(
             Position.ZERO, "release");

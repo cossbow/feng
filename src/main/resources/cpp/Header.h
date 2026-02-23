@@ -10,6 +10,12 @@
 class DoubleFree : public std::exception {
 };
 
+class OutOfBounds : public std::exception {
+};
+
+class NegativeInteger : public std::exception {
+};
+
 class NilPointer : public std::exception {
 };
 
@@ -63,6 +69,9 @@ struct Feng$Enum {
 	char name[FENG_MAX_ENUM_NAME_LEN];
 };
 
+#ifndef FENG_MAX_CLASS_NUM
+#define FENG_MAX_CLASS_NUM 1
+#endif
 #ifndef FENG_MAX_INHERIT_SIZE
 #define FENG_MAX_INHERIT_SIZE 1
 #endif
@@ -92,7 +101,7 @@ struct Feng$ClassRelation {
 	}
 };
 
-extern const Feng$ClassRelation Feng$classRelations[];
+extern const Feng$ClassRelation Feng$classRelations[FENG_MAX_CLASS_NUM];
 
 template<class T>
 static T *Feng$inherit(void *p, uint32_t classId) {
@@ -186,11 +195,62 @@ static T *&Feng$dec(T *&p) {
 }
 
 
-template<typename E>
+template <typename E>
 struct Feng$ArrayRefer {
-	E *start;
-	int64_t size;
+    E* start;
+    int64_t len;
+
+    E& operator[](int64_t index) {
+        if (index < 0 || index >= len)
+            throw OutOfBounds();
+        return start[index];
+    }
 };
 
+template <typename E>
+static Feng$ArrayRefer<E> Feng$newArray(int64_t len) {
+    if (len < 0)
+        throw NegativeInteger();
+    E* p = (E*)Feng$alloc(sizeof(E) * len, false);
+    return {.start = p, .len = len};
+}
+
+template <typename E>
+static Feng$ArrayRefer<E>& Feng$incAR(Feng$ArrayRefer<E> &ar) {
+    Feng$inc(ar.start);
+    return ar;
+}
+
+template <typename E>
+static Feng$ArrayRefer<E>&& Feng$incAR(Feng$ArrayRefer<E>&& ar) {
+    Feng$inc(ar.start);
+    return ar;
+}
+
+template <typename E>
+static Feng$ArrayRefer<E>& Feng$decAR(Feng$ArrayRefer<E>& ar) {
+    Feng$dec(ar.start);
+    return ar;
+}
+
+template <typename S, typename R>
+static Feng$ArrayRefer<R> Feng$mapA2A(Feng$ArrayRefer<S> s) {
+    int64_t len = (sizeof(S) * s.len) / sizeof(R);
+    return (Feng$ArrayRefer<R>){.start = (R*)s.start, .len = len};
+}
+
+template <typename S, typename R>
+static Feng$ArrayRefer<R> Feng$mapU2A(S *s) {
+    int64_t len = sizeof(S) / sizeof(R);
+    return (Feng$ArrayRefer<R>){.start = (R*)s, .len = len};
+}
+
+template <typename S, typename R>
+static R* Feng$mapA2U(Feng$ArrayRefer<S>& s) {
+    if (sizeof(R) > (sizeof(S) * s.len)) {
+        throw OutOfBounds();
+    }
+    return (R *) s.start;
+}
 
 #endif //FENG_HEADER_H
