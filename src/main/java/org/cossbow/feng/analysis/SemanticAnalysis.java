@@ -181,13 +181,11 @@ public class SemanticAnalysis {
         dag.get().bfs(gv -> {
             if (gv.type().has()) {
                 visit(gv.type().must());
-                collectArray(gv);
                 return;
             }
             var g = optimize(gv.init().must());
             gv.value().set(g.a());
             gv.type().set(fromLiteral(g.b()));
-            collectArray(gv);
         });
     }
 
@@ -207,13 +205,6 @@ public class SemanticAnalysis {
                                 t instanceof LiteralTypeDeclarer);
     }
 
-    private Set<ArrayTypeDeclarer> valueArrayAll = new HashSet<>();
-    private Set<ArrayTypeDeclarer> valueArrays = new LinkedHashSet<>();
-
-    private void collectArray(DependValueArray dva) {
-        dva.arrays().addAll(valueArrays);
-        valueArrays.clear();
-    }
 
     public Entity visit(Source s) {
         var tab = s.table();
@@ -337,9 +328,6 @@ public class SemanticAnalysis {
         } else {
             visit(td.refer().must());
         }
-        // collect value array
-        if (td.refer().none() && valueArrayAll.add(td))
-            valueArrays.add(td);
         return td;
     }
 
@@ -461,7 +449,6 @@ public class SemanticAnalysis {
         for (var sf : sd.fields()) {
             visitBitfield(sf);
             visit(sf.type());
-            collectArray(sd);
         }
     }
 
@@ -721,7 +708,6 @@ public class SemanticAnalysis {
 
         declareMethod(cd);
 
-        collectArray(cd);
         enterClass = null;
     }
 
@@ -759,7 +745,6 @@ public class SemanticAnalysis {
         visit(cm.func().procedure());
         enterMethod = null;
 
-        collectArray(cm.func());
         return cm;
     }
 
@@ -843,7 +828,6 @@ public class SemanticAnalysis {
         }
         all.forEach(def.allMethods::add);
 
-        collectArray(def);
         return def;
     }
 
@@ -856,7 +840,6 @@ public class SemanticAnalysis {
     public Entity visit(PrototypeDefinition pd) {
         visit(pd.generic());
         visit(pd.prototype(), false);
-        collectArray(pd);
         return pd;
     }
 
@@ -866,7 +849,6 @@ public class SemanticAnalysis {
         visit(fd.generic());
         visit(fd.modifier());
         visit(fd.procedure());
-        collectArray(fd);
         return fd;
     }
 
@@ -2573,7 +2555,8 @@ public class SemanticAnalysis {
             }
             var ie = ig.a();
             if (idx != null) {
-                ie = new LiteralExpression(e.pos(), idx);
+                ie = new LiteralExpression(e.index().pos(), idx);
+                ie.resultType.set(new LiteralTypeDeclarer(ie.pos(), idx));
             }
             var n = new IndexOfExpression(e.pos(), a, ie);
             return Groups.g2(n, atd.element());
@@ -2606,7 +2589,8 @@ public class SemanticAnalysis {
     }
 
     private Groups.G2<Expression, TypeDeclarer>
-    optimizeArray(Expression s, ArrayTypeDeclarer atd, Identifier name) {
+    optimizeArray(PrimaryExpression s, ArrayTypeDeclarer atd,
+                  Identifier name) {
         var af = atd.getField(name);
         if (af.has()) {
             var td = Primitive.INT.declarer(s.pos());
@@ -2615,7 +2599,7 @@ public class SemanticAnalysis {
                 var n = new LiteralExpression(s.pos(), lit);
                 return Groups.g2(n, td);
             }
-            var n = new ArrayLenExpression(s.pos(), atd);
+            var n = new ArrayLenExpression(s.pos(), s, atd);
             return Groups.g2(n, td);
         }
         return semantic("array has no field %s: %s",
@@ -2707,13 +2691,13 @@ public class SemanticAnalysis {
             return optimizeEnum(e, ed);
         }
 
+        var s = (PrimaryExpression) sg.a();
         if (sg.b() instanceof ArrayTypeDeclarer atd) {
-            return optimizeArray(sg.a(), atd, e.member());
+            return optimizeArray(s, atd, e.member());
         }
 
         if (sg.b() instanceof DerivedTypeDeclarer dtd) {
             var def = visit(dtd.derivedType());
-            var s = (PrimaryExpression) sg.a();
             s.expectCallable(e.expectCallable());
             return optimizeMember(s, def, e.member(), e.generic());
         }
@@ -2925,7 +2909,7 @@ public class SemanticAnalysis {
             return Groups.g2(e, t);
         }
 
-        var values = new ArrayList<Expression>(e.elements().size());
+        var values = new ArrayList<Expression>(e.size());
         TypeDeclarer type = null;
         var i = 0;
         for (var v : es) {
@@ -3063,7 +3047,7 @@ public class SemanticAnalysis {
                     ee.primitive(), c);
         }
         if (e instanceof ArrayExpression ee) {
-            var list = new ArrayList<Expression>(ee.elements().size());
+            var list = new ArrayList<Expression>(ee.size());
             for (var el : ee.elements()) {
                 list.add(splitChain(el, s));
             }

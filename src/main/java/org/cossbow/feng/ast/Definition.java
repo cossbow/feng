@@ -1,15 +1,10 @@
 package org.cossbow.feng.ast;
 
 import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.dcl.ArrayTypeDeclarer;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
-import java.util.ArrayList;
-import java.util.List;
-
 abstract
-public class Definition extends Entity
-        implements DependValueArray {
+public class Definition extends Entity {
     private Modifier modifier;
     private Symbol symbol;
     private TypeParameters generic;
@@ -39,7 +34,6 @@ public class Definition extends Entity
     //
 
     private volatile boolean builtin;
-    private final List<ArrayTypeDeclarer> arrays = new ArrayList<>();
 
     public boolean builtin() {
         return builtin;
@@ -47,10 +41,6 @@ public class Definition extends Entity
 
     public void builtin(boolean builtin) {
         this.builtin = builtin;
-    }
-
-    public List<ArrayTypeDeclarer> arrays() {
-        return arrays;
     }
 
 }

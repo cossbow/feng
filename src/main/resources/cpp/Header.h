@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <list>
 #include <new>
 
@@ -194,6 +195,16 @@ static T *&Feng$dec(T *&p) {
 	return p;
 }
 
+template <typename E, int64_t L>
+struct Feng$Array {
+    E values[L];
+
+    E& operator[](int64_t index) {
+        if (index < 0 || index >= L)
+            throw OutOfBounds();
+        return values[index];
+    }
+};
 
 template <typename E>
 struct Feng$ArrayRefer {
@@ -212,7 +223,18 @@ static Feng$ArrayRefer<E> Feng$newArray(int64_t len) {
     if (len < 0)
         throw NegativeInteger();
     E* p = (E*)Feng$alloc(sizeof(E) * len, false);
+    memset(p, 0, sizeof(E) * len);
     return {.start = p, .len = len};
+}
+
+template <typename E, int64_t L>
+static Feng$ArrayRefer<E> Feng$newArray(int64_t len, Feng$Array<E, L>&& init) {
+    if (len < L) throw OutOfBounds();
+    Feng$ArrayRefer<E> ar = Feng$newArray<E>(len);
+    for (int i = 0; i < L; ++i) {
+        ar[i] = init[i];
+    }
+    return ar;
 }
 
 template <typename E>
@@ -251,6 +273,17 @@ static R* Feng$mapA2U(Feng$ArrayRefer<S>& s) {
         throw OutOfBounds();
     }
     return (R *) s.start;
+}
+
+template <typename E>
+static Feng$ArrayRefer<E> Feng$refer(E *start, int64_t len) {
+    return {.start = start, .len = len};
+}
+
+template <typename S, typename R>
+static Feng$ArrayRefer<R> Feng$refer(S* start, int64_t len) {
+    int64_t l = sizeof(S) * len / sizeof(R);
+    return {.start = (R*) start, .len = l};
 }
 
 #endif //FENG_HEADER_H

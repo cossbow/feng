@@ -97,8 +97,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
     public boolean baseTypeSame(TypeDeclarer td) {
         if (!(td instanceof ArrayTypeDeclarer t))
             return false;
-        return element.equals(t.element) &&
-                Objects.equals(len, t.len);
+        return element.equals(t.element);
     }
 
     @Override

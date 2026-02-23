@@ -17,6 +17,10 @@ public class ArrayExpression extends PrimaryExpression {
         return elements;
     }
 
+    public int size() {
+        return elements.size();
+    }
+
     @Override
     public boolean isFinal() {
         return elements.stream().allMatch(Expression::isFinal);

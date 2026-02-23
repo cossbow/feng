@@ -106,7 +106,7 @@ public class AttributeParseTest extends BaseParseTest {
         Assertions.assertEquals(fieldType, field.type());
         Assertions.assertTrue(field.array());
         var arr = (ArrayExpression) field.init().must();
-        Assertions.assertEquals(2, arr.elements().size());
+        Assertions.assertEquals(2, arr.size());
     }
 
     private IdentifierTable<Attribute> atDefine(String code) {

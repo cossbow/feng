@@ -658,7 +658,7 @@ public class ExpressionParseTest extends BaseParseTest {
     public void testArray() {
         var ae = (ArrayExpression) parseExpr("[15,1.5,\"yy\",false,nil,{id=0},[3],{a2:b2},-9,2+5]");
 
-        Assertions.assertEquals(10, ae.elements().size());
+        Assertions.assertEquals(10, ae.size());
         var els = ae.elements();
 
         Assertions.assertInstanceOf(IntegerLiteral.class, ((LiteralExpression) els.get(0)).literal());

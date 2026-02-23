@@ -4,22 +4,29 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.ArrayTypeDeclarer;
 
 public class ArrayLenExpression extends PrimaryExpression {
-    private final ArrayTypeDeclarer array;
+    private final PrimaryExpression subject;
+    private final ArrayTypeDeclarer type;
 
     public ArrayLenExpression(Position pos,
-                              ArrayTypeDeclarer array) {
+                              PrimaryExpression subject,
+                              ArrayTypeDeclarer type) {
         super(pos);
-        this.array = array;
+        this.subject = subject;
+        this.type = type;
     }
 
-    public ArrayTypeDeclarer array() {
-        return array;
+    public PrimaryExpression subject() {
+        return subject;
+    }
+
+    public ArrayTypeDeclarer type() {
+        return type;
     }
 
     //
 
     @Override
     public String toString() {
-        return array + "." + array.LengthField.name();
+        return subject + "." + type.LengthField.name();
     }
 }
