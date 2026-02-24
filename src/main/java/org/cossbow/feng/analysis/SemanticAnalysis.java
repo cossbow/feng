@@ -1514,7 +1514,9 @@ public class SemanticAnalysis {
         if (var.type().has()) {
             var l = var.type().must();
             // check type
-            if (assignable(l, t, Optional.of(g.a()))) return;
+            if (assignable(l, t, Optional.of(g.a()))) {
+                return;
+            }
             semantic("incompatible, %s:%s can't assign %s:%s",
                     l, l.pos(), t, t.pos());
         } else {

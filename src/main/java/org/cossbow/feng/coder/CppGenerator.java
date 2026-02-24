@@ -391,6 +391,9 @@ public class CppGenerator {
             if (rt instanceof ArrayTypeDeclarer art) {
                 return write("Feng$mapA2A<").write(art.element()).write(',')
                         .write(at.element()).write(">(").write(v).write(')');
+            }
+            if (rt.isNil()) {
+                return write("{}");
             } else {
                 return write("Feng$mapU2A<").baseTypeSymbol(rt).write(',')
                         .write(at.element()).write(">(").write(v).write(')');
@@ -418,8 +421,8 @@ public class CppGenerator {
                     .write(')');
         }
 
-        if (vt instanceof ArrayTypeDeclarer avt) {
-            var at = (ArrayTypeDeclarer) t;
+        if (t instanceof ArrayTypeDeclarer at) {
+            var avt = (ArrayTypeDeclarer) vt;
             // mappable
             return write("Feng$refer<").write(avt.element())
                     .write(',').write(at.element()).write(">(")
@@ -440,16 +443,16 @@ public class CppGenerator {
             return write(v).write(".Feng$share()");
         }
 
+        if (v instanceof LiteralExpression le &&
+                le.literal() instanceof NilLiteral) {
+            return castPtr(v, t);
+        }
+
         if (r.get().isKind(PHANTOM)) {
             return referPhantom(v, t);
         }
 
         if (move || v.unbound()) {
-            return castPtr(v, t);
-        }
-
-        if (v instanceof LiteralExpression le &&
-                le.literal() instanceof NilLiteral) {
             return castPtr(v, t);
         }
 
@@ -1023,11 +1026,7 @@ public class CppGenerator {
     }
 
     public CppGenerator write(IndexOperand e) {
-        write(e.subject());
-        write('[');
-        write(e.index());
-        write(']');
-        return this;
+        return index(e.subject(), e.index());
     }
 
     public CppGenerator write(FieldOperand e) {
@@ -1314,11 +1313,7 @@ public class CppGenerator {
     }
 
     public CppGenerator write(IndexOfExpression e) {
-        write(e.subject());
-        write('[');
-        write(e.index());
-        write(']');
-        return this;
+        return index(e.subject(), e.index());
     }
 
     private CppGenerator write(VariableExpression e) {
@@ -1395,6 +1390,17 @@ public class CppGenerator {
             write('.');
         }
         return this;
+    }
+
+    private CppGenerator index(
+            PrimaryExpression subject, Expression index) {
+        var t = subject.resultType.must();
+        if (t.maybeRefer().none()) {
+            write(subject);
+        } else {
+            write("Feng$required(").write(subject).write(')');
+        }
+        return write('[').write(index).write(']');
     }
 
     private CppGenerator enumMember(
@@ -1533,7 +1539,10 @@ public class CppGenerator {
     }
 
     public CppGenerator write(IsNilExpression e) {
+        var st = e.subject().resultType.must();
         write(e.subject());
+        if (st instanceof ArrayTypeDeclarer)
+            write(".start");
         write(e.nil() ? '=' : '!');
         return write("=nullptr");
     }

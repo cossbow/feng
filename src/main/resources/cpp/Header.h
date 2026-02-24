@@ -26,11 +26,6 @@ static T *Feng$required(T *p) {
 	throw NilPointer();
 }
 
-
-struct Feng$Type {
-	uint32_t classId;
-};
-
 class Object {
 public:
 	uint32_t feng$classId;
@@ -252,6 +247,18 @@ static Feng$ArrayRefer<E>&& Feng$incAR(Feng$ArrayRefer<E>&& ar) {
 template <typename E>
 static Feng$ArrayRefer<E>& Feng$decAR(Feng$ArrayRefer<E>& ar) {
     Feng$dec(ar.start);
+    return ar;
+}
+
+template <typename E>
+static Feng$ArrayRefer<E>& Feng$required(Feng$ArrayRefer<E>& ar) {
+    if (ar.start == nullptr) throw NilPointer();
+    return ar;
+}
+
+template <typename E>
+static Feng$ArrayRefer<E>&& Feng$required(Feng$ArrayRefer<E>&& ar) {
+    if (ar.start == nullptr) throw NilPointer();
     return ar;
 }
 
