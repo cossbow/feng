@@ -148,13 +148,13 @@ final class SourceParseVisitor
     private void checkGlobalName(Identifier name, Entity def) {
         var old = globalNames.putIfAbsent(name, def);
         if (old == null) return;
-        var m = switch (def) {
+        var m = switch (old) {
             case TypeDefinition d -> d.domain();
             case FunctionDefinition d -> "function";
             case GlobalVariable v -> "variable";
             case null, default -> unreachable();
         };
-        semantic("global name %s%s used for global %s%s: ",
+        semantic("name '%s' @%s has been used by %s: %s",
                 name, def.pos(), m, old.pos());
     }
 
@@ -1041,7 +1041,7 @@ final class SourceParseVisitor
             var r = td.maybeRefer();
             if (r.none() || r.get().kind() != PHANTOM) return;
             if (dcl == Declare.CONST) return;
-            semantic("phantom refer must be const: %s", td.pos());
+            semantic("phantom refer must be const value: %s", td.pos());
         });
         var names = identifiers(dnCtx.identifierList());
         var vars = new ArrayList<Variable>(names.size());

@@ -136,11 +136,11 @@ public class CppGenerator {
 
     private String toCType(Primitive p) {
         return switch (p) {
-            case INT8, BYTE -> "int8_t";
+            case INT8 -> "int8_t";
             case INT16 -> "int16_t";
             case INT32 -> "int32_t";
             case INT64, INT -> "int64_t";
-            case UINT8 -> "uint8_t";
+            case UINT8, BYTE -> "uint8_t";
             case UINT16 -> "uint16_t";
             case UINT32 -> "uint32_t";
             case UINT64, UINT -> "uint64_t";

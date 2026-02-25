@@ -148,12 +148,12 @@ public class SemanticAnalysis {
             if (p.has())
                 return p.must().declarer(td.pos());
             if (ltd.literal() instanceof StringLiteral sl) {
-                var etd = Primitive.UINT8.declarer(sl.pos());
+                var etd = Primitive.BYTE.declarer(sl.pos());
                 var ref = new Refer(sl.pos(), STRONG, false, true);
                 var atd = new ArrayTypeDeclarer(td.pos(), etd,
                         Optional.empty(), Optional.of(ref));
                 atd.len(sl.length());
-                atd.unit((long) Primitive.UINT8.size());
+                atd.unit((long) Primitive.BYTE.size());
                 return atd;
             }
             return semantic("auto type-infer can't support %s: %s",
@@ -945,13 +945,14 @@ public class SemanticAnalysis {
 
     private boolean enablePhantom(Optional<Expression> re) {
         if (re.none()) return true;
-        if (enablePhantom(re.get())) {
-            if (re.get() instanceof VariableExpression ve) {
+        var e = re.get();
+        if (enablePhantom(e)) {
+            if (e instanceof VariableExpression ve) {
                 context.lockVar(ve.variable());
             }
             return true;
         }
-        return semantic("can't use phantom reference: %s", re.get().pos());
+        return semantic("can't convert to phantom refer: %s", e.pos());
     }
 
     //
