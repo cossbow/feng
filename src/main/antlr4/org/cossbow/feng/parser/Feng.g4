@@ -635,7 +635,7 @@ newArrayType
     : '[' len=expression immutable=HASH? ']' typeDeclarer
     ;
 sizeof
-    : SIZEOF '(' (typeDeclarer) ')'
+    : SIZEOF '(' typeDeclarer ')'
     ;
 
 

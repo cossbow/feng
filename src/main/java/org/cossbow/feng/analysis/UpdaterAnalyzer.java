@@ -1,6 +1,7 @@
 package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.dcl.NewArrayType;
+import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassMethod;
@@ -69,7 +70,9 @@ public class UpdaterAnalyzer {
     }
 
     private void analyse(DeclarationStatement s) {
-        analyse(s.init());
+        for (Variable v : s.variables()) {
+            v.value().use(this::analyse);
+        }
     }
 
     private void analyse(ConditionalForStatement s) {

@@ -1,10 +1,16 @@
 package org.cossbow.feng.ast.var;
 
 import org.cossbow.feng.ast.Entity;
+import org.cossbow.feng.ast.MayNeedRelay;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.Expression;
 
-public class Assignment extends Entity {
+import java.util.ArrayList;
+import java.util.List;
+
+public class Assignment extends Entity
+        implements MayNeedRelay {
     private Operand operand;
     private Expression value;
     private boolean copy;
@@ -23,11 +29,32 @@ public class Assignment extends Entity {
         return operand;
     }
 
+    public void operand(Operand operand) {
+        this.operand = operand;
+    }
+
     public Expression value() {
         return value;
+    }
+
+    public void value(Expression value) {
+        this.value = value;
     }
 
     public boolean copy() {
         return copy;
     }
+
+    //
+
+    private final List<Variable> relay = new ArrayList<>();
+
+    public List<Variable> relay() {
+        return relay;
+    }
+
+    public void relay(Variable v) {
+        relay.add(v);
+    }
+
 }

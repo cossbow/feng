@@ -133,8 +133,8 @@ public class ExportImportTest extends BaseParseTest {
         var im = makeImports(type, param);
         var code = "var a = new(%s`%s`);".formatted(type, param);
         var ds = (DeclarationStatement) parseLocal(im, code);
-        var e = ds.init().getFirst();
-        var n = (NewExpression) e;
+        var v = ds.variables().getFirst();
+        var n = (NewExpression) v.value().must();
         var t = (DerivedType) ((NewDefinedType) n.type()).type();
         Assertions.assertEquals(type, t.symbol());
         Assertions.assertEquals(param,
@@ -148,8 +148,7 @@ public class ExportImportTest extends BaseParseTest {
         var im = makeImports(index, type);
         var code = "var a = new([%s]%s);".formatted(index, type);
         var ds = (DeclarationStatement) parseLocal(im, code);
-        var e = ds.init().getFirst();
-        var n = (NewExpression) e;
+        var n = (NewExpression) ds.variables().getFirst().value().must();
         var t = (NewArrayType) n.type();
         Assertions.assertEquals(index, varName(t.length()));
         Assertions.assertEquals(type, typeName(t.element()));

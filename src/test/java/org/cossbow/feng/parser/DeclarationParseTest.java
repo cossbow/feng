@@ -65,14 +65,16 @@ public class DeclarationParseTest extends BaseParseTest {
     public void testLocal3() {
         {
             var dcl = parseLocalDecl("var i = 0");
-            Assertions.assertTrue(dcl.variables().getFirst().type().none());
-            Assertions.assertFalse(dcl.init().isEmpty());
+            var v = dcl.variables().getFirst();
+            Assertions.assertTrue(v.type().none());
+            Assertions.assertTrue(v.value().has());
         }
         for (var prim : Primitive.values()) {
             var dcl = parseLocalDecl("var i " + prim.code);
-            var type = (PrimitiveTypeDeclarer) dcl.variables().getFirst().type().must();
+            var v = dcl.variables().getFirst();
+            var type = (PrimitiveTypeDeclarer) v.type().must();
             Assertions.assertEquals(prim, type.primitive());
-            Assertions.assertTrue(dcl.init().isEmpty());
+            Assertions.assertTrue(v.value().none());
         }
         {
             var dcl = parseLocalDecl("var u *User");
@@ -134,8 +136,8 @@ public class DeclarationParseTest extends BaseParseTest {
             var code = "var " + idList(names) + " = " + idList(values);
             var dcl = parseLocalDecl(code);
             Assertions.assertEquals(names, Utils.listOf(dcl.variables(), Variable::name));
-            Assertions.assertEquals(values, Utils.listOf((dcl.init()),
-                    BaseParseTest::varName));
+            Assertions.assertEquals(values, Utils.listOf((dcl.variables()),
+                    v -> varName(v.value().must())));
         }
     }
 

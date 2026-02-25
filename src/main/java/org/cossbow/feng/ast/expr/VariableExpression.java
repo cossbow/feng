@@ -19,6 +19,6 @@ public class VariableExpression extends PrimaryExpression {
 
     @Override
     public String toString() {
-        return variable.toString();
+        return variable.name().toString();
     }
 }

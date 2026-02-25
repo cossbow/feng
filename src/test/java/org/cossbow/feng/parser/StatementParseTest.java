@@ -163,8 +163,9 @@ public class StatementParseTest extends BaseParseTest {
         var stmt = (SwitchStatement) parseStmt(code);
 
         var dcl = (DeclarationStatement) stmt.init().must();
-        Assertions.assertEquals(a, dcl.variables().getFirst().name());
-        var init = (CallExpression) (dcl.init().getFirst());
+        var v = dcl.variables().getFirst();
+        Assertions.assertEquals(a, v.name());
+        var init = (CallExpression) v.value().must();
         Assertions.assertEquals(symbol("goods"), varName(init.callee()));
         Assertions.assertTrue(init.arguments().isEmpty());
 

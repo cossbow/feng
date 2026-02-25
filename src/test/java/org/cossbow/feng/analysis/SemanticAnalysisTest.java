@@ -1611,6 +1611,8 @@ public class SemanticAnalysisTest {
         checkSucc("var x = c*b; const c = a+b; const a,b = 1,2;");
         checkSucc("var a = 1; var b = a;");
         checkSucc("var a = b; var b = 1;");
+
+        checkFail("const a = b; var b = 1;");
     }
 
     @Test

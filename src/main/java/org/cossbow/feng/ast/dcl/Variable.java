@@ -2,14 +2,18 @@ package org.cossbow.feng.ast.dcl;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.MayNeedRelay;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.util.Lazy;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class Variable extends Entity {
+public class Variable extends Entity
+        implements MayNeedRelay {
     private final Modifier modifier;
     private final Declare declare;
     private final Identifier name;
@@ -56,6 +60,7 @@ public class Variable extends Entity {
 
     private final Lazy<Expression> defVal = Lazy.nil();
     private final int id = IdGenerator.getAndIncrement();
+    private final List<Variable> relay = new ArrayList<>();
 
     public Lazy<Expression> defVal() {
         return defVal;
@@ -63,6 +68,14 @@ public class Variable extends Entity {
 
     public int id() {
         return id;
+    }
+
+    public List<Variable> relay() {
+        return relay;
+    }
+
+    public void relay(Variable v) {
+        relay.add(v);
     }
 
     //

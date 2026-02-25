@@ -24,6 +24,10 @@ public class TypeDeclarer extends Entity {
         return Optional.empty();
     }
 
+    public boolean referKind(ReferKind kind) {
+        return this instanceof Referable r && r.isKind(kind);
+    }
+
     private Boolean mappable;
     private Long size;
 

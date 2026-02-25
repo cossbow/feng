@@ -29,7 +29,6 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
-import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class CppGenerator {
@@ -469,9 +468,30 @@ public class CppGenerator {
     }
 
     private CppGenerator write(Variable v) {
-        return write(v.type().must()).write(' ').
-                varName(v).write(" = ").
-                writeValue(v.requireValue(), v.type().must(), false);
+        var t = v.type().must();
+        write(t).write(' ').varName(v).write(" = ");
+        if (!v.relay().isEmpty()) {
+            write("({");
+            writeVars(v.relay());
+            write(t).write(" feng$tmp = ");
+        }
+        writeValue(v.requireValue(), t, false);
+        if (!v.relay().isEmpty()) {
+            endStmt();
+            release(v.relay());
+            write("feng$tmp").endStmt();
+            write("})");
+        }
+        return this;
+    }
+
+    public CppGenerator declareVar(Variable v) {
+        return write(v).endStmt();
+    }
+
+    private void writeVars(List<Variable> list) {
+        if (list.isEmpty()) return;
+        for (var v : list) declareVar(v);
     }
 
     // type declarer
@@ -485,7 +505,7 @@ public class CppGenerator {
                 .write(td.element()).write('>');
     }
 
-    private CppGenerator writeRefer(TypeDeclarer td) {
+    private CppGenerator typeRefer(TypeDeclarer td) {
         if (td.maybeRefer().none()) return this;
         return write('*');
     }
@@ -495,7 +515,7 @@ public class CppGenerator {
         if (def instanceof EnumDefinition) {
             return write(toCType(Primitive.INT32));
         }
-        return write(td.derivedType()).writeRefer(td);
+        return write(td.derivedType()).typeRefer(td);
     }
 
     public CppGenerator write(Primitive p) {
@@ -503,7 +523,7 @@ public class CppGenerator {
     }
 
     public CppGenerator write(PrimitiveTypeDeclarer td) {
-        return write(td.primitive()).writeRefer(td);
+        return write(td.primitive()).typeRefer(td);
     }
 
     public CppGenerator write(FuncTypeDeclarer e) {
@@ -793,10 +813,6 @@ public class CppGenerator {
     }
 
 
-    public CppGenerator declareVar(Variable v) {
-        return write(v).endStmt();
-    }
-
     public CppGenerator write(DerivedType dt) {
         write(dt.symbol());
         if (!dt.generic().isEmpty())
@@ -904,28 +920,43 @@ public class CppGenerator {
             release(v);
     }
 
+    private void wrapRelay(MayNeedRelay e, Runnable r) {
+        if (!e.relay().isEmpty()) {
+            write('{').newLine();
+            writeVars(e.relay());
+        }
+        r.run();
+        if (!e.relay().isEmpty()) {
+            release(e.relay());
+            write('}').newLine();
+        }
+    }
+
     private void write(List<Statement> list) {
         for (var s : list) write(s);
     }
 
     private CppGenerator write(Statement e) {
-        return switch (e) {
-            case AssignmentsStatement ee -> write(ee);
-            case BlockStatement ee -> write(ee);
-            case BreakStatement ee -> write(ee);
-            case CallStatement ee -> write(ee);
-            case ContinueStatement ee -> write(ee);
-            case DeclarationStatement ee -> write(ee);
-            case ForStatement ee -> write(ee);
-            case GotoStatement ee -> write(ee);
-            case IfStatement ee -> write(ee);
-            case LabeledStatement ee -> write(ee);
-            case ReturnStatement ee -> write(ee);
-            case SwitchStatement ee -> write(ee);
-            case ThrowStatement ee -> write(ee);
-            case TryStatement ee -> write(ee);
-            case null, default -> unreachable();
-        };
+        wrapRelay(e, () -> {
+            switch (e) {
+                case DeclarationStatement ee -> write(ee);
+                case AssignmentsStatement ee -> write(ee);
+                case BlockStatement ee -> write(ee);
+                case BreakStatement ee -> write(ee);
+                case CallStatement ee -> write(ee);
+                case ContinueStatement ee -> write(ee);
+                case ForStatement ee -> write(ee);
+                case GotoStatement ee -> write(ee);
+                case IfStatement ee -> write(ee);
+                case LabeledStatement ee -> write(ee);
+                case ReturnStatement ee -> write(ee);
+                case SwitchStatement ee -> write(ee);
+                case ThrowStatement ee -> write(ee);
+                case TryStatement ee -> write(ee);
+                default -> unreachable();
+            }
+        });
+        return this;
     }
 
     private CppGenerator write(ForStatement e) {
@@ -977,11 +1008,14 @@ public class CppGenerator {
         return this;
     }
 
+    private CppGenerator release(List<Variable> list) {
+        return release(list, -1);
+    }
+
     public CppGenerator write(ReturnStatement rs) {
         writeComment("release and return");
         if (rs.result().none()) {
-            return release(rs.local(), -1)
-                    .write("return").endStmt();
+            return release(rs.local()).write("return").endStmt();
         }
 
         var re = rs.result().get();
@@ -989,7 +1023,7 @@ public class CppGenerator {
         var rt = prot.returnSet().must();
 
         if (re.unbound()) {
-            release(rs.local(), -1);
+            release(rs.local());
             return write("return ").writeValue(re, rt, true).endStmt();
         }
 
@@ -1002,7 +1036,7 @@ public class CppGenerator {
 
         write(rt).write(" feng$tmp = ")
                 .writeValue(re, rt, false).endStmt();
-        release(rs.local(), -1);
+        release(rs.local());
         return write("return feng$tmp").endStmt();
     }
 
@@ -1035,9 +1069,10 @@ public class CppGenerator {
     }
 
     public CppGenerator write(AssignmentsStatement as) {
-        for (Assignment a : as.list()) {
-            writeAssign(a.operand(), a.value());
-            endStmt();
+        for (var a : as.list()) {
+            wrapRelay(a, () -> {
+                writeAssign(a.operand(), a.value()).endStmt();
+            });
         }
         return this;
     }
@@ -1049,9 +1084,9 @@ public class CppGenerator {
     }
 
     public CppGenerator write(CallStatement e) {
-        var pt = e.call().prototype().must();
-        pt.returnSet().use(td -> {
-        });
+//        var pt = e.call().prototype().must();
+//        pt.returnSet().use(td -> {
+//        });
         write(e.call());
         return endStmt();
     }
@@ -1088,25 +1123,6 @@ public class CppGenerator {
         return write(".Feng$share()");
     }
 
-    private void writeForStmt(Statement s) {
-        if (s instanceof DeclarationStatement ds) {
-            if (ds.variables().size() > 1) {
-                unsupported("multi declaration: %s", ds.pos());
-                return;
-            }
-            write(ds.variables().getFirst());
-        } else if (s instanceof AssignmentsStatement as) {
-            boolean first = true;
-            for (var a : as.list()) {
-                if (first) first = false;
-                else write(',');
-                writeAssign(a.operand(), a.value());
-            }
-        } else {
-            unreachable();
-        }
-    }
-
 
     public CppGenerator write(ConditionalForStatement fs) {
         if (fs.initializer().none()) {
@@ -1116,14 +1132,16 @@ public class CppGenerator {
             write(fs.body());
         } else {
             write('{');
-            fs.initializer().use(this::write);
+            write(fs.initializer().must());
             write("for(");
             write(';');
             write(fs.condition());
             write(';');
-            fs.updater().use(this::writeForStmt);
             write(')');
+            write('{');
             write(fs.body());
+            write(fs.updater().must());
+            write('}');
             exitScope(fs);
             write('}');
         }
@@ -1384,12 +1402,10 @@ public class CppGenerator {
     }
 
     private CppGenerator deRefer(Expression subject, Referable ref) {
-        if (ref.refer().has()) {
-            write("Feng$required(").write(subject).write(")->");
-        } else {
-            write('.');
-        }
-        return this;
+        if (ref.refer().none())
+            return write(subject).write('.');
+
+        return write("Feng$required(").write(subject).write(")->");
     }
 
     private CppGenerator index(

@@ -215,22 +215,10 @@ final class SourceParseVisitor
     public Entity visitGlobalDeclaration(FengParser.GlobalDeclarationContext ctx) {
         var stmt = (DeclarationStatement) visit(ctx.declaration());
         var gvs = new ArrayList<GlobalVariable>(stmt.size());
-        if (!stmt.init().isEmpty()) {
-            var init = stmt.init();
-            if (stmt.size() != init.size())
-                return semantic("number of var and init not match");
-            for (int i = 0; i < init.size(); i++) {
-                var v = stmt.variables().get(i);
-                globalVarCheck(v);
-                gvs.add(new GlobalVariable(v, defineSymbol(v.name()),
-                        Lazy.of(init.get(i))));
-            }
-        } else {
-            for (var v : stmt.variables()) {
-                globalVarCheck(v);
-                gvs.add(new GlobalVariable(v, defineSymbol(v.name()),
-                        Lazy.nil()));
-            }
+        for (var v : stmt.variables()) {
+            globalVarCheck(v);
+            var gv = new GlobalVariable(v, defineSymbol(v.name()));
+            gvs.add(gv);
         }
         if (isExport(ctx.exportable())) {
             for (var v : gvs) gst.exportedVariables.add(v.symbol(), v);
@@ -1057,7 +1045,7 @@ final class SourceParseVisitor
     public Entity visitOnlyDeclaration(FengParser.OnlyDeclarationContext ctx) {
         var typeDcl = (TypeDeclarer) visit(ctx.typeDeclarer());
         var variables = parseVariables(ctx.declaredNames(), Optional.of(typeDcl));
-        return new DeclarationStatement(posOf(ctx), variables, List.of());
+        return new DeclarationStatement(posOf(ctx), variables);
     }
 
     @Override
@@ -1069,7 +1057,11 @@ final class SourceParseVisitor
         if (variables.size() != init.size()) {
             return semantic("number of var and value not match: %s", posOf(ctx));
         }
-        return new DeclarationStatement(posOf(ctx), variables, init.values());
+        int i = 0;
+        for (var v : variables) {
+            v.value().set(init.values().get(i++));
+        }
+        return new DeclarationStatement(posOf(ctx), variables);
     }
 
     @Override

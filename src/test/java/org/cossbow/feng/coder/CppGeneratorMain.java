@@ -18,7 +18,7 @@ public class CppGeneratorMain {
     }
 
     static void generate(String srcFile, String cppFile) {
-        System.out.printf("[check]>>> %s\n", srcFile);
+        System.out.printf("[compile]%s >>> %s\n", srcFile, cppFile);
         var source = doParse(srcFile);
         var ctx = new GlobalSymbolContext(source.table());
         new SemanticAnalysis(ctx).visit(source);
