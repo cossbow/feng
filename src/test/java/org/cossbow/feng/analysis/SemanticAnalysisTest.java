@@ -903,7 +903,7 @@ public class SemanticAnalysisTest {
     public void testNewExpression1() {
         var d = "func A(); enum E{U,V,W,} class C{} interface I{}";
         checkFail(d + "func f(){var v = new(A);}");
-        checkFail(d + "func f(){var v = new(E);}");
+        checkSucc(d + "func f(){var v = new(E);}");
         checkSucc(d + "func f(){var v = new(C);}");
         checkFail(d + "func f(){var v = new(I);}");
 
@@ -1158,7 +1158,7 @@ public class SemanticAnalysisTest {
         checkSucc("func f(v *bool) {}");
         checkSucc("struct ID{} func f(v *ID) {}");
         checkSucc("union ID{} func f(v *ID) {}");
-        checkFail("enum ID{A,} func f(v *ID) {}");
+        checkSucc("enum ID{A,} func f(v *ID) {}");
         checkFail("func ID(); func f(v *ID) {}");
     }
 
@@ -2173,8 +2173,8 @@ public class SemanticAnalysisTest {
         checkSucc("enum S{A,B,} func f() { var s S; s=S.A; }");
         checkFail("enum S{A,B,} func f() { var s int; s=S.A; }");
         checkFail("enum S{A,B,} func f() { var s S; s=S.C; }");
-        checkFail("enum S{A,B,} func f() { var s *S; }");
-        checkFail("enum S{A,B,} func f() { var s = new(S); }");
+        checkSucc("enum S{A,B,} func f() { var s *S; }");
+        checkSucc("enum S{A,B,} func f() { var s = new(S); }");
     }
 
     @Test

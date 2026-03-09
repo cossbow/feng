@@ -1489,17 +1489,22 @@ public class CppGenerator {
     public CppGenerator write(CurrentExpression e) {
         assert enterClass != null;
         if (e.isSelf()) return write("this");
-        unsupported("super");
         var pd = enterClass.parent().must();
-        return write(pd.symbol()).write("::");
+        return write(pd.symbol());
     }
 
     private CppGenerator deRefer(Expression subject, Referable ra) {
         if (ra.refer().none())
             return write(subject).write('.');
         var ref = ra.refer().get();
-        if (ref.required())
-            return write(subject).write("->");
+        if (ref.required()) {
+            write(subject);
+            if (subject instanceof CurrentExpression ce
+                    && !ce.isSelf()) {
+                return write("::");
+            }
+            return write("->");
+        }
         return write("Feng$required(").write(subject).write(")->");
     }
 

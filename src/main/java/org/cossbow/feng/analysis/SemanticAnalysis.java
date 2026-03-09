@@ -328,6 +328,8 @@ public class SemanticAnalysis {
                     td.pos());
         }
 
+        if (dt instanceof EnumDefinition) return dt;
+
         if (r.none()) return dt;
         return semantic("can't refer %s %s", dt.domain(), dt.symbol());
     }
@@ -978,7 +980,7 @@ public class SemanticAnalysis {
             case SizeofExpression ee -> false;
             case NewExpression ee -> false;
             case CurrentExpression ee -> true;
-            default -> unreachable();
+            default -> false;
         };
     }
 
@@ -1215,6 +1217,11 @@ public class SemanticAnalysis {
         if (lt instanceof ObjectDefinition lo &&
                 rt instanceof ObjectDefinition ro)
             return assignable(lo, ro);
+
+        if (lt instanceof EnumDefinition le &&
+                rt instanceof EnumDefinition re) {
+            return le.equals(re);
+        }
         return false;
     }
 
@@ -1262,7 +1269,8 @@ public class SemanticAnalysis {
                 if (lr.immutable()) return true;
                 return semantic("can't convert: immutable -> mutable: %s", lr.pos());
             }
-            return semantic("can't convert to phantom refer: %s", e.pos());
+            return semantic("can't convert '%s' to phantom refer: %s",
+                    e, e.pos());
         }
         assert lr.kind() == STRONG;
 
@@ -1405,6 +1413,11 @@ public class SemanticAnalysis {
                     l, l.size(), l.pos(), r, r.size(), r.pos());
         }
 
+        if (r instanceof PrimitiveTypeDeclarer rp) {
+            return l instanceof PrimitiveTypeDeclarer lp &&
+                    rp.primitive() == lp.primitive();
+        }
+
         // Objects
         if (r instanceof DerivedTypeDeclarer rd) {
             if (l instanceof DerivedTypeDeclarer ld)
@@ -1429,7 +1442,7 @@ public class SemanticAnalysis {
             }
         }
 
-        return semantic("%s can't refer %s: %s", l, r, l.pos());
+        return semantic("'%s' can't refer '%s': %s", l, r, l.pos());
     }
 
     private boolean assignValue(TypeDeclarer l, LiteralTypeDeclarer rt) {
@@ -3152,7 +3165,8 @@ public class SemanticAnalysis {
         if (e.type() instanceof DerivedType dt) {
             var def = visit(dt);
             if (def instanceof StructureDefinition ||
-                    def instanceof ClassDefinition) {
+                    def instanceof ClassDefinition ||
+                    def instanceof EnumDefinition) {
                 var n = new DerivedTypeDeclarer(e.pos(), dt,
                         Optional.of(ref));
                 n.def.set(def);
