@@ -6,7 +6,25 @@
 #include <cstdlib>
 #include <cstring>
 #include <list>
-#include <new>
+
+
+// define primitives
+typedef uint8_t Byte;
+typedef int64_t Int;
+typedef int8_t Int8;
+typedef int16_t Int16;
+typedef int32_t Int32;
+typedef int64_t Int64;
+typedef uint64_t Uint;
+typedef uint8_t Uint8;
+typedef uint16_t Uint16;
+typedef uint32_t Uint32;
+typedef uint64_t Uint64;
+typedef double Float;
+typedef float Float32;
+typedef double Float64;
+typedef bool Bool;
+
 
 class DoubleFree : public std::exception {
 };
@@ -22,6 +40,13 @@ class NegativeInteger : public std::exception {
 
 class NilPointer : public std::exception {
 };
+
+template<typename T>
+requires std::integral<T>
+static T Feng$checkIndex(T index, T bounds) {
+	if (0 <= index && index < bounds) return index;
+	throw OutOfBounds();
+}
 
 template<typename T>
 static T *Feng$required(T *p) {
@@ -59,14 +84,6 @@ static Feng$Header *Feng$headerOf(void *p) {
 static void *Feng$toInstance(Feng$Header *fh) {
 	return (((uint8_t *) fh) + sizeof(Feng$Header));
 }
-
-#ifndef FENG_MAX_ENUM_NAME_LEN
-#define FENG_MAX_ENUM_NAME_LEN 64
-#endif
-struct Feng$Enum {
-	int32_t value;
-	char name[FENG_MAX_ENUM_NAME_LEN];
-};
 
 #ifndef FENG_MAX_CLASS_NUM
 #define FENG_MAX_CLASS_NUM 1
@@ -351,5 +368,25 @@ static Feng$ArrayRefer<R> Feng$refer(S* start, int64_t len) {
 	int64_t l = sizeof(S) * len / sizeof(R);
 	return {.start = (R*) start, .len = l};
 }
+
+template<typename T, size_t L>
+struct Feng$GlobalArray {
+	Feng$Header $header;
+	Feng$Array<T, L> array;
+
+	Feng$ArrayRefer<T> incAR() {
+		return {.start = Feng$inc(array.values), .len=L};
+	}
+
+	Feng$ArrayRefer<T> refer() {
+		return {.start = array.values, .len=L};
+	}
+};
+
+// enum type struct
+struct Feng$Enum {
+	Int value;
+	Feng$ArrayRefer<Byte> name;
+};
 
 #endif //FENG_HEADER_H

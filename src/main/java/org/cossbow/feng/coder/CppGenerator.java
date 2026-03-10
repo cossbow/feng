@@ -208,6 +208,8 @@ public class CppGenerator {
         writeComment("global const");
         declareGlobalVar(src.table().dagConst);
 
+        writeComment("string cache");
+        literalStringCache(src);
         writeComment("enum definition");
         visitEnums(src);
         writeComment("struct definition");
@@ -285,24 +287,26 @@ public class CppGenerator {
                     .write(p).endStmt();
         }
         newLine();
+    }
 
-/*
-        writeComment("define TypeId");
-        write("enum TypeId {").newLine();
-        for (var p : Primitive.values()) {
-            var def = p.type();
-            typeId(def).write('=').write(def.typeId())
-                    .write(',').newLine();
-        }
-        var sorted = src.types().stream()
-                .sorted(Comparator.comparingInt(TypeDefinition::typeId))
+    void literalStringCache(Source src) {
+        var list = src.table().stringCache
+                .keySet().stream()
+                .sorted(Comparator.comparingInt(StringLiteral::id))
                 .toList();
-        for (var def : sorted) {
-            typeId(def).write('=').write(def.typeId())
-                    .write(',').newLine();
+        for (var sl : list) {
+            write("static Feng$GlobalArray<Byte,").write(sl.length());
+            write("> ").literalString(sl);
+            write("= {.$header={.refcnt={1}}, .array = {.values = {");
+            for (byte b : sl.value()) {
+                write(b).write(',');
+            }
+            write("}}}").endStmt();
         }
-        write('}').endStmt();
-*/
+    }
+
+    private CppGenerator literalString(StringLiteral sl) {
+        return write("Feng$constString_").write(sl.id());
     }
 
     void declareType(PrototypeDefinition def) {
@@ -350,9 +354,9 @@ public class CppGenerator {
 
     void visitEnum(EnumDefinition ed) {
         write("static Feng$Enum ").enumName(ed).write("[] = {").newLine();
-        for (EnumDefinition.Value v : ed.values()) {
-            write("{.value=").write(v.val()).write(", .name=\"")
-                    .write(v.name()).write("\"},").newLine();
+        for (var v : ed.values()) {
+            write("{.value=").write(v.val()).write(", .name=");
+            write(v.nameLit()).write(".incAR()},").newLine();
         }
         write('}').endStmt().newLine();
     }
@@ -459,18 +463,37 @@ public class CppGenerator {
                 .write('&').write(v).write(')');
     }
 
+    private CppGenerator writeLiteral(LiteralExpression v, TypeDeclarer t) {
+        if (v.literal() instanceof NilLiteral)
+            return castPtr(v, t);
+
+        if (v.literal() instanceof StringLiteral sl) {
+            if (t instanceof LiteralTypeDeclarer) {
+                return write(sl).write(".incAR()");
+            }
+            var r = t.maybeRefer();
+            if (r.none()) {
+                return writeData(sl);
+            }
+            if (r.get().isKind(PHANTOM)) {
+                return write(sl).write(".refer()");
+            }
+            return write(sl).write(".incAR()");
+        }
+
+        return write(v);
+    }
+
     private CppGenerator writeValue(Expression v, TypeDeclarer t, boolean move) {
+        if (v instanceof LiteralExpression le)
+            return writeLiteral(le, t);
+
         var r = t.maybeRefer();
         if (r.none()) {
             if (findClass(t).none()) return write(v);
             if (move) return write(v);
             if (v.unbound()) return write(v);
             return write(v).write(".Feng$share()");
-        }
-
-        if (v instanceof LiteralExpression le &&
-                le.literal() instanceof NilLiteral) {
-            return castPtr(v, t);
         }
 
         if (r.get().isKind(PHANTOM)) {
@@ -532,7 +555,7 @@ public class CppGenerator {
     public CppGenerator write(DerivedTypeDeclarer td) {
         var def = td.def.must();
         if (def instanceof EnumDefinition) {
-            return write(toCType(Primitive.INT32));
+            return write(Primitive.INT);
         }
         return write(td.derivedType()).typeRefer(td);
     }
@@ -550,7 +573,7 @@ public class CppGenerator {
     }
 
     public CppGenerator write(EnumTypeDeclarer e) {
-        return write(toCType(Primitive.INT32));
+        return write(Primitive.INT);
     }
 
     public CppGenerator write(VoidTypeDeclarer e) {
@@ -1395,8 +1418,9 @@ public class CppGenerator {
     public CppGenerator write(ArrayExpression e) {
         e.type().use(this::write);
         write("{.values = {");
+        var t = (ArrayTypeDeclarer) e.resultType.must();
         var types = new RepeatList<>(
-                e.resultType.must(), e.size());
+                t.element(), e.size());
         writeValues(e.elements(), types);
         write("}}");
         return this;
@@ -1466,14 +1490,16 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator write(StringLiteral e) {
-        write('"');
-        var cb = e.charset().decode(ByteBuffer.wrap(e.value()));
-        for (int i = 0; i < cb.length(); i++) {
-            write(cb.charAt(i));
+    public CppGenerator writeData(StringLiteral e) {
+        write("{.values={");
+        for (byte b : e.value()) {
+            write(b).write(',');
         }
-        write('"');
-        return this;
+        return write("}}");
+    }
+
+    public CppGenerator write(StringLiteral e) {
+        return literalString(e);
     }
 
     public CppGenerator write(LiteralExpression e) {
@@ -1521,7 +1547,7 @@ public class CppGenerator {
     }
 
     private CppGenerator enumMember(
-            PrimaryExpression s, EnumDefinition ed, Identifier m) {
+            EnumValueExpression s, EnumDefinition ed, Identifier m) {
         // TODO: check bounds
         if (EnumDefinition.TokenFieldId.equals(m.value()))
             return write(s);
@@ -1543,13 +1569,15 @@ public class CppGenerator {
     }
 
     public CppGenerator write(MemberOfExpression e) {
-        var td = (DerivedTypeDeclarer) e.subject().resultType.must();
-        var def = td.def.must();
-        if (def instanceof EnumDefinition ed) {
-            return enumMember(e.subject(), ed, e.member());
+        var td = e.subject().resultType.must();
+        if (td instanceof EnumTypeDeclarer etd) {
+            return enumMember((EnumValueExpression) e.subject(), etd.def(), e.member());
         }
 
-        deRefer(e.subject(), td);
+        var dtd = (DerivedTypeDeclarer) td;
+        var def = dtd.def.must();
+
+        deRefer(e.subject(), dtd);
         if (!e.generic().isEmpty()) return unreachable();
         write(e.member());
         return this;
@@ -1709,7 +1737,11 @@ public class CppGenerator {
     }
 
     private CppGenerator write(EnumIdExpression e) {
-        return write(e.index());
+        var t = e.index().resultType.must();
+        return write("Feng$checkIndex(").
+                write(e.index()).write(',')
+                .write('(').write(t).write(')')
+                .write(e.def().size()).write(')');
     }
 
     private CppGenerator write(ArrayLenExpression e) {

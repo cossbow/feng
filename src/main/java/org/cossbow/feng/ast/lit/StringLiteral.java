@@ -1,10 +1,18 @@
 package org.cossbow.feng.ast.lit;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.dcl.ArrayTypeDeclarer;
+import org.cossbow.feng.ast.dcl.Primitive;
+import org.cossbow.feng.ast.dcl.Refer;
+import org.cossbow.feng.ast.dcl.ReferKind;
 import org.cossbow.feng.util.CommonUtil;
+import org.cossbow.feng.util.Optional;
 
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.cossbow.feng.ast.Position.*;
 
 public class StringLiteral extends Literal {
     private final Charset charset;
@@ -39,18 +47,35 @@ public class StringLiteral extends Literal {
                 CommonUtil.concat(value, o.value));
     }
 
-    @Override
+    public ArrayTypeDeclarer array(Optional<ReferKind> kind) {
+        var len = new IntegerLiteral(ZERO, value.length).expr();
+        var r = kind.map(k ->
+                new Refer(ZERO, k, true, true));
+        return new ArrayTypeDeclarer(pos(), Primitive.BYTE.declarer(ZERO),
+                Optional.of(len), r);
+    }
+
+    //
+
+    private final int id = idGenerator.getAndIncrement();
+
+    public int id() {
+        return id;
+    }
+
+    private static final AtomicInteger idGenerator = new AtomicInteger();
+
+    //
+
     public String type() {
         return "string";
     }
 
-    @Override
     public boolean equals(Object o) {
-        if (!(o instanceof StringLiteral f)) return false;
-        return Arrays.equals(value, f.value);
+        return o instanceof StringLiteral f &&
+                Arrays.equals(value, f.value);
     }
 
-    @Override
     public int hashCode() {
         return 31 * charset.hashCode() +
                 Arrays.hashCode(value);

@@ -27,6 +27,10 @@ public class Field extends Entity {
         return false;
     }
 
+    public boolean enablePhantom() {
+        return true;
+    }
+
     //
 
     @Override

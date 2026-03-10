@@ -285,7 +285,9 @@ final class SourceParseVisitor
         if (tn == null) return null;
         var text = tn.getText();
         text = text.substring(1, text.length() - 1);
-        return new StringLiteral(posOf(tn), charset, text.getBytes(charset)); // 去掉引号
+        var sl = new StringLiteral(posOf(tn), charset, text.getBytes(charset)); // 去掉引号
+        var old = gst.stringCache.putIfAbsent(sl, sl);
+        return old != null ? old : sl;
     }
 
     private BoolLiteral parseBool(TerminalNode tn) {
@@ -596,9 +598,15 @@ final class SourceParseVisitor
         var values = new IdentifierTable<EnumDefinition.Value>();
         var id = 0;
         for (var vc : ctx.enumValue()) {
-            var v = new EnumDefinition.Value(posOf(vc), id++,
-                    identifier(vc.name), visitOptional(vc.value));
-            values.add(v.name(), v);
+            var name = identifier(vc.name);
+            var sl = new StringLiteral(name.pos(), charset,
+                    name.value().getBytes(charset));
+            var old = gst.stringCache.putIfAbsent(sl, sl);
+            if (old != null) sl = old;
+            var value = this.<Expression>visitOptional(vc.value);
+            var ev = new EnumDefinition.Value(posOf(vc), id++,
+                    name, value, sl);
+            values.add(ev.name(), ev);
         }
         return new EnumDefinition(posOf(ctx), modifier, symbol, values);
     }

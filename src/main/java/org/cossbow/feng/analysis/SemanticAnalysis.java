@@ -18,6 +18,7 @@ import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.layout.LayoutTool;
+import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.*;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.Stack;
@@ -31,7 +32,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.nio.charset.StandardCharsets.US_ASCII;
 import static org.cossbow.feng.ast.Position.ZERO;
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
 import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
@@ -178,48 +178,6 @@ public class SemanticAnalysis {
         return Optional.of(dag);
     }
 
-    private TypeDeclarer fromLiteral(TypeDeclarer td) {
-        if (td instanceof LiteralTypeDeclarer ltd) {
-            var p = ltd.literal().compatible();
-            if (p.has())
-                return p.must().declarer(td.pos());
-            if (ltd.literal() instanceof StringLiteral sl) {
-                var etd = Primitive.BYTE.declarer(sl.pos());
-                var ref = new Refer(sl.pos(), STRONG, false, true);
-                var atd = new ArrayTypeDeclarer(td.pos(), etd,
-                        Optional.empty(), Optional.of(ref), true);
-                atd.len(sl.length());
-                atd.unit((long) Primitive.BYTE.size());
-                return atd;
-            }
-            return semantic("auto type-infer can't support %s: %s",
-                    td, td.pos());
-        } else if (td instanceof ArrayTypeDeclarer atd) {
-            var ntd = fromLiteral(atd.element());
-            var na = new ArrayTypeDeclarer(atd.pos(), ntd,
-                    atd.length(), atd.refer(), atd.literal());
-            na.len(atd.len());
-            na.unit(atd.unit());
-            visit(na);
-            return na;
-        } else if (td instanceof ObjectTypeDeclarer ||
-                td instanceof VoidTypeDeclarer) {
-            return semantic("can't infer type from %s: %s",
-                    td, td.pos());
-        }
-        return td;
-    }
-
-    private TypeDeclarer literal2Std(TypeDeclarer t) {
-        if (t instanceof ObjectTypeDeclarer ||
-                t instanceof LiteralTypeDeclarer ||
-                (t instanceof ArrayTypeDeclarer at
-                        && at.literal())) {
-            return fromLiteral(t);
-        }
-        return t;
-    }
-
     private Optional<DAGGraph<GlobalVariable>>
     globalVarInit(Collection<GlobalVariable> list,
                   IdentifierTable<GlobalVariable> all,
@@ -230,9 +188,11 @@ public class SemanticAnalysis {
         return dag;
     }
 
+    private ParseSymbolTable gst;
 
     public Entity visit(Source s) {
         var tab = s.table();
+        gst = tab;
 
         var constValues = tab.variables.stream()
                 .filter(v -> v.declare() == Declare.CONST)
@@ -508,13 +468,14 @@ public class SemanticAnalysis {
     public Entity visit(EnumDefinition def) {
         var i = 0;
         for (var v : def.values()) {
-            v.val(i++);
+            v.val(i);
             if (v.init().none()) {
                 continue;
             }
             var il = calcInteger(v.init().must());
             v.init().set(new LiteralExpression(il.pos(), il));
-            v.val(il.value().intValue());
+            i = il.value().intValue();
+            v.val(i++);
         }
 
         return def;
@@ -976,10 +937,8 @@ public class SemanticAnalysis {
             case ParenExpression ee -> enablePhantom(lr, ee.child());
             case VariableExpression ee -> enablePhantom(lr, ee.variable());
             case SymbolExpression ee -> enablePhantom(lr, ee);
-            case AssertExpression ee -> false;
-            case SizeofExpression ee -> false;
-            case NewExpression ee -> false;
             case CurrentExpression ee -> true;
+            case EnumExpression ee -> false;
             default -> false;
         };
     }
@@ -1012,11 +971,15 @@ public class SemanticAnalysis {
 
     private boolean enablePhantom(Refer lr, MemberOfExpression e) {
         var f = e.field().must();
+        if (!f.enablePhantom()) return false;
+        if (e.subject() instanceof EnumExpression)
+            return true;
+
         var fr = f.type().maybeRefer();
         if (fr.none()) return enablePhantom(lr, e.subject());
 
         if (f.immutable())
-            return f.immutable() && enablePhantom(lr, e.subject());
+            return enablePhantom(lr, e.subject());
         return semantic("can't convert var-refer-field to phantom-refer: %s", f.pos());
     }
 
@@ -1206,6 +1169,11 @@ public class SemanticAnalysis {
         return false;
     }
 
+    private boolean
+    assignable(DerivedTypeDeclarer l, EnumTypeDeclarer r) {
+        var ld = l.def.must();
+        return ld instanceof EnumDefinition ed && r.def().equals(ed);
+    }
 
     private boolean
     assignable(DerivedTypeDeclarer l, DerivedTypeDeclarer r) {
@@ -1290,15 +1258,10 @@ public class SemanticAnalysis {
             if (!lr.required()) return true;
             return semantic("required-refer can't set nil: %s", rt.pos());
         }
-        if (rt.isString()) {
-            if (!(l instanceof ArrayTypeDeclarer la))
-                return false;
-
-            if (!(la.element() instanceof PrimitiveTypeDeclarer lp))
-                return false;
-
-            return lp.primitive() == Primitive.UINT8 &&
-                    la.refer().get().isKind(STRONG);
+        if (rt.literal() instanceof StringLiteral) {
+            return l instanceof ArrayTypeDeclarer la &&
+                    la.element() instanceof PrimitiveTypeDeclarer lp
+                    && lp.primitive() == Primitive.BYTE;
         }
         return false;
     }
@@ -1418,6 +1381,11 @@ public class SemanticAnalysis {
                     rp.primitive() == lp.primitive();
         }
 
+        if (r instanceof EnumTypeDeclarer rd) {
+            if (l instanceof DerivedTypeDeclarer ld)
+                return assignable(ld, rd);
+        }
+
         // Objects
         if (r instanceof DerivedTypeDeclarer rd) {
             if (l instanceof DerivedTypeDeclarer ld)
@@ -1462,6 +1430,17 @@ public class SemanticAnalysis {
 
         if (rt.isNil())
             return l instanceof FuncTypeDeclarer;
+
+        if (rt.literal() instanceof StringLiteral sl) {
+            if (!(l instanceof ArrayTypeDeclarer la))
+                return false;
+            if (la.refer().has()) return false;
+            if (!(la.element() instanceof PrimitiveTypeDeclarer lp))
+                return false;
+            if (lp.primitive() != Primitive.BYTE) return false;
+            if (la.len() >= sl.length()) return true;
+            return semantic("string data overflow: %s", sl.pos());
+        }
 
         return false;
     }
@@ -1617,6 +1596,42 @@ public class SemanticAnalysis {
         for (var a : as.list())
             visit(a);
         return as;
+    }
+
+    private TypeDeclarer fromLiteral(TypeDeclarer td, boolean enablePhantom) {
+        if (td instanceof LiteralTypeDeclarer ltd) {
+            var p = ltd.literal().compatible();
+            if (p.has())
+                return p.must().declarer(td.pos());
+            if (ltd.literal() instanceof StringLiteral sl) {
+                return sl.array(Optional.of(enablePhantom ? PHANTOM : STRONG));
+            }
+            return semantic("auto type-infer can't support %s: %s",
+                    td, td.pos());
+        } else if (td instanceof ArrayTypeDeclarer atd) {
+            var ntd = fromLiteral(atd.element(), false);
+            var na = new ArrayTypeDeclarer(atd.pos(), ntd,
+                    atd.length(), atd.refer(), atd.literal());
+            na.len(atd.len());
+            na.unit(atd.unit());
+            visit(na);
+            return na;
+        } else if (td instanceof ObjectTypeDeclarer ||
+                td instanceof VoidTypeDeclarer) {
+            return semantic("can't infer type from %s: %s",
+                    td, td.pos());
+        }
+        return td;
+    }
+
+    private TypeDeclarer literal2Std(TypeDeclarer t) {
+        if (t instanceof ObjectTypeDeclarer ||
+                t instanceof LiteralTypeDeclarer ||
+                (t instanceof ArrayTypeDeclarer at
+                        && at.literal())) {
+            return fromLiteral(t, true);
+        }
+        return t;
     }
 
     private void initVar(Variable v) {
@@ -2098,15 +2113,16 @@ public class SemanticAnalysis {
     //
 
     private boolean immutable(MemberOfExpression e, boolean left) {
-        var g = optimize((Expression) e);
-        var isValue = g.b().maybeRefer().none();
-        var f = ((MemberOfExpression) g.a()).field();
+        var t = e.resultType.must();
+        var isValue = t.maybeRefer().none();
+        var f = e.field();
         if (f.none()) {
             return semantic("operable field not found %s: %s",
                     e.member(), e.member().pos());
         }
 
-        if (f.get().type().maybeRefer().has()) return false;
+        var r = f.get().type().maybeRefer();
+        if (r.has()) return r.get().immutable();
         if (f.get() instanceof ClassField cf) {
             if (cf.declare() == Declare.CONST) return true;
         }
@@ -2169,6 +2185,7 @@ public class SemanticAnalysis {
             case ReferEqualExpression ee -> left;
             case BinaryExpression ee -> left;
             case UnaryExpression ee -> left;
+            case EnumExpression ee -> true;
             case null, default -> unreachable();
         };
     }
@@ -2422,6 +2439,8 @@ public class SemanticAnalysis {
         if (lv instanceof StringLiteral sll &&
                 rv instanceof StringLiteral srl) {
             var lit = computer.calc(op, sll, srl);
+            var old = gst.stringCache.putIfAbsent(lit, lit);
+            if (old != null) lit = old;
             var td = new LiteralTypeDeclarer(e.pos(), lit);
             return Groups.g2(new LiteralExpression(e.pos(), lit), td);
         }
@@ -3084,29 +3103,9 @@ public class SemanticAnalysis {
         if (o.none()) return semantic("%s has no field %s: %s",
                 etd.def(), name, name.pos());
 
-        var v = eve.value();
-        switch (name.value()) {
-            case EnumDefinition.TokenFieldId -> {
-                var lit = new IntegerLiteral(v.pos(), v.id());
-                var n = new LiteralExpression(v.pos(), lit);
-                var td = Primitive.INT.declarer(name.pos());
-                return Groups.g2(n, td);
-            }
-            case EnumDefinition.TokenFieldValue -> {
-                var lit = new IntegerLiteral(v.pos(), v.val());
-                var n = new LiteralExpression(v.pos(), lit);
-                var td = Primitive.INT.declarer(name.pos());
-                return Groups.g2(n, td);
-            }
-            case EnumDefinition.TokenFieldName -> {
-                var lit = new StringLiteral(v.pos(), US_ASCII, v.name().value().getBytes());
-                var n = new LiteralExpression(v.pos(), lit);
-                var td = new LiteralTypeDeclarer(v.pos(), lit);
-                return Groups.g2(n, td);
-            }
-        }
-        return semantic("%s has no field %s: %s",
-                etd.def(), name, name.pos());
+        var f = o.get();
+        var n = new MemberOfExpression(eve.pos(), eve, name, TypeArguments.EMPTY, f);
+        return Groups.g2(n, f.type());
     }
 
     public Groups.G2<Expression, TypeDeclarer> optimize(MemberOfExpression e) {
@@ -3382,6 +3381,8 @@ public class SemanticAnalysis {
     }
 
     public Groups.G2<Expression, TypeDeclarer> optimize(ObjectExpression oe) {
+        oe.type().use(this::visit);
+
         var entries = new IdentifierTable<Expression>(oe.entries().size());
         var types = new IdentifierTable<TypeDeclarer>(oe.entries().size());
         for (var n : oe.entries().nodes()) {

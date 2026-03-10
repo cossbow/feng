@@ -100,6 +100,14 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         public ArrayTypeDeclarer master() {
             return master;
         }
+
+        public boolean immutable() {
+            return true;
+        }
+
+        public boolean enablePhantom() {
+            return false;
+        }
     }
 
 

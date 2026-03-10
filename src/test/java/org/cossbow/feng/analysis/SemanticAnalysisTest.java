@@ -1055,8 +1055,8 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testLiteral6() {
-        checkSucc("func f() { const a=\"true\"; const c [*#]uint8 = a; }");
-        checkSucc("func f() { const a=\"true\"; const c [&#]uint8 = a; }");
+        checkSucc("func f() { const a=\"true\"; const c [4]byte = a; }");
+        checkSucc("func f() { const a=\"true\"; const c [&#]byte = a; }");
     }
 
     //
@@ -1319,10 +1319,10 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testPhantom2() {
-        checkSucc( "func f(){var s int; const r &int = s;}");
-        checkFail( "func f(){const s int; const r &int = s;}");
-        checkSucc( "func f(s *int){const r &int = s;}");
-        checkSucc( "func f(s &int){const r &int = s;}");
+        checkSucc("func f(){var s int; const r &int = s;}");
+        checkFail("func f(){const s int; const r &int = s;}");
+        checkSucc("func f(s *int){const r &int = s;}");
+        checkSucc("func f(s &int){const r &int = s;}");
     }
 
     @Test
@@ -2181,9 +2181,9 @@ public class SemanticAnalysisTest {
     public void testEnum3() {
         var d = "enum S{A,B=4,C,}";
 
-        checkSucc(d + "func f(s S) { var v = S.B.id; }");
-        checkSucc(d + "func f(s S) { var v = S.B.name; }");
-        checkSucc(d + "func f(s S) { var v = S.B.value; }");
+        checkSucc(d + "func f() { var v = S.B.id; }");
+        checkSucc(d + "func f() { var v = S.B.name; }");
+        checkSucc(d + "func f() { var v = S.B.value; }");
 
         checkSucc(d + "func f(s S) { var v = s.id; }");
         checkSucc(d + "func f(s S) { var v = s.name; }");
@@ -2194,6 +2194,23 @@ public class SemanticAnalysisTest {
     public void testEnum4() {
         var d = "enum A{X,} enum B{X,} ";
         checkFail(d + "func f(a A){var b B =a;}");
+    }
+
+    @Test
+    public void testEnum5() {
+        var d = "enum E {Stop, ALPHA,} ";
+        checkFail(d + "func f() {const e &#E = E.Stop;}");
+        checkSucc(d + "func f() {const e E = E.Stop;}");
+        checkFail(d + "func f() {const i &#int = E.Stop.id;}");
+        checkSucc(d + "func f() {const i int = E.Stop.id;}");
+
+        checkFail(d + "func f() {const v &#int = E.Stop.value;}");
+        checkSucc(d + "func f() {const v int = E.Stop.value;}");
+
+        checkSucc(d + "func f() {const n [&#]byte= E.Stop.name;}");
+        checkFail(d + "func f() {const n [&]byte= E.Stop.name;}");
+        checkSucc(d + "func f() {const n [*#]byte= E.Stop.name;}");
+        checkFail(d + "func f() {const n [*]byte= E.Stop.name;}");
     }
 
     // statement

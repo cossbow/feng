@@ -1,20 +1,14 @@
 package org.cossbow.feng.ast;
 
 import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.dcl.LiteralTypeDeclarer;
-import org.cossbow.feng.ast.dcl.Primitive;
-import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.ast.lit.IntegerLiteral;
-import org.cossbow.feng.ast.lit.Literal;
 import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
-import java.util.function.Function;
-
-import static java.nio.charset.StandardCharsets.US_ASCII;
+import static org.cossbow.feng.ast.Position.*;
 
 public class EnumDefinition extends TypeDefinition {
     private IdentifierTable<Value> values;
@@ -32,6 +26,10 @@ public class EnumDefinition extends TypeDefinition {
         return values;
     }
 
+    public int size() {
+        return values.size();
+    }
+
     public Value ofId(int id) {
         return values.getValue(id);
     }
@@ -40,15 +38,18 @@ public class EnumDefinition extends TypeDefinition {
         private final int id;
         private final Identifier name;
         private final Lazy<Expression> init;
+        private final StringLiteral nameLit;
 
         public Value(Position pos,
                      int id,
                      Identifier name,
-                     Optional<Expression> init) {
+                     Optional<Expression> init,
+                     StringLiteral nameLit) {
             super(pos);
             this.id = id;
             this.name = name;
             this.init = Lazy.of(init);
+            this.nameLit = nameLit;
         }
 
         public int id() {
@@ -61,6 +62,10 @@ public class EnumDefinition extends TypeDefinition {
 
         public Lazy<Expression> init() {
             return init;
+        }
+
+        public StringLiteral nameLit() {
+            return nameLit;
         }
 
         private volatile int val;
@@ -85,7 +90,6 @@ public class EnumDefinition extends TypeDefinition {
             return name.hashCode();
         }
 
-
         //
 
         @Override
@@ -95,19 +99,6 @@ public class EnumDefinition extends TypeDefinition {
                     "init=" + init + ']';
         }
 
-    }
-
-    //
-
-    public Optional<Function<Value, Literal>> field(Identifier name) {
-        Function<Value, Literal> f = switch (name.value()) {
-            case "id" -> v -> new IntegerLiteral(v.pos(), v.id);
-            case "value" -> v -> new IntegerLiteral(v.pos(), v.val);
-            case "name" -> v -> new StringLiteral(v.pos(),
-                    US_ASCII, v.name.value().getBytes());
-            case null, default -> null;
-        };
-        return Optional.of(f);
     }
 
     //
@@ -126,26 +117,38 @@ public class EnumDefinition extends TypeDefinition {
         return Optional.of(f);
     }
 
-    public final EnumField IdField = makeField(TokenFieldId, Primitive.INT.declarer(pos()));
-    public final EnumField ValueField = makeField(TokenFieldValue, Primitive.INT.declarer(pos()));
-    public final EnumField NameField = makeField(TokenFieldName, new LiteralTypeDeclarer(pos(),
-            new StringLiteral(pos(), US_ASCII, TokenFieldName.getBytes(US_ASCII))));
+    public final EnumField IdField = makeField(TokenFieldId,
+            Primitive.INT.declarer(ZERO), false);
+    public final EnumField ValueField = makeField(TokenFieldValue,
+            Primitive.INT.declarer(ZERO), false);
+    public final EnumField NameField = makeField(TokenFieldName,
+            new ArrayTypeDeclarer(ZERO, Primitive.BYTE.declarer(pos()),
+                    Optional.empty(),
+                    Optional.of(new Refer(ZERO, ReferKind.STRONG,
+                            true, true))),
+            true);
 
-    private EnumField makeField(String name, TypeDeclarer td) {
-        return new EnumField(pos(), new Identifier(pos(), name), td, this);
+    private EnumField makeField(String name, TypeDeclarer td, boolean enablePhantom) {
+        return new EnumField(new Identifier(pos(), name), td, enablePhantom);
     }
 
-    public static class EnumField extends Field {
-        private final EnumDefinition definition;
+    public class EnumField extends Field {
+        private final boolean enablePhantom;
 
-        public EnumField(Position pos,
-                         Identifier name,
+        public EnumField(Identifier name,
                          TypeDeclarer type,
-                         EnumDefinition definition) {
-            super(pos, name, type);
-            this.definition = definition;
+                         boolean enablePhantom) {
+            super(EnumDefinition.this.pos(), name, type);
+            this.enablePhantom = enablePhantom;
         }
 
+        public boolean immutable() {
+            return true;
+        }
+
+        public boolean enablePhantom() {
+            return enablePhantom;
+        }
     }
 
 }
