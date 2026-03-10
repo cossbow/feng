@@ -9,6 +9,9 @@ import java.util.List;
 import static org.cossbow.feng.util.ErrorUtil.semantic;
 import static org.cossbow.feng.util.ErrorUtil.unreachable;
 
+/**
+ * 用于分析函数体是否缺失返回值的工具
+ */
 public class ReturnAnalyzer {
 
     public ReturnAnalyzer() {
@@ -16,7 +19,7 @@ public class ReturnAnalyzer {
 
     //
 
-    public boolean check(Optional<Statement> o) {
+    private boolean check(Optional<Statement> o) {
         return o.has() && check(o.get());
     }
 
@@ -34,7 +37,7 @@ public class ReturnAnalyzer {
         };
     }
 
-    public boolean check(List<Statement> list) {
+    private boolean check(List<Statement> list) {
         var found = false;
         for (var s : list) {
             if (found) {
@@ -46,11 +49,11 @@ public class ReturnAnalyzer {
         return found;
     }
 
-    public boolean check(BlockStatement bs) {
+    private boolean check(BlockStatement bs) {
         return check(bs.list());
     }
 
-    public boolean check(ForStatement s) {
+    private boolean check(ForStatement s) {
         return switch (s) {
             case ConditionalForStatement fs -> check(fs);
             case IterableForStatement fs -> check(fs);
@@ -58,15 +61,15 @@ public class ReturnAnalyzer {
         };
     }
 
-    public boolean check(ConditionalForStatement s) {
+    private boolean check(ConditionalForStatement s) {
         return s.cond().match(BoolLiteral::value);
     }
 
-    public boolean check(IterableForStatement s) {
+    private boolean check(IterableForStatement s) {
         return false;
     }
 
-    public boolean check(IfStatement s) {
+    private boolean check(IfStatement s) {
         if (s.cond().has()) {
             if (s.cond().must().value()) {
                 return check(s.yes());
@@ -77,7 +80,7 @@ public class ReturnAnalyzer {
         return check(s.yes()) && check(s.not());
     }
 
-    public boolean check(SwitchStatement s) {
+    private boolean check(SwitchStatement s) {
         var found = true;
         for (var b : s.branches()) {
             found = found && check(b.body());
@@ -87,7 +90,7 @@ public class ReturnAnalyzer {
         return found && check(s.defaultBranch().get().body());
     }
 
-    public boolean check(TryStatement s) {
+    private boolean check(TryStatement s) {
         var found = check(s.body());
         for (var c : s.catchClauses()) {
             found = found && check(c.body());

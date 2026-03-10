@@ -40,11 +40,6 @@ public class ObjectExpression extends PrimaryExpression {
     }
 
     @Override
-    public boolean isFinal() {
-        return entries.values().stream().allMatch(Expression::isFinal);
-    }
-
-    @Override
     public boolean unbound() {
         return true;
     }

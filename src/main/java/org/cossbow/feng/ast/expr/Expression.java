@@ -12,19 +12,18 @@ public class Expression extends Entity {
         super(pos);
     }
 
-    public boolean isFinal() {
-        return false;
-    }
-
+    // 游离的，未被变量、字段或数组元素绑定的
     public boolean unbound() {
         return false;
     }
 
+    // 表达式推导出来的类型缓存在这里
     public final Lazy<TypeDeclarer> resultType = Lazy.nil();
 
 
     //
 
+    // 用于标记需要引用的是可调用的过程：函数或方法
     private volatile boolean expectCallable;
 
     public boolean expectCallable() {

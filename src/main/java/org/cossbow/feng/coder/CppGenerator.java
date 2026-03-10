@@ -29,7 +29,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
-import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -111,7 +110,7 @@ public class CppGenerator {
         return write(fmt.formatted(args));
     }
 
-    public static final String COMMA = ", ";
+    private static final String COMMA = ", ";
 
     private int indentValue;
 
@@ -189,8 +188,11 @@ public class CppGenerator {
 */
     }
 
-    public CppGenerator write(Source src) {
-        if (!src.imports().isEmpty()) return unsupported("import");
+    public void write(Source src) {
+        if (!src.imports().isEmpty()) {
+            unsupported("import");
+            return;
+        }
 
         definePre(src);
         start();
@@ -232,10 +234,10 @@ public class CppGenerator {
         writeComment("function definition");
         visitFunctions(src.table());
 
-        return this;
     }
 
-    void declareGlobalVar(Optional<DAGGraph<GlobalVariable>> vars) {
+    private void declareGlobalVar(
+            Optional<DAGGraph<GlobalVariable>> vars) {
         vars.use(dag -> {
             dag.bfs(this::write);
             newLine();
@@ -274,11 +276,6 @@ public class CppGenerator {
         return findType((DerivedType) dt);
     }
 
-    private CppGenerator domain(TypeDomain d) {
-//        return write("DOMAIN_").write(d.name());
-        return write(d.ordinal());
-    }
-
     void typesMetadata(Source src) {
         newLine();
         writeComment("define primitives");
@@ -289,7 +286,8 @@ public class CppGenerator {
         newLine();
     }
 
-    void literalStringCache(Source src) {
+    // 写入全局的字符串常量池：非C-type字符串，没有尾部的'0'
+    private void literalStringCache(Source src) {
         var list = src.table().stringCache
                 .keySet().stream()
                 .sorted(Comparator.comparingInt(StringLiteral::id))
@@ -305,6 +303,7 @@ public class CppGenerator {
         }
     }
 
+    // 用于引用全局字符串常量
     private CppGenerator literalString(StringLiteral sl) {
         return write("Feng$constString_").write(sl.id());
     }
@@ -406,7 +405,7 @@ public class CppGenerator {
 
     static final String STATIC = "static";
 
-    public CppGenerator write(GlobalVariable v) {
+    private CppGenerator write(GlobalVariable v) {
         write(STATIC);
         write(' ');
         return declareVar(v);
@@ -527,7 +526,7 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator declareVar(Variable v) {
+    private CppGenerator declareVar(Variable v) {
         return write(v).endStmt();
     }
 
@@ -538,7 +537,7 @@ public class CppGenerator {
 
     // type declarer
 
-    public CppGenerator write(ArrayTypeDeclarer td) {
+    private CppGenerator write(ArrayTypeDeclarer td) {
         if (td.refer().none()) {
             return write("Feng$Array<").write(td.element()).write(',')
                     .write(td.len()).write('>');
@@ -552,7 +551,7 @@ public class CppGenerator {
         return write('*');
     }
 
-    public CppGenerator write(DerivedTypeDeclarer td) {
+    private CppGenerator write(DerivedTypeDeclarer td) {
         var def = td.def.must();
         if (def instanceof EnumDefinition) {
             return write(Primitive.INT);
@@ -560,27 +559,27 @@ public class CppGenerator {
         return write(td.derivedType()).typeRefer(td);
     }
 
-    public CppGenerator write(Primitive p) {
+    private CppGenerator write(Primitive p) {
         return write(CommonUtil.upperFirst(p.code));
     }
 
-    public CppGenerator write(PrimitiveTypeDeclarer td) {
+    private CppGenerator write(PrimitiveTypeDeclarer td) {
         return write(td.primitive()).typeRefer(td);
     }
 
-    public CppGenerator write(FuncTypeDeclarer e) {
+    private CppGenerator write(FuncTypeDeclarer e) {
         return unsupported("func");
     }
 
-    public CppGenerator write(EnumTypeDeclarer e) {
+    private CppGenerator write(EnumTypeDeclarer e) {
         return write(Primitive.INT);
     }
 
-    public CppGenerator write(VoidTypeDeclarer e) {
+    private CppGenerator write(VoidTypeDeclarer e) {
         return write("void");
     }
 
-    public CppGenerator write(TempNameTypeDeclarer e) {
+    private CppGenerator write(TempNameTypeDeclarer e) {
         return write(e.name);
     }
 
@@ -597,7 +596,7 @@ public class CppGenerator {
         };
     }
 
-    public static class TempNameTypeDeclarer extends TypeDeclarer {
+    private static class TempNameTypeDeclarer extends TypeDeclarer {
         final String name;
 
         TempNameTypeDeclarer(String name) {
@@ -616,7 +615,7 @@ public class CppGenerator {
 
     //
 
-    public CppGenerator write(StructureField sf) {
+    private CppGenerator write(StructureField sf) {
         write(sf.type());
         write(' ');
         write(sf.name());
@@ -626,7 +625,7 @@ public class CppGenerator {
         return endStmt();
     }
 
-    public CppGenerator write(StructureDefinition sd) {
+    private CppGenerator write(StructureDefinition sd) {
         write("struct ");
         write(sd.symbol().name());
         write('{').newLine();
@@ -689,7 +688,7 @@ public class CppGenerator {
     private volatile ClassDefinition enterClass;
     private volatile ClassMethod enterMethod;
 
-    public void declareClass(ClassDefinition cd) {
+    private void declareClass(ClassDefinition cd) {
         if (cd.builtin()) return;
         assert enterClass == null;
         enterClass = cd;
@@ -823,13 +822,14 @@ public class CppGenerator {
         write(token, m.prototype());
         newLine();
         write('{').newLine();
-        var hasReturn = m.prototype().returnSet().has();
         var args = m.prototype().parameterSet();
         write("switch (((Object *)this)->feng$classId) {").newLine();
         m.seeOverride(or -> {
             var child = or.master();
             write("case ").write(child.id()).write(':').newLine();
-            if (hasReturn) write("return ");
+            m.prototype().returnSet().use(rt ->{
+                write("return (").write(rt).write(')');
+            });
             write("((").write(child.symbol()).write("*)this)->");
             if (or.override().isEmpty()) {
                 write(m.name());
@@ -837,13 +837,13 @@ public class CppGenerator {
                 write(switchMethodName(m.name().value()));
             }
             write('(').writeArgs(args).write(");");
-            if (!hasReturn) write("break;");
+            if (m.prototype().returnSet().none()) write("break;");
             newLine();
         });
 
         write("default:").newLine();
         if (m instanceof ClassMethod) {
-            if (hasReturn) write("return ");
+            if (m.prototype().returnSet().has()) write("return ");
             write(" this->").write(m.name());
             write('(').writeArgs(args);
             write(')').endStmt();
@@ -855,12 +855,12 @@ public class CppGenerator {
         write('}').newLine();
     }
 
-    public void declareMethod(Method cm) {
+    private void declareMethod(Method cm) {
         cacheReturnFunc(cm.prototype());
         write(cm.name(), cm.prototype()).endStmt();
     }
 
-    public void implClass(ClassDefinition cd) {
+    private void implClass(ClassDefinition cd) {
         if (cd.builtin()) return;
         assert enterClass == null;
         enterClass = cd;
@@ -875,7 +875,7 @@ public class CppGenerator {
         return def.symbol() + "::" + name;
     }
 
-    public void implMethod(ClassMethod cm) {
+    private void implMethod(ClassMethod cm) {
         assert enterClass != null;
         assert enterMethod == null;
         enterMethod = cm;
@@ -889,7 +889,7 @@ public class CppGenerator {
         enterMethod = null;
     }
 
-    public CppGenerator write(Symbol s) {
+    private CppGenerator write(Symbol s) {
         if (s.module().has()) {
             write(s.module().get());
             write('$');
@@ -899,7 +899,7 @@ public class CppGenerator {
     }
 
 
-    public CppGenerator write(DerivedType dt) {
+    private CppGenerator write(DerivedType dt) {
         write(dt.symbol());
         if (!dt.generic().isEmpty())
             unsupported("泛型未实现");
@@ -915,7 +915,7 @@ public class CppGenerator {
         return unreachable();
     }
 
-    public CppGenerator write(PrimitiveType dt) {
+    private CppGenerator write(PrimitiveType dt) {
         return write(dt.primitive());
     }
 
@@ -932,7 +932,7 @@ public class CppGenerator {
         return declare(name.value(), td);
     }
 
-    public CppGenerator write(ClassField cf) {
+    private CppGenerator write(ClassField cf) {
         assert enterClass != null;
         return declare(cf.name(), cf.type()).endStmt();
     }
@@ -979,7 +979,7 @@ public class CppGenerator {
         return write(name.value(), prototype);
     }
 
-    public void implFunc(FunctionDefinition fd) {
+    private void implFunc(FunctionDefinition fd) {
         assert enterFunc == null;
         enterFunc = fd;
         var proc = fd.procedure();
@@ -1047,7 +1047,7 @@ public class CppGenerator {
         };
     }
 
-    public CppGenerator write(BlockStatement bs) {
+    private CppGenerator write(BlockStatement bs) {
         if (bs.newScope()) write('{').newLine();
 
         write(bs.list());
@@ -1121,7 +1121,7 @@ public class CppGenerator {
                 .endStmt();
     }
 
-    public CppGenerator write(ReturnStatement rs) {
+    private CppGenerator write(ReturnStatement rs) {
         writeComment("release and return");
         if (rs.result().none()) {
             return release(rs.local()).write("return").endStmt();
@@ -1133,12 +1133,12 @@ public class CppGenerator {
         return release(rs.local(), re, rt, "return ");
     }
 
-    public CppGenerator write(DeclarationStatement ds) {
+    private CppGenerator write(DeclarationStatement ds) {
         ds.variables().forEach(this::declareVar);
         return this;
     }
 
-    public CppGenerator write(Operand e) {
+    private CppGenerator write(Operand e) {
         switch (e) {
             case IndexOperand ee -> write(ee);
             case FieldOperand ee -> write(ee);
@@ -1148,21 +1148,21 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator write(VariableOperand e) {
+    private CppGenerator write(VariableOperand e) {
         varName(e.variable().must());
         return this;
     }
 
-    public CppGenerator write(IndexOperand e) {
+    private CppGenerator write(IndexOperand e) {
         return index(e.subject(), e.index());
     }
 
-    public CppGenerator write(FieldOperand e) {
+    private CppGenerator write(FieldOperand e) {
         var td = (DerivedTypeDeclarer) e.subject().resultType.must();
         return deRefer(e.subject(), td).write(e.field());
     }
 
-    public CppGenerator write(AssignmentsStatement as) {
+    private CppGenerator write(AssignmentsStatement as) {
         for (var a : as.list()) {
             var e = a.operand();
             if (!e.relay().isEmpty()) {
@@ -1178,13 +1178,13 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator write(BreakStatement e) {
+    private CppGenerator write(BreakStatement e) {
         if (e.label().has()) return unsupported("break label");
         write("break;\n");
         return this;
     }
 
-    public CppGenerator write(CallStatement e) {
+    private CppGenerator write(CallStatement e) {
         if (e.replace().has()) {
             write(e.replace().must());
         } else {
@@ -1226,7 +1226,7 @@ public class CppGenerator {
     }
 
 
-    public CppGenerator write(ConditionalForStatement fs) {
+    private CppGenerator write(ConditionalForStatement fs) {
         if (fs.initializer().none()) {
             write("while(");
             write(fs.condition());
@@ -1250,21 +1250,21 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator write(IterableForStatement s) {
+    private CppGenerator write(IterableForStatement s) {
         return write(s.replace.must());
     }
 
-    public CppGenerator write(ContinueStatement s) {
+    private CppGenerator write(ContinueStatement s) {
         write("continue ");
         s.label().use(this::write);
         return endStmt();
     }
 
-    public CppGenerator write(GotoStatement e) {
+    private CppGenerator write(GotoStatement e) {
         return unsupported("goto");
     }
 
-    public CppGenerator write(IfStatement is) {
+    private CppGenerator write(IfStatement is) {
         is.init().use(s -> {
             write('{');
             write(s);
@@ -1283,13 +1283,13 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator write(LabeledStatement s) {
+    private CppGenerator write(LabeledStatement s) {
         write(s.label());
         write(':');
         return write(s.target());
     }
 
-    public CppGenerator write(SwitchStatement ss) {
+    private CppGenerator write(SwitchStatement ss) {
         if (ss.init().has()) {
             write('{');
             write(ss.init().get());
@@ -1316,22 +1316,22 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator write(Branch e) {
+    private CppGenerator write(Branch e) {
         write((Statement) e.body());
         return this;
     }
 
-    public CppGenerator write(ThrowStatement e) {
+    private CppGenerator write(ThrowStatement e) {
         return unsupported("throw");
     }
 
-    public CppGenerator write(TryStatement e) {
+    private CppGenerator write(TryStatement e) {
         return unsupported("try..catch");
     }
 
     // expression
 
-    public CppGenerator write(Expression e) {
+    private CppGenerator write(Expression e) {
         return switch (e) {
             case BinaryExpression ee -> write(ee);
             case ReferEqualExpression ee -> write(ee);
@@ -1352,7 +1352,7 @@ public class CppGenerator {
             case ParenExpression ee -> write(ee);
             case SymbolExpression ee -> write(ee);
             case VariableExpression ee -> write(ee);
-            case IsNilExpression ee -> write(ee);
+            case CheckNilExpression ee -> write(ee);
             case EnumValueExpression ee -> write(ee);
             case EnumIdExpression ee -> write(ee);
             case ArrayLenExpression ee -> write(ee);
@@ -1374,7 +1374,7 @@ public class CppGenerator {
         return unsupported("幂运算");
     }
 
-    public CppGenerator write(BinaryExpression e) {
+    private CppGenerator write(BinaryExpression e) {
         var op = e.operator();
         if (op == BinaryOperator.POW)
             return writePow(e.left(), e.right());
@@ -1404,7 +1404,7 @@ public class CppGenerator {
                 .write(o).write('(').write(e.right()).write(')');
     }
 
-    public CppGenerator write(ReferEqualExpression e) {
+    private CppGenerator write(ReferEqualExpression e) {
         write(e.left());
         var lt = e.left().resultType.must();
         if (lt instanceof ArrayTypeDeclarer) write(".start");
@@ -1415,7 +1415,7 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator write(ArrayExpression e) {
+    private CppGenerator write(ArrayExpression e) {
         e.type().use(this::write);
         write("{.values = {");
         var t = (ArrayTypeDeclarer) e.resultType.must();
@@ -1426,7 +1426,7 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator write(AssertExpression e) {
+    private CppGenerator write(AssertExpression e) {
         if (!e.needCheck())
             return castPtr(e.subject(), e.type());
 
@@ -1441,13 +1441,13 @@ public class CppGenerator {
                 .write(dst.id()).write(')');
     }
 
-    public CppGenerator write(CallExpression e) {
+    private CppGenerator write(CallExpression e) {
         write(e.callee());
         return write('(').writeValues(e.arguments(), e.prototype()
                 .must().parameterSet().types()).write(')');
     }
 
-    public CppGenerator write(IndexOfExpression e) {
+    private CppGenerator write(IndexOfExpression e) {
         return index(e.subject(), e.index());
     }
 
@@ -1455,11 +1455,11 @@ public class CppGenerator {
         return varName(e.variable());
     }
 
-    public CppGenerator write(LambdaExpression e) {
+    private CppGenerator write(LambdaExpression e) {
         return unsupported("尼玛函数");
     }
 
-    public CppGenerator write(Literal e) {
+    private CppGenerator write(Literal e) {
         return switch (e) {
             case BoolLiteral ee -> write(ee);
             case FloatLiteral ee -> write(ee);
@@ -1470,27 +1470,27 @@ public class CppGenerator {
         };
     }
 
-    public CppGenerator write(BoolLiteral e) {
+    private CppGenerator write(BoolLiteral e) {
         write(e.value() ? "true" : "false");
         return this;
     }
 
-    public CppGenerator write(FloatLiteral e) {
+    private CppGenerator write(FloatLiteral e) {
         write(e.value().toString());
         return this;
     }
 
-    public CppGenerator write(IntegerLiteral e) {
+    private CppGenerator write(IntegerLiteral e) {
         write(e.value().toString(e.radix()));
         return this;
     }
 
-    public CppGenerator write(NilLiteral e) {
+    private CppGenerator write(NilLiteral e) {
         write("nullptr");
         return this;
     }
 
-    public CppGenerator writeData(StringLiteral e) {
+    private CppGenerator writeData(StringLiteral e) {
         write("{.values={");
         for (byte b : e.value()) {
             write(b).write(',');
@@ -1498,11 +1498,11 @@ public class CppGenerator {
         return write("}}");
     }
 
-    public CppGenerator write(StringLiteral e) {
+    private CppGenerator write(StringLiteral e) {
         return literalString(e);
     }
 
-    public CppGenerator write(LiteralExpression e) {
+    private CppGenerator write(LiteralExpression e) {
         var rt = e.resultType.must();
         if (rt instanceof ArrayTypeDeclarer atd
                 && atd.refer().has()) {
@@ -1512,7 +1512,7 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator write(CurrentExpression e) {
+    private CppGenerator write(CurrentExpression e) {
         assert enterClass != null;
         if (e.isSelf()) return write("this");
         var pd = enterClass.parent().must();
@@ -1568,7 +1568,7 @@ public class CppGenerator {
         return write(member);
     }
 
-    public CppGenerator write(MemberOfExpression e) {
+    private CppGenerator write(MemberOfExpression e) {
         var td = e.subject().resultType.must();
         if (td instanceof EnumTypeDeclarer etd) {
             return enumMember((EnumValueExpression) e.subject(), etd.def(), e.member());
@@ -1583,7 +1583,7 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator write(MethodExpression e) {
+    private CppGenerator write(MethodExpression e) {
         var td = (DerivedTypeDeclarer) e.subject().resultType.must();
         var def = td.def.must();
 
@@ -1643,7 +1643,7 @@ public class CppGenerator {
         return write(')');
     }
 
-    public CppGenerator write(NewExpression e) {
+    private CppGenerator write(NewExpression e) {
         return switch (e.type()) {
             case NewDefinedType t -> visitNew(t, e);
             case NewArrayType t -> visitNew(t, e);
@@ -1670,7 +1670,7 @@ public class CppGenerator {
         return true;
     }
 
-    public CppGenerator write(ObjectExpression oe) {
+    private CppGenerator write(ObjectExpression oe) {
         if (oe.initStack.isEmpty())
             return write("{}");
 
@@ -1679,18 +1679,18 @@ public class CppGenerator {
         return this;
     }
 
-    public CppGenerator write(PairsExpression e) {
+    private CppGenerator write(PairsExpression e) {
         return unsupported("pairs");
     }
 
-    public CppGenerator write(ParenExpression e) {
+    private CppGenerator write(ParenExpression e) {
         write('(');
         write(e.child());
         write(')');
         return this;
     }
 
-    public CppGenerator write(IsNilExpression e) {
+    private CppGenerator write(CheckNilExpression e) {
         var st = e.subject().resultType.must();
         write(e.subject());
         if (st instanceof ArrayTypeDeclarer)
@@ -1699,14 +1699,14 @@ public class CppGenerator {
         return write("=nullptr");
     }
 
-    public CppGenerator write(SymbolExpression e) {
+    private CppGenerator write(SymbolExpression e) {
         if (!e.generic().isEmpty()) return unsupported("generic");
         var t = e.resultType.must();
         write(e.symbol());
         return this;
     }
 
-    public CppGenerator write(UnaryExpression e) {
+    private CppGenerator write(UnaryExpression e) {
         var op = e.operator();
         var td = e.resultType.must();
         if (!(td instanceof PrimitiveTypeDeclarer ptd))

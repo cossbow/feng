@@ -16,8 +16,4 @@ public class LambdaExpression extends PrimaryExpression {
         return procedure;
     }
 
-    @Override
-    public boolean isFinal() {
-        return true;
-    }
 }

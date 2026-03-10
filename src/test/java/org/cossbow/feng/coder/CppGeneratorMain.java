@@ -23,7 +23,7 @@ public class CppGeneratorMain {
         var source = doParse(srcFile);
         // 分析ast
         var ctx = new GlobalSymbolContext(source.table());
-        new SemanticAnalysis(ctx).visit(source);
+        new SemanticAnalysis(ctx).analyse(source);
         // 生成C++代码
         try (var out = new FileOutputStream(cppFile);
              var bo = new BufferedOutputStream(out);

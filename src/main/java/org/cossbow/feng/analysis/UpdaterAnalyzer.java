@@ -26,7 +26,7 @@ public class UpdaterAnalyzer {
         }
     }
 
-    public void analyse(ClassMethod method) {
+    private void analyse(ClassMethod method) {
         enterMethod = method;
         analyse(method.func().procedure());
     }

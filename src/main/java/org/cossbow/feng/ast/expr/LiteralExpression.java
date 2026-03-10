@@ -20,11 +20,6 @@ public class LiteralExpression extends PrimaryExpression {
     }
 
     @Override
-    public boolean isFinal() {
-        return true;
-    }
-
-    @Override
     public boolean unbound() {
         return true;
     }

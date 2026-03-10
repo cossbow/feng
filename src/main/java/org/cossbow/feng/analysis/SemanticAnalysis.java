@@ -67,7 +67,7 @@ public class SemanticAnalysis {
         var enums = new ArrayList<EnumDefinition>();
         for (var t : types) {
             if (t instanceof EnumDefinition ed) {
-                visit(ed);
+                analyse(ed);
                 enums.add(ed);
             }
         }
@@ -101,13 +101,13 @@ public class SemanticAnalysis {
         }
         if (all.isEmpty()) return Optional.empty();
         var dag = makeDAG(all, edges);
-        dag.bfs(this::visit);
+        dag.bfs(this::analyse);
         return Optional.of(dag);
     }
 
     private void visitAttribute(IdentifierTable<TypeDefinition> types) {
         for (var t : types) {
-            if (t instanceof AttributeDefinition ad) visit(ad);
+            if (t instanceof AttributeDefinition ad) analyse(ad);
         }
     }
 
@@ -150,13 +150,14 @@ public class SemanticAnalysis {
                 case ParenExpression e -> q.add(e.child());
                 case LiteralExpression e -> {
                 }
+                // 其他的Expression类型并不是通过解析创建的，这时不用管
                 case null, default -> semantic("can't depend: %s", c);
             }
         }
         return deps;
     }
 
-
+    // 创建全局变量的依赖图：便于bfs遍历分析
     private Optional<DAGGraph<GlobalVariable>>
     globalGraph(Collection<GlobalVariable> list,
                 IdentifierTable<GlobalVariable> all,
@@ -184,93 +185,105 @@ public class SemanticAnalysis {
                   boolean isConst) {
         var dag = globalGraph(list, all, isConst);
         if (dag.none()) return dag;
-        dag.get().bfs(this::visit);
+        dag.get().bfs(this::analyse);
         return dag;
     }
 
     private ParseSymbolTable gst;
 
-    public Entity visit(Source s) {
+    public Entity analyse(Source s) {
         var tab = s.table();
         gst = tab;
 
+        // 先分析全局常量：必须是const的基本类型才能是常量
         var constValues = tab.variables.stream()
                 .filter(v -> v.declare() == Declare.CONST)
                 .collect(Collectors.toSet());
         tab.dagConst = globalVarInit(constValues, tab.variables, true);
 
+        // 再依次分析定义的类型：先分析各类型的依赖图，检查循环依赖后再按BFS分析
+        // 枚举只可能依赖常量，第一个分析
         tab.enumList = visitEnum(tab.namedTypes);
+        // 结构类型也只依赖常量：优先分析
         tab.dagStructures = visitStructures(tab.namedTypes);
+        // 原型定义先分析：！！！这个可能有问题
         tab.dagPrototypes = visitPrototype(tab.namedTypes);
+        // 先分析接口
         tab.dagInterfaces = visitInterfaces(tab.namedTypes);
+        // 最后分析类
         tab.dagClasses = visitClasses(tab.namedTypes);
 
+        // 然后分析其他全局变量
         var rest = subtract(tab.variables.values(), constValues);
         tab.dagVars = globalVarInit(rest, tab.variables, false);
 
+        // 分析类的方法：包括方法中的语句
         tab.dagClasses.use(this::visitMethods);
+
+        // 【未实现】属性
         visitAttribute(tab.namedTypes);
 
-        for (var f : tab.namedFunctions) visit(f);
+        // 分析函数：包括函数中的语句
+        for (var f : tab.namedFunctions) analyse(f);
 
         return s;
     }
 
-    public Entity visit(Modifier m) {
+    private Entity analyse(Modifier m) {
         if (!m.attributes().isEmpty())
             unsupported("attribute");
         return m;
     }
 
-    public Entity visit(Refer e) {
+    private Entity analyse(Refer e) {
         return e;
     }
 
-    public Entity visit(TypeArguments ta) {
+    private Entity analyse(TypeArguments ta) {
         if (ta.isEmpty()) return ta;
         return unsupported("generic");
     }
 
-    public TypeDefinition visit(DerivedType dt) {
-        visit(dt.generic());
+    private TypeDefinition analyse(DerivedType dt) {
+        analyse(dt.generic());
         var type = context.findType(dt.symbol());
         if (type.none())
             return semantic("type %s not defined: %s",
                     dt.symbol(), dt.pos());
-        visit(type.get().generic());
+        analyse(type.get().generic());
         return type.get();
     }
 
     private TypeDefinition findDef(DerivedTypeDeclarer dtd) {
-        return visit(dtd.derivedType());
+        return analyse(dtd.derivedType());
     }
 
     //
 
     private boolean enablePhantom = false;
 
-    public Entity visit(TypeDeclarer td) {
+    private Entity analyse(TypeDeclarer td) {
         if (enablePhantom) {
             enablePhantom = false;
         } else {
             illegalPhantom(td);
         }
         return switch (td) {
-            case ArrayTypeDeclarer ee -> visit(ee);
-            case DerivedTypeDeclarer ee -> visit(ee);
-            case FuncTypeDeclarer ee -> visit(ee);
-            case PrimitiveTypeDeclarer ee -> visit(ee);
-            case LiteralTypeDeclarer ee -> visit(ee);
-            case ObjectTypeDeclarer ee -> visit(ee);
+            case ArrayTypeDeclarer ee -> analyse(ee);
+            case DerivedTypeDeclarer ee -> analyse(ee);
+            case FuncTypeDeclarer ee -> analyse(ee);
+            case PrimitiveTypeDeclarer ee -> analyse(ee);
+            case LiteralTypeDeclarer ee -> analyse(ee);
+            case ObjectTypeDeclarer ee -> analyse(ee);
             case null, default -> unreachable();
         };
     }
 
-    public TypeDefinition visit(DerivedTypeDeclarer td) {
-        var dt = visit(td.derivedType());
+    private TypeDefinition analyse(DerivedTypeDeclarer td) {
+        var dt = analyse(td.derivedType());
         td.def.set(dt);
         var r = td.refer();
-        if (r.has()) visit(r.get());
+        if (r.has()) analyse(r.get());
 
         if (dt instanceof StructureDefinition) return dt;
 
@@ -301,38 +314,38 @@ public class SemanticAnalysis {
                 td.pos());
     }
 
-    public Entity visit(ArrayTypeDeclarer td) {
-        visit(td.element());
+    private Entity analyse(ArrayTypeDeclarer td) {
+        analyse(td.element());
         if (td.length().has()) {
             var l = td.length().get();
             var s = calcSize(l);
             td.length(Optional.of(new LiteralExpression(l.pos(), s)));
             td.len(s.value().longValue());
         } else {
-            visit(td.refer().must());
+            analyse(td.refer().must());
         }
         return td;
     }
 
-    public Entity visit(FuncTypeDeclarer td) {
-        visit(td.prototype(), false);
-        visit(td.generic());
+    private Entity analyse(FuncTypeDeclarer td) {
+        analyse(td.prototype(), false);
+        analyse(td.generic());
         return td;
     }
 
-    public Entity visit(PrimitiveTypeDeclarer ptd) {
+    private Entity analyse(PrimitiveTypeDeclarer ptd) {
         return ptd;
     }
 
-    public Entity visit(LiteralTypeDeclarer ltd) {
+    private Entity analyse(LiteralTypeDeclarer ltd) {
         return ltd;
     }
 
-    public Entity visit(ObjectTypeDeclarer otd) {
+    private Entity analyse(ObjectTypeDeclarer otd) {
         return otd;
     }
 
-    public Entity visit(TypeParameters e) {
+    private Entity analyse(TypeParameters e) {
         if (e.isEmpty()) return e;
         return unsupported("generic");
     }
@@ -384,7 +397,7 @@ public class SemanticAnalysis {
             if (!dtd.derivedType().generic().isEmpty())
                 return unsupported("generic");
 
-            var def = visit(dtd.derivedType());
+            var def = analyse(dtd.derivedType());
             dtd.def.set(def);
             if (def instanceof StructureDefinition sd)
                 return Stream.of(sd);
@@ -406,7 +419,7 @@ public class SemanticAnalysis {
         return semantic("illegal type: %s%s", td, td.pos());
     }
 
-    public Optional<DAGGraph<StructureDefinition>>
+    private Optional<DAGGraph<StructureDefinition>>
     visitStructures(IdentifierTable<TypeDefinition> types) {
         var all = new ArrayList<StructureDefinition>(types.size());
         var edges = new ArrayList<Groups.G2<StructureDefinition, StructureDefinition>>();
@@ -438,7 +451,7 @@ public class SemanticAnalysis {
     private void visitStructure(StructureDefinition sd) {
         for (var sf : sd.fields()) {
             visitBitfield(sf);
-            visit(sf.type());
+            analyse(sf.type());
         }
     }
 
@@ -465,7 +478,7 @@ public class SemanticAnalysis {
 
     // enum
 
-    public Entity visit(EnumDefinition def) {
+    private Entity analyse(EnumDefinition def) {
         var i = 0;
         for (var v : def.values()) {
             v.val(i);
@@ -549,6 +562,7 @@ public class SemanticAnalysis {
         if (lr.none() != rr.none())
             return 2;
         if (lr.none()) return 0;
+        // 返回值协变（Covariance）：允许“r”的返回值是“l”返回值的子类或实现类
         if (!assignable(lr.get(), rr.get(), Optional.empty()))
             return 2;
         return 0;
@@ -612,7 +626,7 @@ public class SemanticAnalysis {
     }
 
     private ClassDefinition findClass(DerivedType t) {
-        var dt = visit(t);
+        var dt = analyse(t);
         if (dt instanceof ClassDefinition pcd)
             return pcd;
         return semantic("require class: %s", dt.symbol());
@@ -664,7 +678,7 @@ public class SemanticAnalysis {
         cd.parent().use(pd ->
                 cd.allImpls().addAll(pd.allImpls()));
         for (var dt : cd.impl()) {
-            var td = visit(dt);
+            var td = analyse(dt);
             if ((td instanceof InterfaceDefinition id)) {
                 checkImplList(id, cd);
                 cd.allImpls().add(id);
@@ -681,7 +695,7 @@ public class SemanticAnalysis {
             if (ctd.refer().has())
                 return Optional.empty();
 
-            var dt = visit(ctd.derivedType());
+            var dt = analyse(ctd.derivedType());
             if (dt instanceof ClassDefinition cd)
                 return Optional.of(cd);
             return Optional.empty();
@@ -716,9 +730,13 @@ public class SemanticAnalysis {
         }
         if (all.isEmpty()) return Optional.empty();
         var dag = makeDAG(all, edges);
+        // 先分析类的结构
         dag.bfs(this::visitClass);
+        // 再分析继承关系
         dag.bfs(this::checkAllInherits);
+        // 最后分析实现接口
         dag.bfs(this::checkImplList);
+        // 分析方法是否修改字段：暂时没用，期望用于检查到不可变示例是否调用到了updater
         dag.bfs(cd -> new UpdaterAnalyzer().analyse(cd));
         return Optional.of(dag);
     }
@@ -741,32 +759,32 @@ public class SemanticAnalysis {
             return;
         }
 
-        for (var f : cd.fields()) visit(f);
+        for (var f : cd.fields()) analyse(f);
 
         declareMethod(cd);
 
         enterClass = null;
     }
 
-    public Entity visit(ClassField cf) {
+    private Entity analyse(ClassField cf) {
         assert enterClass != null;
-        visit(cf.type());
+        analyse(cf.type());
         return cf;
     }
 
-    public void declareMethod(ClassDefinition cd) {
+    private void declareMethod(ClassDefinition cd) {
         for (var m : cd.methods()) {
-            visit(m.generic());
-            visit(m.func().modifier());
-            visit(m.func().prototype(), false);
+            analyse(m.generic());
+            analyse(m.func().modifier());
+            analyse(m.func().prototype(), false);
         }
     }
 
-    public void implMethod(ClassDefinition cd) {
+    private void implMethod(ClassDefinition cd) {
         assert enterClass == null;
         enterClass = cd;
 
-        for (var m : cd.methods()) visit(m);
+        for (var m : cd.methods()) analyse(m);
 
         if (!cd.macros().isEmpty())
             unsupported("macro");
@@ -774,12 +792,12 @@ public class SemanticAnalysis {
         enterClass = null;
     }
 
-    public Entity visit(ClassMethod cm) {
+    private Entity analyse(ClassMethod cm) {
         assert enterClass != null;
         assert enterMethod == null;
 
         enterMethod = cm;
-        visit(cm.func().procedure());
+        analyse(cm.func().procedure());
         enterMethod = null;
 
         return cm;
@@ -808,7 +826,7 @@ public class SemanticAnalysis {
     private List<InterfaceDefinition>
     findParts(InterfaceDefinition def) {
         return def.parts().stream().map(p -> {
-            var t = visit(p);
+            var t = analyse(p);
             if (t instanceof InterfaceDefinition id) return id;
             return semantic("component must be interface: %s", p.pos());
         }).toList();
@@ -821,6 +839,7 @@ public class SemanticAnalysis {
             var name = m.name();
             var a = methods.putIfAbsent(name, m);
             if (a == null) continue;
+            // 检查part接口的方法与继承的方法是否一致：这里返回值也要一致
             if (m.prototype().equals(a.prototype()))
                 continue;
             return Optional.of(Groups.g2(m, a));
@@ -844,15 +863,15 @@ public class SemanticAnalysis {
         }
         if (all.isEmpty()) return Optional.empty();
         var dag = makeDAG(all, edges);
-        dag.bfs(this::visit);
+        dag.bfs(this::analyse);
         return Optional.of(dag);
     }
 
-    public Entity visit(InterfaceDefinition def) {
+    private Entity analyse(InterfaceDefinition def) {
         if (def.builtin()) return def;
         if (!def.generic().isEmpty()) return unsupported("generic");
 
-        for (var m : def.methods()) visit(m);
+        for (var m : def.methods()) analyse(m);
 
         var all = new HashMap<Identifier, InterfaceMethod>();
         for (var m : def.methods()) all.put(m.name(), m);
@@ -868,41 +887,42 @@ public class SemanticAnalysis {
         return def;
     }
 
-    public Entity visit(InterfaceMethod m) {
-        visit(m.generic());
-        visit(m.prototype(), false);
+    private Entity analyse(InterfaceMethod m) {
+        analyse(m.generic());
+        analyse(m.prototype(), false);
         return m;
     }
 
-    public Entity visit(PrototypeDefinition pd) {
-        visit(pd.generic());
-        visit(pd.prototype(), false);
+    private Entity analyse(PrototypeDefinition pd) {
+        analyse(pd.generic());
+        analyse(pd.prototype(), false);
         return pd;
     }
 
     //
 
-    public Entity visit(FunctionDefinition fd) {
-        visit(fd.generic());
-        visit(fd.modifier());
-        visit(fd.procedure());
+    private Entity analyse(FunctionDefinition fd) {
+        analyse(fd.generic());
+        analyse(fd.modifier());
+        analyse(fd.procedure());
         return fd;
     }
 
     private Procedure enterProc;
 
-    public Entity visit(Procedure proc) {
+    private Entity analyse(Procedure proc) {
         assert enterProc == null;
         enterProc = proc;
         context.enterScope();
-        visit(proc.prototype(), true);
-        visit(proc.body());
+        analyse(proc.prototype(), true);
+        analyse(proc.body());
         checkAllPathReturn(proc);
         context.exitScope(proc);
         enterProc = null;
         return proc;
     }
 
+    // 检查所有路径均有return
     private void checkAllPathReturn(Procedure proc) {
         if (analyzer.check(proc.body()))
             return;
@@ -912,17 +932,17 @@ public class SemanticAnalysis {
                 enterProc.pos());
     }
 
-    public Entity visit(Prototype prot, boolean addVar) {
-        visit(prot.parameterSet(), addVar);
-        prot.returnSet().use(this::visit);
+    private Entity analyse(Prototype prot, boolean addVar) {
+        analyse(prot.parameterSet(), addVar);
+        prot.returnSet().use(this::analyse);
         return prot;
     }
 
-    private void visit(ParameterSet ps, boolean addVar) {
+    private void analyse(ParameterSet ps, boolean addVar) {
         for (var v : ps.variables()) {
-            visit(v.modifier());
+            analyse(v.modifier());
             enablePhantom = true;
-            visit(v.type().must());
+            analyse(v.type().must());
             if (addVar) context.putVar(v);
         }
     }
@@ -990,42 +1010,42 @@ public class SemanticAnalysis {
 
     //
 
-    public Statement visit(Statement s) {
+    private Statement analyse(Statement s) {
         s = switch (s) {
-            case DeclarationStatement ss -> visit(ss);
-            case AssignmentsStatement ss -> visit(ss);
-            case BlockStatement ss -> visit(ss);
-            case BreakStatement ss -> visit(ss);
-            case CallStatement ss -> visit(ss);
-            case ContinueStatement ss -> visit(ss);
-            case ForStatement ss -> visit(ss);
-            case GotoStatement ss -> visit(ss);
-            case IfStatement ss -> visit(ss);
-            case LabeledStatement ss -> visit(ss);
-            case ReturnStatement ss -> visit(ss);
-            case SwitchStatement ss -> visit(ss);
-            case ThrowStatement ss -> visit(ss);
-            case TryStatement ss -> visit(ss);
-            case SwitchBranch ss -> visit(ss);
-            case CatchClause ss -> visit(ss);
+            case DeclarationStatement ss -> analyse(ss);
+            case AssignmentsStatement ss -> analyse(ss);
+            case BlockStatement ss -> analyse(ss);
+            case BreakStatement ss -> analyse(ss);
+            case CallStatement ss -> analyse(ss);
+            case ContinueStatement ss -> analyse(ss);
+            case ForStatement ss -> analyse(ss);
+            case GotoStatement ss -> analyse(ss);
+            case IfStatement ss -> analyse(ss);
+            case LabeledStatement ss -> analyse(ss);
+            case ReturnStatement ss -> analyse(ss);
+            case SwitchStatement ss -> analyse(ss);
+            case ThrowStatement ss -> analyse(ss);
+            case TryStatement ss -> analyse(ss);
+            case SwitchBranch ss -> analyse(ss);
+            case CatchClause ss -> analyse(ss);
             case null, default -> unreachable();
         };
         return s;
     }
 
-    private <S extends Statement> void visit(List<S> list) {
-        for (var s : list) visit(s);
+    private <S extends Statement> void analyse(List<S> list) {
+        for (var s : list) analyse(s);
     }
 
     private <S extends Statement>
-    void visit(Optional<S> so) {
-        so.map(this::visit);
+    void analyse(Optional<S> so) {
+        so.map(this::analyse);
     }
 
-    public Statement visit(BlockStatement bs) {
+    private Statement analyse(BlockStatement bs) {
         if (bs.newScope()) context.enterScope();
         for (var s : bs.list())
-            visit(s);
+            analyse(s);
         if (bs.newScope()) context.exitScope(bs);
         return bs;
     }
@@ -1088,12 +1108,13 @@ public class SemanticAnalysis {
         return true;
     }
 
+    // 字段初始化分析
     private boolean initializable(
             DerivedTypeDeclarer l,
             ObjectTypeDeclarer o, ObjectExpression oe) {
         if (oe.entries().isEmpty()) return true;
 
-        var lt = visit(l.derivedType());
+        var lt = analyse(l.derivedType());
 
         if (lt instanceof StructureDefinition def)
             return initializable(def, o, oe);
@@ -1105,16 +1126,16 @@ public class SemanticAnalysis {
     }
 
     private boolean assignable(ClassDefinition l, ClassDefinition r) {
-        visit(l.generic());
-        visit(r.generic());
+        analyse(l.generic());
+        analyse(r.generic());
 
         if (r.equals(l)) return true;
         return r.parent().match(p -> assignable(l, p));
     }
 
     private boolean assignable(InterfaceDefinition l, ClassDefinition r) {
-        visit(l.generic());
-        visit(r.generic());
+        analyse(l.generic());
+        analyse(r.generic());
 
         if (r.impl().exists(l.symbol())) return true;
 
@@ -1122,8 +1143,8 @@ public class SemanticAnalysis {
         if (ok) return true;
 
         for (var dt : r.impl()) {
-            visit(dt.generic());
-            var id = (InterfaceDefinition) visit(dt);
+            analyse(dt.generic());
+            var id = (InterfaceDefinition) analyse(dt);
             if (assignable(l, id)) return true;
         }
 
@@ -1131,14 +1152,14 @@ public class SemanticAnalysis {
     }
 
     private boolean assignable(InterfaceDefinition l, InterfaceDefinition r) {
-        visit(l.generic());
-        visit(r.generic());
+        analyse(l.generic());
+        analyse(r.generic());
 
         if (l.equals(r)) return true;
 
         for (var dt : r.parts()) {
-            visit(dt.generic());
-            var def = visit(dt);
+            analyse(dt.generic());
+            var def = analyse(dt);
             if (def instanceof InterfaceDefinition id)
                 if (assignable(l, id)) return true;
         }
@@ -1146,6 +1167,7 @@ public class SemanticAnalysis {
         return false;
     }
 
+    // 协变分析
     private boolean assignable(
             ObjectDefinition l, ObjectDefinition r) {
         if (typeNest > 0) return l.equals(r);
@@ -1177,11 +1199,11 @@ public class SemanticAnalysis {
 
     private boolean
     assignable(DerivedTypeDeclarer l, DerivedTypeDeclarer r) {
-        visit(l.derivedType().generic());
-        visit(r.derivedType().generic());
+        analyse(l.derivedType().generic());
+        analyse(r.derivedType().generic());
 
-        var lt = visit(l.derivedType());
-        var rt = visit(r.derivedType());
+        var lt = analyse(l.derivedType());
+        var rt = analyse(r.derivedType());
         if (lt instanceof ObjectDefinition lo &&
                 rt instanceof ObjectDefinition ro)
             return assignable(lo, ro);
@@ -1195,7 +1217,7 @@ public class SemanticAnalysis {
 
     private boolean compatible(
             DerivedTypeDeclarer l, FuncTypeDeclarer r) {
-        visit(r.generic());
+        analyse(r.generic());
         var ldt = l.def.must();
         return ldt instanceof PrototypeDefinition lpd &&
                 compatible(lpd.prototype(), r.prototype());
@@ -1203,22 +1225,25 @@ public class SemanticAnalysis {
 
     private boolean compatible(
             FuncTypeDeclarer l, DerivedTypeDeclarer r) {
-        visit(l.generic());
-        var rt = visit(r.derivedType());
+        analyse(l.generic());
+        var rt = analyse(r.derivedType());
         return rt instanceof PrototypeDefinition rd &&
                 compatible(l.prototype(), rd.prototype());
     }
 
+    // 不可修改引用必须单向传递
     private boolean checkImmutable(Refer lr, Refer rr) {
         if (rr.immutable() && !lr.immutable())
             return semantic("can't deliver: immutable -> mutable: %s", lr.pos());
         return true;
     }
 
+    // 检查非空引用的传递
     private boolean checkRequired(Refer lr, Refer rr,
                                   Optional<Expression> re) {
         if (!lr.required()) return true;
         if (rr.required()) return true;
+        // 检查是否允许反向传递
         if (re.match(this::ifMarkNonNil))
             return true;
 
@@ -1226,15 +1251,17 @@ public class SemanticAnalysis {
                 rr.pos(), lr.pos(), re);
     }
 
+    // 统一检查右边值是否能被引用
     private boolean referable(Refer lr, Optional<Refer> r,
                               Optional<Expression> re) {
         if (lr.kind() == PHANTOM) {
+            // 检查虚引用是否允许
             if (re.none()) return false;
             var e = re.get();
             if (enablePhantom(lr, e)) {
                 if (r.has() && !checkRequired(lr, r.get(), re)) return false;
-                if (!immutable(e, false)) return true;
-                if (lr.immutable()) return true;
+                // 不可修改引用必须单向传递
+                if (!immutable(e, false) || lr.immutable()) return true;
                 return semantic("can't convert: immutable -> mutable: %s", lr.pos());
             }
             return semantic("can't convert '%s' to phantom refer: %s",
@@ -1259,6 +1286,7 @@ public class SemanticAnalysis {
             return semantic("required-refer can't set nil: %s", rt.pos());
         }
         if (rt.literal() instanceof StringLiteral) {
+            // 字符串字面量可以传递给数组引用，当然必须是不可修改的
             return l instanceof ArrayTypeDeclarer la &&
                     la.element() instanceof PrimitiveTypeDeclarer lp
                     && lp.primitive() == Primitive.BYTE;
@@ -1266,6 +1294,7 @@ public class SemanticAnalysis {
         return false;
     }
 
+    // 整数、浮点数、struct/union及其定长数组是可以相互转换引用的
     private boolean mappable(TypeDeclarer td, boolean mustValue) {
         if (mustValue && td.maybeRefer().has()) {
             return false;
@@ -1291,7 +1320,7 @@ public class SemanticAnalysis {
             return ptd.primitive().size();
 
         if (td instanceof DerivedTypeDeclarer dtd) {
-            var type = visit(dtd.derivedType());
+            var type = analyse(dtd.derivedType());
             if (type instanceof StructureDefinition sd)
                 return sd.layout().must().size();
         }
@@ -1299,7 +1328,7 @@ public class SemanticAnalysis {
         return semantic("unsupported sizeof(%s): %s", td, td.pos());
     }
 
-    public long estimateSize(TypeDeclarer td) {
+    private long estimateSize(TypeDeclarer td) {
         if (!(td instanceof ArrayTypeDeclarer atd))
             return typeSize(td);
 
@@ -1310,7 +1339,7 @@ public class SemanticAnalysis {
         return atd.len() * es;
     }
 
-    // convertible types: struct/union/primitive/[]struct/[]union/[]primitive
+    // mappable类型需检查边界：编译时检查，或运行时检查
     private boolean checkBounds(TypeDeclarer l, TypeDeclarer r) {
         assert l.maybeRefer().has();
         if (r instanceof ArrayTypeDeclarer ra) {
@@ -1394,6 +1423,8 @@ public class SemanticAnalysis {
 
         // Arrays
         if (r instanceof ArrayTypeDeclarer ra) {
+            // 数组比较复杂，虚比较每一层的元素
+            // 数组引用本身可以是虚引用，但元素不能是，通过typeNest控制
             if (l instanceof ArrayTypeDeclarer la) {
                 typeNest += 2;
                 try {
@@ -1432,6 +1463,7 @@ public class SemanticAnalysis {
             return l instanceof FuncTypeDeclarer;
 
         if (rt.literal() instanceof StringLiteral sl) {
+            // 字符串字面量只能传递给[N]byte类型
             if (!(l instanceof ArrayTypeDeclarer la))
                 return false;
             if (la.refer().has()) return false;
@@ -1454,6 +1486,7 @@ public class SemanticAnalysis {
 
         if (re.has()) {
             if (re.must() instanceof ArrayExpression ae) {
+                // 数组初始化分析
                 var i = 0;
                 for (var ev : ae.elements()) {
                     if (assignable(l.element(), r.element(),
@@ -1466,6 +1499,7 @@ public class SemanticAnalysis {
                             i, l.element(), ev.pos());
                 }
             } else {
+                // 分析元素
                 if (!assignable(l.element(), r.element(),
                         Optional.empty()))
                     return false;
@@ -1490,7 +1524,6 @@ public class SemanticAnalysis {
             TypeDeclarer l, TypeDeclarer r,
             Optional<Expression> re) {
         assert l.maybeRefer().none();
-        // primitive check by .equals();
 
         if (r instanceof LiteralTypeDeclarer rt)
             return assignValue(l, rt);
@@ -1502,6 +1535,8 @@ public class SemanticAnalysis {
         }
 
         if (r instanceof ArrayTypeDeclarer ra) {
+            // 数组比较复杂，虚比较每一层的元素
+            // 数组引用本身可以是虚引用，但元素不能是，通过typeNest控制
             if (l instanceof ArrayTypeDeclarer la) {
                 var d = ra.literal() ? 0 : 2;
                 typeNest += d;
@@ -1533,7 +1568,7 @@ public class SemanticAnalysis {
 
         if (r instanceof EnumTypeDeclarer rd) {
             if (l instanceof DerivedTypeDeclarer ld) {
-                var def = visit(ld.derivedType());
+                var def = analyse(ld.derivedType());
                 return def.equals(rd.def());
             }
         }
@@ -1541,12 +1576,10 @@ public class SemanticAnalysis {
         return false;
     }
 
+    // 赋值的类型检查入口
     private boolean assignable(
             TypeDeclarer l, TypeDeclarer r,
             Optional<Expression> re) {
-        Objects.requireNonNull(l, "left");
-        Objects.requireNonNull(r, "right");
-
         if (l.equals(r)) return true;
 
         var lr = l.maybeRefer();
@@ -1579,7 +1612,7 @@ public class SemanticAnalysis {
         ifUnmarkNonNil(v);
     }
 
-    private void visit(Assignment a) {
+    private void analyse(Assignment a) {
         var og = optimize(a.operand());
         var vg = optimize(a.value());
         if (assignable(og.b(), vg.b(), Optional.of(vg.a()))) {
@@ -1592,9 +1625,9 @@ public class SemanticAnalysis {
                 a.operand(), a.value(), a.pos());
     }
 
-    public Statement visit(AssignmentsStatement as) {
+    private Statement analyse(AssignmentsStatement as) {
         for (var a : as.list())
-            visit(a);
+            analyse(a);
         return as;
     }
 
@@ -1614,7 +1647,7 @@ public class SemanticAnalysis {
                     atd.length(), atd.refer(), atd.literal());
             na.len(atd.len());
             na.unit(atd.unit());
-            visit(na);
+            analyse(na);
             return na;
         } else if (td instanceof ObjectTypeDeclarer ||
                 td instanceof VoidTypeDeclarer) {
@@ -1657,11 +1690,11 @@ public class SemanticAnalysis {
         }
     }
 
-    private void visit(Variable v) {
-        visit(v.modifier());
+    private void analyse(Variable v) {
+        analyse(v.modifier());
         v.type().use(t -> {
             enablePhantom = true;
-            visit(t);
+            analyse(t);
         });
         if (v.value().none()) {
             if (v.declare() == Declare.CONST) {
@@ -1675,15 +1708,15 @@ public class SemanticAnalysis {
         }
     }
 
-    public Statement visit(DeclarationStatement ds) {
+    private Statement analyse(DeclarationStatement ds) {
         for (var v : ds.variables()) {
-            visit(v);
+            analyse(v);
             context.putVar(v);
         }
         return ds;
     }
 
-    public Statement visit(CallStatement e) {
+    private Statement analyse(CallStatement e) {
         e.call().stmt().set(e);
         var g = optimize((Expression) e.call());
         if (g.a() instanceof CallExpression ce) {
@@ -1714,8 +1747,8 @@ public class SemanticAnalysis {
         return e;
     }
 
-    public Statement visit(LabeledStatement e) {
-        return visit(e.target());
+    private Statement analyse(LabeledStatement e) {
+        return analyse(e.target());
     }
 
     private final Stack<ForStatement> loopStack = new Stack<>();
@@ -1726,7 +1759,7 @@ public class SemanticAnalysis {
         semantic("label not found: %s", label.pos());
     }
 
-    public Statement visit(BreakStatement e) {
+    private Statement analyse(BreakStatement e) {
         e.label().use(this::checkLabel);
 
         if (loopStack.isEmpty())
@@ -1735,7 +1768,7 @@ public class SemanticAnalysis {
         return e;
     }
 
-    public Statement visit(ContinueStatement e) {
+    private Statement analyse(ContinueStatement e) {
         e.label().use(this::checkLabel);
 
         if (loopStack.isEmpty())
@@ -1744,25 +1777,25 @@ public class SemanticAnalysis {
         return e;
     }
 
-    public Statement visit(ForStatement e) {
+    private Statement analyse(ForStatement e) {
         loopStack.push(e);
         context.enterScope();
         if (e instanceof ConditionalForStatement ce) {
-            visit(ce);
+            analyse(ce);
             ifCheckNonNil(ce.condition(), true);
-            visit(e.body());
+            analyse(e.body());
             ifExitNonNilScope(e.body());
         } else if (e instanceof IterableForStatement ie) {
-            visit(ie);
-            visit(e.body());
+            analyse(ie);
+            analyse(e.body());
         }
         context.exitScope(e);
         loopStack.pop();
         return e;
     }
 
-    public ForStatement visit(ConditionalForStatement e) {
-        visit(e.initializer());
+    private ForStatement analyse(ConditionalForStatement e) {
+        analyse(e.initializer());
         var cg = optimize(e.condition());
         e.condition(cg.a());
         if (!cg.b().isBool())
@@ -1772,7 +1805,7 @@ public class SemanticAnalysis {
         if (cg.a() instanceof LiteralExpression le)
             e.cond().set((BoolLiteral) le.literal());
 
-        visit(e.updater());
+        analyse(e.updater());
         return e;
     }
 
@@ -1864,7 +1897,7 @@ public class SemanticAnalysis {
         return e;
     }
 
-    public ForStatement visit(IterableForStatement e) {
+    private ForStatement analyse(IterableForStatement e) {
         var g = optimize(e.iterable());
         e.iterable((PrimaryExpression) g.a());
         if (g.b() instanceof ArrayTypeDeclarer atd)
@@ -1878,16 +1911,16 @@ public class SemanticAnalysis {
 
     }
 
-    public Statement visit(GotoStatement e) {
+    private Statement analyse(GotoStatement e) {
         checkLabel(e.label());
         return e;
     }
 
     private void ifCheckNonNil(
             Expression e, Set<Variable> vars, boolean yes) {
-        if (e instanceof IsNilExpression ine) {
-            if (ine.subject() instanceof VariableExpression ve) {
-                if (yes != ine.nil())
+        if (e instanceof CheckNilExpression cne) {
+            if (cne.subject() instanceof VariableExpression ve) {
+                if (yes != cne.nil())
                     vars.add(ve.variable());
             }
         } else if (e instanceof BinaryExpression ve) {
@@ -1904,6 +1937,7 @@ public class SemanticAnalysis {
         private final Set<Variable> checked = new HashSet<>();
     }
 
+    // 变量显式判断非空之后将其标记，作为反向传递依据
     private final Stack<NonNilCheckSet> ifNonNilVars = new Stack<>();
 
     private void ifCheckNonNil(Expression e, boolean yes) {
@@ -1939,9 +1973,9 @@ public class SemanticAnalysis {
         return false;
     }
 
-    public Statement visit(IfStatement e) {
+    private Statement analyse(IfStatement e) {
         context.enterScope();
-        visit(e.init());
+        analyse(e.init());
 
         var g = optimize(e.condition());
         if (!g.b().isBool()) {
@@ -1953,11 +1987,11 @@ public class SemanticAnalysis {
             e.cond().set((BoolLiteral) le.literal());
 
         ifCheckNonNil(g.a(), true);
-        visit(e.yes());
+        analyse(e.yes());
         ifExitNonNilScope(e.yes());
         e.not().use(not -> {
             ifCheckNonNil(g.a(), false);
-            visit(not);
+            analyse(not);
             ifExitNonNilScope(not);
         });
 
@@ -1965,10 +1999,10 @@ public class SemanticAnalysis {
         return e;
     }
 
-    public Statement visit(ReturnStatement e) {
+    private Statement analyse(ReturnStatement e) {
         assert enterProc != null;
         e.procedure().set(enterProc);
-        e.local(context.local().toList());
+        e.local(context.local().toList()); // 收集已声明变量，方便释放
         var prot = enterProc.prototype();
         var pr = prot.returnSet();
         if (pr.none()) {
@@ -2042,9 +2076,9 @@ public class SemanticAnalysis {
         }
     }
 
-    public Statement visit(SwitchStatement e) {
+    private Statement analyse(SwitchStatement e) {
         context.enterScope();
-        if (e.init().has()) visit(e.init().get());
+        if (e.init().has()) analyse(e.init().get());
 
         var cv = e.value();
         var g = optimize(cv);
@@ -2056,7 +2090,7 @@ public class SemanticAnalysis {
                 ok = true;
             }
         } else if (g.b() instanceof DerivedTypeDeclarer dtd) {
-            var dt = visit(dtd.derivedType());
+            var dt = analyse(dtd.derivedType());
             if (dt instanceof EnumDefinition ed) {
                 checkConstantEnum(e, ed);
                 ok = true;
@@ -2067,44 +2101,44 @@ public class SemanticAnalysis {
                     cv.pos());
         }
 
-        for (var br : e.branches()) visit(br.body());
+        for (var br : e.branches()) analyse(br.body());
 
-        e.defaultBranch().use(br -> visit(br.body()));
+        e.defaultBranch().use(br -> analyse(br.body()));
 
         context.exitScope(e);
         return e;
     }
 
-    public Statement visit(ThrowStatement e) {
+    private Statement analyse(ThrowStatement e) {
         assert enterProc != null;
         e.procedure().set(enterProc);
-        e.local(context.local().toList());
+        e.local(context.local().toList()); // 收集已声明变量，方便释放
         var g = optimize(e.exception());
         e.exception(g.a());
         return e;
     }
 
-    public Statement visit(TryStatement e) {
-        visit(e.body());
-        visit(e.catchClauses());
-        visit(e.finallyClause());
+    private Statement analyse(TryStatement e) {
+        analyse(e.body());
+        analyse(e.catchClauses());
+        analyse(e.finallyClause());
         return e;
     }
 
-    public Statement visit(CatchClause e) {
+    private Statement analyse(CatchClause e) {
         context.enterScope();
         var v = e.argument();
-        visit(v.modifier());
+        analyse(v.modifier());
         if (e.typeSet().size() > 1) {
-            // TODO: 推导
+            // TODO: 推导类型的并集
             return unsupported("catch multi types: %s",
                     e.typeSet().get(1).pos());
         } else {
             v.type().set(e.typeSet().getFirst());
         }
-        for (var td : e.typeSet()) visit(td);
+        for (var td : e.typeSet()) analyse(td);
         context.putVar(v);
-        visit(e.body());
+        analyse(e.body());
         context.exitScope(e);
         return e;
     }
@@ -2163,6 +2197,7 @@ public class SemanticAnalysis {
         return t.maybeRefer().must().immutable();
     }
 
+    // 检查不可修改值的入口
     private boolean immutable(Expression e, boolean left) {
         return switch (e) {
             case CallExpression ee -> immutable(ee);
@@ -2181,7 +2216,7 @@ public class SemanticAnalysis {
             case ArrayExpression ee -> left;
             case SizeofExpression ee -> left;
             case LiteralExpression ee -> left;
-            case IsNilExpression ee -> left;
+            case CheckNilExpression ee -> left;
             case ReferEqualExpression ee -> left;
             case BinaryExpression ee -> left;
             case UnaryExpression ee -> left;
@@ -2190,6 +2225,7 @@ public class SemanticAnalysis {
         };
     }
 
+    // 赋值左操作数分析入口
     private Groups.G2<Operand, TypeDeclarer> optimize(Operand o) {
         Groups.G2<Operand, TypeDeclarer> g = switch (o) {
             case IndexOperand io -> optimize(io);
@@ -2246,7 +2282,7 @@ public class SemanticAnalysis {
             return semantic("illegal operand %s: %s", name, op.pos());
         if (!dtd.derivedType().generic().isEmpty()) return unreachable();
 
-        var def = visit(dtd.derivedType());
+        var def = analyse(dtd.derivedType());
         Optional<? extends Field> of = switch (def) {
             case StructureDefinition sd -> sd.fields().tryGet(name);
             case ClassDefinition cd -> cd.allFields().tryGet(name);
@@ -2289,6 +2325,7 @@ public class SemanticAnalysis {
             if (f.has()) {
                 if (f.get().declare() == Declare.CONST)
                     return semantic("immutable operand %s: %s", s, s.pos());
+                // 操作数加上`this.`前缀，方便后续处理
                 var n = new FieldOperand(op.pos(), newThis(s.pos()), s.name());
                 return Groups.g2(n, f.get().type());
             }
@@ -2323,7 +2360,7 @@ public class SemanticAnalysis {
 
         Expression e;
         if (t instanceof DerivedTypeDeclarer dtd) {
-            var def = visit(dtd.derivedType());
+            var def = analyse(dtd.derivedType());
             if (def instanceof ClassDefinition ||
                     def instanceof StructureDefinition) {
                 e = new ObjectExpression(v.pos());
@@ -2355,27 +2392,12 @@ public class SemanticAnalysis {
 
 
     //
-    // expression and tuple
+    // 表达式-expression
+    // 推导类型、分析语义、计算常量、按需重构
     //
 
-
-    public Groups.G2<List<Expression>, List<TypeDeclarer>>
-    optimize(List<Expression> list) {
-        var vs = new ArrayList<Expression>(list.size());
-        var ts = new ArrayList<TypeDeclarer>(list.size());
-        for (var v : list) {
-            var g = optimize(v);
-            if (g.b() instanceof DefinitionDeclarer) {
-                return semantic("require value, not type %s: %s",
-                        g.b(), v.pos());
-            }
-            vs.add(g.a());
-            ts.add(g.b());
-        }
-        return Groups.g2(vs, ts);
-    }
-
-    public Groups.G2<Expression, TypeDeclarer> optimize(Expression e) {
+    // 表达式分析同一入口
+    private Groups.G2<Expression, TypeDeclarer> optimize(Expression e) {
         Groups.G2<Expression, TypeDeclarer> g = switch (e) {
             case BinaryExpression ee -> optimize(ee);
             case UnaryExpression ee -> optimize(ee);
@@ -2525,6 +2547,7 @@ public class SemanticAnalysis {
         return Optional.empty();
     }
 
+    // 转换表达式为check-nil，方便后续处理
     private Groups.G2<Expression, TypeDeclarer> checkNilBinOp(
             Groups.G2<Expression, TypeDeclarer> g, BinaryExpression e) {
         if (e.operator() != BinaryOperator.EQ &&
@@ -2538,7 +2561,7 @@ public class SemanticAnalysis {
 
         var oc = checkCallee(g.b());
         if (oc.has()) {
-            var n = new IsNilExpression(e.pos(), g.a(), nil);
+            var n = new CheckNilExpression(e.pos(), g.a(), nil);
             return Groups.g2(n, t);
         }
 
@@ -2554,7 +2577,7 @@ public class SemanticAnalysis {
 
         var s = (PrimaryExpression) g.a();
         var n = wrapRelayExpr(s, t, a -> {
-            return new IsNilExpression(e.pos(), a, nil);
+            return new CheckNilExpression(e.pos(), a, nil);
         });
         return Groups.g2(n, t);
     }
@@ -2563,7 +2586,7 @@ public class SemanticAnalysis {
         if (td instanceof EnumTypeDeclarer etd)
             return Optional.of(etd.def());
         if (td instanceof DerivedTypeDeclarer dtd) {
-            var def = visit(dtd.derivedType());
+            var def = analyse(dtd.derivedType());
             if (def instanceof EnumDefinition ed)
                 return Optional.of(ed);
         }
@@ -2582,10 +2605,10 @@ public class SemanticAnalysis {
 
     private boolean objectBinOp(
             DerivedTypeDeclarer l, DerivedTypeDeclarer r) {
-        visit(l.derivedType().generic());
-        visit(r.derivedType().generic());
-        var lt = visit(l.derivedType());
-        var rt = visit(r.derivedType());
+        analyse(l.derivedType().generic());
+        analyse(r.derivedType().generic());
+        var lt = analyse(l.derivedType());
+        var rt = analyse(r.derivedType());
         if (lt instanceof ObjectDefinition lo &&
                 rt instanceof ObjectDefinition ro)
             return assignable(lo, ro) ||
@@ -2606,7 +2629,7 @@ public class SemanticAnalysis {
     }
 
 
-    public Groups.G2<Expression, TypeDeclarer>
+    private Groups.G2<Expression, TypeDeclarer>
     optimize(BinaryExpression e) {
         var l = optimize(e.left());
         var r = optimize(e.right());
@@ -2699,7 +2722,7 @@ public class SemanticAnalysis {
         return false;
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(UnaryExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(UnaryExpression e) {
         var o = optimize(e.operand());
         if (o.a() instanceof LiteralExpression le) {
             return optimizeLit(e, le);
@@ -2714,7 +2737,7 @@ public class SemanticAnalysis {
 
     private ObjectDefinition getObject(TypeDeclarer td) {
         if (td instanceof DerivedTypeDeclarer dtd) {
-            var t = visit(dtd.derivedType());
+            var t = analyse(dtd.derivedType());
             dtd.def.set(t);
             if (t instanceof ObjectDefinition cd)
                 return cd;
@@ -2729,20 +2752,22 @@ public class SemanticAnalysis {
         semantic("contravariance can't use for final class %s: %s", def, e.pos());
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(AssertExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(AssertExpression e) {
         var g = optimize(e.subject());
         if (!(g.b() instanceof DerivedTypeDeclarer srcType)) {
             return semantic("assert can't used for %s: %s", g.b(), e.type());
         }
         var sr = srcType.refer();
-        if (sr.none()) {
-            return semantic("require a refer: %s", e.subject().pos());
-        }
+        if (sr.none()) return semantic(
+                "assert only for refer: %s", e.subject().pos());
+
 
         var dstType = e.type();
         var dr = dstType.maybeRefer();
         if (dr.none()) return semantic(
                 "type must refer: %s", e.type().pos());
+        if (dr.get().required()) return semantic(
+                "assert result will be nil if failed: %s", e.type().pos());
 
         if (!referable(dr.get(), sr, Optional.of(g.a())))
             return unreachable();
@@ -2774,9 +2799,9 @@ public class SemanticAnalysis {
                 srcType, dstType, e.pos());
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(SizeofExpression se) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(SizeofExpression se) {
         enablePhantom = true;
-        visit(se.type());
+        analyse(se.type());
 
         var size = estimateSize(se.type());
         se.size(size);
@@ -2796,7 +2821,7 @@ public class SemanticAnalysis {
         return Optional.empty();
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(CallExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(CallExpression e) {
         var call = e.callee();
         var args = e.arguments();
 
@@ -2848,7 +2873,7 @@ public class SemanticAnalysis {
         return Groups.g2(be, rt);
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(ConvertExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(ConvertExpression e) {
         // explicit convert
         var p = e.primitive();
         var g = optimize(e.operand());
@@ -2899,7 +2924,7 @@ public class SemanticAnalysis {
         return semantic("can't convert: %s", e.operand().pos());
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(CurrentExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(CurrentExpression e) {
         // 必定是在类的方法里
         var dt = new DerivedType(e.pos(), e.type(), TypeArguments.EMPTY);
         var ref = new Refer(e.pos(), PHANTOM, true, false);
@@ -2908,7 +2933,7 @@ public class SemanticAnalysis {
         return Groups.g2(e, td);
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(IndexOfExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(IndexOfExpression e) {
         var sg = optimize(e.subject());
         var ig = optimize(e.index());
 
@@ -2967,11 +2992,11 @@ public class SemanticAnalysis {
                 sg.b(), e.subject().pos());
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(LambdaExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(LambdaExpression e) {
         return unsupported("lambda");
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(LiteralExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(LiteralExpression e) {
         return Groups.g2(e, new LiteralTypeDeclarer(e.pos(), e.literal()));
     }
 
@@ -3108,7 +3133,7 @@ public class SemanticAnalysis {
         return Groups.g2(n, f.type());
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(MemberOfExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(MemberOfExpression e) {
         if (!e.generic().isEmpty()) return unsupported("generic");
         var sg = optimize(e.subject());
 
@@ -3124,7 +3149,7 @@ public class SemanticAnalysis {
         }
 
         if (sg.b() instanceof DerivedTypeDeclarer dtd) {
-            var def = visit(dtd.derivedType());
+            var def = analyse(dtd.derivedType());
             s.expectCallable(e.expectCallable());
             return optimizeMember(s, def, e.member(), e.generic());
         }
@@ -3137,8 +3162,8 @@ public class SemanticAnalysis {
                 e.member(), e.pos());
     }
 
-    public TypeDeclarer optimize(NewArrayType e) {
-        visit(e.element());
+    private TypeDeclarer optimize(NewArrayType e) {
+        analyse(e.element());
 
         var ref = new Refer(e.pos(), STRONG, true, false);
         var lg = optimize(e.length());
@@ -3155,14 +3180,14 @@ public class SemanticAnalysis {
                 e.length().pos());
     }
 
-    public TypeDeclarer optimize(NewDefinedType e) {
+    private TypeDeclarer optimize(NewDefinedType e) {
         var ref = new Refer(e.pos(), STRONG, true, false);
         if (e.type() instanceof PrimitiveType pt) {
             return new PrimitiveTypeDeclarer(e.pos(),
                     pt.primitive(), Optional.of(ref));
         }
         if (e.type() instanceof DerivedType dt) {
-            var def = visit(dt);
+            var def = analyse(dt);
             if (def instanceof StructureDefinition ||
                     def instanceof ClassDefinition ||
                     def instanceof EnumDefinition) {
@@ -3176,7 +3201,7 @@ public class SemanticAnalysis {
                 e.type(), e.type().pos());
     }
 
-    public TypeDeclarer optimize(NewType e) {
+    private TypeDeclarer optimize(NewType e) {
         return switch (e) {
             case NewArrayType ee -> optimize(ee);
             case NewDefinedType ee -> optimize(ee);
@@ -3184,7 +3209,7 @@ public class SemanticAnalysis {
         };
     }
 
-    public boolean newInitializable(
+    private boolean newInitializable(
             NewExpression e, TypeDeclarer dstType,
             TypeDeclarer argType, Expression arg) {
         if (e.type() instanceof NewDefinedType ndt) {
@@ -3230,7 +3255,7 @@ public class SemanticAnalysis {
         return false;
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(NewExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(NewExpression e) {
         var dstType = optimize(e.type());
         var ea = e.arg().map(this::optimize);
         if (ea.none()) {
@@ -3255,7 +3280,7 @@ public class SemanticAnalysis {
 
     private Groups.G2<Prototype, PrimaryExpression>
     findCallable(SymbolExpression re) {
-        visit(re.generic());
+        analyse(re.generic());
         var s = re.symbol();
 
         var ov = context.findVar(s);
@@ -3273,6 +3298,7 @@ public class SemanticAnalysis {
         if (s.module().none() && enterClass != null) {
             var om = enterClass.allMethods().tryGet(s.name());
             if (om.has()) {
+                // 函数调用加上`this.`前缀，方便后续处理
                 var n = wrapThis(re, om.get());
                 return Groups.g2(om.get().prototype(), n);
             }
@@ -3287,7 +3313,7 @@ public class SemanticAnalysis {
                 s, re.pos());
     }
 
-    public Groups.G2<Expression, TypeDeclarer> findVariable(SymbolExpression re) {
+    private Groups.G2<Expression, TypeDeclarer> findVariable(SymbolExpression re) {
         var s = re.symbol();
         var o = context.findVar(s);
         if (o.has()) {
@@ -3315,6 +3341,7 @@ public class SemanticAnalysis {
         if (enterClass != null && s.module().none()) {
             var of = enterClass.allFields().tryGet(s.name());
             if (of.has()) {
+                // 表达式加上`this.`前缀，方便后续处理
                 return Groups.g2(wrapThis(re.symbol(), of.get()), of.get().type());
             }
         }
@@ -3322,8 +3349,8 @@ public class SemanticAnalysis {
         return semantic("undefined symbol '%s': %s", s, s.pos());
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(SymbolExpression e) {
-        visit(e.generic());
+    private Groups.G2<Expression, TypeDeclarer> optimize(SymbolExpression e) {
+        analyse(e.generic());
 
         if (e.expectCallable()) {
             var g = findCallable(e);
@@ -3334,9 +3361,9 @@ public class SemanticAnalysis {
         return findVariable(e);
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(ArrayExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(ArrayExpression e) {
         var es = e.elements();
-        e.type().use(this::visit);
+        e.type().use(this::analyse);
 
         if (es.isEmpty()) {
             if (e.type().has()) return Groups.g2(e, e.type().get());
@@ -3380,8 +3407,8 @@ public class SemanticAnalysis {
         return Groups.g2(n, atd);
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(ObjectExpression oe) {
-        oe.type().use(this::visit);
+    private Groups.G2<Expression, TypeDeclarer> optimize(ObjectExpression oe) {
+        oe.type().use(this::analyse);
 
         var entries = new IdentifierTable<Expression>(oe.entries().size());
         var types = new IdentifierTable<TypeDeclarer>(oe.entries().size());
@@ -3400,13 +3427,13 @@ public class SemanticAnalysis {
         return semantic("can't init: %s", n.pos());
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(ParenExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(ParenExpression e) {
         return optimize(e.child());
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(BlockExpression e) {
         context.enterScope();
-        for (var s : e.block()) visit(s);
+        for (var s : e.block()) analyse(s);
         var r = optimize(e.result());
         e.result(r.a());
         context.exitScope(e);
@@ -3432,7 +3459,7 @@ public class SemanticAnalysis {
         return Groups.g2(n, t);
     }
 
-    public Groups.G2<Expression, TypeDeclarer> optimize(PairsExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(PairsExpression e) {
         return unsupported("pairs");
     }
 
@@ -3462,7 +3489,11 @@ public class SemanticAnalysis {
     }
 
 
+    //
     // relay: 检查到临时对象，内部生成一个relay变量指向它，方便后面的自动内存管理
+    // 例如：“new(A).run(); ” 没有变量指向new创建的临时对象，会导致引用计数无法释放
+    // 这种会重构成block表达式
+    //
 
     private boolean needRelay(TypeDeclarer t) {
         if (t.maybeRefer().has()) return true; // 引用需要释放
@@ -3588,7 +3619,7 @@ public class SemanticAnalysis {
     // attribute
 
 
-    public Entity visit(AttributeDefinition ad) {
+    private Entity analyse(AttributeDefinition ad) {
         return unsupported("attribute");
     }
 }

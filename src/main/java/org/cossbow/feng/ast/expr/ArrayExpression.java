@@ -36,11 +36,6 @@ public class ArrayExpression extends PrimaryExpression {
     }
 
     @Override
-    public boolean isFinal() {
-        return elements.stream().allMatch(Expression::isFinal);
-    }
-
-    @Override
     public boolean unbound() {
         return true;
     }

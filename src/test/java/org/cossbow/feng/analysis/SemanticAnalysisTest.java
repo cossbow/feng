@@ -25,7 +25,7 @@ public class SemanticAnalysisTest {
         System.out.println("<<<");
         var src = BaseParseTest.doParseFile(code);
         var ctx = new GlobalSymbolContext(src.table());
-        new SemanticAnalysis(ctx).visit(src);
+        new SemanticAnalysis(ctx).analyse(src);
     }
 
     void checkFail(String code) {
@@ -797,11 +797,26 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testAssertExpression6() {
-        var d = "interface I{} class A{} ";
+        var d = "class A{} ";
         checkSucc(d + "func f(o *Object){ var a = o?(*A); }");
         checkSucc(d + "func f(o &Object){ var a = o?(&A); }");
         checkSucc(d + "func f(o *Object){ var a = o?(&A); }");
         checkFail(d + "func f(o &Object){ var a = o?(*A); }");
+    }
+
+    @Test
+    public void testAssertExpression7() {
+        var d = "class A{} ";
+        checkSucc(d + "func f(o *Object){ var a = o?(*A); }");
+        checkFail(d + "func f(o *Object){ var a = o?(*!A); }");
+    }
+
+    @Test
+    public void testAssertExpression8() {
+        var d = "class A{} ";
+        checkSucc(d + "func f(o *#Object){ var a = o?(*#A); }");
+        checkFail(d + "func f(o *#Object){ var a = o?(*A); }");
+        checkSucc(d + "func f(o *Object){ var a = o?(*#A); }");
     }
 
     @Test
@@ -1055,8 +1070,9 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testLiteral6() {
-        checkSucc("func f() { const a=\"true\"; const c [4]byte = a; }");
-        checkSucc("func f() { const a=\"true\"; const c [&#]byte = a; }");
+        checkSucc("func f() { const a [4]byte =\"true\"; const c [4]byte = a; }");
+        checkFail("func f() { const a=\"true\"; const c [4]byte = a; }");
+        checkSucc("func f() { const a=\"true\"; const c [&!#]byte = a; }");
     }
 
     //
@@ -2477,7 +2493,7 @@ public class SemanticAnalysisTest {
             Assertions.assertNotNull(is);
             var src = BaseParseTest.doParseFile(is);
             var ctx = new GlobalSymbolContext(src.table());
-            new SemanticAnalysis(ctx).visit(src);
+            new SemanticAnalysis(ctx).analyse(src);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

@@ -23,7 +23,7 @@ public class CppGeneratorTest {
         var src = BaseParseTest.doParseFile(code);
         var sb = new StringBuilder("/* -------------------- */\n");
         var ctx = new GlobalSymbolContext(src.table());
-        new SemanticAnalysis(ctx).visit(src);
+        new SemanticAnalysis(ctx).analyse(src);
         new CppGenerator(ctx, sb, true).write(src);
         System.out.println(sb);
         try {

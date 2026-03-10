@@ -5,7 +5,9 @@ import org.cossbow.feng.ast.Position;
 
 public class Refer extends Entity {
     private ReferKind kind;
+    // 不能为空（nil）
     private boolean required;
+    // 实例不可修改
     private boolean immutable;
 
     public Refer(Position pos,

@@ -39,7 +39,7 @@ public class LiteralComputer {
             Map.entry(BinaryOperator.MOD, BigInteger::mod),
             Map.entry(BinaryOperator.POW, LiteralComputer::pow));
     static final Map<BinaryOperator, BiFunction<BigInteger, BigInteger, BigInteger>>
-            intgerBit = Map.ofEntries(
+            integerBit = Map.ofEntries(
             Map.entry(BinaryOperator.BITAND, BigInteger::and),
             Map.entry(BinaryOperator.BITXOR, BigInteger::xor),
             Map.entry(BinaryOperator.BITOR, BigInteger::or)
@@ -74,7 +74,7 @@ public class LiteralComputer {
             var r = ir.apply(a, b);
             return new BoolLiteral(al.pos(), r);
         }
-        var ib = intgerBit.get(op);
+        var ib = integerBit.get(op);
         if (ib != null) {
             var c = checkRange(ib.apply(a, b));
             return new IntegerLiteral(al.pos(), c, al.radix());
