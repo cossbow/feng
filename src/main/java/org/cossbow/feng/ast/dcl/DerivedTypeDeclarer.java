@@ -3,7 +3,8 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.gen.DerivedType;
-import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.ast.gen.GenericMap;
+import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.util.Optional;
 
 public class DerivedTypeDeclarer extends TypeDeclarer
@@ -27,14 +28,27 @@ public class DerivedTypeDeclarer extends TypeDeclarer
         return refer;
     }
 
-    public Lazy<TypeDefinition> def = Lazy.nil();
+    public TypeArguments generic() {
+        return derivedType.generic();
+    }
+
+    public TypeDefinition def() {
+        return derivedType.def.must();
+    }
+
+    public GenericMap gm() {
+        return derivedType.gm();
+    }
 
     //
+
+    public boolean hasTemplate() {
+        return derivedType.hasTemplate();
+    }
 
     public Optional<TypeDeclarer> derefer() {
         var n = new DerivedTypeDeclarer(pos(), derivedType,
                 Optional.empty());
-        n.def.set(def);
         return Optional.of(n);
     }
 
@@ -58,6 +72,8 @@ public class DerivedTypeDeclarer extends TypeDeclarer
         result = 31 * result + refer.hashCode();
         return result;
     }
+
+
     //
 
     @Override

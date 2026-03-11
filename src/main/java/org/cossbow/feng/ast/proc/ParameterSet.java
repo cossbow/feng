@@ -49,6 +49,10 @@ public class ParameterSet implements Iterable<Variable> {
         return variables.stream();
     }
 
+    public boolean hasTemplate() {
+        return variables.stream().anyMatch(v ->
+                v.type().match(TypeDeclarer::hasTemplate));
+    }
 
     //
 

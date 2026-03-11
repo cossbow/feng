@@ -1,0 +1,117 @@
+
+interface I`O` {
+    get() O;
+    set(o O);
+}
+
+class Box`E` (I`E`) {
+    var v E;
+    func get() E {
+        return v;
+    }
+    func set(v E) {
+        this.v=v;
+    }
+
+}
+
+class BigBox`V`:Box`V` {
+    func change(v V) V {
+        var o V = get();
+        set(v);
+        return o;
+    }
+}
+
+class SealedBox`X`:BigBox`X`{
+    func fetch() X {
+        return get();
+    }
+    func map`G`(g G) Pair`X,G` {
+        var p Pair`X,G` = {l=v,r=g};
+        return p;
+    }
+}
+
+class Pair`L, R` final {
+    var l L;
+    var r R;
+}
+
+class Car {
+    var id int;
+    var sp float;
+}
+
+class Disk`D` final {
+    var d D;
+}
+
+func alloc`T`(t T) [*]T {
+    return new([4]T, [t]);
+}
+
+func make`T`(t T) [*]Box`T` {
+    return new([4]Box`T`, [{v=t}]);
+}
+
+func test(n int) {
+    var i int;
+    {
+        var a = alloc`int`(n+11);
+        i = a[0];
+        var b = new([11]int, a);
+    }
+    {
+        var a = alloc`*int`(new(int, n+13));
+        i = *a[0];
+        var b = new([13]*int, a);
+    }
+    {
+        var a = make`int`(n+111);
+        i = a[0].get();
+    }
+    {
+        var p = new(Pair`bool,int`, {l=false,r=101});
+        var r int = p.r;
+    }
+    {
+        var a = alloc`Pair`int,bool``({r=true,l=202});
+        var l int = a[0].l;
+    }
+    {
+        var p Pair`int,bool` = {r=true,l=302};
+        var p1 = new(Pair`int,bool`, {r=false,l=57});
+        var a = make`Pair`int,bool``({r=true,l=203});
+        i = a[0].v.l;
+    }
+    {
+        var c Car = {id=21,sp=3.14};
+        var p = new(Car, {id=21,sp=3.14});
+        var bc = new(Box`Car`, {v={id=24,sp=3.1415}});
+        i = bc.v.id;
+    }
+    {
+        var a = new([2]SealedBox`Box`int``, [{v={v=1}}]);
+        var f = a[0].map`float`(7.00001);
+    }
+    {
+        var a = new([2]*SealedBox`Box`int``, [nil]);
+        a[0] = new(SealedBox`Box`int``, {v={v=1}});
+    }
+    {
+        var d1 = new(Disk`[4]Box`*int``, {
+            d=[{
+                v=new(int,n)
+            }]
+        });
+        var d2 = new(Disk`[4]Box`*int``);
+        var d3 = new(Disk`[*]Box`*int``);
+    }
+
+}
+
+func main() int32 {
+    test(15);
+    return 0;
+}

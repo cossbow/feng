@@ -2,6 +2,8 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.ArrayTypeDeclarer;
+import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
 import java.util.List;
@@ -39,6 +41,8 @@ public class ArrayExpression extends PrimaryExpression {
     public boolean unbound() {
         return true;
     }
+
+    public final Lazy<TypeDeclarer> lt = Lazy.nil();
 
     //
 

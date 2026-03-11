@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.dcl;
 
 import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.util.Lazy;
 
 import java.util.stream.Collectors;
 
@@ -20,6 +21,11 @@ public class ObjectTypeDeclarer extends TypeDeclarer {
     public IdentifierTable<TypeDeclarer> entries() {
         return entries;
     }
+
+    // 左边的类型
+    public final Lazy<DerivedTypeDeclarer> lt = Lazy.nil();
+
+    //
 
     @Override
     public boolean equals(Object o) {

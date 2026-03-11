@@ -17,6 +17,14 @@ public class Stack<E> extends ArrayList<E> implements Iterable<E> {
         return getLast();
     }
 
+    public synchronized boolean none() {
+        return isEmpty();
+    }
+
+    public synchronized Optional<E> tryPeek() {
+        return isEmpty() ? Optional.empty() : Optional.of(peek());
+    }
+
     public Iterator<E> iterator() {
         return new Iterator<>() {
             private int cursor = size();

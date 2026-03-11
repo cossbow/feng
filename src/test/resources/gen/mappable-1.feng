@@ -1,0 +1,31 @@
+
+struct U {
+    value [4]int;
+}
+func array3() {
+    {
+        var a1 [*]int32 = new([2]int32);
+        var a2 [*]uint8 = a1;
+        var a3 [*]uint = a1;
+        var i *int = a1;
+        var a4 [*]int = i;
+        var pu1 *U = a1;
+    }
+    {
+        var u U;
+        const pu1 &U = u;
+        const i1 &int = u.value;
+        const i2 &int = u.value[2];
+        var a1 [2]int16;
+//        const pu2 &U = a1;
+    }
+}
+
+func test(n int) {
+    array3();
+}
+
+func main() int32 {
+    test(5);
+    return 0;
+}

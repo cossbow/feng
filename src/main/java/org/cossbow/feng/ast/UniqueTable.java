@@ -156,4 +156,10 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
         }
     }
 
+    //
+
+    @Override
+    public String toString() {
+        return values().toString();
+    }
 }

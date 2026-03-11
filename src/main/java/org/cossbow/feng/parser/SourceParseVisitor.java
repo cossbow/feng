@@ -25,6 +25,7 @@ import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
+import org.cossbow.feng.util.Stack;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -342,7 +343,8 @@ final class SourceParseVisitor
         var dt = (DefinedType) visit(ctx.definedType());
         if (dt instanceof PrimitiveType pt)
             return pt.primitive().declarer(pt.pos(), refer);
-
+        if (dt instanceof GenericType gt)
+            return new GenericTypeDeclarer(posOf(ctx), gt);
         return new DerivedTypeDeclarer(posOf(ctx),
                 (DerivedType) dt, refer);
     }
@@ -350,7 +352,7 @@ final class SourceParseVisitor
     @Override
     public Entity visitFuncTypeDeclarer(FengParser.FuncTypeDeclarerContext ctx) {
         var prototype = (Prototype) visit(ctx.prototype());
-        return new FuncTypeDeclarer(posOf(ctx), prototype, TypeArguments.EMPTY,
+        return new FuncTypeDeclarer(posOf(ctx), prototype,
                 FuncTypeDeclarer.Type.REFER);
     }
 
@@ -368,6 +370,16 @@ final class SourceParseVisitor
     //
 
 
+    private final Stack<TypeParameters> genericStack = new Stack<>();
+
+    private Optional<TypeParameter> findGeneric(Identifier name) {
+        for (var tp : genericStack) {
+            var o = tp.params().tryGet(name);
+            if (o.has()) return o;
+        }
+        return Optional.empty();
+    }
+
     private TypeArguments typeArguments(FengParser.TypeArgumentsContext ctx) {
         if (ctx == null) return TypeArguments.EMPTY;
         var arguments = parseTypeDeclarerList(ctx.typeDeclarerList());
@@ -378,11 +390,23 @@ final class SourceParseVisitor
     public Entity visitDefinedType(FengParser.DefinedTypeContext ctx) {
         var symbol = parseSymbol(ctx.symbol());
         if (symbol.module().none()) {
+            var name = symbol.name();
+            // 优先解析泛型参数
+            var gt = findGeneric(name);
+            if (gt.has()) {
+                var ta = ctx.typeArguments();
+                if (ta != null)
+                    return semantic("%s have no generic: %s", name, posOf(ta));
+                return new GenericType(posOf(ctx), gt.get());
+            }
+
+            // 然后解析基本类型
             var pd = Primitive.ofCode(symbol.name().value());
             if (pd.has()) {
                 var ta = ctx.typeArguments();
                 if (ta != null)
-                    return semantic("primitive have no generic: %s", posOf(ta));
+                    return semantic("%s have no generic: %s",
+                            name, posOf(ta));
 
                 return new PrimitiveType(posOf(ctx), symbol.name(), pd.get());
             }
@@ -419,7 +443,12 @@ final class SourceParseVisitor
     @Override
     public Entity visitTypeParameter(FengParser.TypeParameterContext ctx) {
         var name = identifier(ctx.name);
+        findGeneric(name).use(tp -> {
+            semantic("duplicate type parameter '%s'%s, before at %s",
+                    name, name.pos(), tp.pos());
+        });
         var constraint = this.<TypeConstraint>visitOptional(ctx.typeConstraint());
+        if (constraint.has()) unsupported("generic constraint");
         return new TypeParameter(posOf(ctx), name, constraint);
     }
 
@@ -509,10 +538,13 @@ final class SourceParseVisitor
         var domain = parseDomain(ctx.domain);
         var symbol = defineSymbol(ctx.name);
         var generic = typeParameters(ctx.typeParameters());
+        if (!generic.isEmpty()) unsupported("generic: %s", generic.pos());
+        genericStack.push(generic);
         var fields = parseStructureMembers(ctx.structureFieldsDef());
         var def = new StructureDefinition(posOf(ctx), modifier, symbol,
                 generic, domain, fields);
         for (var f : fields) f.master().set(def);
+        genericStack.pop();
         return def;
     }
 
@@ -559,9 +591,10 @@ final class SourceParseVisitor
     public Entity visitDefinedStructureFieldType(
             FengParser.DefinedStructureFieldTypeContext ctx) {
         var type = (DefinedType) visit(ctx.definedType());
-        if (type instanceof PrimitiveType pt) {
+        if (type instanceof PrimitiveType pt)
             return pt.primitive().declarer(posOf(ctx));
-        }
+        if (type instanceof GenericType gt)
+            return new GenericTypeDeclarer(posOf(ctx), gt);
         return new DerivedTypeDeclarer(posOf(ctx), (DerivedType) type,
                 Optional.empty());
     }
@@ -626,6 +659,7 @@ final class SourceParseVisitor
         var modifier = parseModifier(ctx.modifier());
         var symbol = defineSymbol(ctx.name);
         var generic = typeParameters(ctx.typeParameters());
+        genericStack.push(generic);
         var methods = new IdentifierTable<InterfaceMethod>();
         var parts = new SymbolTable<DerivedType>();
         var macros = new MacroTable();
@@ -646,8 +680,8 @@ final class SourceParseVisitor
         }
         var def = new InterfaceDefinition(posOf(ctx),
                 modifier, symbol, generic, methods, parts, macros);
-        for (InterfaceMethod m : methods)
-            m.master.set(def);
+        for (var m : methods) m.master.set(def);
+        genericStack.pop();
         return def;
     }
 
@@ -661,9 +695,11 @@ final class SourceParseVisitor
         enterMethodName = name;
         methodReturnThis = false;
         var generic = typeParameters(ctx.typeParameters());
+        genericStack.push(generic);
         var prototype = (Prototype) visit(ctx.prototype());
         var method = new InterfaceMethod(pos, modifier, name, generic,
                 prototype, methodReturnThis);
+        genericStack.pop();
         methodReturnThis = false;
         enterMethodName = null;
         return method;
@@ -727,6 +763,7 @@ final class SourceParseVisitor
         if (enterClassSymbol != null) syntax("nested define class: %s", symbol);
         enterClassSymbol = symbol;
         var generic = typeParameters(ctx.typeParameters());
+        genericStack.push(generic);
         var ext = ctx.classExtension();
         var isFinal = ext.FINAL() != null;
         var inherit = parseClassInherit(ext.classInherit());
@@ -748,13 +785,13 @@ final class SourceParseVisitor
                 enterMethodName = mName;
                 methodReturnThis = false;
                 var mGeneric = typeParameters(mi.method.typeParameters());
+                genericStack.push(mGeneric);
                 var procedure = (Procedure) visit(mi.method.procedure());
-                var func = new FunctionDefinition(posOf(mi), mModifier,
-                        new Symbol(mName), mGeneric, procedure);
-                var method = new ClassMethod(posOf(mi), mExport, mName,
-                        func, methodReturnThis);
+                var method = new ClassMethod(posOf(mi), mExport, mModifier, mName,
+                        mGeneric, procedure.prototype(), procedure, methodReturnThis);
                 methodReturnThis = false;
                 methods.add(mName, method);
+                genericStack.pop();
                 enterMethodName = null;
             } else if (mi.fields != null) {
                 var dcl = parseDeclare(mi.fields.declare);
@@ -774,8 +811,9 @@ final class SourceParseVisitor
         var def = new ClassDefinition(posOf(ctx), modifier, symbol,
                 generic, isFinal, inherit, impl, fields, methods, macros);
         for (var f : fields) f.master().set(def);
-        for (var m : methods) m.master.set(def);
+        for (var m : methods) m.master(def);
 
+        genericStack.pop();
         enterClassSymbol = null;
         return def;
     }
@@ -1518,10 +1556,14 @@ final class SourceParseVisitor
             FengParser.PrototypeDefinitionContext ctx) {
         var modifier = parseModifier(ctx.modifier());
         var symbol = defineSymbol(ctx.name);
-        var prototype = (Prototype) visit(ctx.prototype());
         var generic = typeParameters(ctx.typeParameters());
-        return new PrototypeDefinition(posOf(ctx), modifier,
+        if (!generic.isEmpty()) unsupported("generic: %s", generic.pos());
+        genericStack.push(generic);
+        var prototype = (Prototype) visit(ctx.prototype());
+        var def = new PrototypeDefinition(posOf(ctx), modifier,
                 symbol, generic, prototype);
+        genericStack.pop();
+        return def;
     }
 
     @Override
@@ -1530,9 +1572,12 @@ final class SourceParseVisitor
         var modifier = parseModifier(ctx.modifier());
         var name = defineSymbol(ctx.name);
         var generic = typeParameters(ctx.typeParameters());
+        genericStack.push(generic);
         var procedure = (Procedure) visit(ctx.procedure());
-        return new FunctionDefinition(posOf(ctx), modifier,
+        var def = new FunctionDefinition(posOf(ctx), modifier,
                 name, generic, procedure);
+        genericStack.pop();
+        return def;
     }
 
 

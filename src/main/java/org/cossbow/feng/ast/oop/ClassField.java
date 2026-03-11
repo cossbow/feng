@@ -7,7 +7,6 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
-import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.util.Lazy;
 
 public class ClassField extends Field implements Exportable {
@@ -40,11 +39,6 @@ public class ClassField extends Field implements Exportable {
         return export;
     }
 
-    public FieldVariable variable() {
-        return new FieldVariable(pos(), modifier, declare,
-                name(), Lazy.of(type()), this);
-    }
-
     @Override
     public boolean immutable() {
         return declare == Declare.CONST;
@@ -52,29 +46,19 @@ public class ClassField extends Field implements Exportable {
 
     //
 
-    private final Lazy<ClassDefinition> master = Lazy.nil();
+    private Lazy<ClassDefinition> master = Lazy.nil();
 
     public Lazy<ClassDefinition> master() {
         return master;
     }
 
-    //
-
-    public static class FieldVariable extends Variable {
-        private final ClassField field;
-
-        public FieldVariable(Position pos, Modifier modifier,
-                             Declare declare, Identifier name,
-                             Lazy<TypeDeclarer> type, ClassField field) {
-            super(pos, modifier, declare, name, type,
-                    Lazy.nil());
-            this.field = field;
-        }
-
-        public ClassField field() {
-            return field;
-        }
+    public ClassField clone() {
+        var n = (ClassField) super.clone();
+        n.master = master.clone();
+        return n;
     }
+
+    //
 
     //
 

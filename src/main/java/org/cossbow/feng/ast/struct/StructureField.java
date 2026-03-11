@@ -35,7 +35,7 @@ public class StructureField extends Field {
 
     //
 
-    private final Lazy<StructureDefinition> master=Lazy.nil();
+    private final Lazy<StructureDefinition> master = Lazy.nil();
 
     public Lazy<StructureDefinition> master() {
         return master;

@@ -47,4 +47,10 @@ public class ReturnStatement extends Statement {
     public Lazy<Expression> relay() {
         return relay;
     }
+
+    //
+    @Override
+    public String toString() {
+        return "return " + result + ';';
+    }
 }

@@ -22,6 +22,10 @@ public class Prototype extends Entity {
         return parameterSet;
     }
 
+    public void parameterSet(ParameterSet parameterSet) {
+        this.parameterSet = parameterSet;
+    }
+
     public Optional<TypeDeclarer> returnSet() {
         return returnSet;
     }
@@ -32,6 +36,11 @@ public class Prototype extends Entity {
 
     public TypeDeclarer returnType() {
         return returnSet.getOrElse(new VoidTypeDeclarer(pos()));
+    }
+
+    public boolean hasTemplate() {
+        return parameterSet.hasTemplate() ||
+                returnSet.match(TypeDeclarer::hasTemplate);
     }
 
     //

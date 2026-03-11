@@ -14,13 +14,13 @@ class C:B{
 
 func test(n int) {
     var i1 *I = new(A);
-    i1.run();
+    i1.run(); // A.run
     var i2 *I = new(B);
-    i2.run(); // wrong
+    i2.run(); // A.run
     var i3 *I = new(C);
-    i3.run(); // wrong
+    i3.run(); // C.run
     var b *B = new(C);
-    b.run(); // wrong
+    b.run(); // C.run
 }
 
 func main() int32 {

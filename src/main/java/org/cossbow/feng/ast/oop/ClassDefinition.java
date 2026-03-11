@@ -16,12 +16,12 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ClassDefinition extends ObjectDefinition {
-    private final boolean isFinal;
-    private final Optional<DerivedType> inherit;
-    private final SymbolTable<DerivedType> impl;
-    private final IdentifierTable<ClassField> fields;
-    private final IdentifierTable<ClassMethod> methods;
-    private final MacroTable macros;
+    private boolean isFinal;
+    private Optional<DerivedType> inherit;
+    private SymbolTable<DerivedType> impl;
+    private IdentifierTable<ClassField> fields;
+    private IdentifierTable<ClassMethod> methods;
+    private MacroTable macros;
 
     public ClassDefinition(Position pos,
                            Modifier modifier,
@@ -82,21 +82,18 @@ public class ClassDefinition extends ObjectDefinition {
         return fields;
     }
 
-    public IdentifierTable<ClassMethod> methods() {
-        return methods;
+    public void fields(IdentifierTable<ClassField> fields) {
+        this.fields = fields;
     }
 
-    public boolean hasMember(Identifier name) {
-        return fields.exists(name) || methods.exists(name);
+    public IdentifierTable<ClassMethod> methods() {
+        return methods;
     }
 
     public MacroTable macros() {
         return macros;
     }
 
-    public Optional<ClassField> field(Identifier name) {
-        return fields.tryGet(name);
-    }
 
     //
 
@@ -105,8 +102,9 @@ public class ClassDefinition extends ObjectDefinition {
     private final List<ClassDefinition> ancestors = new ArrayList<>();
     private final Set<ClassDefinition> children = new HashSet<>();
     private final List<InterfaceDefinition> allImpls = new ArrayList<>();
-    private final IdentifierTable<ClassField> allFields = new IdentifierTable<>();
-    private final IdentifierTable<ClassMethod> allMethods = new IdentifierTable<>();
+    private IdentifierTable<ClassField> allFields = new IdentifierTable<>();
+    private IdentifierTable<ClassField> inheritFields = new IdentifierTable<>();
+    private IdentifierTable<ClassMethod> allMethods = new IdentifierTable<>();
     private volatile boolean resource;
 
     public int id() {
@@ -133,8 +131,16 @@ public class ClassDefinition extends ObjectDefinition {
         return allFields;
     }
 
+    public IdentifierTable<ClassField> inheritFields() {
+        return inheritFields;
+    }
+
     public IdentifierTable<ClassMethod> allMethods() {
         return allMethods;
+    }
+
+    public void allMethods(IdentifierTable<ClassMethod> allMethods) {
+        this.allMethods = allMethods;
     }
 
     public boolean resource() {
@@ -146,6 +152,7 @@ public class ClassDefinition extends ObjectDefinition {
     }
 
     //
+
 
     // static
 

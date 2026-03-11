@@ -22,7 +22,7 @@ public class SemanticAnalysisMain {
         System.out.printf("[check]>>> %s\n", file);
         var src = doParse(file);
         var ctx = new GlobalSymbolContext(src.table());
-        new SemanticAnalysis(ctx).analyse(src);
+        new SemanticAnalysis(ctx, false).analyse(src);
     }
 
     public static void main(String[] args) {

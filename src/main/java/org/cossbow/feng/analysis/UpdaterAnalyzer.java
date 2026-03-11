@@ -28,7 +28,7 @@ public class UpdaterAnalyzer {
 
     private void analyse(ClassMethod method) {
         enterMethod = method;
-        analyse(method.func().procedure());
+        analyse(method.procedure().must());
     }
 
     private void analyse(Procedure proc) {

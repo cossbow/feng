@@ -138,7 +138,7 @@ public class ExportImportTest extends BaseParseTest {
         var t = (DerivedType) ((NewDefinedType) n.type()).type();
         Assertions.assertEquals(type, t.symbol());
         Assertions.assertEquals(param,
-                typeName(t.generic().arguments().getFirst()));
+                typeName(t.generic().get(0)));
     }
 
     @Test

@@ -36,6 +36,10 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         return element;
     }
 
+    public void element(TypeDeclarer element) {
+        this.element = element;
+    }
+
     public Optional<Expression> length() {
         return length;
     }
@@ -71,6 +75,10 @@ public class ArrayTypeDeclarer extends TypeDeclarer
 
     public void unit(Long unit) {
         this.unit = unit;
+    }
+
+    public boolean hasTemplate() {
+        return element.hasTemplate();
     }
 
     //

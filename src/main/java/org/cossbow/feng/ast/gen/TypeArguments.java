@@ -3,13 +3,17 @@ package org.cossbow.feng.ast.gen;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
-import org.cossbow.feng.util.Optional;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public class TypeArguments extends Entity {
+public class TypeArguments extends Entity
+        implements Iterable<TypeDeclarer> {
     private final List<TypeDeclarer> arguments;
 
     public TypeArguments(Position pos,
@@ -30,13 +34,46 @@ public class TypeArguments extends Entity {
         return arguments.get(i);
     }
 
-    public Optional<TypeDeclarer> tryGet(int i) {
-        return isEmpty() ? Optional.empty() : Optional.of(get(i));
-    }
-
     public boolean isEmpty() {
         return arguments.isEmpty();
     }
+
+    public boolean allMatch(Predicate<TypeDeclarer> p) {
+        for (var a : arguments) {
+            if (!p.test(a)) return false;
+        }
+        return true;
+    }
+
+    public boolean anyMatch(Predicate<TypeDeclarer> p) {
+        for (var a : arguments) {
+            if (p.test(a)) return true;
+        }
+        return false;
+    }
+
+    public Stream<TypeDeclarer> stream() {
+        return arguments.stream();
+    }
+
+    public Iterator<TypeDeclarer> iterator() {
+        return arguments.iterator();
+    }
+
+    public TypeArguments map(Function<TypeDeclarer, TypeDeclarer> f) {
+        var list = new ArrayList<TypeDeclarer>(arguments.size());
+        for (var a : arguments) {
+            list.add(f.apply(a));
+        }
+        return new TypeArguments(pos(), list);
+    }
+
+    public boolean hasTemplate() {
+        return arguments.stream().anyMatch(
+                TypeDeclarer::hasTemplate);
+    }
+
+    //
 
     @Override
     public boolean equals(Object o) {

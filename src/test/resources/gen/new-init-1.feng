@@ -1,0 +1,36 @@
+
+interface I {
+    run();
+}
+class A (I) {
+    var id int;
+    func run() {}
+}
+class B:A{
+}
+class C:B{
+    func run() {}
+}
+
+func test(n int) {
+    {
+        var a0 = new(A);
+        var a1 = new(A, {id=1});
+        var a2 = new(A,a1);
+        var a A;
+        var a3 = new(A,a);
+    }
+    {
+        var c = new(C, {id=1});
+        var b1 *B = c;
+        const b2 &B = c;
+    }
+    {
+        var i = new(int, n);
+    }
+}
+
+func main() int32 {
+    test(15);
+    return 0;
+}

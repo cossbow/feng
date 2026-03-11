@@ -64,4 +64,8 @@ public class TypeDeclarer extends Entity {
     public boolean isVoid() {
         return false;
     }
+
+    public boolean hasTemplate() {
+        return false;
+    }
 }

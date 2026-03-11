@@ -4,23 +4,23 @@ import java.util.HashMap;
 import java.util.Map;
 
 public enum TypeDomain {
-    PRIMITIVE("primitive", false),
-    STRUCT("struct", true),
-    UNION("union", true),
-    ENUM("enum", true),
-    ATTRIBUTE("attribute", true),
-    INTERFACE("interface", true),
-    CLASS("class", true),
+    PRIMITIVE("primitive", true),
+    STRUCT("struct", false),
+    UNION("union", false),
+    ENUM("enum", false),
+    ATTRIBUTE("attribute", false),
+    INTERFACE("interface", false),
+    CLASS("class", false),
     FUNC("func", false),
-    ARRAY("array", false),
+    GENERIC("generic", false),
     ;
 
     public final String name;
-    public final boolean custom;
+    public final boolean builtin;
 
-    TypeDomain(String name, boolean custom) {
+    TypeDomain(String name, boolean builtin) {
         this.name = name;
-        this.custom = custom;
+        this.builtin = builtin;
     }
 
     @Override

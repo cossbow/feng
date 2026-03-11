@@ -52,7 +52,7 @@ public class GenericParseTest extends BaseParseTest {
             var code = "class A{func foo`%s`(){}}".formatted(idList(params));
             var def = (ClassDefinition) doParseType(code, "A");
             var m = def.methods().get(identifier("foo"));
-            checkIds(params, m.func().generic().params());
+            checkIds(params, m.generic().params());
         }
     }
 
@@ -83,7 +83,7 @@ public class GenericParseTest extends BaseParseTest {
     public void testTypeConstraint2() {
         for (var g2 : simpleGlobalDefineFmt) {
             for (var d : TypeDomain.values()) {
-                if (!d.custom) continue;
+                if (d.builtin) continue;
                 var type = randTypeName(2);
                 var param = doParse(g2, type + " " + d.name)
                         .params().get(type);

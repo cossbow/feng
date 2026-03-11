@@ -1,11 +1,14 @@
 package org.cossbow.feng.ast.gen;
 
 import org.cossbow.feng.ast.Entity;
-import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.ast.Position;
 
-public class TypeParameters extends Entity {
+import java.util.Iterator;
+import java.util.stream.Collectors;
+
+public class TypeParameters extends Entity
+        implements Iterable<TypeParameter> {
     private IdentifierTable<TypeParameter> params;
 
     public TypeParameters(Position pos,
@@ -18,16 +21,30 @@ public class TypeParameters extends Entity {
         return params;
     }
 
-    public TypeParameter get(Identifier name) {
-        return params.get(name);
+    public TypeParameter get(int i) {
+        return params.getValue(i);
     }
 
-    public boolean exists(Identifier name) {
-        return params.exists(name);
+    public int size() {
+        return params.size();
     }
 
     public boolean isEmpty() {
         return params.isEmpty();
+    }
+
+    public Iterator<TypeParameter> iterator() {
+        return params.iterator();
+    }
+
+    //
+
+    @Override
+    public String toString() {
+        if (params.isEmpty()) return "";
+        return '`' + params.stream().map(Object::toString)
+                .collect(Collectors.joining(", "))
+                + '`';
     }
 
     //

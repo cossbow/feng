@@ -48,4 +48,9 @@ public class Assignment extends Entity {
         relay.add(v);
     }
 
+    //
+    @Override
+    public String toString() {
+        return operand + " = " + value;
+    }
 }

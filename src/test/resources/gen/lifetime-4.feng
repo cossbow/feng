@@ -1,0 +1,29 @@
+
+class A {
+}
+
+class B : A {
+    var idx *int;
+}
+
+func object1() {
+    var a *A = new(B, {idx=new(int)});
+}
+
+func array1() {
+    {
+        var a *A = new(B, {idx=new(int)});
+        var aa [*]*A = new([2]*A);
+        aa[0] = a;
+    }
+}
+
+func test(n int) {
+    object1();
+    array1();
+}
+
+func main() int32 {
+    test(15);
+    return 0;
+}

@@ -1,7 +1,13 @@
 package org.cossbow.feng.ast;
 
 import org.cossbow.feng.ast.attr.Modifier;
+import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.ast.oop.ClassDefinition;
+import org.cossbow.feng.util.Lazy;
+
+import java.util.HashMap;
+import java.util.Map;
 
 abstract
 public class Definition extends Entity {
@@ -34,6 +40,8 @@ public class Definition extends Entity {
     //
 
     private volatile boolean builtin;
+    public final Map<TypeArguments, Definition> instantiated = new HashMap<>();
+    public final Lazy<Definition> template = Lazy.nil();
 
     public boolean builtin() {
         return builtin;
@@ -41,6 +49,18 @@ public class Definition extends Entity {
 
     public void builtin(boolean builtin) {
         this.builtin = builtin;
+    }
+
+    //
+
+    public boolean equals(Object o) {
+        if (!(o instanceof Definition t))
+            return false;
+        return symbol.equals(t.symbol);
+    }
+
+    public int hashCode() {
+        return symbol.hashCode();
     }
 
 }

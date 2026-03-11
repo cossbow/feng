@@ -2,9 +2,10 @@ package org.cossbow.feng.util;
 
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
-public class Lazy<T> {
+public class Lazy<T> implements Cloneable {
     private volatile T value;
 
     private Lazy(T value) {
@@ -54,8 +55,10 @@ public class Lazy<T> {
         return matcher.test(v);
     }
 
-    public boolean same(T o) {
-        return has() && value.equals(o);
+    public void update(Function<T, T> f) {
+        var v = value;
+        if (v == null) return;
+        value = f.apply(v);
     }
 
     public void use(Consumer<T> user) {
@@ -67,6 +70,15 @@ public class Lazy<T> {
         var v = value;
         if (v != null) user.accept(v);
         else or.run();
+    }
+
+    @SuppressWarnings("unchecked")
+    public Lazy<T> clone() {
+        try {
+            return (Lazy<T>) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new ErrorUtil.UnreachableException();
+        }
     }
 
     //

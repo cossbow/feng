@@ -1,0 +1,66 @@
+
+class B:A {
+    func run() {
+    }
+}
+
+class S final {
+    var tag int;
+}
+interface I {
+    clone() *I;
+    run();
+}
+class A (I) {
+    var id int;
+    var n *A;
+    var s S;
+    func run() {
+    }
+    func clone() *A {
+        return new(A, {id=id,n=n,s=s});
+    }
+}
+class B:A {
+    func run() {
+    }
+}
+func object1() {
+    {
+        var x *A = new(A, {});
+    }
+    var a *A = new(B, {n=new(B,{s={tag=-1}})});
+    a.run();
+    const p1 &A = a;
+    p1.run();
+    var b = a;
+    b.run();
+
+    var c *A= new(A,{n=a.n});
+    b=c;
+    b.run();
+
+    c=nil;
+
+    var d A = {id=112};
+    const p2 &A = d;
+    p2.run();
+
+    var s = new(S,{tag=1});
+
+    a.clone().clone().clone().run();
+
+    var i *I = new(B);
+    i.clone().clone().run();
+}
+
+
+func test(n int) {
+    object1();
+}
+
+
+func main() int32 {
+    test(1);
+    return 0;
+}

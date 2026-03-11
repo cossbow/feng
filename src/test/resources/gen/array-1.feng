@@ -1,0 +1,74 @@
+
+
+func array1() {
+    var aa [2]A = [{id=123}];
+    aa[0].run();
+    const ap1 [&]A = aa;
+    ap1[0].run();
+
+    var ar1 [*]A= new([8]A, [{id=123}]);
+    ar1[0].run();
+    {
+        const ap2 [&]A = ar1;
+        ap2[0].run();
+    }
+    ar1=nil;
+
+    var ar2 [*]A= new([7]A, aa);
+    ar2[0].run();
+}
+
+func array2() {
+    {
+        var aa [2]A = [{id=123}];
+        const pa &A = aa[0];
+        pa.run();
+    }
+    {
+        var aa [2][5]A = [[{id=123}]];
+        const pa &A = aa[0][0];
+        pa.run();
+    }
+    {
+        var aa [2]*A = [new(A)];
+        aa[0].run();
+    }
+    {
+        var aa [2][*]A = [new([4]A, [{id=321}])];
+        aa[0][0].run();
+    }
+}
+
+struct U {
+    value [4]int;
+}
+func array3() {
+    {
+        var a1 [*]int32 = new([2]int32);
+        var a2 [*]uint8 = a1;
+        var a3 [*]uint = a1;
+        var i *int = a1;
+        var a4 [*]int = i;
+        var pu1 *U = a1;
+    }
+    {
+        var u U;
+        const pu1 &U = u;
+        const i1 &int = u.value;
+        const i2 &int = u.value[2];
+        var a1 [2]int16;
+//        const pu2 &U = a1;
+    }
+}
+
+
+func test(n int) {
+    array1();
+    array2();
+    array3();
+}
+
+func main() int32 {
+    test(5);
+    return 0;
+}

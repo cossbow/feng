@@ -13,8 +13,8 @@ public class Variable extends Entity {
     private final Modifier modifier;
     private final Declare declare;
     private final Identifier name;
-    private final Lazy<TypeDeclarer> type;
-    private final Lazy<Expression> value;
+    private Lazy<TypeDeclarer> type;
+    private Lazy<Expression> value;
 
     public Variable(Position pos,
                     Modifier modifier,
@@ -50,16 +50,9 @@ public class Variable extends Entity {
         return value;
     }
 
-    public Expression requireValue() {
-        return value.has() ? value.must() : defVal.must();
-    }
+    //
 
-    private final Lazy<Expression> defVal = Lazy.nil();
     private final int id = IdGenerator.getAndIncrement();
-
-    public Lazy<Expression> defVal() {
-        return defVal;
-    }
 
     public int id() {
         return id;
@@ -67,6 +60,15 @@ public class Variable extends Entity {
 
 
     //
+
+    @Override
+    public Entity clone() {
+        var r = (Variable) super.clone();
+        // clone Lazy<T>: 防止被修改
+        r.type = type.clone();
+        r.value = value.clone();
+        return r;
+    }
 
     @Override
     public boolean equals(Object o) {

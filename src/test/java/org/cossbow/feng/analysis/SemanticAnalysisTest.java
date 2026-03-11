@@ -1,7 +1,6 @@
 package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.BinaryOperator;
-import org.cossbow.feng.ast.TypeDomain;
 import org.cossbow.feng.ast.UnaryOperator;
 import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.err.SemanticException;
@@ -25,7 +24,7 @@ public class SemanticAnalysisTest {
         System.out.println("<<<");
         var src = BaseParseTest.doParseFile(code);
         var ctx = new GlobalSymbolContext(src.table());
-        new SemanticAnalysis(ctx).analyse(src);
+        new SemanticAnalysis(ctx, false).analyse(src);
     }
 
     void checkFail(String code) {
@@ -80,21 +79,14 @@ public class SemanticAnalysisTest {
 
     //
 
-    List<TypeDomain> getDomains(TypeDomain exclude) {
-        return Arrays.stream(TypeDomain.values())
-                .filter(d -> d.custom)
-                .filter(d -> d != exclude)
-                .filter(d -> d != TypeDomain.ENUM)
-                .filter(d -> d != TypeDomain.ATTRIBUTE)
-                .toList();
-    }
-
     @Test
     public void testClassInherit1() {
-        checkSucc("class B {} class A : B {}");
         checkFail("class A : B {}");
-        for (var domain : getDomains(TypeDomain.CLASS))
-            checkFail(domain + " B {} class A : B {}");
+        checkSucc("class B {} class A : B {}");
+        checkFail("struct B {} class A : B {}");
+        checkFail("union B {} class A : B {}");
+        checkFail("interface B {} class A : B {}");
+        checkFail("attribute B {} class A : B {}");
         checkFail("enum B {WAIT,} class A : B {}");
     }
 
@@ -262,9 +254,12 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testClassImpl3() {
-        for (var domain : getDomains(TypeDomain.INTERFACE))
-            checkFail(domain + " I {} class A (I) {}");
+        checkSucc("interface I {} class A (I) {}");
+        checkFail("class I {} class A (I) {}");
+        checkFail("struct I {} class A (I) {}");
+        checkFail("union I {} class A (I) {}");
         checkFail("enum I {WAIT,} class A (I) {}");
+        checkFail("attribute I {} class A (I) {}");
     }
 
     @Test
@@ -2632,7 +2627,7 @@ public class SemanticAnalysisTest {
             Assertions.assertNotNull(is);
             var src = BaseParseTest.doParseFile(is);
             var ctx = new GlobalSymbolContext(src.table());
-            new SemanticAnalysis(ctx).analyse(src);
+            new SemanticAnalysis(ctx, false).analyse(src);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

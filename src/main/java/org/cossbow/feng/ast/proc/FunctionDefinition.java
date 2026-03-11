@@ -5,21 +5,21 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.util.Optional;
 
 public class FunctionDefinition extends Definition {
-    private final Procedure procedure;
-    private final boolean builtin;
+    private Prototype prototype;
+    private Optional<Procedure> procedure;
 
-    public FunctionDefinition(Position pos,
-                              Modifier modifier,
-                              Symbol symbol,
-                              TypeParameters generic,
-                              Procedure procedure,
-                              boolean builtin) {
+    private FunctionDefinition(Position pos,
+                               Modifier modifier,
+                               Symbol symbol,
+                               TypeParameters generic,
+                               Prototype prototype,
+                               Optional<Procedure> procedure) {
         super(pos, modifier, symbol, generic);
-
+        this.prototype = prototype;
         this.procedure = procedure;
-        this.builtin = builtin;
     }
 
     public FunctionDefinition(Position pos,
@@ -28,19 +28,25 @@ public class FunctionDefinition extends Definition {
                               TypeParameters generic,
                               Procedure procedure) {
         this(pos, modifier, symbol, generic,
-                procedure, false);
+                procedure.prototype(),
+                Optional.of(procedure));
+    }
+
+    public FunctionDefinition(Position pos,
+                              Modifier modifier,
+                              Symbol symbol,
+                              TypeParameters generic,
+                              Prototype prototype) {
+        this(pos, modifier, symbol, generic,
+                prototype, Optional.empty());
     }
 
     public Procedure procedure() {
-        return procedure;
+        return procedure.must();
     }
 
     public Prototype prototype() {
-        return procedure.prototype();
-    }
-
-    public boolean builtin() {
-        return builtin;
+        return prototype;
     }
 
     //

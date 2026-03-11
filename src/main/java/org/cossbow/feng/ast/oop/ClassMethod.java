@@ -1,67 +1,109 @@
 package org.cossbow.feng.ast.oop;
 
-import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.Exportable;
+import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Method;
+import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.ast.proc.Procedure;
 import org.cossbow.feng.ast.proc.Prototype;
-import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.Optional;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-public class ClassMethod extends Method implements Exportable {
+public class ClassMethod extends Method
+        implements Exportable {
     private boolean export;
+    private Modifier modifier;
     private Identifier name;
-    private FunctionDefinition func;
+    private TypeParameters generic;
+    private Prototype prototype;
+    private Optional<Procedure> procedure;
     private boolean returnThis;
 
     public ClassMethod(Position pos,
                        boolean export,
+                       Modifier modifier,
                        Identifier name,
-                       FunctionDefinition func,
+                       TypeParameters generic,
+                       Prototype prototype,
+                       Optional<Procedure> procedure,
                        boolean returnThis) {
         super(pos);
         this.export = export;
+        this.modifier = modifier;
         this.name = name;
-        this.func = func;
+        this.generic = generic;
+        this.prototype = prototype;
+        this.procedure = procedure;
         this.returnThis = returnThis;
+    }
+
+    public ClassMethod(Position pos,
+                       boolean export,
+                       Modifier modifier,
+                       Identifier name,
+                       TypeParameters generic,
+                       Prototype prototype,
+                       Procedure procedure,
+                       boolean returnThis) {
+        this(pos, export, modifier, name, generic, prototype,
+                Optional.of(procedure), returnThis);
     }
 
     public boolean export() {
         return export;
     }
 
-    public Identifier name() {
-        return name;
+    public Modifier modifier() {
+        return modifier;
     }
 
-    public FunctionDefinition func() {
-        return func;
+    public Identifier name() {
+        return name;
     }
 
     public boolean returnThis() {
         return returnThis;
     }
 
-    @Override
     public Prototype prototype() {
-        return func.prototype();
+        return prototype;
     }
 
-    @Override
+    public void prototype(Prototype prototype) {
+        this.prototype = prototype;
+    }
+
+    public Optional<Procedure> procedure() {
+        return procedure;
+    }
+
     public TypeParameters generic() {
-        return func.generic();
+        return generic;
+    }
+
+    public ClassMethod declaration() {
+        return new ClassMethod(pos(), export, modifier,
+                name, generic, prototype, Optional.empty(),
+                returnThis);
     }
 
     //
 
-    public final Lazy<ClassDefinition> master = Lazy.nil();
-    private final List<ClassMethod> override = new ArrayList<>();
+    private ClassDefinition master;
+    private List<ClassMethod> override = new ArrayList<>();
     private boolean updater;
 
     public ClassDefinition master() {
-        return master.must();
+        return master;
+    }
+
+    public void master(ClassDefinition master) {
+        this.master = master;
     }
 
     public List<ClassMethod> override() {
@@ -88,8 +130,9 @@ public class ClassMethod extends Method implements Exportable {
 
     @Override
     public String toString() {
-        if (master.none())
-            return name.value() + func;
-        return master.must().symbol() + "." + func;
+        if (master == null)
+            return name.value() + prototype;
+        return master.symbol() + "." +
+                name + prototype;
     }
 }

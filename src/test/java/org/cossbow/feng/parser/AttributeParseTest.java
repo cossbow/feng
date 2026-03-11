@@ -156,7 +156,7 @@ public class AttributeParseTest extends BaseParseTest {
     private IdentifierTable<Attribute> atClassMethod(CharSequence attr) {
         var code = "class A{%s func get(){}}".formatted(attr);
         var def = (ClassDefinition) doParseType(code, "A");
-        return def.methods().get(identifier("get")).func().modifier().attributes();
+        return def.methods().get(identifier("get")).modifier().attributes();
     }
 
     private IdentifierTable<Attribute> atInterfaceMethod(CharSequence attr) {
@@ -168,7 +168,7 @@ public class AttributeParseTest extends BaseParseTest {
     private IdentifierTable<Attribute> atParameter(CharSequence attr) {
         var code = "func test(%s a A){}".formatted(attr);
         var func = doParseFunc(code, "test");
-        var ps = (ParameterSet) func.procedure().prototype().parameterSet();
+        var ps = func.procedure().prototype().parameterSet();
         return ps.variables().get(identifier("a")).modifier().attributes();
     }
 

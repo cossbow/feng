@@ -5,9 +5,6 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.layout.StructureLayout;
 import org.cossbow.feng.util.Lazy;
-import org.cossbow.feng.util.Optional;
-
-import java.util.List;
 
 public class StructureDefinition extends TypeDefinition {
     private IdentifierTable<StructureField> fields;
@@ -27,18 +24,11 @@ public class StructureDefinition extends TypeDefinition {
         return fields;
     }
 
-    public Optional<StructureField> field(Identifier name) {
-        return fields.tryGet(name);
-    }
+    //
 
-    private final Lazy<List<StructureDefinition>> initDeps = Lazy.nil();
     private int pack = 0;
     private long size = 1;
     private final Lazy<StructureLayout> layout = Lazy.nil();
-
-    public Lazy<List<StructureDefinition>> initDeps() {
-        return initDeps;
-    }
 
     public int pack() {
         return pack;

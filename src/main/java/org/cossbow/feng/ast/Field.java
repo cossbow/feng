@@ -23,6 +23,10 @@ public class Field extends Entity {
         return type;
     }
 
+    public void type(TypeDeclarer type) {
+        this.type = type;
+    }
+
     public boolean immutable() {
         return false;
     }

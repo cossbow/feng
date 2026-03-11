@@ -1,0 +1,82 @@
+
+interface I`R` {
+    get() R;
+    set(r R);
+}
+
+class A {
+    var id int;
+    func run() {}
+}
+
+class Box`E` (I`E`) {
+    var v E;
+    func get() E {
+        return v;
+    }
+    func set(v E) {
+        this.v=v;
+    }
+    func change(v E) E {
+        var o = get();
+        set(v);
+        return o;
+    }
+}
+
+class BigBox`V` : Box`V` {
+    func change(v V) V {
+        return v;
+    }
+}
+
+class Node`T` {
+    var t T;
+    var n *Node`T`;
+    var x *Box`T`;
+    var y *Box`*Box`T``;
+    var p *Pair`int, T`;
+}
+
+func make`T`(t T) T {
+    return t;
+}
+
+class Pair`L, R`{
+    var l L;
+    var r R;
+}
+
+func use(a *Node`*int`) {
+    var n *Node`*int` = a.n;
+    if(n==nil) n=a;
+    var b1 *Box`*int` = a.x;
+    var b2 *Box`*Box`*int`` = a.y;
+    var t *int = a.p.r;
+    *t = a.p.l;
+    var v *int = a.t;
+
+    const p1 &Box`*int` = b1;
+    v=p1.change(v);
+    const i1 &I`*int` = b1;
+    i1.set(v);
+}
+
+func test(i int) {
+    var a *A = make`*A`(new(A,{id=i}));
+    var p = new(Pair`int,*int`,{r=new(int, i)});
+    var n = new(Node`*int`);
+    n.p=p;
+    use(new(Node`*int`, {
+        t=new(int),
+        n=new(Node`*int`),
+        x=new(Box`*int`),
+        y=new(Box`*Box`*int``, {v=new(BigBox`*int`)}),
+        p=p
+    }));
+}
+
+func main() int32 {
+    test(15);
+    return 0;
+}

@@ -44,6 +44,7 @@ public class ObjectExpression extends PrimaryExpression {
         return true;
     }
 
+    @Deprecated
     public final List<List<Field>> initStack = new ArrayList<>();
 
     //

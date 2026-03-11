@@ -1,0 +1,60 @@
+
+interface I`O` {
+    get() O;
+    set(o O);
+}
+
+class Box`E` (I`E`) {
+    var v E;
+    func get() E {
+        return v;
+    }
+    func set(v E) {
+        this.v=v;
+    }
+
+}
+
+class BigBox`V`:Box`V` {
+    func change(v V) V {
+        var o V = get();
+        set(v);
+        return o;
+    }
+}
+
+class SealedBox`X`:BigBox`X`{
+    func fetch() X {
+        return get();
+    }
+    func map`G`(g G) Pair`X,G` {
+        var p Pair`X,G` = {l=v,r=g};
+        return p;
+    }
+}
+
+class Pair`L, R`{
+    var l L;
+    var r R;
+}
+
+func make`T`(t T) *Box`T` {
+    return new(Box`T`, {v=t});
+}
+
+func test(n int) {
+    var i int;
+    var b  = make`int`(n);
+    b.set(n+1);
+    var bb = new(BigBox`int`,{v=n+11});
+    i = bb.change(n+33);
+    var sb = new(SealedBox`int`,{v=n*2});
+    i = sb.fetch();
+    var yes Pair`int,bool` = sb.map`bool`(true);
+    i = sb.get();
+}
+
+func main() int32 {
+    test(15);
+    return 0;
+}
