@@ -393,7 +393,7 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitDomainTypeConstraint(FengParser.DomainTypeConstraintContext ctx) {
-        var domain = TypeDomain.parse(ctx.typeDomains().getText());
+        var domain = TypeDomain.parse(ctx.typeDomain().getText());
         return new DomainTypeConstraint(posOf(ctx), domain);
     }
 

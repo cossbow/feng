@@ -357,12 +357,12 @@ typeParameter
     : name=Identifier typeConstraint?
     ;
 typeConstraint
-    : typeDomains                                   # DomainTypeConstraint
+    : typeDomain                                    # DomainTypeConstraint
     | definedType                                   # DefinedTypeConstraint
     | l=typeConstraint op=BITAND r=typeConstraint   # BinaryTypeConstraint
     | l=typeConstraint op=BITOR r=typeConstraint    # BinaryTypeConstraint
     ;
-typeDomains
+typeDomain
     : CLASS | INTERFACE | ENUM | STRUCT | UNION | ATTRIBUTE | FUNC
     ;
 

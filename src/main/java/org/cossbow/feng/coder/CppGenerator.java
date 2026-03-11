@@ -14,10 +14,7 @@ import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
-import org.cossbow.feng.ast.var.FieldOperand;
-import org.cossbow.feng.ast.var.IndexOperand;
-import org.cossbow.feng.ast.var.Operand;
-import org.cossbow.feng.ast.var.VariableOperand;
+import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.CommonUtil;
@@ -780,10 +777,11 @@ public class CppGenerator {
         if (cd.resource()) {
             write("this->release()").endStmt();
         }
-        if (cd.inherit().has()) {
-            var pdt = cd.inherit().get();
+        cd.inherit().use(pdt -> {
+            var pd = (ClassDefinition) findType(pdt);
+            if (pd == ClassDefinition.ObjectClass) return;
             write(pdt.symbol()).write("::Feng$release()").endStmt();
-        }
+        });
         for (var cf : cd.fields()) {
             var ft = cf.type();
             if (ft.maybeRefer().has()) {
@@ -827,7 +825,7 @@ public class CppGenerator {
         m.seeOverride(or -> {
             var child = or.master();
             write("case ").write(child.id()).write(':').newLine();
-            m.prototype().returnSet().use(rt ->{
+            m.prototype().returnSet().use(rt -> {
                 write("return (").write(rt).write(')');
             });
             write("((").write(child.symbol()).write("*)this)->");
@@ -1143,6 +1141,7 @@ public class CppGenerator {
             case IndexOperand ee -> write(ee);
             case FieldOperand ee -> write(ee);
             case VariableOperand ee -> write(ee);
+            case DereferOperand ee -> write(ee);
             default -> unreachable();
         }
         return this;
@@ -1159,7 +1158,11 @@ public class CppGenerator {
 
     private CppGenerator write(FieldOperand e) {
         var td = (DerivedTypeDeclarer) e.subject().resultType.must();
-        return deRefer(e.subject(), td).write(e.field());
+        return ofMember(e.subject(), td).write(e.field());
+    }
+
+    private CppGenerator write(DereferOperand e) {
+        return derefer(e.subject());
     }
 
     private CppGenerator write(AssignmentsStatement as) {
@@ -1352,6 +1355,7 @@ public class CppGenerator {
             case ParenExpression ee -> write(ee);
             case SymbolExpression ee -> write(ee);
             case VariableExpression ee -> write(ee);
+            case DereferExpression ee -> write(ee);
             case CheckNilExpression ee -> write(ee);
             case EnumValueExpression ee -> write(ee);
             case EnumIdExpression ee -> write(ee);
@@ -1455,6 +1459,10 @@ public class CppGenerator {
         return varName(e.variable());
     }
 
+    private CppGenerator write(DereferExpression e) {
+        return derefer(e.subject());
+    }
+
     private CppGenerator write(LambdaExpression e) {
         return unsupported("尼玛函数");
     }
@@ -1519,7 +1527,15 @@ public class CppGenerator {
         return write(pd.symbol());
     }
 
-    private CppGenerator deRefer(Expression subject, Referable ra) {
+    private CppGenerator derefer(PrimaryExpression e) {
+        var t = e.resultType.must();
+        write("(*");
+        if (!t.maybeRefer().must().required())
+            write("Feng$required");
+        return write("(").write(e).write("))");
+    }
+
+    private CppGenerator ofMember(Expression subject, Referable ra) {
         if (ra.refer().none())
             return write(subject).write('.');
         var ref = ra.refer().get();
@@ -1577,7 +1593,7 @@ public class CppGenerator {
         var dtd = (DerivedTypeDeclarer) td;
         var def = dtd.def.must();
 
-        deRefer(e.subject(), dtd);
+        ofMember(e.subject(), dtd);
         if (!e.generic().isEmpty()) return unreachable();
         write(e.member());
         return this;
@@ -1587,7 +1603,7 @@ public class CppGenerator {
         var td = (DerivedTypeDeclarer) e.subject().resultType.must();
         var def = td.def.must();
 
-        deRefer(e.subject(), td);
+        ofMember(e.subject(), td);
         if (!e.generic().isEmpty()) return unsupported("泛型");
         return callMethod(def, e.method().name());
     }

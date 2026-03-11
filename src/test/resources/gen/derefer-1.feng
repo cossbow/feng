@@ -1,0 +1,27 @@
+
+
+class A {
+    var id int;
+}
+
+func use(a &A, i&int) {
+    *i = *i * *i;
+    *a = {id=(*a).id/(*i)};
+}
+
+func test(n int) {
+    var a *A = new(A, {id=n});
+    var v = *a;
+    var i = v.id;
+    var b *A =new(A,{id=n*2});
+    i = b.id;
+    *a = *b;
+    i = a.id;
+    use(a,i);
+}
+
+
+func main() int32 {
+    test(17);
+    return 0;
+}

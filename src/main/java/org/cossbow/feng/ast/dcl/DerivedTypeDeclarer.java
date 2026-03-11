@@ -34,6 +34,7 @@ public class DerivedTypeDeclarer extends TypeDeclarer
     public Optional<TypeDeclarer> derefer() {
         var n = new DerivedTypeDeclarer(pos(), derivedType,
                 Optional.empty());
+        n.def.set(def);
         return Optional.of(n);
     }
 
