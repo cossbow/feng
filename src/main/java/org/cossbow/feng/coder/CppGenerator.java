@@ -641,7 +641,7 @@ public class CppGenerator {
     private void writePrototype(PrototypeDefinition pd) {
         write("typedef ");
         var td = new FuncTypeDeclarer(Position.ZERO, pd.prototype(),
-                TypeArguments.EMPTY, Optional.empty());
+                TypeArguments.EMPTY, FuncTypeDeclarer.Type.FUNC);
         declare(pd.symbol().name(), td);
         endStmt();
     }

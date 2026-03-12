@@ -54,6 +54,10 @@ public class Lazy<T> {
         return matcher.test(v);
     }
 
+    public boolean same(T o) {
+        return has() && value.equals(o);
+    }
+
     public void use(Consumer<T> user) {
         var v = value;
         if (v != null) user.accept(v);

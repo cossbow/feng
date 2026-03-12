@@ -422,6 +422,9 @@ public class SemanticAnalysisTest {
     @Test
     public void testPrototype1() {
         checkSucc("func F(); func f(){} func m(){ var c F = f; }");
+        checkSucc("func F(); func m(){ var c F = nil; }");
+        checkSucc("func m(){ var c func() = nil; }");
+
         checkSucc("func F(int); func f(v int){} func m(){ var c F = f; }");
         checkFail("func F(int8); func f(v int){} func m(){ var c F = f; }");
         checkSucc("func F()int; func f()int{return 1;} func m(){ var c F = f; }");
@@ -430,7 +433,11 @@ public class SemanticAnalysisTest {
         checkFail("func F()int; func m(f func()int8){ var c F = f; }");
 
         checkSucc("func F()int; func m(f F){ var c func()int = f; }");
-        checkFail("func F()int; func G()int; func m(f F){ var c G = f; }");
+        checkSucc("func F()int; func G()int; func m(f F){ var c G = f; }");
+
+        checkSucc("func F()int; func m(a,b F){ if(a==b){} }");
+        checkSucc("func F()int; func m(a F, b func()int){ if(a==b){} }");
+        checkSucc("func F()int; func G()int; func m(a F, b G){ if(a==b){} }");
     }
 
     @Test
@@ -2227,6 +2234,17 @@ public class SemanticAnalysisTest {
         checkFail(d + "func f() {const n [&]byte= E.Stop.name;}");
         checkSucc(d + "func f() {const n [*#]byte= E.Stop.name;}");
         checkFail(d + "func f() {const n [*]byte= E.Stop.name;}");
+    }
+
+    @Test
+    public void testEnum6() {
+        var d = "enum E {STOP, RUN,} enum W{PEND,}";
+        checkSucc(d + "func f(a,b E) {if(a==b){}}");
+        checkFail(d + "func f(a E,b W) {if(a==b){}}");
+        checkSucc(d + "func f(a E) {if(a==E.STOP){}}");
+        checkSucc(d + "func f(a E) {if(E.STOP==a){}}");
+        checkFail(d + "func f(a E) {if(a==W.PEND){}}");
+        checkFail(d + "func f(a E) {if(W.PEND==a){}}");
     }
 
     // statement

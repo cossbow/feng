@@ -1,10 +1,8 @@
 package org.cossbow.feng.ast.dcl;
 
-import org.cossbow.feng.ast.Method;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.proc.Prototype;
-import org.cossbow.feng.util.Optional;
 
 /**
  * 临时及(AST)都有
@@ -12,22 +10,16 @@ import org.cossbow.feng.util.Optional;
 public class FuncTypeDeclarer extends TypeDeclarer {
     private final Prototype prototype;
     private final TypeArguments generic;
-    private final Optional<? extends Method> method;
+    private final Type type;
 
     public FuncTypeDeclarer(Position pos,
                             Prototype prototype,
                             TypeArguments generic,
-                            Optional<? extends Method> method) {
+                            Type type) {
         super(pos);
         this.prototype = prototype;
         this.generic = generic;
-        this.method = method;
-    }
-
-    public FuncTypeDeclarer(Position pos,
-                            Prototype prototype,
-                            TypeArguments generic) {
-        this(pos, prototype, generic, Optional.empty());
+        this.type = type;
     }
 
     public Prototype prototype() {
@@ -38,10 +30,21 @@ public class FuncTypeDeclarer extends TypeDeclarer {
         return generic;
     }
 
-    public Optional<? extends Method> method() {
-        return method;
+    public Type type() {
+        return type;
     }
 
+    public boolean isRefer() {
+        return type == Type.REFER;
+    }
+
+    public enum Type {
+        FUNC,
+        REFER,
+        METHOD,
+    }
+
+    //
 
     @Override
     public boolean equals(Object o) {

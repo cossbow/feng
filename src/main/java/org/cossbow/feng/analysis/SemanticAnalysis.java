@@ -1218,17 +1218,22 @@ public class SemanticAnalysis {
     private boolean compatible(
             DerivedTypeDeclarer l, FuncTypeDeclarer r) {
         analyse(r.generic());
-        var ldt = l.def.must();
-        return ldt instanceof PrototypeDefinition lpd &&
-                compatible(lpd.prototype(), r.prototype());
+        return l.def.must() instanceof PrototypeDefinition lpd
+                && compatible(lpd.prototype(), r.prototype());
     }
 
     private boolean compatible(
             FuncTypeDeclarer l, DerivedTypeDeclarer r) {
         analyse(l.generic());
-        var rt = analyse(r.derivedType());
-        return rt instanceof PrototypeDefinition rd &&
-                compatible(l.prototype(), rd.prototype());
+        return r.def.must() instanceof PrototypeDefinition rd
+                && compatible(l.prototype(), rd.prototype());
+    }
+
+    private boolean compatible(
+            DerivedTypeDeclarer l, DerivedTypeDeclarer r) {
+        return l.def.must() instanceof PrototypeDefinition ld &&
+                r.def.must() instanceof PrototypeDefinition rd &&
+                compatible(ld.prototype(), rd.prototype());
     }
 
     // 不可修改引用必须单向传递
@@ -1459,8 +1464,12 @@ public class SemanticAnalysis {
             return l instanceof PrimitiveTypeDeclarer ptd
                     && ptd.primitive().isBool();
 
-        if (rt.isNil())
+        if (rt.isNil()) {
+            if (l instanceof DerivedTypeDeclarer dtd) {
+                return dtd.def.must() instanceof PrototypeDefinition;
+            }
             return l instanceof FuncTypeDeclarer;
+        }
 
         if (rt.literal() instanceof StringLiteral sl) {
             // 字符串字面量只能传递给[N]byte类型
@@ -1558,18 +1567,22 @@ public class SemanticAnalysis {
 
         if (r instanceof DerivedTypeDeclarer rd) {
             if (l instanceof DerivedTypeDeclarer ld) {
-                return ld.derivedType().equals(rd.derivedType()) &&
+                var eq = ld.derivedType().equals(rd.derivedType()) &&
                         (rd.refer().none() || re.match(e ->
                                 e instanceof CurrentExpression));
+                if (eq) return true;
+                if (compatible(ld, rd))
+                    return true;
             }
+            if (l instanceof EnumTypeDeclarer ld)
+                return rd.def.same(ld.def());
             if (l instanceof FuncTypeDeclarer lf)
                 return compatible(lf, rd);
         }
 
         if (r instanceof EnumTypeDeclarer rd) {
             if (l instanceof DerivedTypeDeclarer ld) {
-                var def = analyse(ld.derivedType());
-                return def.equals(rd.def());
+                return ld.def.same(rd.def());
             }
         }
 
@@ -2559,15 +2572,14 @@ public class SemanticAnalysis {
         var t = new PrimitiveTypeDeclarer(e.pos(),
                 Primitive.BOOL, Optional.empty());
 
-        var oc = checkCallee(g.b());
-        if (oc.has()) {
+        if (g.b() instanceof FuncTypeDeclarer ftd && ftd.isRefer()) {
             var n = new CheckNilExpression(e.pos(), g.a(), nil);
             return Groups.g2(n, t);
         }
 
         var r = g.b().maybeRefer();
         if (r.none())
-            return semantic("%s can't check-nil: %s", g.b(), e.pos());
+            return semantic("'%s' can't check-nil: %s", g.a(), e.pos());
         if (r.get().required()) {
             // required refer cannot be empty, so direct set to literal-bool
             var n = new LiteralExpression(e.pos(),
@@ -2622,8 +2634,8 @@ public class SemanticAnalysis {
                 e.operator() != BinaryOperator.NE)
             return Optional.empty();
 
-        if (enumBinOp(l, r, e) || l.equals(r)) return Optional.of(
-                Primitive.BOOL.declarer(e.pos()));
+        if (assignable(l, r, Optional.empty()))
+            return Optional.of(Primitive.BOOL.declarer(e.pos()));
 
         return Optional.empty();
     }
@@ -3043,7 +3055,7 @@ public class SemanticAnalysis {
             if (om.has()) {
                 var m = om.get();
                 var t = new FuncTypeDeclarer(s.pos(), m.prototype(),
-                        generic, om);
+                        generic, FuncTypeDeclarer.Type.METHOD);
                 var n = wrapRelayExpr(s, t, _s -> {
                     return new MethodExpression(s.pos(),
                             (PrimaryExpression) _s, m, generic);
@@ -3103,7 +3115,7 @@ public class SemanticAnalysis {
             var m = id.allMethods.tryGet(name);
             if (m.has()) {
                 var t = new FuncTypeDeclarer(s.pos(), m.get().prototype(),
-                        generic, m);
+                        generic, FuncTypeDeclarer.Type.METHOD);
                 var n = wrapRelayExpr(s, t, _s -> {
                     return new MethodExpression(s.pos(),
                             (PrimaryExpression) _s, m.get(), generic);
@@ -3278,7 +3290,7 @@ public class SemanticAnalysis {
     }
 
 
-    private Groups.G2<Prototype, PrimaryExpression>
+    private Groups.G2<Expression, TypeDeclarer>
     findCallable(SymbolExpression re) {
         analyse(re.generic());
         var s = re.symbol();
@@ -3288,24 +3300,36 @@ public class SemanticAnalysis {
             var op = checkCallee(ov.get().type().must());
             if (op.has()) {
                 var n = new VariableExpression(re.pos(), ov.get());
-                return Groups.g2(op.get(), n);
+                var td = new FuncTypeDeclarer(re.pos(), op.get(), re.generic(),
+                        FuncTypeDeclarer.Type.REFER);
+                return Groups.g2(n, td);
             }
         }
 
         var od = context.findFunc(s);
-        if (od.has()) return Groups.g2(od.get().prototype(), re);
+        if (od.has()) {
+            var td = new FuncTypeDeclarer(re.pos(), od.get().prototype(),
+                    re.generic(), FuncTypeDeclarer.Type.FUNC);
+            return Groups.g2(re, td);
+        }
 
         if (s.module().none() && enterClass != null) {
             var om = enterClass.allMethods().tryGet(s.name());
             if (om.has()) {
                 // 函数调用加上`this.`前缀，方便后续处理
                 var n = wrapThis(re, om.get());
-                return Groups.g2(om.get().prototype(), n);
+                var td = new FuncTypeDeclarer(re.pos(), om.get().prototype(),
+                        re.generic(), FuncTypeDeclarer.Type.METHOD);
+                return Groups.g2(n, td);
             }
             var of = enterClass.allFields().tryGet(s.name());
             if (of.has()) {
                 var prot = checkCallee(of.get().type());
-                if (prot.has()) return Groups.g2(prot.get(), re);
+                if (prot.has()) {
+                    var td = new FuncTypeDeclarer(re.pos(), prot.get(), re.generic(),
+                            FuncTypeDeclarer.Type.REFER);
+                    return Groups.g2(re, td);
+                }
             }
         }
 
@@ -3328,7 +3352,7 @@ public class SemanticAnalysis {
         var f = context.findFunc(s);
         if (f.has()) {
             var td = new FuncTypeDeclarer(re.pos(), f.get().prototype(),
-                    re.generic());
+                    re.generic(), FuncTypeDeclarer.Type.FUNC);
             return Groups.g2(re, td);
         }
 
@@ -3352,11 +3376,8 @@ public class SemanticAnalysis {
     private Groups.G2<Expression, TypeDeclarer> optimize(SymbolExpression e) {
         analyse(e.generic());
 
-        if (e.expectCallable()) {
-            var g = findCallable(e);
-            var td = new FuncTypeDeclarer(e.pos(), g.a(), e.generic());
-            return Groups.g2(g.b(), td);
-        }
+        if (e.expectCallable())
+            return findCallable(e);
 
         return findVariable(e);
     }
