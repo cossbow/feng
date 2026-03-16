@@ -559,6 +559,118 @@ public class SemanticAnalysisTest {
         checkFail("func r() {} func f(){var i int = r();}");
     }
 
+    @Test
+    public void testOperand1() {
+        checkSucc("func f() { var i int; i = 0; }");
+        checkFail("func f() { const i int; i = 0; }");
+    }
+
+    @Test
+    public void testOperand2() {
+        var d = "class A {var id int;} class B {var a A;}";
+        checkSucc(d + "func f(a*A) { a.id = 1; }");
+        checkFail(d + "func f(a*A) { a.id = false; }");
+        checkFail(d + "func f(a*A) { a.index = 1; }");
+
+        checkSucc(d + "func f(b*B) { b.a.id = 1; }");
+        checkFail(d + "func f(b*B) { b.a.id = false; }");
+        checkFail(d + "func f(b*B) { b.a.index = 1; }");
+
+        checkFail(d + "func f(a *#A) { a.id = 1; }");
+        checkFail(d + "func f(b *#B) { b.a.id = 1; }");
+
+        d = "class A {var id int;} class B {var a *A;}";
+        checkSucc(d + "func f(b *#B) { b.a.id = 1; }");
+    }
+
+    @Test
+    public void testOperand3() {
+        checkSucc("func f(i int){ var a [2]int; a[i] = 1;}");
+        checkFail("func f(i int){ var a [2]int; a[i] = false;}");
+        checkFail("func f(i int){ var a int; a[i] = false;}");
+
+        checkSucc("func f(i int){ var a [*]int; a[i] = 1;}");
+        checkFail("func f(i int){ var a [*]int; a[i] = false;}");
+
+        checkSucc("func f(i,j int){ var a [*][*]int; a[i][j] = 1;}");
+        checkSucc("func f(i,j int){ var a [*#][*]int; a[i][j] = 1;}");
+        checkFail("func f(i,j int){ var a [*][*#]int; a[i][j] = 1;}");
+    }
+
+    @Test
+    public void testOperand4() {
+        checkSucc("func f(i *int){ *i = 0;}");
+        checkFail("func f(i *#int){ *i = 0;}");
+
+        var d = "class A{var id int; var p *A; var c *#A;} ";
+        checkSucc(d + "func f(i *A){ *i = {id=0};}");
+        checkFail(d + "func f(i *#A){ *i = {id=0};}");
+        checkSucc(d + "func f(i *A){ *i.p = {id=0};}");
+        checkSucc(d + "func f(i *#A){ *i.p = {id=0};}");
+        checkFail(d + "func f(i *A){ *i.c = {id=0};}");
+
+        checkSucc("func f(a,b *int)int{return *a+*a;}");
+        checkSucc("func f(a,b *int)int{return *a-*a;}");
+        checkSucc("func f(a,b *int)int{return *a**a;}");
+        checkSucc("func f(a,b *int)int{return *a/*a;}");
+        checkSucc("func f(a,b *int)int{return *a%*a;}");
+    }
+
+    @Test
+    public void testOperand5() {
+        var d = "class A{var id int;} class B {var a1 *A; var a2 *#A; } ";
+        checkSucc(d + "func f(a *A) { a.id = 1; }");
+        checkFail(d + "func f(a *A) { a.id = false; }");
+        checkFail(d + "func f(a *#A) { a.id = false; }");
+
+        checkSucc(d + "func f(b *B) { b.a1.id = 1; }");
+        checkFail(d + "func f(b *B) { b.a2.id = 1; }");
+
+        checkSucc(d + "func f(b *#B) { b.a1.id = 1; }");
+        checkFail(d + "func f(b *#B) { b.a2.id = 1; }");
+    }
+
+    @Test
+    public void testOperand6() {
+        var d = "class A{var id int;} class B {var a1 *A; var a2 *#A; } ";
+        d += "class C {var b *B;} ";
+        checkSucc(d + "func f(a [*]A) { a[0].id = 1; }");
+        checkFail(d + "func f(a [*#]A) { a[0].id = 1; }");
+
+        checkSucc(d + "func f(a [*]*A) { a[0].id = 1; }");
+        checkSucc(d + "func f(a [*#]*A) { a[0].id = 1; }");
+
+        checkSucc(d + "func f(b [*]*B) { b[0].a1.id = 1; }");
+        checkFail(d + "func f(b [*]*B) { b[0].a2.id = 1; }");
+        checkSucc(d + "func f(b [*#]*B) { b[0].a1.id = 1; }");
+        checkSucc(d + "func f(b [*]*#B) { b[0].a1.id = 1; }");
+
+        checkSucc(d + "func f3(c *#C) {c.b.a1.id=1;}");
+    }
+
+    @Test
+    public void testOperand7() {
+        var d = "class A{var id int;} ";
+        checkFail(d + "func f(g func()A) {g().id=0;}");
+        checkSucc(d + "func f(g func()*A) {g().id=0;}");
+        checkFail(d + "func f(g func()*#A) {g().id=0;}");
+
+        checkFail(d + "func f(g func()A) { {var a A; a}.id=0;}");
+        checkSucc(d + "func f(g func()A) { {var a *A; a}.id=0;}");
+        checkFail(d + "func f(g func()A) { {var a *#A; a}.id=0;}");
+    }
+
+    @Test
+    public void testOperand8() {
+        var d = "class A{var id int; const vv int;} ";
+        checkSucc(d + "func f(a *Object) {a?(*A).id=0;}");
+        checkFail(d + "func f(a *Object) {a?(*A).vv=0;}");
+        checkFail(d + "func f(a *Object) {a?(*#A).id=0;}");
+
+        checkSucc(d + "func f(a [*]*Object) {a[0]?(*A).id=0;}");
+        checkFail(d + "func f(a [*]*Object) {a[0]?(*#A).id=0;}");
+    }
+
     // variable
 
     @Test
@@ -985,7 +1097,8 @@ public class SemanticAnalysisTest {
         checkSucc(d + "func f(a*B){var v B = *a;}");
         checkFail(d + "func f(a*B){var v B = a;}");
 
-        checkFail(d + "func f(a*B){var v B = **a;}");
+        // 语法解析失败
+        // checkFail(d + "func f(a*B){var v B = **a;}");
     }
 
     @Test

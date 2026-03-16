@@ -955,21 +955,19 @@ final class SourceParseVisitor
     }
 
     @Override
-    public Entity visitDereferExpression(
-            FengParser.DereferExpressionContext ctx) {
-        var subject = (PrimaryExpression) visit(ctx.primaryExpr());
-        return new DereferExpression(posOf(ctx), subject);
-    }
-
-    @Override
     public Entity visitUnaryExpression(FengParser.UnaryExpressionContext ctx) {
         var tt = ctx.op.getType();
         var rhs = (Expression) visit(ctx.rightAssocExpr());
-        var op = switch (tt) {
+        if (tt == FengParser.MUL) {
+            if (rhs instanceof PrimaryExpression pe)
+                return new DereferExpression(posOf(ctx), pe);
+            return semantic("derefer must use for reference: %s", rhs.pos());
+        }
+        UnaryOperator op = switch (tt) {
             case FengParser.ADD -> UnaryOperator.POSITIVE;
             case FengParser.SUB -> UnaryOperator.NEGATIVE;
             case FengParser.NOT -> UnaryOperator.INVERT;
-            default -> throw new UnsupportedOperationException("unreachable branch");
+            default -> unreachable();
         };
         return new UnaryExpression(posOf(ctx), op, rhs);
     }
@@ -1002,7 +1000,7 @@ final class SourceParseVisitor
     @Override
     public Entity visitPowerExpression(FengParser.PowerExpressionContext ctx) {
         var bin = parseBinaryOperator(ctx.op);
-        var lhs = (Expression) visit(ctx.primaryExpr());
+        var lhs = (Expression) visit(ctx.dereferExpr());
         var rhs = (Expression) visit(ctx.rightAssocExpr());
         return new BinaryExpression(posOf(ctx.op), bin, lhs, rhs);
     }
@@ -1013,6 +1011,12 @@ final class SourceParseVisitor
         var lhs = (Expression) visit(ctx.lhs);
         var rhs = (Expression) visit(ctx.rhs);
         return new BinaryExpression(posOf(ctx.op), bin, lhs, rhs);
+    }
+
+    @Override
+    public Entity visitDereferExpression(FengParser.DereferExpressionContext ctx) {
+        var subject = (PrimaryExpression) visit(ctx.primaryExpr());
+        return new DereferExpression(posOf(ctx), subject);
     }
 
     @Override

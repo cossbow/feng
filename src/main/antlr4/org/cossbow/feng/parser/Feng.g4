@@ -537,8 +537,13 @@ rightAssocExpr
     ;
 
 powerExpr
-    : primaryExpr                           # PrimaryExpression_
-    | primaryExpr op=POW rightAssocExpr     # PowerExpression       // priority=1
+    : dereferExpr                           # DereferExpression_
+    | dereferExpr op=POW rightAssocExpr     # PowerExpression       // priority=1
+    ;
+
+dereferExpr
+    : primaryExpr       # PrimaryExpression
+    | MUL primaryExpr   # DereferExpression
     ;
 
 primaryExpr
@@ -547,7 +552,6 @@ primaryExpr
     | primaryExpr indexOf                               # IndexOfExpression
     | primaryExpr memberOf typeArguments?               # MemberOfExpression
     | primaryExpr argumentSet                           # CallExpression
-    | MUL primaryExpr                                   # DereferExpression
     ;
 
 operandExpr

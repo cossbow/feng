@@ -2159,25 +2159,30 @@ public class SemanticAnalysis {
 
     //
 
-    private boolean immutable(MemberOfExpression e, boolean left) {
+    private boolean immutable(IndexOfExpression e, boolean left) {
         var t = e.resultType.must();
-        var isValue = t.maybeRefer().none();
-        var f = e.field();
-        if (f.none()) {
-            return semantic("operable field not found %s: %s",
-                    e.member(), e.member().pos());
-        }
-
-        var r = f.get().type().maybeRefer();
+        var r = t.maybeRefer();
         if (r.has()) return r.get().immutable();
-        if (f.get() instanceof ClassField cf) {
+        return immutable(e.subject(), left);
+    }
+
+    private boolean immutable(MemberOfExpression e, boolean left) {
+        var r = e.resultType.must().maybeRefer();
+        if (r.has()) return r.get().immutable();
+        if (e.field().must() instanceof ClassField cf) {
             if (cf.declare() == Declare.CONST) return true;
         }
-        return isValue && immutable(e.subject(), left);
+        return immutable(e.subject(), left);
     }
 
     private boolean immutable(BlockExpression e, boolean left) {
-        return immutable(e.result(), left);
+        if (e.origin().has()) {
+            var o = e.origin().must();
+            return immutable(o, left);
+        }
+        var t = e.resultType.must();
+        var ref = t.maybeRefer();
+        return ref.none() || ref.get().immutable();
     }
 
     private boolean immutable(CallExpression e) {
@@ -2204,17 +2209,11 @@ public class SemanticAnalysis {
         return im || immutable(e.subject(), left);
     }
 
-    private boolean immutable(DereferExpression e) {
-        var s = e.subject();
-        var t = s.resultType.must();
-        return t.maybeRefer().must().immutable();
-    }
-
     // 检查不可修改值的入口
     private boolean immutable(Expression e, boolean left) {
         return switch (e) {
             case CallExpression ee -> immutable(ee);
-            case IndexOfExpression ee -> immutable(ee.subject(), left);
+            case IndexOfExpression ee -> immutable(ee, left);
             case MemberOfExpression ee -> immutable(ee, left);
             case ParenExpression ee -> immutable(ee.child(), left);
             case SymbolExpression ee -> immutable(ee);
@@ -2267,14 +2266,14 @@ public class SemanticAnalysis {
         if (!(sg.b() instanceof ArrayTypeDeclarer td)) {
             return semantic("require array: %s", op.pos());
         }
-        if (td.refer().has()) {
-            if (td.refer().get().immutable()) {
-                return semantic("immutable array: %s", op.pos());
-            }
+
+        var r = td.refer();
+        if (r.has()) {
+            if (r.get().immutable())
+                return semantic("immutable array '%s': %s", op, op.pos());
         } else {
-            if (immutable(sg.a(), true)) {
-                return semantic("immutable array: %s", op.pos());
-            }
+            if (immutable(sg.a(), true))
+                return semantic("immutable array '%s': %s", op, op.pos());
         }
 
         var s = (PrimaryExpression) sg.a();
@@ -2309,8 +2308,14 @@ public class SemanticAnalysis {
         if (f instanceof ClassField cf && cf.declare() == Declare.CONST)
             return semantic("immutable field: %s", name.pos());
 
-        var im = td.maybeRefer().none() && immutable(sg.a(), true);
-        if (im) return semantic("immutable operand: %s", op.pos());
+        var r = td.maybeRefer();
+        if (r.has()) {
+            if (r.get().immutable())
+                return semantic("immutable operand '%s': %s", op, op.pos());
+        } else {
+            if (immutable(sg.a(), true))
+                return semantic("immutable operand '%s': %s", op, op.pos());
+        }
 
         var s = (PrimaryExpression) sg.a();
         var n = wrapRelayOperand(s, _s -> {
