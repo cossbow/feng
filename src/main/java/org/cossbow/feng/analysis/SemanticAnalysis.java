@@ -1070,10 +1070,6 @@ public class SemanticAnalysis {
                     f.name(), v, v.pos());
             keys.add(f);
         }
-        for (var k : oe.entries().keys()) {
-            if (fields.exists(k)) continue;
-            semantic("field '%s' not defined: %s", k, k.pos());
-        }
         return keys;
     }
 
@@ -1081,6 +1077,10 @@ public class SemanticAnalysis {
             StructureDefinition sd,
             ObjectTypeDeclarer odt, ObjectExpression oe) {
         var keys = checkInitField(sd.fields(), odt, oe);
+        for (var k : oe.entries().keys()) {
+            if (sd.fields().exists(k)) continue;
+            semantic("field '%s' not defined: %s", k, k.pos());
+        }
         oe.initStack.add(keys);
         return true;
     }

@@ -2292,6 +2292,14 @@ public class SemanticAnalysisTest {
         checkFail(d + "var v B = A{id=1};");
     }
 
+    @Test
+    public void testFieldInit4() {
+        var d = "class A{var tag uint;} class B:A{} ";
+        checkSucc(d + "var a A = {tag=1};");
+        checkFail(d + "var a A = {id=1};");
+        checkSucc(d + "var b B = {tag=1};");
+    }
+
     // enum
 
     @Test
