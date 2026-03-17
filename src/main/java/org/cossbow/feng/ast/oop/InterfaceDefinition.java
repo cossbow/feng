@@ -7,7 +7,9 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -46,6 +48,7 @@ public class InterfaceDefinition extends ObjectDefinition {
     private final int id = IdGenerator.getAndIncrement();
     public final List<InterfaceDefinition> partDefs = new ArrayList<>();
     public final IdentifierTable<InterfaceMethod> allMethods = new IdentifierTable<>();
+    public final Set<ClassDefinition> impls = new HashSet<>();
 
     public int id() {
         return id;

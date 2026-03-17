@@ -219,6 +219,7 @@ public class CppGenerator {
                 dag.bfs(this::declareInterface));
         src.table().dagClasses.use(dag ->
                 dag.bfs(this::declareClass));
+        src.table().dagClasses.use(this::addClassReleasers);
         src.table().dagInterfaces.use(dag ->
                 dag.bfs(this::implInterface));
         src.table().dagClasses.use(dag ->
@@ -801,6 +802,19 @@ public class CppGenerator {
         write("}").newLine();
     }
 
+    private void addClassReleasers(DAGGraph<ClassDefinition> dag) {
+        write("const Feng$Releaser Feng$Releasers[FENG_MAX_CLASS_NUM] = {")
+                .newLine();
+
+        for (var cd : sortedById(dag.all())) {
+            writeComment(cd.toString());
+            write('[').write(cd.id()).write("] = Feng$releaser<")
+                    .write(cd.symbol()).write(">,");
+            newLine();
+        }
+        write("};").newLine();
+    }
+
     private String switchMethodName(String methodName) {
         return "Feng$switch_" + methodName;
     }
@@ -812,7 +826,7 @@ public class CppGenerator {
         endStmt();
     }
 
-    private void implSwitchMethod(Method m) {
+    private void implSwitchMethod(ClassMethod m) {
         if (m.override().isEmpty()) return;
 
         var token = implMethodToken(m.master(),
@@ -829,25 +843,44 @@ public class CppGenerator {
                 write("return (").write(rt).write(')');
             });
             write("((").write(child.symbol()).write("*)this)->");
-            if (or.override().isEmpty()) {
-                write(m.name());
-            } else {
-                write(switchMethodName(m.name().value()));
-            }
-            write('(').writeArgs(args).write(");");
+            write(m.name()).write('(').writeArgs(args).write(");");
             if (m.prototype().returnSet().none()) write("break;");
             newLine();
         });
 
         write("default:").newLine();
-        if (m instanceof ClassMethod) {
-            if (m.prototype().returnSet().has()) write("return ");
-            write(" this->").write(m.name());
-            write('(').writeArgs(args);
-            write(')').endStmt();
-        } else {
-            write("throw Unreachable()").endStmt();
+        if (m.prototype().returnSet().has()) write("return ");
+        write(" this->").write(m.name());
+        write('(').writeArgs(args);
+        write(')').endStmt();
+
+        write('}').newLine();
+        write('}').newLine();
+    }
+
+    private void implSwitchMethod(InterfaceMethod m) {
+        if (m.override().isEmpty()) return;
+
+        var token = implMethodToken(m.master(),
+                switchMethodName(m.name().value()));
+        write(token, m.prototype());
+        newLine();
+        write('{').newLine();
+        var args = m.prototype().parameterSet();
+        write("switch (((Object *)this)->feng$classId) {").newLine();
+        for (var cd : m.master.must().impls) {
+            write("case ").write(cd.id()).write(':').newLine();
+            m.prototype().returnSet().use(rt -> {
+                write("return (").write(rt).write(')');
+            });
+            write("((").write(cd.symbol()).write("*)this)->");
+            var cm = cd.allMethods().get(m.name());
+            write(m.name()).write('(').writeArgs(args).write(");");
+            if (m.prototype().returnSet().none()) write("break;");
+            newLine();
         }
+        write("default:").newLine();
+        write("throw Unreachable()").endStmt();
 
         write('}').newLine();
         write('}').newLine();
@@ -1573,7 +1606,7 @@ public class CppGenerator {
 
     private CppGenerator callMethod(TypeDefinition def, Identifier member) {
         if (def instanceof ClassDefinition cd) {
-            var cm = cd.methods().tryGet(member);
+            var cm = cd.allMethods().tryGet(member);
             if (cm.match(m -> !m.override().isEmpty())) {
                 write(switchMethodName(member.value()));
                 return this;

@@ -96,6 +96,18 @@ static void *Feng$toInstance(Feng$Header *fh) {
 #endif
 
 
+// 类的释放函数：没有纯虚类，需要这样指定
+template<class T>
+void Feng$releaser(void *p) {
+	((T *) p)->Feng$release();
+}
+typedef void (*Feng$Releaser)(void *p);
+extern const Feng$Releaser Feng$Releasers[FENG_MAX_CLASS_NUM];
+void Feng$release(Object *o) {
+	Feng$Releasers[o->feng$classId](o);
+}
+
+
 struct Feng$ClassRelation {
 	uint16_t inheritsSize;
 	uint16_t implsSize;
@@ -144,6 +156,16 @@ static T *Feng$impl(void *p, uint32_t interfaceId) {
 
 #ifdef FENG_DEBUG_MEMORY
 static std::list<Feng$Header *> objects;
+#include <cstdio>
+static void feng$debug(bool all) {
+	printf("==== see memory stat ====\n");
+	for (const auto &o: objects) {
+		int c = o->refcnt.load();
+		bool r = o->released;
+		if (all || c) printf("ref=%d, del=%d\n", c, r);
+	}
+	printf("==== end memory stat ====\n");
+}
 #endif
 
 static void *Feng$alloc(int64_t size, bool isObject) {
@@ -219,7 +241,9 @@ static bool Feng$dec0(T *p) {
 template<typename T>
 static T *&Feng$dec(T *&p) {
 	if (Feng$dec0(p)) {
-		if constexpr (requires { p->Feng$release(); }) {
+        if (std::is_base_of_v<Object, T>) {
+            Feng$release((Object *)p);
+        } else if constexpr (requires { p->Feng$release(); }) {
 			p->Feng$release();
 		}
 		Feng$del(p);

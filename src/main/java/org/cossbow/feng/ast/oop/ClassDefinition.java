@@ -10,7 +10,9 @@ import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ClassDefinition extends ObjectDefinition {
@@ -101,6 +103,7 @@ public class ClassDefinition extends ObjectDefinition {
     private final int id = IdGenerator.getAndIncrement();
     private final Lazy<ClassDefinition> parent = Lazy.nil();
     private final List<ClassDefinition> ancestors = new ArrayList<>();
+    private final Set<ClassDefinition> children = new HashSet<>();
     private final List<InterfaceDefinition> allImpls = new ArrayList<>();
     private final IdentifierTable<ClassField> allFields = new IdentifierTable<>();
     private final IdentifierTable<ClassMethod> allMethods = new IdentifierTable<>();
@@ -116,6 +119,10 @@ public class ClassDefinition extends ObjectDefinition {
 
     public List<ClassDefinition> ancestors() {
         return ancestors;
+    }
+
+    public Set<ClassDefinition> children() {
+        return children;
     }
 
     public List<InterfaceDefinition> allImpls() {

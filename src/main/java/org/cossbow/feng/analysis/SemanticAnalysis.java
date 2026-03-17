@@ -587,6 +587,7 @@ public class SemanticAnalysis {
             ClassDefinition parent, ClassDefinition child,
             IdentifierTable<ClassField> allFields,
             IdentifierTable<ClassMethod> allMethods) {
+        parent.children().add(child);
         if (parent.isFinal()) {
             semantic("can't inherit final %s: %s",
                     parent, child.inherit().must().pos());
@@ -675,6 +676,7 @@ public class SemanticAnalysis {
     }
 
     private void checkImplList(ClassDefinition cd) {
+        if (cd.builtin()) return;
         cd.parent().use(pd ->
                 cd.allImpls().addAll(pd.allImpls()));
         for (var dt : cd.impl()) {
@@ -686,6 +688,9 @@ public class SemanticAnalysis {
                 continue;
             }
             semantic("require interface: %s", dt.pos());
+        }
+        for (var id : cd.allImpls()) {
+            id.impls.add(cd);
         }
     }
 
