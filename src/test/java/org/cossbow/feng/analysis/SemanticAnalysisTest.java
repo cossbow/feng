@@ -1849,6 +1849,7 @@ public class SemanticAnalysisTest {
     public void testArray14() {
         checkSucc("var a [2]int = [1,2];");
         checkSucc("var a [2]int = [2]int[1,2];");
+        checkFail("var a [2]int = [1]int[1,2];");
         checkSucc("var a [2]int = []int[1,2];");
         checkFail("var a [2]int = []int[1,2,3];");
 
@@ -1985,6 +1986,16 @@ public class SemanticAnalysisTest {
         var def = "struct A { a struct{ id int; }; } ";
         checkSucc(def + "func f() { var a A = { a={id=123} }; }");
         checkFail(def + "func f() { var a A = { a={id=true} }; }");
+    }
+
+    @Test
+    public void testStruct7() {
+        var def = "union A {v1 int; v2 byte;} ";
+        checkSucc(def + "func f() { var a A = { v1=1 }; }");
+        checkFail(def + "func f() { var a A = { v1=1, v2=2 }; }");
+        def = "struct A {v1 int; v2 byte;} ";
+        checkSucc(def + "func f() { var a A = { v1=1 }; }");
+        checkSucc(def + "func f() { var a A = { v1=1, v2=2 }; }");
     }
 
     @Test
@@ -2614,6 +2625,51 @@ public class SemanticAnalysisTest {
 
     //
 
+    @Test
+    public void testGenericDefineFunc1() {
+        checkSucc("func gen`T`() {}");
+        checkSucc("func gen`T`(t T) {var v T = t;}");
+        checkSucc("func gen`T`() T {var t T; return t;}");
+
+        checkSucc("func gen`A,B`(a A) {var v A = a;}");
+        checkFail("func gen`A,B`(a A) {var v B = a;}");
+        checkFail("func gen`A,B`(a A) {var v int = a;}");
+        checkFail("func gen`A,B`(a A) {var v bool = a;}");
+        checkFail("struct S{} func gen`A,B`(a A) {var v S = a;}");
+
+        checkSucc("struct S{id int;} func gen`S`(a S) {var v S = a;}");
+        checkFail("struct S{id int;} func gen`S`(a S) {var v int = a.id;}");
+    }
+
+    @Test
+    public void testGenericDefineType1() {
+        checkSucc("class A`T`{} class B`R`:A`R`{}");
+        checkSucc("class A`T,S`{} class B`R,E`:A`R,E`{}");
+        checkSucc("class A`T,S`{} class B`R,E`:A`E,R`{}");
+        checkSucc("class A`T,S`{} class B`R,E`:A`int,R`{}");
+        checkSucc("class A`T,S`{} class B`R,E`:A`bool,int`{}");
+    }
+
+    @Test
+    public void testGenericImplType1() {
+        var d = "class A`T`{var t T;} ";
+        checkSucc(d + "func f(a A`int`) { var v int = a.t; }");
+        checkFail(d + "func f(a A`int`) { var v bool = a.t; }");
+        checkSucc(d + "func f(i int) { var a A`int`; a.t = i; }");
+        checkFail(d + "func f(i bool) { var a A`int`; a.t = i; }");
+
+        checkSucc(d + "func f(a *A`int`) { var v int = a.t; }");
+        checkFail(d + "func f(a *A`int`) { var v bool = a.t; }");
+        checkSucc(d + "func f(i int, a *A`int`) { a.t = i; }");
+        checkFail(d + "func f(i bool, a *A`int`) { a.t = i; }");
+
+    }
+
+    @Test
+    public void testGenericImplType2() {
+        var d = "class A`T`{var t T;} ";
+        checkSucc(d + "func f(a A`*int`) {}");
+    }
 
     //
 
@@ -2638,6 +2694,8 @@ public class SemanticAnalysisTest {
         parseSample("string");
         parseSample("queue");
         parseSample("hashmap");
+        parseSample("hashmap-generic");
+        parseSample("generic");
     }
 
 }

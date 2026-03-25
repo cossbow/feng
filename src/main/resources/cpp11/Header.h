@@ -57,6 +57,12 @@ static T *Feng$required(T *p) {
 class Object {
 public:
 	uint32_t feng$classId;
+
+    Object() = default;
+
+    Object &operator=(const Object &) = default;
+
+    auto operator<=>(const Object &) const = default;
 };
 
 
@@ -218,6 +224,8 @@ struct Feng$SRefer {
 	// [builtin] creator without init
 	Feng$SRefer() : t(nullptr) {}
 
+    explicit Feng$SRefer(std::nullptr_t _t) : t(nullptr) {}
+
 	// [builtin] creator with init
 	explicit Feng$SRefer(T *t) : t(t) {}
 
@@ -229,7 +237,8 @@ struct Feng$SRefer {
 	// var t *T = new(T);
 	// var t *T = make();
 	Feng$SRefer(Feng$SRefer<T> &&r) noexcept {
-		t = Feng$inc(r.t);
+		t = r.t;
+		r.t = nullptr;
 	}
 
 	// var t *T = s;
@@ -285,11 +294,14 @@ struct Feng$SRefer {
 
 	// t = new(T);
 	Feng$SRefer<T> &operator=(Feng$SRefer<T> &&r) noexcept {
-		if (this != &r)
-			Feng$dec(t) = Feng$inc(r.t);
+		if (this != &r) {
+			Feng$dec(t) = r.t;
+			r.t = nullptr;
+		}
 		return *this;
 	}
 
+    auto operator<=>(const Feng$SRefer<T> &) const = default;
 };
 
 template<class T>
@@ -410,6 +422,7 @@ struct Feng$Array {
 		return values[index];
 	}
 
+    auto operator<=>(const Feng$Array<E, L> &) const = default;
 };
 
 /**
@@ -449,6 +462,8 @@ struct Feng$ArrayPRefer : public Feng$ArrayRefer<E> {
 			throw Feng$NilPointer();
 		return *this;
 	}
+
+    auto operator<=>(const Feng$ArrayPRefer<E> &) const = default;
 };
 
 // 数组引用：强引用
@@ -467,6 +482,13 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 	Feng$ArraySRefer(Feng$ArraySRefer<E> &r) {
 		this->start = Feng$inc(r.start);
 		this->len = r.len;
+	}
+
+	Feng$ArraySRefer(Feng$ArraySRefer<E> &&r) noexcept {
+		this->start = r.start;
+		this->len = r.len;
+		r.start = nullptr;
+		r.len = 0;
 	}
 
 	~Feng$ArraySRefer() {
@@ -489,19 +511,25 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 		return *this;
 	}
 
-	void operator=(Feng$ArraySRefer<E> &r) {
-		if (this == &r) return;
+	Feng$ArraySRefer<E> &operator=(Feng$ArraySRefer<E> const &r) {
+		if (this == &r) return *this;
 		dec();
 		this->start = Feng$inc(r.start);
 		this->len = r.len;
+		return *this;
 	}
 
-	void operator=(Feng$ArraySRefer<E> &&r) {
-		if (this == &r) return;
+	Feng$ArraySRefer<E> &operator=(Feng$ArraySRefer<E> &&r) noexcept {
+		if (this == &r) return *this;
 		dec();
-		this->start = Feng$inc(r.start);
+		this->start = r.start;
 		this->len = r.len;
+		r.start = nullptr;
+		r.len = 0;
+		return *this;
 	}
+
+    auto operator<=>(const Feng$ArraySRefer<E> &) const = default;
 
 private:
 	void dec() {

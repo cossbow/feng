@@ -38,8 +38,18 @@ class Node`T` {
     var p *Pair`int, T`;
 }
 
-func make`T`(t T) T {
+func g1`T`(t T) T {
     return t;
+}
+func g2`S`(s S) S{
+    return g1`S`(s);
+}
+func g3`R`(r R) R {
+    return g2`R`(r);
+}
+
+func make`T`(t T) T {
+    return g3`T`(t);
 }
 
 class Pair`L, R`{

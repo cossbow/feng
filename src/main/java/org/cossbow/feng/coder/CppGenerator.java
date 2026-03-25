@@ -513,7 +513,7 @@ public class CppGenerator {
     }
 
     private CppGenerator writeValue(
-            Expression v, TypeDeclarer t, boolean move) {
+            Expression v, TypeDeclarer t) {
         if (v instanceof LiteralExpression le)
             return writeLiteral(le, t);
 
@@ -539,7 +539,7 @@ public class CppGenerator {
         var t = v.type().must();
         declare(genName(v), t);
         v.value().use(e -> {
-            write(" = ").writeValue(e, t, false);
+            write(" = ").writeValue(e, t);
         }, () -> {
             write(" = {}");
         });
@@ -554,9 +554,11 @@ public class CppGenerator {
     // type declarer
 
     private CppGenerator defaultValue(TypeDeclarer td) {
-        if (td.maybeRefer().has() ||
-                td instanceof FuncTypeDeclarer) {
+        if (td instanceof FuncTypeDeclarer) {
             return write("nullptr");
+        }
+        if (td.maybeRefer().has()) {
+            return write(td).write("()");
         }
         if (td instanceof PrimitiveTypeDeclarer ||
                 td instanceof GenericTypeDeclarer) {
@@ -712,6 +714,13 @@ public class CppGenerator {
     }
 
     void defaultDeconstruct(ObjectDefinition def) {
+        if (def instanceof ClassDefinition cd && cd.resource()) {
+            write("virtual ~").write(def.symbol().name())
+                    .write("() {");
+            write("this->release()").endStmt();
+            write('}').newLine();
+            return;
+        }
         write("virtual ~").write(def.symbol().name())
                 .write("() = default").endStmt();
     }
@@ -759,10 +768,11 @@ public class CppGenerator {
             fullConstruct(cd);
             copyConstruct(cd, false);
             copyConstruct(cd, true);
-            operatorAssign(cd, false);
-            operatorAssign(cd, true);
+            operatorAssign(cd);
             defaultDeconstruct(cd);
         }
+        operatorEquals(cd);
+
         for (var m : cd.methods().values()) {
             if (!m.override().isEmpty())
                 write("virtual ");
@@ -783,17 +793,12 @@ public class CppGenerator {
     }
 
     private void emptyConstruct(ClassDefinition cd) {
-        write(cd.symbol().name()).write("():");
-        write(cd.inherit().must());
-        write("()");
-        if (!cd.fields().isEmpty()) write(',');
-        joinByComma(cd.fields().values(), f -> {
-            write(f.name()).write("()");
-        });
-        write("{}").newLine();
+        write(cd.symbol().name());
+        write("() = default").endStmt();
     }
 
     private void fullConstruct(ClassDefinition cd) {
+        if (cd.allFields().isEmpty()) return;
         write("explicit ");
         var inherit = cd.inherit().must();
         write(cd.symbol().name());
@@ -816,36 +821,26 @@ public class CppGenerator {
         write("{}").newLine();
     }
 
-    private void copyConstruct(ClassDefinition cd, boolean move) {
+    private void copyConstruct(ClassDefinition cd, boolean tmp) {
         write(cd.symbol().name());
         write('(');
         classToken(cd);
-        if (move) write(" &&r)noexcept:");
-        else write(" &r):");
-        write(cd.inherit().must());
-        write("(r)");
-        if (!cd.fields().isEmpty()) write(',');
-        joinByComma(cd.fields().values(), f -> {
-            write(f.name()).write("(r.")
-                    .write(f.name()).write(')');
-        });
-        write("{}").newLine();
+        if (tmp) write("&&");
+        else write("&");
+        write(") = default").endStmt();
     }
 
-    private void operatorAssign(ClassDefinition cd, boolean move) {
+    private void operatorAssign(ClassDefinition cd) {
         classToken(cd);
-        write("&operator=(");
+        write(" &operator=(const ");
         classToken(cd);
-        if (move) write(" &&r)noexcept{").newLine();
-        else write(" const&r){").newLine();
-        write("if (this != &r) {").newLine();
-        write(cd.inherit().must()).write("::operator=(r)").endStmt();
-        for (var f : cd.fields()) {
-            write(f.name()).write("=r.").write(f.name()).endStmt();
-        }
-        write('}').newLine();
-        write("return *this").endStmt();
-        write('}').newLine();
+        write(" &) = default").endStmt();
+    }
+
+    private void operatorEquals(ClassDefinition cd) {
+        write("auto operator<=>(const ");
+        classToken(cd);
+        write(" &) const = default").endStmt();
     }
 
     private <O extends ObjectDefinition> List<O>
@@ -1099,7 +1094,7 @@ public class CppGenerator {
         var re = rs.result().get();
         var prot = rs.procedure().must().prototype();
         var rt = prot.returnSet().must();
-        return write("return ").writeValue(re, rt, true).endStmt();
+        return write("return ").writeValue(re, rt).endStmt();
     }
 
     private CppGenerator write(DeclarationStatement ds) {
@@ -1321,7 +1316,7 @@ public class CppGenerator {
             List<Expression> values, List<TypeDeclarer> dstTypes) {
         for (int i = 0; i < values.size(); i++) {
             if (i > 0) write(COMMA);
-            writeValue(values.get(i), dstTypes.get(i), false);
+            writeValue(values.get(i), dstTypes.get(i));
         }
         return this;
     }
@@ -1591,7 +1586,7 @@ public class CppGenerator {
             write(ndt.type());
         }
         write(">(");
-        e.arg().use(this::write,()->{
+        e.arg().use(this::write, () -> {
             if (def instanceof StructureDefinition)
                 write("{}");
         });
@@ -1737,7 +1732,7 @@ public class CppGenerator {
         write(e.block());
         var re = e.result();
         var rt = re.resultType.must();
-        writeValue(re, rt, true);
+        writeValue(re, rt).endStmt();
         return write("})");
     }
 

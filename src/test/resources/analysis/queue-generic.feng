@@ -1,0 +1,71 @@
+
+class Result`E`{
+    var value E;
+    var ok bool;
+}
+
+class Node`E` {
+    var next *Node`E`;
+    var value E;
+}
+
+func newNode`E`(value E) *Node`E` {
+    return new(Node`E`,{value=value});
+}
+
+class Queue`E` {
+    var head, tail *Node`E`;
+
+    func push(value E) {
+        var t = tail;
+        var n = newNode`E`(value);
+        tail = n;
+        if (t == nil) {
+            head = n;
+        } else {
+            t.next = n;
+        }
+    }
+
+    func poll() Result`E` {
+        var n = head;
+        if (n == nil) return {};
+        head = n.next;
+        if (head == nil) {
+            tail = nil;
+        }
+        return {ok=true,value=n.value};
+    }
+
+    func isEmpty() bool {
+        return head == nil;
+    }
+
+}
+
+class Data {
+    var value int;
+}
+
+func test(n int) int {
+    var queue = new(Queue`int`);
+    for (var i = 0; i < n; i+=1) {
+        queue.push(i);
+    }
+
+    var c = 0;
+    for (!queue.isEmpty()) {
+        var v = queue.poll();
+        if (v.ok) {
+            c += v.value;
+        }
+    }
+    return c;
+}
+
+
+
+func main() int32 {
+    test(15);
+    return 0;
+}

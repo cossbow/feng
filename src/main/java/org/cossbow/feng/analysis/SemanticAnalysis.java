@@ -669,12 +669,12 @@ public class SemanticAnalysis {
                 inheritMethods.add(cm.name(), cm);
                 continue;
             }
-            if (!pm.generic().isEmpty()) {
-                semantic("can't override generic method '%s': %s: ",
-                        pm, pm.pos());
+            var cm = o.must();
+            if (!pm.generic().isEmpty() || !cm.generic().isEmpty()) {
+                semantic("override method not support generic: '%s' -> '%s' %s ",
+                        pm, cm, cm.pos());
                 return;
             }
-            var cm = o.must();
             if (pm.export() != cm.export()) {
                 semantic("override require same export: ",
                         cm.pos());
@@ -852,8 +852,7 @@ public class SemanticAnalysis {
 
         for (var m : cd.methods()) analyse(m);
 
-        if (!cd.macros().isEmpty())
-            unsupported("macro");
+        macro(cd);
 
         enterClass = null;
     }
@@ -1115,37 +1114,43 @@ public class SemanticAnalysis {
         return bs;
     }
 
-    private <F extends Field> List<Field> checkInitField(
+    private <F extends Field> void checkInitField(
             GenericMap gm, IdentifierTable<F> fields,
             ObjectTypeDeclarer odt, ObjectExpression oe) {
-        var keys = new ArrayList<Field>();
         for (var f : fields) {
             var o = oe.entries().tryGet(f.name());
             if (o.none()) {
                 if (!f.immutable()) continue;
-                return semantic("const field must init: %s",
+                semantic("const field must init: %s",
                         oe.pos());
+                return;
             }
 
             var v = o.get();
             var l = gm.mapIf(f.type());
             var r = odt.entries().get(f.name());
             var able = assignable(l, r, o);
-            if (!able) return semantic(
-                    "incompatible field '%s' and value '%s': %s",
-                    f.name(), v, v.pos());
-            keys.add(f);
+            if (!able) {
+                semantic(
+                        "incompatible field '%s' and value '%s': %s",
+                        f.name(), v, v.pos());
+                return;
+            }
         }
-        return keys;
     }
 
     private boolean initializable(
             DerivedTypeDeclarer dtd, StructureDefinition sd,
             ObjectTypeDeclarer odt, ObjectExpression oe) {
+        if (sd.domain() == TypeDomain.UNION) {
+            if (oe.entries().size() > 1)
+                return semantic("union only can init one field: %s",
+                        oe.entries().getKey(1).pos());
+        }
         checkInitField(dtd.gm(), sd.fields(), odt, oe);
         for (var k : oe.entries().keys()) {
             if (sd.fields().exists(k)) continue;
-            semantic("field '%s' not defined: %s", k, k.pos());
+            return semantic("field '%s' not defined: %s", k, k.pos());
         }
         return true;
     }
@@ -1263,14 +1268,12 @@ public class SemanticAnalysis {
 
     private boolean compatible(
             DerivedTypeDeclarer l, FuncTypeDeclarer r) {
-        // TODO
         return l.def() instanceof PrototypeDefinition lpd
                 && compatible(lpd.prototype(), r.prototype());
     }
 
     private boolean compatible(
             FuncTypeDeclarer l, DerivedTypeDeclarer r) {
-        // TODO
         return r.def() instanceof PrototypeDefinition rd
                 && compatible(l.prototype(), rd.prototype());
     }
@@ -2841,7 +2844,6 @@ public class SemanticAnalysis {
 
         if (td instanceof DerivedTypeDeclarer dtd) {
             if (dtd.def() instanceof PrototypeDefinition pd) {
-                // TODO: map
                 var prot = dtd.gm().instantiate(pd.prototype());
                 var t = new FuncTypeDeclarer(td.pos(), prot,
                         FuncTypeDeclarer.Type.REFER);
@@ -2875,8 +2877,8 @@ public class SemanticAnalysis {
             var a = args.get(i);
             var ag = optimize(a);
             if (!assignable(l, ag.b(), Optional.of(ag.a())))
-                return semantic("can't use %s as type %s: %s",
-                        a, l, a.pos());
+                return semantic("can't use %s(type '%s') as type '%s': %s",
+                        a, ag.b(), l, a.pos());
             nArgs.add(ag.a());
         }
 
@@ -3104,14 +3106,14 @@ public class SemanticAnalysis {
         if (of.has()) {
             invalid(generic);
             var f = of.get();
-            // TODO
             var ot = checkCall(f.type());
             if (ot.has()) {
-                var n = wrapRelayExpr(s, ot.get(), _s -> {
+                var t = st.gm().mapIf(ot.get());
+                var n = wrapRelayExpr(s, t, _s -> {
                     return new MemberOfExpression(_s.pos(),
                             (PrimaryExpression) _s, name, TypeArguments.EMPTY);
                 });
-                return Groups.g2(n, ot.get());
+                return Groups.g2(n, t);
             }
         }
         return semantic("class '%s' not defined callable '%s': %s",
@@ -3144,7 +3146,6 @@ public class SemanticAnalysis {
             if (m.has()) {
                 var gm = genericMap(st.gm(), m.get().generic(), generic);
                 var prot = gm.instantiate(m.get().prototype());
-                // TODO: map
                 var t = new FuncTypeDeclarer(s.pos(), prot,
                         FuncTypeDeclarer.Type.METHOD);
                 var n = wrapRelayExpr(s, t, _s -> {
@@ -3389,7 +3390,6 @@ public class SemanticAnalysis {
         if (f.has()) {
             var gm = genericMap(f.get().generic(), re.generic());
             var prot = gm.instantiate(f.get().prototype());
-            // TODO: map
             var td = new FuncTypeDeclarer(re.pos(), prot,
                     FuncTypeDeclarer.Type.FUNC);
             return Groups.g2(re, td);
@@ -3434,9 +3434,13 @@ public class SemanticAnalysis {
             t.len(0);
             return Groups.g2(e, t);
         }
+        e.type().use(t -> {
+            if (t.len() >= e.size()) return;
+            semantic("array length '%s' less than number of values: %s",
+                    t.length(), t.pos());
+        });
 
         var values = new ArrayList<Expression>(e.size());
-        var type = e.type().map(ArrayTypeDeclarer::element);
         TypeDeclarer first = null;
         for (var v : es) {
             var g = optimize(v);
@@ -3445,23 +3449,27 @@ public class SemanticAnalysis {
                 first = g.b();
             }
             var a = Optional.of(g.a());
-            if (type.has()) {
-                if (!assignable(type.get(), g.b(), a))
+            if (e.type().has()) {
+                var t = e.type().get();
+                if (!assignable(t.element(), g.b(), a))
                     return semantic("can't use '%s' as type '%s': %s",
-                            v, type, v.pos());
+                            v, t.element(), v.pos());
             } else if (first != null) {
                 if (!assignable(first, g.b(), a)) {
                     return semantic("type incompatible of value '%s' and value '%': %s",
                             first, v, v.pos());
                 }
+                g.a().resultType.set(first);
             }
         }
         var n = new ArrayExpression(e.pos(), values, e.type());
-        if (type.has()) return Groups.g2(n, n.type().get());
+        if (e.type().has()) return Groups.g2(n, e.type().get());
 
         var length = new IntegerLiteral(e.pos(), es.size());
         var le = new LiteralExpression(e.pos(), length);
-        var atd = new ArrayTypeDeclarer(e.pos(), type.getOrElse(first),
+
+        var atd = new ArrayTypeDeclarer(e.pos(),
+                e.type().map(ArrayTypeDeclarer::element).getOrElse(first),
                 Optional.of(le), Optional.empty(), true);
         atd.len(es.size());
         return Groups.g2(n, atd);
@@ -3579,6 +3587,7 @@ public class SemanticAnalysis {
     }
 
     private boolean needRelay(Expression e) {
+        if (!low) return false;
         if (e instanceof NewExpression)
             return true; // new创建的一定是
         if (e instanceof CallExpression ce) {
@@ -3676,8 +3685,15 @@ public class SemanticAnalysis {
         return n;
     }
 
-    // attribute
 
+    // macro
+
+    private void macro(ClassDefinition cd) {
+        // TODO: macro
+    }
+
+
+    // attribute
 
     private Entity analyse(AttributeDefinition ad) {
         return unsupported("attribute");

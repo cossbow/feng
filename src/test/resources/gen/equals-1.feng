@@ -1,0 +1,87 @@
+
+
+class A {
+    var v float;
+    var r *int;
+}
+class B`V` final {
+    var v V;
+}
+
+func refer(i int) {
+    var b1 = new(B`int`, {v=i});
+    var b2 = new(B`int`, {v=i});
+    if (b1 == b2) {
+    }
+    b2 = b1;
+    if (b1 == b2) {
+    }
+    {
+        var x *B`int` = b1;
+        if (x == nil){
+        }
+        x = nil;
+    }
+    {
+        const p1 &B`int` = b1;
+        const p2 &B`int` = b2;
+        if (p1 == p2){}
+        if (p1 == nil){}
+    }
+}
+
+func array(n int) {
+    var a [2]int = [1,2];
+    var b [2]int = [1,2];
+    if (a == b) {
+    }
+    {
+        const ra [&]int = a;
+        const rb [&]int = b;
+        if (ra == rb) {
+        }
+    }
+    {
+        const r1 [&]int = a;
+        const r2 [&]int = a;
+        if (r1 == r2) {
+        }
+        if (r1 == nil) {
+        }
+    }
+    {
+        var a = new([n]int, [n]);
+        var b = new([n]int, [n]);
+        if (a == b) {
+        }
+        b = a;
+        if (a == b) {
+        }
+        var x [*]int = a;
+        if (x == nil) {
+        }
+        x = nil;
+    }
+}
+
+func test(k int) {
+    var a A;
+    var a1 A = {v=3.1415926};
+    var a2 = a1;
+    if (a1 == a2) {
+    }
+    a2.r= new(int);
+    if (a1 == a2) {
+    }
+    var b1 B`float` = {v=3.1415926};
+    var b2 = b1;
+    if (b1 == b2) {
+    }
+    refer(k);
+    array(k);
+}
+
+func main() int32 {
+    test(15);
+    return 0;
+}

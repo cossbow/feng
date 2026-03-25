@@ -6,13 +6,16 @@ import org.cossbow.feng.ast.IdentifierTable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.function.BiConsumer;
 
 public class MacroTable {
     private Map<Identifier, IdentifierTable<Macro>> tables
             = new HashMap<>();
 
-    public void add(Identifier group, Identifier id, Macro value) {
+    public void add(Macro macro) {
+        add(macro.type(), macro.name(), macro);
+    }
+
+    void add(Identifier group, Identifier id, Macro value) {
         tables.computeIfAbsent(group, g -> new IdentifierTable<>())
                 .add(id, value);
     }

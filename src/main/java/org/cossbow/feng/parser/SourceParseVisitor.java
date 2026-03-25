@@ -231,6 +231,15 @@ final class SourceParseVisitor
         return stmt;
     }
 
+    @Override
+    public Entity visitGlobalMacro(FengParser.GlobalMacroContext ctx) {
+        var exported = isExport(ctx.exportable());
+        var macro = (Macro) visit(ctx.macro());
+        if (exported) gst.exportedMacros.add(macro);
+        gst.macros.add(macro);
+        return macro;
+    }
+
     private boolean isExport(FengParser.ExportableContext ctx) {
         return ctx.EXPORT() != null;
     }
@@ -675,7 +684,7 @@ final class SourceParseVisitor
                 methods.add(method.name(), method);
             } else {
                 var macro = (Macro) visit(imc.macro());
-                macros.add(macro.type(), macro.name(), macro);
+                macros.add(macro);
             }
         }
         var def = new InterfaceDefinition(posOf(ctx),
@@ -804,7 +813,7 @@ final class SourceParseVisitor
                 }
             } else {
                 var macro = (Macro) visit(mi.macro());
-                macros.add(macro.type(), macro.name(), macro);
+                macros.add(macro);
             }
         }
 
@@ -1433,7 +1442,7 @@ final class SourceParseVisitor
             var types = parseTypeDeclarerList(ctx.typeDeclarerList());
             for (int i = 0, typesSize = types.size(); i < typesSize; i++) {
                 var td = types.get(i);
-                var name = new Identifier(td.pos(), "feng$unnamedParameter" + i);
+                var name = new Identifier(td.pos(), "feng$unnamedParameter" + i, true);
                 var v = new Variable(td.pos(), Modifier.empty(),
                         Declare.CONST, name, Lazy.of(td), Lazy.nil());
                 params.add(name, v);

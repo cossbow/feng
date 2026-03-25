@@ -39,6 +39,7 @@ global
     : exportable def=typeDefinition         # GlobalTypeDefinition
     | exportable def=functionDefinition     # GlobalFunctionDefinition
     | exportable declaration SEMI           # GlobalDeclaration
+    | exportable macro                      # GlobalMacro
     ;
 
 
