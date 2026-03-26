@@ -2529,6 +2529,21 @@ func test(k int) {
 
 支持定义泛型形参的有函数、接口、类及类的方法。
 
+泛型除了解决样板代码外，还能解决自依赖问题，比如：
+
+```feng
+var bb Box`Box`int``;
+var bbb Box`Box`Box`int```;
+```
+
+在没有泛型时，上面的`Box`类会陷入递归初始化导致无法编译：
+
+```feng
+class Box {
+   var t Box;
+}
+```
+
 ### 泛型函数
 
 函数定义的泛型形参在函数体内可以被当做类型使用：
@@ -2644,11 +2659,17 @@ interface Box`V` {
 }
 ```
 
-前面的“class Box`E`”就可以改成实现类了：
+实现类示例：
 
 ```feng
 class MyBox`E` (Box`E`) {
-   // 参考前面的
+   var value E;
+   func set(v E) {
+      value = v;
+   }
+   func get() E {
+      return value;
+   }
 }
 ```
 

@@ -27,7 +27,7 @@ public class SampleParseTest extends BaseParseTest {
     );
 
     static InputStream getSample(String name) {
-        return SampleParseTest.class.getResourceAsStream("/samples/" + name + ".feng");
+        return SampleParseTest.class.getResourceAsStream("/parse/" + name + ".feng");
     }
 
 

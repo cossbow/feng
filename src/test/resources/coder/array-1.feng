@@ -1,4 +1,9 @@
 
+class A {
+    var id int;
+    func run(){}
+}
+
 
 func array1() {
     var aa [2]A = [{id=123}];
@@ -14,9 +19,16 @@ func array1() {
     }
     ar1=nil;
 
-    var ar2 [*]A= new([7]A, aa);
-    ar2[0].run();
+    {
+        var ar2 [*]A= new([7]A, aa);
+        ar2[0].run();
+    }
+    {
+        var ar2 [2]*A = [new(A, aa[0])];
+        ar2[0].run();
+    }
 }
+
 
 func array2() {
     {
@@ -39,33 +51,11 @@ func array2() {
     }
 }
 
-struct U {
-    value [4]int;
-}
-func array3() {
-    {
-        var a1 [*]int32 = new([2]int32);
-        var a2 [*]uint8 = a1;
-        var a3 [*]uint = a1;
-        var i *int = a1;
-        var a4 [*]int = i;
-        var pu1 *U = a1;
-    }
-    {
-        var u U;
-        const pu1 &U = u;
-        const i1 &int = u.value;
-        const i2 &int = u.value[2];
-        var a1 [2]int16;
-//        const pu2 &U = a1;
-    }
-}
 
 
 func test(n int) {
     array1();
     array2();
-    array3();
 }
 
 func main() int32 {

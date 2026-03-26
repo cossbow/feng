@@ -3,7 +3,7 @@ class A {
     var id int;
 }
 
-func make(n int) {
+func test(n int) {
     var a = new(A);
     {
         var a=new(A);

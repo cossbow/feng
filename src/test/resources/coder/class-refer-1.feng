@@ -1,9 +1,4 @@
 
-class B:A {
-    func run() {
-    }
-}
-
 class S final {
     var tag int;
 }

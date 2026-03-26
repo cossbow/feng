@@ -2,13 +2,12 @@
 enum E{Stop, GO=100, Wait,}
 
 func test(i int) {
-    make(i+5);
     const e1 E = E.Stop;
     const e2 E = E[i];
     const id int = E.Stop.id;
     const v int = E.GO.value;
     const n [&#]byte= E.Stop.name;
-
+}
 
 func main() int32 {
     test(1);

@@ -307,7 +307,7 @@ public class LowCppGenerator {
     }
 
     void declareType(StructureDefinition def) {
-        write("struct ");
+        write(def.domain().name).write(' ');
         write(def.symbol().name());
         endStmt();
     }
@@ -621,14 +621,15 @@ public class LowCppGenerator {
     }
 
     private LowCppGenerator write(StructureDefinition sd) {
-        write("struct ");
+        write(sd.domain().name).write(' ');
         write(sd.symbol().name());
         write('{').newLine();
         for (var sf : sd.fields()) {
             write(sf);
         }
         write('}').endStmt();
-        write("static_assert(sizeof(struct ");
+        write("static_assert(sizeof(");
+        write(sd.domain().name).write(' ');
         write(sd.symbol().name()).write(") == ");
         write(sd.layout().must().size()).write(')');
         return endStmt();

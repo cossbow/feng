@@ -4,6 +4,7 @@ import org.cossbow.feng.ast.Field;
 import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.ObjectTypeDeclarer;
 import org.cossbow.feng.util.Optional;
 
 import java.util.ArrayList;
@@ -37,6 +38,12 @@ public class ObjectExpression extends PrimaryExpression {
 
     public Optional<DerivedTypeDeclarer> type() {
         return type;
+    }
+
+    public DerivedTypeDeclarer dtd() {
+        if (type.has()) return type.get();
+        var t = (ObjectTypeDeclarer) resultType.must();
+        return t.lt.must();
     }
 
     @Override

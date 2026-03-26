@@ -73,23 +73,25 @@ public class SemanticAnalysis {
         return enums;
     }
 
-    private Stream<PrototypeDefinition>
-    findPrototypes(TypeDeclarer td) {
+    private Optional<PrototypeDefinition>
+    findPrototype(TypeDeclarer td) {
         if (td instanceof DerivedTypeDeclarer dtd) {
             var def = findDef(dtd);
             if (def instanceof PrototypeDefinition pd)
-                return findDepends(pd);
+                return Optional.of(pd);
         }
-        return Stream.empty();
+        return Optional.empty();
     }
 
-    private Stream<PrototypeDefinition>
+    private List<PrototypeDefinition>
     findDepends(PrototypeDefinition pd) {
+        var list = new ArrayList<PrototypeDefinition>(4);
         var p = pd.prototype();
-        return Stream.concat(p.returnSet().stream(),
-                        p.parameterSet().stream().map(
-                                v -> v.type().must()))
-                .flatMap(this::findPrototypes);
+        p.returnSet().flatmap(this::findPrototype).use(list::add);
+        for (var v : p.parameterSet()) {
+            v.type().flatmap(this::findPrototype).use(list::add);
+        }
+        return list;
     }
 
     private Optional<DAGGraph<PrototypeDefinition>>
@@ -101,8 +103,9 @@ public class SemanticAnalysis {
             if (!(def instanceof PrototypeDefinition pd))
                 continue;
             all.add(pd);
-            findDepends(pd).forEach(d ->
-                    edges.add(Groups.g2(d, pd)));
+            for (var d : findDepends(pd)) {
+                edges.add(Groups.g2(d, pd));
+            }
         }
         if (all.isEmpty()) return Optional.empty();
         var dag = makeDAG(all, edges);
@@ -271,7 +274,7 @@ public class SemanticAnalysis {
             TypeParameters params, TypeArguments args) {
         var size = params.size();
         if (size > args.size()) {
-            return semantic("mismatch type arguments: %s", args.pos());
+            return semantic("mismatch type arguments: %s", params.pos());
         }
         if (size < args.size()) {
             return semantic("too much type arguments: %s", args.pos());
@@ -324,9 +327,6 @@ public class SemanticAnalysis {
             case ArrayTypeDeclarer ee -> analyse(ee);
             case DerivedTypeDeclarer ee -> analyse(ee);
             case FuncTypeDeclarer ee -> analyse(ee);
-            case PrimitiveTypeDeclarer ee -> analyse(ee);
-            case LiteralTypeDeclarer ee -> analyse(ee);
-            case ObjectTypeDeclarer ee -> analyse(ee);
             default -> td;
         };
     }
@@ -383,18 +383,6 @@ public class SemanticAnalysis {
     private FuncTypeDeclarer analyse(FuncTypeDeclarer td) {
         analyse(td.prototype(), false);
         return td;
-    }
-
-    private PrimitiveTypeDeclarer analyse(PrimitiveTypeDeclarer ptd) {
-        return ptd;
-    }
-
-    private LiteralTypeDeclarer analyse(LiteralTypeDeclarer ltd) {
-        return ltd;
-    }
-
-    private ObjectTypeDeclarer analyse(ObjectTypeDeclarer otd) {
-        return otd;
     }
 
     private void analyse(TypeParameters e) {
@@ -533,12 +521,14 @@ public class SemanticAnalysis {
         for (var v : def.values()) {
             v.val(i);
             if (v.init().none()) {
+                i++;
                 continue;
             }
             var il = calcInteger(v.init().must());
             v.init().set(new LiteralExpression(il.pos(), il));
             i = il.value().intValue();
-            v.val(i++);
+            v.val(i);
+            i++;
         }
 
         return def;
@@ -1090,7 +1080,6 @@ public class SemanticAnalysis {
             case SwitchStatement ss -> analyse(ss);
             case ThrowStatement ss -> analyse(ss);
             case TryStatement ss -> analyse(ss);
-            case SwitchBranch ss -> analyse(ss);
             case CatchClause ss -> analyse(ss);
             case null, default -> unreachable();
         };
@@ -1182,7 +1171,7 @@ public class SemanticAnalysis {
         if (lt instanceof ClassDefinition def)
             return initializable(l, def, o, oe);
 
-        return false;
+        return unreachable();
     }
 
     private boolean assignable(ClassDefinition l, ClassDefinition r) {
@@ -1208,7 +1197,6 @@ public class SemanticAnalysis {
         if (l.equals(r)) return true;
 
         for (var dt : r.parts()) {
-            invalid(dt.generic());
             var def = dt.def.must();
             if (def instanceof InterfaceDefinition id)
                 if (assignable(l, id)) return true;
@@ -1238,7 +1226,7 @@ public class SemanticAnalysis {
             }
         }
 
-        return false;
+        return unreachable();
     }
 
     private boolean
@@ -1747,6 +1735,11 @@ public class SemanticAnalysis {
                     e, e.pos());
             return;
         }
+        if (t.isNil() && v.declare() == Declare.CONST) {
+            semantic("let a const = nil is meaningless: %s",
+                    e, e.pos());
+            return;
+        }
         if (v.type().has()) {
             var l = v.type().must();
             // check type
@@ -1870,8 +1863,8 @@ public class SemanticAnalysis {
         analyse(e.initializer());
         var cg = optimize(e.condition());
         e.condition(cg.a());
-        if (!cg.b().isBool())
-            return semantic("condition must be bool: %s",
+        if (!cg.b().isBool() || cg.b().maybeRefer().has())
+            return semantic("condition must be bool-value: %s",
                     e.condition().pos());
 
         if (cg.a() instanceof LiteralExpression le)
@@ -1960,7 +1953,7 @@ public class SemanticAnalysis {
         var a = e.arguments().getFirst();
         var dt = new DerivedType(a.pos(), ed.symbol(), TypeArguments.EMPTY);
         dt.def.set(ed);
-        var t = new DerivedTypeDeclarer(a.pos(), dt, Optional.empty());
+        var t = new EnumTypeDeclarer(a.pos(), ed);
 
         var size = new IntegerLiteral(ZERO, ed.values().size()).expr();
         var rp = forReplace(
@@ -2259,7 +2252,7 @@ public class SemanticAnalysis {
 
     private boolean immutable(SymbolExpression e) {
         var o = context.findVar(e.symbol());
-        if (o.none()) return semantic("%s not declared", e.symbol());
+        if (o.none()) return semantic("var '%s' not declared", e.symbol());
         return immutable(o.get());
     }
 
@@ -2594,9 +2587,8 @@ public class SemanticAnalysis {
         var t = new PrimitiveTypeDeclarer(e.pos(),
                 Primitive.BOOL, Optional.empty());
 
-        if (g.b() instanceof FuncTypeDeclarer ftd && ftd.isRefer()) {
-            var n = new CheckNilExpression(e.pos(), g.a(), nil);
-            return Groups.g2(n, t);
+        if (g.b() instanceof FuncTypeDeclarer) {
+            return semantic("func-type var can't be nil: %s", e.pos());
         }
 
         var r = g.b().maybeRefer();
@@ -2616,30 +2608,8 @@ public class SemanticAnalysis {
         return Groups.g2(n, t);
     }
 
-    private Optional<EnumDefinition> findEnum(TypeDeclarer td) {
-        if (td instanceof EnumTypeDeclarer etd)
-            return Optional.of(etd.def());
-        if (td instanceof DerivedTypeDeclarer dtd) {
-            if (dtd.def() instanceof EnumDefinition ed)
-                return Optional.of(ed);
-        }
-        return Optional.empty();
-    }
-
-    private boolean enumBinOp(
-            TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
-        var le = findEnum(l);
-        if (le.none()) return false;
-        var re = findEnum(r);
-        if (re.none()) return false;
-
-        return le.get().equals(re.get());
-    }
-
     private boolean objectBinOp(
             DerivedTypeDeclarer l, DerivedTypeDeclarer r) {
-//        analyse(l.derivedType().generic());
-//        analyse(r.derivedType().generic());
         if (l.def() instanceof ObjectDefinition lo &&
                 r.def() instanceof ObjectDefinition ro)
             return assignable(lo, ro) ||
@@ -3166,7 +3136,7 @@ public class SemanticAnalysis {
     }
 
     private Groups.G2<Expression, TypeDeclarer>
-    optimizeEnumValue(EnumValueExpression eve,
+    optimizeEnumValue(PrimaryExpression eve,
                       EnumTypeDeclarer etd, Identifier name) {
         var o = etd.def().getField(name);
         if (o.none()) return semantic("%s has no field %s: %s",
@@ -3202,7 +3172,7 @@ public class SemanticAnalysis {
 
         if (sg.b() instanceof EnumTypeDeclarer etd) {
             invalid(e.generic());
-            return optimizeEnumValue((EnumValueExpression) sg.a(), etd, e.member());
+            return optimizeEnumValue((PrimaryExpression) sg.a(), etd, e.member());
         }
 
         return semantic("member '%s' not defined: %s",
@@ -3378,6 +3348,7 @@ public class SemanticAnalysis {
         var s = re.symbol();
         var o = context.findVar(s);
         if (o.has()) {
+            invalid(re.generic());
             var v = o.get();
             if (v.declare() == Declare.CONST &&
                     v.value().match(e -> e instanceof LiteralExpression))
@@ -3397,6 +3368,7 @@ public class SemanticAnalysis {
 
         var t = context.findType(s);
         if (t.has()) {
+            invalid(re.generic());
             var td = new DefinitionDeclarer(s.pos(), t.get());
             return Groups.g2(re, td);
         }
@@ -3404,6 +3376,7 @@ public class SemanticAnalysis {
         if (enterClass != null && s.module().none()) {
             var of = enterClass.allFields().tryGet(s.name());
             if (of.has()) {
+                invalid(re.generic());
                 // 表达式加上`this.`前缀，方便后续处理
                 return Groups.g2(wrapThis(re.symbol(), of.get()), of.get().type());
             }

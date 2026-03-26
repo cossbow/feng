@@ -56,6 +56,11 @@ public class Optional<T> {
         return of(f.apply(value));
     }
 
+    public <R> Optional<R> flatmap(Function<T, Optional<R>> f) {
+        if (none()) return empty();
+        return f.apply(value);
+    }
+
     public Stream<T> stream() {
         return has() ? Stream.of(value) : Stream.empty();
     }

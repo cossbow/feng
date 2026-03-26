@@ -1,0 +1,161 @@
+
+struct U {
+    value [4]int;
+}
+struct V {
+    value [2]byte;
+}
+func array3() {
+    {
+        var a1 int;
+        {
+            const i &int = a1;
+            const j &int32 = a1;
+            const k &V = a1;
+        }
+        {
+            const i [&]int = a1;
+            const j [&]int32 = a1;
+            const k [&]V = a1;
+            const x [&]U = a1;
+        }
+    }
+    {
+        var a1 = new(int);
+        {
+            const i &int = a1;
+            const j &int32 = a1;
+            const k &V = a1;
+        }
+        {
+            var i *int = a1;
+            var j *int32 = a1;
+            var k *V = a1;
+        }
+        {
+            const i [&]int = a1;
+            const j [&]int32 = a1;
+            const k [&]V = a1;
+            const x [&]U = a1;
+        }
+        {
+            var i [*]int = a1;
+            var j [*]int32 = a1;
+            var k [*]V = a1;
+            var x [*]U = a1;
+        }
+    }
+    {
+        var a1 U;
+        {
+            const i &int = a1;
+            const j &int32 = a1;
+            const k &V = a1;
+        }
+        {
+            const i [&]int = a1;
+            const j [&]int32 = a1;
+            const k [&]V = a1;
+            const x [&]U = a1;
+        }
+    }
+    {
+        var a1 = new(U);
+        {
+            const i &int = a1;
+            const j &int32 = a1;
+            const k &V = a1;
+        }
+        {
+            var i *int = a1;
+            var j *int32 = a1;
+            var k *V = a1;
+        }
+        {
+            const i [&]int = a1;
+            const j [&]int32 = a1;
+            const k [&]V = a1;
+            const x [&]U = a1;
+        }
+        {
+            var i [*]int = a1;
+            var j [*]int32 = a1;
+            var k [*]V = a1;
+            var x [*]U = a1;
+        }
+    }
+    {
+        var a1 [2]int=[21,32];
+        {
+            const i &int = a1;
+            const j &int32 = a1;
+            const k &V = a1;
+        }
+        {
+            const i [&]int = a1;
+            const j [&]int32 = a1;
+            const k [&]V = a1;
+            const x [&]U = a1;
+        }
+    }
+    {
+        var a1 = new([4]int32);
+        {
+            const i &int = a1;
+            const j &int32 = a1;
+            const k &V = a1;
+        }
+        {
+            var i *int = a1;
+            var j *int32 = a1;
+            var k *V = a1;
+        }
+        {
+            const i [&]int = a1;
+            const j [&]int32 = a1;
+            const k [&]V = a1;
+            const x [&]U = a1;
+        }
+        {
+            var i [*]int = a1;
+            var j [*]int32 = a1;
+            var k [*]V = a1;
+            var x [*]U = a1;
+        }
+    }
+    {
+        var a1 = new([2]U);
+        {
+            const i &int = a1;
+            const j &int32 = a1;
+            const k &V = a1;
+        }
+        {
+            var i *int = a1;
+            var j *int32 = a1;
+            var k *V = a1;
+        }
+        {
+            const i [&]int = a1;
+            const j [&]int32 = a1;
+            const k [&]V = a1;
+            const x [&]U = a1;
+        }
+        {
+            var i [*]int = a1;
+            var j [*]int32 = a1;
+            var k [*]V = a1;
+            var x [*]U = a1;
+        }
+    }
+
+}
+
+func test(n int) {
+    array3();
+}
+
+func main() int32 {
+    test(5);
+    return 0;
+}

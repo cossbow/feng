@@ -4,6 +4,7 @@ import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 public class Lazy<T> implements Cloneable {
     private volatile T value;
@@ -70,6 +71,18 @@ public class Lazy<T> implements Cloneable {
         var v = value;
         if (v != null) user.accept(v);
         else or.run();
+    }
+
+    public <R> Optional<R>
+    flatmap(Function<T, Optional<R>> f) {
+        var v = value;
+        if (v == null) return Optional.empty();
+        return f.apply(v);
+    }
+
+    public Stream<T> stream() {
+        var v = value;
+        return Stream.ofNullable(v);
     }
 
     @SuppressWarnings("unchecked")

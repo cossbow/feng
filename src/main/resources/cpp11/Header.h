@@ -218,16 +218,30 @@ static T *&Feng$dec(T *&p) {
 }
 
 template<typename T>
+struct Feng$Refer {
+	T *t;
+
+	T *borrow() {
+		return t;
+	}
+};
+
+template<typename T>
 struct Feng$SRefer {
 	T *t;
 
 	// [builtin] creator without init
 	Feng$SRefer() : t(nullptr) {}
 
-    explicit Feng$SRefer(std::nullptr_t _t) : t(nullptr) {}
+    explicit Feng$SRefer(std::nullptr_t) : t(nullptr) {}
 
 	// [builtin] creator with init
-	explicit Feng$SRefer(T *t) : t(t) {}
+	Feng$SRefer(T *t) : t(t) {}
+
+	// var t1 = map(t0);
+	Feng$SRefer(Feng$Refer<T> &&r) {
+		t = Feng$inc(r.t);
+	}
 
 	// var t1 = t0;
 	Feng$SRefer(Feng$SRefer<T> const &r) {
@@ -283,6 +297,12 @@ struct Feng$SRefer {
 	T &operator*() {
 		Feng$required(t);
 		return *t;
+	}
+
+	// t1 = map(t0);
+	Feng$SRefer<T> &operator=(Feng$Refer<T> &&r) {
+		Feng$dec(t) = Feng$inc(r.t);
+		return *this;
 	}
 
 	// t1 = t0;
@@ -348,6 +368,52 @@ static Feng$SRefer<T> Feng$newMem(T &&init) {
 	*p = init;
 	return Feng$SRefer<T>{p};
 }
+
+template<typename T>
+struct Feng$PRefer {
+	T *t;
+
+	Feng$PRefer() : t(nullptr) {}
+
+	Feng$PRefer(T *t) : t(t) {}
+
+	template<typename S>
+	Feng$PRefer(S *s) : t((T *) s) {}
+
+	Feng$PRefer(T &t) : t(&t) {}
+
+	template<typename S>
+	Feng$PRefer(S &s) : t((T *) &s) {}
+
+	Feng$PRefer(Feng$SRefer<T> &r) : t(r.t) {}
+
+	template<typename S>
+	Feng$PRefer(Feng$SRefer<S> &r) : t((T *) r.t) {}
+
+	Feng$PRefer(Feng$PRefer<T> &r) : t(r.t) {}
+
+	template<typename S>
+	Feng$PRefer(Feng$PRefer<S> &r) : t((T *) r.t) {}
+
+	Feng$PRefer(Feng$Refer<T> &&r) : t(r.t) {}
+
+	// t == nil;
+	bool absent() {
+		return t == nullptr;
+	}
+
+	// t.start();
+	T *&operator->() {
+		Feng$required(t);
+		return t;
+	}
+
+	// *t
+	T &operator*() {
+		Feng$required(t);
+		return *t;
+	}
+};
 
 template<class S, class T>
 static T *Feng$assert(S *p) {
@@ -444,26 +510,12 @@ struct Feng$ArrayRefer {
 	}
 
 	E &operator[](int64_t index) {
+		Feng$required(start);
 		if (index < 0 || index >= this->len)
 			throw Feng$OutOfBounds();
 		return this->start[index];
 	}
 
-};
-
-// 数组引用：虚引用
-template<typename E>
-struct Feng$ArrayPRefer : public Feng$ArrayRefer<E> {
-
-	Feng$ArrayPRefer(E *start, int64_t len) : Feng$ArrayRefer<E>(start, len) {}
-
-	Feng$ArrayPRefer<E> &required() {
-		if (this->start == nullptr)
-			throw Feng$NilPointer();
-		return *this;
-	}
-
-    auto operator<=>(const Feng$ArrayPRefer<E> &) const = default;
 };
 
 // 数组引用：强引用
@@ -477,6 +529,18 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 	Feng$ArraySRefer(E *start, int64_t len) {
 		this->start = start;
 		this->len = len;
+	}
+
+	Feng$ArraySRefer(Feng$ArrayRefer<E> &r) {
+		this->start = Feng$inc(r.start);
+		this->len = r.len;
+	}
+
+	Feng$ArraySRefer(Feng$ArrayRefer<E> &&r) {
+		this->start = Feng$inc(r.start);
+		this->len = r.len;
+		r.start = nullptr;
+		r.len = 0;
 	}
 
 	Feng$ArraySRefer(Feng$ArraySRefer<E> &r) {
@@ -495,19 +559,11 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 		dec();
 	}
 
-	Feng$ArrayPRefer<E> borrow() {
-		return {this->start, this->len};
-	}
-
-	void clear() {
+	Feng$ArraySRefer<E> &operator=(std::nullptr_t) {
+		if (this->start == nullptr) return *this;
 		dec();
 		this->start = nullptr;
 		this->len = 0;
-	}
-
-	Feng$ArraySRefer<E> &required() {
-		if (this->start == nullptr)
-			throw Feng$NilPointer();
 		return *this;
 	}
 
@@ -541,6 +597,23 @@ private:
 		}
 		Feng$del(this->start);
 	}
+};
+
+// 数组引用：虚引用
+template<typename E>
+struct Feng$ArrayPRefer : public Feng$ArrayRefer<E> {
+
+	Feng$ArrayPRefer(std::nullptr_t) : Feng$ArrayRefer<E>() {}
+
+	Feng$ArrayPRefer(E *start, int64_t len) : Feng$ArrayRefer<E>(start, len) {}
+
+	Feng$ArrayPRefer(Feng$ArrayRefer<E> &&r) : Feng$ArrayRefer<E>(r) {}
+
+	Feng$ArrayPRefer(Feng$ArraySRefer<E> &r) : Feng$ArrayRefer<E>(r) {}
+
+	Feng$ArrayPRefer(Feng$ArrayPRefer<E> &r) : Feng$ArrayRefer<E>(r) {}
+
+	auto operator<=>(const Feng$ArrayPRefer<E> &) const = default;
 };
 
 template<typename E, typename T>
@@ -589,28 +662,52 @@ static Feng$ArraySRefer<E> Feng$newArrayCopy(int64_t len, A &init) {
 }
 
 // mappable数组转换，例如：[*]int32 -> [*]int8
-template<typename S, typename A, typename E,  typename B>
-requires BaseArrayRefer<S, A> && BaseArrayRefer<E, B>
-static B Feng$mapA2A(A s) {
-	int64_t len = (sizeof(S) * s.len) / sizeof(E);
-	return {(E *)s.start, len};
+template<typename S, typename A, typename T>
+requires BaseArrayRefer<S, A>
+static Feng$ArrayRefer<T> Feng$mapA2A(A &s) {
+	int64_t len = (sizeof(S) * s.len) / sizeof(T);
+	return {(T *) s.start, len};
+}
+template<typename S, int64_t L, typename R>
+static Feng$ArrayPRefer<R> Feng$mapA2A(Feng$Array<S, L> &s) {
+	int64_t l = sizeof(S) * L / sizeof(R);
+	return {(R *) s.values, l};
 }
 
 // mappable数组转换，例如： *int32 -> [*]int8
-template<typename S, typename E, typename A>
-requires BaseArrayRefer<E, A>
-static A Feng$mapU2A(S *s) {
-	int64_t len = sizeof(S) / sizeof(E);
-	return {(E *) s, len};
+template<typename S, typename T>
+static Feng$ArrayRefer<T> Feng$mapU2A(S *s) {
+	int64_t len = sizeof(S) / sizeof(T);
+	return {(T *) s, len};
+}
+template<typename S, typename T>
+static Feng$ArrayRefer<T> Feng$mapU2A(Feng$SRefer<S> &s) {
+	int64_t len = sizeof(S) / sizeof(T);
+	return {(T *) s.t, len};
+}
+template<typename S, typename T>
+static Feng$ArrayRefer<T> Feng$mapU2A(Feng$SRefer<S> &&s) {
+	int64_t len = sizeof(S) / sizeof(T);
+	return {(T *) s.t, len};
+}
+template<typename S, typename T>
+static Feng$ArrayRefer<T> Feng$mapU2A(Feng$PRefer<S> &s) {
+	int64_t len = sizeof(S) / sizeof(T);
+	return {(T *) s.t, len};
+}
+template<typename S, typename T>
+static Feng$ArrayRefer<T> Feng$mapU2A(Feng$PRefer<S> &&s) {
+	int64_t len = sizeof(S) / sizeof(T);
+	return {(T *) s.t, len};
 }
 
 // mappable数组转换，例如：[*]int8 -> *int32
 template<typename E, typename A, typename U>
 requires BaseArrayRefer<E, A>
-static U *Feng$mapA2U(A &s) {
+static Feng$Refer<U> Feng$mapA2U(A &s) {
 	if (sizeof(U) > (sizeof(E) * s.len))
 		throw Feng$OutOfBounds();
-	return (U *) s.start;
+	return {(U *) s.start};
 }
 
 
@@ -620,11 +717,11 @@ struct Feng$GlobalArray {
 	Feng$Array<T, L> array;
 
 	Feng$ArraySRefer<T> sr() {
-		return {.start = Feng$inc(array.values), .len=L};
+		return {Feng$inc(array.values), L};
 	}
 
 	Feng$ArrayPRefer<T> pr() {
-		return {.start = array.values, .len=L};
+		return {array.values, L};
 	}
 };
 

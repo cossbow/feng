@@ -291,11 +291,12 @@ public class CppGenerator {
         for (var sl : list) {
             write("static Feng$GlobalArray<Byte,").write(sl.length());
             write("> ").literalString(sl);
-            write("= {.$header={.refcnt={1}}, .array = {.values = {");
+            write("= {{{1}}, Feng$Array<Byte, ");
+            write(sl.length()).write(">{");
             for (byte b : sl.value()) {
                 write(b).write(',');
             }
-            write("}}}").endStmt();
+            write("}}").endStmt();
         }
     }
 
@@ -333,7 +334,7 @@ public class CppGenerator {
 
     void declareType(StructureDefinition def) {
         write(def.generic());
-        write("struct ");
+        write(def.domain().name).write(' ');
         write(def.symbol().name());
         endStmt();
     }
@@ -377,8 +378,8 @@ public class CppGenerator {
     void visitEnum(EnumDefinition ed) {
         write("static Feng$Enum ").enumName(ed).write("[] = {").newLine();
         for (var v : ed.values()) {
-            write("{.value=").write(v.val()).write(", .name=");
-            write(v.nameLit()).write(".incAR()},").newLine();
+            write('{').write(v.val()).write(',');
+            write(v.nameLit()).write(".sr()},").newLine();
         }
         write('}').endStmt().newLine();
     }
@@ -439,20 +440,22 @@ public class CppGenerator {
             Expression v, TypeDeclarer t) {
         var rt = v.resultType.must();
         if (t.baseTypeSame(rt)) {
-            var r = rt.maybeRefer().must();
             return write(v);
         }
         if (t instanceof ArrayTypeDeclarer at) {
             if (rt instanceof ArrayTypeDeclarer art) {
                 write("Feng$mapA2A<").write(art.element()).write(',');
-                write(art).write(',').write(at.element()).write(',');
-                return write(at).write(">(").write(v).write(')');
+                if (art.refer().none()) write(art.len());
+                else write(art);
+                write(',').write(at.element());
+                return write(">(").write(v).write(')');
             }
             if (rt.isNil()) {
-                return write("{}");
+                return write("nullptr");
             } else {
                 write("Feng$mapU2A<").baseTypeSymbol(rt).write(',');
-                write(at.element()).write(',').write(at).write(">(");
+                write(at.element()).write(">(");
+                if (rt.maybeRefer().none()) write('&');
                 return write(v).write(')');
             }
         }
@@ -466,29 +469,27 @@ public class CppGenerator {
 
     private CppGenerator referPhantom(Expression v, TypeDeclarer t) {
         var vt = v.resultType.must();
-        if (vt.maybeRefer().has())
-            return castRef(v, t).write(".borrow()");
+        var vr = vt.maybeRefer();
+        if (vr.has()) {
+            castRef(v, t);
+            return this;
+        }
 
+        // 原型相同不需要转类型
         if (t.baseTypeSame(vt)) {
             if (!(vt instanceof ArrayTypeDeclarer avt))
-                return write('&').write(v);
+                return write(v);
 
             return write('{').write(v)
                     .write(".values,").write(avt.len())
                     .write('}');
         }
 
-        if (t instanceof ArrayTypeDeclarer at) {
-            var avt = (ArrayTypeDeclarer) vt;
-            // mappable
-            return write("Feng$refer<").write(avt.element())
-                    .write(',').write(at.element()).write(">(")
-                    .write(v).write(".values,").write(avt.len())
-                    .write(')');
+        if (t instanceof ArrayTypeDeclarer) {
+            return castRef(v, t);
         }
 
-        return write("((").write(t).write(')')
-                .write('&').write(v).write(')');
+        return write(v);
     }
 
     private CppGenerator writeLiteral(LiteralExpression v, TypeDeclarer t) {
@@ -538,10 +539,14 @@ public class CppGenerator {
     private CppGenerator declareVar(Variable v) {
         var t = v.type().must();
         declare(genName(v), t);
+        write(" = ");
         v.value().use(e -> {
-            write(" = ").writeValue(e, t);
+            writeValue(e, t);
         }, () -> {
-            write(" = {}");
+            if (t.maybeRefer().has())
+                write("nullptr");
+            else
+                write("{}");
         });
         return endStmt();
     }
@@ -579,12 +584,11 @@ public class CppGenerator {
                     .write(td.len()).write('>');
         }
         var r = td.refer().get();
-        if (r.isKind(PHANTOM)) {
-            return write("Feng$ArrayPRefer<")
-                    .write(td.element()).write('>');
-        }
-        return write("Feng$ArraySRefer<")
-                .write(td.element()).write('>');
+        if (r.isKind(PHANTOM))
+            write("Feng$ArrayPRefer<");
+        else
+            write("Feng$ArraySRefer<");
+        return write(td.element()).write('>');
     }
 
     private CppGenerator write(DerivedTypeDeclarer td) {
@@ -596,8 +600,10 @@ public class CppGenerator {
             return write(td.derivedType());
         var r = td.refer().get();
         if (r.isKind(PHANTOM))
-            return write(td.derivedType()).write('*');
-        return write("Feng$SRefer<").write(td.derivedType()).write('>');
+            write("Feng$PRefer<");
+        else
+            write("Feng$SRefer<");
+        return write(td.derivedType()).write('>');
     }
 
     private CppGenerator write(Primitive p) {
@@ -608,8 +614,10 @@ public class CppGenerator {
         if (td.refer().none()) return write(td.primitive());
         var r = td.refer().get();
         if (r.isKind(PHANTOM))
-            return write(td.primitive()).write('*');
-        return write("Feng$SRefer<").write(td.primitive()).write('>');
+            write("Feng$PRefer<");
+        else
+            write("Feng$SRefer<");
+        return write(td.primitive()).write('>');
     }
 
     private CppGenerator write(FuncTypeDeclarer e) {
@@ -676,14 +684,15 @@ public class CppGenerator {
     }
 
     private CppGenerator write(StructureDefinition sd) {
-        write("struct ");
+        write(sd.domain().name).write(' ');
         write(sd.symbol().name());
         write('{').newLine();
         for (var sf : sd.fields()) {
             write(sf);
         }
         write('}').endStmt();
-        write("static_assert(sizeof(struct ");
+        write("static_assert(sizeof(");
+        write(sd.domain().name).write(' ');
         write(sd.symbol().name()).write(") == ");
         write(sd.layout().must().size()).write(')');
         return endStmt();
@@ -739,6 +748,7 @@ public class CppGenerator {
             write(" = 0").endStmt();
         }
         defaultDeconstruct(id);
+        operatorEquals(id);
         write("}").endStmt();
     }
 
@@ -824,22 +834,22 @@ public class CppGenerator {
     private void copyConstruct(ClassDefinition cd, boolean tmp) {
         write(cd.symbol().name());
         write('(');
-        classToken(cd);
+        definedToken(cd);
         if (tmp) write("&&");
         else write("&");
         write(") = default").endStmt();
     }
 
     private void operatorAssign(ClassDefinition cd) {
-        classToken(cd);
+        definedToken(cd);
         write(" &operator=(const ");
-        classToken(cd);
+        definedToken(cd);
         write(" &) = default").endStmt();
     }
 
-    private void operatorEquals(ClassDefinition cd) {
+    private void operatorEquals(ObjectDefinition cd) {
         write("auto operator<=>(const ");
-        classToken(cd);
+        definedToken(cd);
         write(" &) const = default").endStmt();
     }
 
@@ -889,7 +899,7 @@ public class CppGenerator {
         enterClass = null;
     }
 
-    private CppGenerator classToken(ClassDefinition cd) {
+    private CppGenerator definedToken(ObjectDefinition cd) {
         write(cd.symbol());
         if (cd.generic().isEmpty()) return this;
         write('<');
@@ -905,7 +915,7 @@ public class CppGenerator {
         write(enterClass.generic());
         write(cm.generic());
         write(() -> {
-            classToken(enterClass).write("::").write(cm.name());
+            definedToken(enterClass).write("::").write(cm.name());
         }, cm.prototype());
         newLine();
         write(cm.procedure().must());
@@ -1359,10 +1369,12 @@ public class CppGenerator {
         write(e.left());
         var lt = e.left().resultType.must();
         if (lt instanceof ArrayTypeDeclarer) write(".start");
+        else write(".t");
         write(e.same() ? "==" : "!=");
         write(e.right());
         var rt = e.right().resultType.must();
         if (rt instanceof ArrayTypeDeclarer) write(".start");
+        else write(".t");
         return this;
     }
 
@@ -1464,10 +1476,7 @@ public class CppGenerator {
                 : e.resultType.must();
         var r = rt.maybeRefer();
         if (r.has()) {
-            if (r.get().isKind(PHANTOM)) {
-                return write("nullptr");
-            }
-            return write("{}");
+            return write("nullptr");
         }
         write(e.literal());
         return this;
@@ -1503,7 +1512,7 @@ public class CppGenerator {
     }
 
     private CppGenerator enumMember(
-            EnumValueExpression s, EnumDefinition ed, Identifier m) {
+            PrimaryExpression s, EnumDefinition ed, Identifier m) {
         // TODO: check bounds
         if (EnumDefinition.TokenFieldId.equals(m.value()))
             return write(s);
@@ -1514,7 +1523,7 @@ public class CppGenerator {
     private CppGenerator write(MemberOfExpression e) {
         var td = e.subject().resultType.must();
         if (td instanceof EnumTypeDeclarer etd) {
-            return enumMember((EnumValueExpression) e.subject(), etd.def(), e.member());
+            return enumMember(e.subject(), etd.def(), e.member());
         }
 
         var dtd = (DerivedTypeDeclarer) td;
@@ -1626,11 +1635,10 @@ public class CppGenerator {
     }
 
     private CppGenerator write(ObjectExpression oe) {
-        var ot = (ObjectTypeDeclarer) oe.resultType.must();
-        var t = ot.lt.must();
-        write('(').write(t).write(')');
+        var dt = oe.dtd();
+        write('(').write(dt).write(')');
 
-        var def = t.def();
+        var def = dt.def();
         if (def instanceof ClassDefinition cd
                 && !cd.isFinal()) {
             return write('{').fieldInit(cd.allFields(),
@@ -1666,17 +1674,9 @@ public class CppGenerator {
     }
 
     private CppGenerator write(CheckNilExpression e) {
-        var st = e.subject().resultType.must();
-        var sr = st.maybeRefer().must();
-
-        if (st instanceof ArrayTypeDeclarer ||
-                sr.isKind(STRONG)) {
-            if (!e.nil()) write('!');
-            return write(e.subject()).write(".absent()");
-        }
-
         write(e.subject());
-        return write(e.nil() ? '=' : '!').write("=nullptr");
+        if (!e.nil()) write('!');
+        return write(".absent()");
     }
 
     private CppGenerator write(SymbolExpression e) {

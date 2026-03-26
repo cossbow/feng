@@ -2,6 +2,7 @@ package org.cossbow.feng.parser;
 
 import org.antlr.v4.runtime.*;
 import org.cossbow.feng.ast.Source;
+import org.cossbow.feng.util.ErrorUtil;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -39,8 +40,8 @@ public class SourceParser {
                                 Object offendingSymbol, int line,
                                 int charPositionInLine, String msg,
                                 RecognitionException e) {
-            var er = new SyntaxErrorMsg(line, charPositionInLine, msg);
-            errors.add(er);
+            ErrorUtil.syntax("parse error at (%d:%d): %s: \n",
+                    line, charPositionInLine, msg);
         }
     }
 }
