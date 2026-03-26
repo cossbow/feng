@@ -1980,7 +1980,7 @@ public class SemanticAnalysisTest {
     public void testGlobalVar5() {
         checkFail("const a [2]int=[1,2]; var b=a[0];");
         var d = "struct A{id int;} ";
-        checkFail(d + "const a A={id=1}; var b=a.id;");
+        checkSucc(d + "const a A={id=1}; var b=a.id;");
     }
 
     // struct

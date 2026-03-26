@@ -14,8 +14,16 @@ public class Identifier extends Entity {
         this(pos, value, false);
     }
 
+    public Identifier(String value) {
+        this(Position.ZERO, value);
+    }
+
     public String value() {
         return value;
+    }
+
+    public boolean unnamed() {
+        return unnamed;
     }
 
     //

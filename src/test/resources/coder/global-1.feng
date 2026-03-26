@@ -1,0 +1,43 @@
+struct S{
+    id int;
+}
+class A {
+    var id int;
+}
+
+struct B {
+    off int;
+}
+
+enum E {RUN,}
+
+var gv1 int = 0;
+const gv2 int = 0;
+var gv3 *int = new(int);
+
+var gav1 A = {id=10};
+var gav2 A = {id=gv2};
+
+var gsv1 S = {id=10};
+var gsv2 S = {id=gv2};
+
+var gar1 *A = new(A,{id=10});
+var gar2 *A = new(A,{id=gv2});
+
+var gsr1 *S = new(S,{id=10});
+var gsr2 *S = new(S,{id=gv2});
+
+var gba1 [16]B = [];
+var gba2 [16]B = [{off=1},{off=gv2}];
+
+var gState E = E.RUN;
+
+
+func test(n int) {
+
+}
+
+
+func main(args [&!#][*!#]byte) {
+    test(1);
+}

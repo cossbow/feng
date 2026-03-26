@@ -1,12 +1,14 @@
 package org.cossbow.feng.ast;
 
 import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Optional;
 
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -24,11 +26,10 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
         nodes = new ArrayList<>(initCapacity);
     }
 
-    public UniqueTable(List<Node<K, V>> nodes) {
-        this.nodes = new ArrayList<>(nodes);
-        table = new HashMap<>();
-        for (Node<K, V> n : nodes)
-            addIndex(n);
+    public UniqueTable(List<Groups.G2<K, V>> data) {
+        table = new HashMap<>(data.size());
+        nodes = new ArrayList<>(data.size());
+        for (var g : data) add(g.a(), g.b());
     }
 
     private void addIndex(Node<K, V> node) {

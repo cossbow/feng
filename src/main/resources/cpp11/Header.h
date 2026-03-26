@@ -54,15 +54,16 @@ static T *Feng$required(T *p) {
 	throw Feng$NilPointer();
 }
 
-class Object {
+// The root of polymorphism and abstraction classes
+class $Object {
 public:
 	uint32_t feng$classId;
 
-    Object() = default;
+    $Object() = default;
 
-    Object &operator=(const Object &) = default;
+    $Object &operator=(const $Object &) = default;
 
-    auto operator<=>(const Object &) const = default;
+    auto operator<=>(const $Object &) const = default;
 };
 
 
@@ -121,7 +122,7 @@ extern const Feng$ClassRelation Feng$classRelations[FENG_MAX_CLASS_NUM];
 template<class T>
 static T *Feng$inherit0(void *p, uint32_t classId) {
 	if (p == nullptr) return nullptr;
-	Object *o = (Object *) p;
+	$Object *o = ($Object *) p;
 	int id = o->feng$classId;
 	if (id == classId) return (T *) p;
 	if (Feng$classRelations[id].findAncestor(classId)) {
@@ -133,7 +134,7 @@ static T *Feng$inherit0(void *p, uint32_t classId) {
 template<class T>
 static T *Feng$impl0(void *p, uint32_t interfaceId) {
 	if (p == nullptr) return nullptr;
-	Object *o = (Object *) p;
+	$Object *o = ($Object *) p;
 	if (Feng$classRelations[o->feng$classId].findImpl(interfaceId)) {
 		return (T *) p;
 	}
@@ -455,7 +456,7 @@ struct Feng$Array {
 	}
 
 	template<typename... Args>
-	explicit Feng$Array(Args &&... args) {
+	Feng$Array(Args &&... args) {
 		static_assert(sizeof...(Args) <= L, "out of bounds");
 		int i = 0;
 		((values[i++] = std::forward<E>(args)), ...);
@@ -514,6 +515,20 @@ struct Feng$ArrayRefer {
 		if (index < 0 || index >= this->len)
 			throw Feng$OutOfBounds();
 		return this->start[index];
+	}
+
+	bool operator==(const Feng$ArrayRefer<E> &o) const {
+		return this->start == o.start;
+	}
+
+	bool operator!=(const Feng$ArrayRefer<E> &o) const {
+		return this->start != o.start;
+	}
+
+	auto operator<=>(const Feng$ArrayRefer<E> &o) const {
+		if (this->start < o.start) return std::strong_ordering::less;
+		if (this->start > o.start) return std::strong_ordering::greater;
+		return std::strong_ordering::equal;
 	}
 
 };
@@ -727,8 +742,59 @@ struct Feng$GlobalArray {
 
 // enum type struct
 struct Feng$Enum {
-	Int value;
-	Feng$ArrayPRefer<Byte> name;
+	Int $value;
+	Feng$ArrayPRefer<Byte> $name;
+};
+
+
+// function prototype
+template<typename Signature>
+class Feng$Prototype;
+
+template<typename Ret, typename... Args>
+class Feng$Prototype<Ret(Args...)> {
+private:
+	using Feng$CppFun = Ret(*)(Args...);
+	Feng$CppFun fp;
+
+public:
+	Feng$Prototype() : fp(nullptr) {}
+
+	Feng$Prototype(Feng$CppFun fp) : fp(fp) {}
+
+	Ret operator()(Args... args) const {
+		Feng$required(fp);
+		return fp(std::forward<Args>(args)...);
+	}
+
+	Feng$Prototype &operator=(Feng$CppFun fp) {
+		fp = fp;
+		return *this;
+	}
+
+	explicit operator bool() const {
+		return fp != nullptr;
+	}
+
+	Feng$CppFun target() const {
+		return fp;
+	}
+
+	bool operator==(const Feng$Prototype &o) const {
+		return fp == o.fp;
+	}
+
+	bool operator!=(const Feng$Prototype &o) const {
+		return fp != o.fp;
+	}
+
+	auto operator<=>(const Feng$Prototype &o) const {
+		// 函数指针的比较返回 bool，需要转换为 ordering
+		if ((void *) fp < (void *) o.fp) return std::strong_ordering::less;
+		if ((void *) fp > (void *) o.fp) return std::strong_ordering::greater;
+		return std::strong_ordering::equal;
+	}
+
 };
 
 

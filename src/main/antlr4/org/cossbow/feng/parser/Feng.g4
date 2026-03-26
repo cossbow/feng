@@ -196,10 +196,10 @@ classImpl
 // enum: enumeration type
 //
 enumDefinition
-    : modifier ENUM name=Identifier '{' enumValue+ '}'
+    : modifier ENUM name=Identifier '{' enumValue (COMMA enumValue)* COMMA? '}'
     ;
 enumValue
-    : name=Identifier (ASSIGN value=expression)? COMMA
+    : name=Identifier (ASSIGN value=expression)?
     ;
 
 
@@ -571,7 +571,7 @@ operandExpr
 
 
 argumentSet
-    : '(' args=expressionList? ')'
+    : '(' args=expressionList? COMMA? ')'
     ;
 
 // closure
@@ -591,14 +591,14 @@ expressionList
 
 // init class & struct & union
 objectExpr
-    : definedType? '{' (objectEntry (COMMA objectEntry)*)? '}'
+    : definedType? '{' (objectEntry (COMMA objectEntry)* COMMA?)? '}'
     ;
 objectEntry
     : name=Identifier ASSIGN value=expression
     ;
 // init array
 arrayExpr
-    : ('[' len=expression? ']' et=typeDeclarer)? '[' elements=expressionList? ']'
+    : ('[' len=expression? ']' et=typeDeclarer)? '[' elements=expressionList? COMMA? ']'
     ;
 // init with key-value pair
 pairsExpr

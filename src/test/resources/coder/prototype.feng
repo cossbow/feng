@@ -1,4 +1,28 @@
 
+class A {
+    var id int;
+    var cb func();
+}
+
+func run() {}
+
+func Task`T`(t T);
+
+func Callable();
+
+func get() func() {
+    return run;
+}
+
+func myTask(i int) {}
+
+func using1(a,b func()) {
+    if (a==b){}
+}
+func using2(a func(), b Callable) {
+    if (a==b){}
+}
+
 func Callback(int)bool;
 
 func positive(a int)bool{
@@ -11,13 +35,22 @@ func use1(a Callback) func(int)bool {
 func use2(a func(int)bool) func(int)bool {
     return use1(a);
 }
+func use3() func(func(int)bool)func(int)bool {
+    return use2;
+}
 
 func test(n int) {
+    var a1 A = {cb=run};
+    var a2 A = {cb=run};
+    if (a1 == a2){}
+    using1(run,run);
+    using2(run,run);
+    var t Task`int` = myTask;
     var check = use2(positive);
     var r=check(2);
 }
 
-func main() int32 {
+
+func main(args [&!#][*!#]byte) {
     test(5);
-    return 0;
 }

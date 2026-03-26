@@ -1,5 +1,7 @@
 package org.cossbow.feng.ast;
 
+import org.cossbow.feng.util.Groups;
+
 import java.util.List;
 
 public class IdentifierTable<T>
@@ -11,8 +13,8 @@ public class IdentifierTable<T>
         super(initCapacity);
     }
 
-    public IdentifierTable(List<Node<Identifier, T>> nodes) {
-        super(nodes);
+    public IdentifierTable(List<Groups.G2<Identifier, T>> data) {
+        super(data);
     }
 
 }

@@ -134,8 +134,12 @@ public class SemanticAnalysis {
                         return unsupported("module");
 
                     var ov = all.tryGet(s.name());
-                    if (ov.none())
+                    if (ov.none()) {
+                        var ot = context.findType(s);
+                        if (ot.match(t -> t instanceof EnumDefinition))
+                            break;
                         return semantic("undeclared var: %s", s);
+                    }
                     var v = ov.get();
 
                     if (isConst) {
@@ -156,6 +160,7 @@ public class SemanticAnalysis {
                 case ObjectExpression e -> q.addAll(e.entries().values());
                 case NewExpression e -> e.arg().use(q::add);
                 case ParenExpression e -> q.add(e.child());
+                case MemberOfExpression e -> q.add(e.subject());
                 case LiteralExpression e -> {
                 }
                 // 其他的Expression类型并不是通过解析创建的，这时不用管
@@ -265,19 +270,20 @@ public class SemanticAnalysis {
         semantic("here can't use type parameters '%s'", tp);
     }
 
-    private GenericMap genericMap(TypeParameters params, TypeArguments args) {
-        return genericMap(GenericMap.EMPTY, params, args);
+    private GenericMap genericMap(
+            Entity e, TypeParameters params, TypeArguments args) {
+        return genericMap(e, GenericMap.EMPTY, params, args);
     }
 
     private GenericMap genericMap(
-            GenericMap parent,
+            Entity e, GenericMap parent,
             TypeParameters params, TypeArguments args) {
         var size = params.size();
         if (size > args.size()) {
-            return semantic("mismatch type arguments: %s", params.pos());
+            return semantic("mismatch type arguments: %s", e.pos());
         }
         if (size < args.size()) {
-            return semantic("too much type arguments: %s", args.pos());
+            return semantic("too much type arguments: %s", e.pos());
         }
         if (size == 0) return parent;
 
@@ -300,7 +306,7 @@ public class SemanticAnalysis {
         if (o.has()) {
             dt.def.set(o);
             analyse(dt.generic());
-            var gm = genericMap(o.get().generic(), dt.generic());
+            var gm = genericMap(dt, o.get().generic(), dt.generic());
             dt.gm(gm);
             return o.get();
         }
@@ -955,13 +961,41 @@ public class SemanticAnalysis {
 
     //
 
+    private void checkMain(FunctionDefinition fd) {
+        var main = FunctionDefinition.MAIN_FUNC;
+        if (!main.symbol().equals(fd.symbol()))
+            return;
+        int r = checkPrototype(main.prototype(), fd.prototype());
+        switch (r) {
+            case 1 -> {
+                semantic("invalid main function argument: %s", fd.pos());
+            }
+            case 2 -> {
+                semantic("invalid main function returns: %s", fd.pos());
+            }
+        }
+        fd.entry(true);
+
+    }
+
+    private FunctionDefinition enterFunc;
+
     private Entity analyse(FunctionDefinition fd) {
+        assert enterFunc == null;
+        enterFunc = fd;
+        checkMain(fd);
         analyse(fd.modifier());
         analyse(fd.procedure());
+        enterFunc = null;
         return fd;
     }
 
     private Procedure enterProc;
+
+    private Identifier protName() {
+        return enterFunc != null ? enterFunc.symbol().name()
+                : enterMethod.name();
+    }
 
     private Entity analyse(Procedure proc) {
         assert enterProc == null;
@@ -1054,7 +1088,7 @@ public class SemanticAnalysis {
 
         if (f.immutable())
             return enablePhantom(lr, e.subject());
-        return semantic("can't convert var-refer-field to phantom-refer: %s", f.pos());
+        return semantic("can't convert var-refer-field to phantom-refer: %s", e.pos());
     }
 
     private boolean enablePhantom(Refer lr, LiteralExpression e) {
@@ -1256,8 +1290,10 @@ public class SemanticAnalysis {
 
     private boolean compatible(
             DerivedTypeDeclarer l, FuncTypeDeclarer r) {
-        return l.def() instanceof PrototypeDefinition lpd
-                && compatible(lpd.prototype(), r.prototype());
+        if (!(l.def() instanceof PrototypeDefinition lpd))
+            return false;
+        var prot = l.gm().instantiate(lpd.prototype());
+        return compatible(prot, r.prototype());
     }
 
     private boolean compatible(
@@ -1581,6 +1617,17 @@ public class SemanticAnalysis {
             if (l instanceof DerivedTypeDeclarer ld)
                 return initializable(ld, ro,
                         (ObjectExpression) re.must());
+            if (l instanceof ObjectTypeDeclarer lo) {
+                var oe = (ObjectExpression) re.must();
+                if (lo.dtd().has()) {
+                    if (ro.dtd().has())
+                        return lo.dtd().equals(ro.dtd());
+                    return initializable(lo.dtd().get(), ro, oe);
+                } else {
+                    if (ro.dtd().none()) return true;
+                    return initializable(ro.dtd().get(), lo, oe);
+                }
+            }
         }
 
         if (r instanceof ArrayTypeDeclarer ra) {
@@ -1613,6 +1660,10 @@ public class SemanticAnalysis {
                 if (eq) return true;
                 if (compatible(ld, rd))
                     return true;
+            }
+            if (l instanceof ObjectTypeDeclarer lo) {
+                if (re.must() instanceof ObjectExpression oe)
+                    return initializable(rd, lo, oe);
             }
             if (l instanceof EnumTypeDeclarer ld)
                 return ld.def().equals(rd.def());
@@ -1926,7 +1977,7 @@ public class SemanticAnalysis {
                     args.get(2).pos());
 
         var in = args.size() > 1 ? args.getLast() :
-                new Identifier(ZERO, "feng$index");
+                new Identifier(ZERO, "feng$index", true);
         var vn = args.getFirst();
         var size = atd.refer().none() ?
                 new IntegerLiteral(ZERO, atd.len()).expr() :
@@ -1957,7 +2008,7 @@ public class SemanticAnalysis {
 
         var size = new IntegerLiteral(ZERO, ed.values().size()).expr();
         var rp = forReplace(
-                new Identifier(ZERO, "feng$id"), a, t, ie ->
+                new Identifier(ZERO, "feng$id", true), a, t, ie ->
                         new EnumIdExpression(ZERO, ed, ie), size, e.body());
         e.replace.set(rp);
         return e;
@@ -2073,10 +2124,12 @@ public class SemanticAnalysis {
         var pr = prot.returnSet();
         if (pr.none()) {
             if (e.result().none()) return e;
-            return semantic("no result types");
+            return semantic("'%s' has no return value: %s",
+                    protName(), e.pos());
         }
         if (e.result().none())
-            return semantic("has result types");
+            return semantic("'%s' has return value: %s",
+                    protName(), e.pos());
 
         var er = e.result().get();
         var g = optimize(er);
@@ -3062,7 +3115,7 @@ public class SemanticAnalysis {
         var om = cd.allMethods().tryGet(name);
         if (om.has()) {
             var m = om.get();
-            var gm = genericMap(st.gm(), m.generic(), generic);
+            var gm = genericMap(name, st.gm(), m.generic(), generic);
             var prot = gm.instantiate(m.prototype());
             var t = new FuncTypeDeclarer(s.pos(), prot,
                     FuncTypeDeclarer.Type.METHOD);
@@ -3114,7 +3167,7 @@ public class SemanticAnalysis {
                         name, s.pos());
             var m = id.allMethods.tryGet(name);
             if (m.has()) {
-                var gm = genericMap(st.gm(), m.get().generic(), generic);
+                var gm = genericMap(name, st.gm(), m.get().generic(), generic);
                 var prot = gm.instantiate(m.get().prototype());
                 var t = new FuncTypeDeclarer(s.pos(), prot,
                         FuncTypeDeclarer.Type.METHOD);
@@ -3309,7 +3362,7 @@ public class SemanticAnalysis {
 
         var od = context.findFunc(s);
         if (od.has()) {
-            var gm = genericMap(od.get().generic(), re.generic());
+            var gm = genericMap(re, od.get().generic(), re.generic());
             var prot = gm.instantiate(od.get().prototype());
             var td = new FuncTypeDeclarer(re.pos(), prot,
                     FuncTypeDeclarer.Type.FUNC);
@@ -3321,7 +3374,7 @@ public class SemanticAnalysis {
             if (om.has()) {
                 // 叠加上继承的泛型替换
                 var gm = enterClass.inherit().must().gm();
-                gm = genericMap(gm, om.get().generic(), re.generic());
+                gm = genericMap(re, gm, om.get().generic(), re.generic());
                 var prot = gm.instantiate(om.get().prototype());
                 // 函数调用加上`this.`前缀，方便后续处理
                 var n = wrapThis(re, om.get());
@@ -3339,8 +3392,10 @@ public class SemanticAnalysis {
             }
         }
 
-        return semantic("func/method %s not found: %s",
-                s, re.pos());
+        if (enterMethod == null)
+            return semantic("func '%s' not defined: %s", s, re.pos());
+        return semantic("method '%s.%s' not defined: %s",
+                enterClass, s, re.pos());
     }
 
     private Groups.G2<Expression, TypeDeclarer>
@@ -3359,7 +3414,7 @@ public class SemanticAnalysis {
 
         var f = context.findFunc(s);
         if (f.has()) {
-            var gm = genericMap(f.get().generic(), re.generic());
+            var gm = genericMap(re, f.get().generic(), re.generic());
             var prot = gm.instantiate(f.get().prototype());
             var td = new FuncTypeDeclarer(re.pos(), prot,
                     FuncTypeDeclarer.Type.FUNC);
@@ -3418,9 +3473,7 @@ public class SemanticAnalysis {
         for (var v : es) {
             var g = optimize(v);
             values.add(g.a());
-            if (first == null) {
-                first = g.b();
-            }
+
             var a = Optional.of(g.a());
             if (e.type().has()) {
                 var t = e.type().get();
@@ -3429,10 +3482,12 @@ public class SemanticAnalysis {
                             v, t.element(), v.pos());
             } else if (first != null) {
                 if (!assignable(first, g.b(), a)) {
-                    return semantic("type incompatible of value '%s' and value '%': %s",
+                    return semantic("type incompatible of value '%s' and value '%s': %s",
                             first, v, v.pos());
                 }
                 g.a().resultType.set(first);
+            } else {
+                first = g.b();
             }
         }
         var n = new ArrayExpression(e.pos(), values, e.type());
@@ -3458,7 +3513,7 @@ public class SemanticAnalysis {
             entries.add(n.key(), g.a());
             types.add(n.key(), g.b());
         }
-        var ot = new ObjectTypeDeclarer(oe.pos(), types);
+        var ot = new ObjectTypeDeclarer(oe.pos(), types, oe.type());
         var n = new ObjectExpression(oe.pos(), entries, oe.type());
         if (!oe.type().has()) return Groups.g2(n, ot);
 
@@ -3578,7 +3633,7 @@ public class SemanticAnalysis {
 
     private Variable makeTmpVar(String name, Expression e) {
         var im = immutable(e, false);
-        var vn = new Identifier(e.pos(), name);
+        var vn = new Identifier(e.pos(), name, true);
         return new Variable(e.pos(), Modifier.empty(),
                 im ? Declare.CONST : Declare.VAR,
                 vn, e.resultType, Lazy.of(e));

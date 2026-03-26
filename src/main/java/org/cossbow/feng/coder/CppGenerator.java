@@ -30,7 +30,6 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
-import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class CppGenerator {
@@ -57,10 +56,11 @@ public class CppGenerator {
     static final List<String> headers = List.of(
             "cpp11/Header.h"
     );
+    static final String mainFile = "cpp11/Main.cpp";
 
     private void start() {
         var cl = Thread.currentThread().getContextClassLoader();
-        for (String hf : headers) {
+        for (var hf : headers) {
             try (var is = cl.getResourceAsStream(hf);
                  var r = new InputStreamReader(Objects.requireNonNull(is));
                  var br = new BufferedReader(r)) {
@@ -101,6 +101,7 @@ public class CppGenerator {
     }
 
     private CppGenerator write(Identifier name) {
+        if (!name.unnamed()) write('$');
         return write(name.value());
     }
 
@@ -357,6 +358,7 @@ public class CppGenerator {
     }
 
     void declareType(TypeDefinition def) {
+        if (def.builtin()) return;
         switch (def) {
             case StructureDefinition cd -> declareType(cd);
             case ClassDefinition cd -> declareType(cd);
@@ -405,15 +407,15 @@ public class CppGenerator {
             var tmpName = tmpName();
             var nt = new TempNameTypeDeclarer(tmpName);
             write("typedef ");
-            writePrototype(tmpName, ft.prototype()).endStmt();
+            writePrototype(() -> write(tmpName), ft.prototype()).endStmt();
             return nt;
         });
         pt.returnSet(nr);
     }
 
     void declareFunction(FunctionDefinition fd) {
+        if (fd.entry()) return;
         write(fd.generic());
-        cacheReturnFunc(fd.procedure().prototype());
         write(fd.symbol().name(), fd.procedure().prototype());
         endStmt();
     }
@@ -422,9 +424,31 @@ public class CppGenerator {
         var list = table.namedFunctions.stream()
                 .filter(f -> !table.builtinFunctions.exists(f.symbol().name()))
                 .toList();
+        FunctionDefinition main = null;
         for (var fd : list) {
+            if (fd.entry()) {
+                main = fd;
+                continue;
+            }
             implFunc(fd);
             newLine();
+        }
+        if (main != null) {
+            newLine();
+            writeComment("main entry function");
+            implFunc(main);
+            newLine();
+            writeMain(main);
+        }
+    }
+
+    void writeMain(FunctionDefinition main) {
+        var ld = Thread.currentThread().getContextClassLoader();
+        try (var is = ld.getResourceAsStream(mainFile);
+             var reader = new BufferedReader(new InputStreamReader(is))) {
+            reader.lines().forEach(line -> write(line).newLine());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -498,16 +522,16 @@ public class CppGenerator {
 
         if (v.literal() instanceof StringLiteral sl) {
             if (t instanceof LiteralTypeDeclarer) {
-                return write(sl).write(".incAR()");
+                return write(sl).write(".sr()");
             }
             var r = t.maybeRefer();
             if (r.none()) {
-                return writeData(sl);
+                return writeData(sl, t);
             }
             if (r.get().isKind(PHANTOM)) {
-                return write(sl).write(".refer()");
+                return write(sl).write(".pr()");
             }
-            return write(sl).write(".incAR()");
+            return write(sl).write(".sr()");
         }
 
         return write(v);
@@ -528,18 +552,17 @@ public class CppGenerator {
         return castRef(v, t);
     }
 
-    private String genName(Variable v) {
-        return v.name() + "_" + v.id();
+    private CppGenerator varName(Variable v) {
+        return write(v.name()).write('_').write(v.id());
     }
 
-    private CppGenerator varName(Variable v) {
-        return write(genName(v));
+    private CppGenerator declare(Variable v) {
+        return declare(() -> varName(v), v.type().must());
     }
 
     private CppGenerator declareVar(Variable v) {
         var t = v.type().must();
-        declare(genName(v), t);
-        write(" = ");
+        declare(v).write(" = ");
         v.value().use(e -> {
             writeValue(e, t);
         }, () -> {
@@ -551,11 +574,6 @@ public class CppGenerator {
         return endStmt();
     }
 
-    private void declareVars(List<Variable> list) {
-        if (list.isEmpty()) return;
-        for (var v : list) declareVar(v);
-    }
-
     // type declarer
 
     private CppGenerator defaultValue(TypeDeclarer td) {
@@ -563,17 +581,20 @@ public class CppGenerator {
             return write("nullptr");
         }
         if (td.maybeRefer().has()) {
-            return write(td).write("()");
+            return write("nullptr");
         }
         if (td instanceof PrimitiveTypeDeclarer ||
                 td instanceof GenericTypeDeclarer) {
             return write('0');
         }
         if (td instanceof DerivedTypeDeclarer dtd) {
+            var dt = dtd.derivedType();
             var def = dtd.def();
-            if (def instanceof ClassDefinition cd) {
-                return write(cd.symbol()).write("()");
+            if (def instanceof ClassDefinition cd
+                    && !cd.isFinal()) {
+                return write(dt.symbol()).write("()");
             }
+            write(dt.symbol());
         }
         return write("{}");
     }
@@ -621,7 +642,7 @@ public class CppGenerator {
     }
 
     private CppGenerator write(FuncTypeDeclarer e) {
-        return unsupported("func");
+        return write(e.prototype());
     }
 
     private CppGenerator write(GenericTypeDeclarer e) {
@@ -702,11 +723,9 @@ public class CppGenerator {
 
     private void writePrototype(PrototypeDefinition pd) {
         write(pd.generic());
-        write("typedef ");
-        var td = new FuncTypeDeclarer(Position.ZERO, pd.prototype(),
-                FuncTypeDeclarer.Type.FUNC);
-        declare(pd.symbol().name(), td);
-        endStmt();
+        write("using ").write(pd.symbol()).write(" = ");
+        write(pd.prototype());
+        endStmt().newLine();
     }
 
     // interface definition
@@ -726,7 +745,7 @@ public class CppGenerator {
         if (def instanceof ClassDefinition cd && cd.resource()) {
             write("virtual ~").write(def.symbol().name())
                     .write("() {");
-            write("this->release()").endStmt();
+            write("this->$release()").endStmt();
             write('}').newLine();
             return;
         }
@@ -923,10 +942,7 @@ public class CppGenerator {
     }
 
     private CppGenerator write(Symbol s) {
-        if (s.module().has()) {
-            write(s.module().get());
-            write('$');
-        }
+        s.module().use(this::write);
         write(s.name());
         return this;
     }
@@ -953,17 +969,20 @@ public class CppGenerator {
         return write(dt.primitive());
     }
 
-    private CppGenerator declare(String name, TypeDeclarer td) {
+    private CppGenerator declare(Runnable namer, TypeDeclarer td) {
         if (td instanceof FuncTypeDeclarer ftd) {
-            writePrototype(name, ftd.prototype());
+//            writePrototype(namer, ftd.prototype());
+            write(ftd.prototype()).write(' ');
+            namer.run();
         } else {
-            write(td).write(' ').write(name);
+            write(td).write(' ');
+            namer.run();
         }
         return this;
     }
 
     private CppGenerator declare(Identifier name, TypeDeclarer td) {
-        return declare(name.value(), td);
+        return declare(() -> write(name), td);
     }
 
     private CppGenerator write(ClassField cf) {
@@ -974,31 +993,25 @@ public class CppGenerator {
     private volatile FunctionDefinition enterFunc;
 
     CppGenerator write(ParameterSet ps) {
-        var first = true;
-        for (var a : ps.variables()) {
-            if (first) first = false;
-            else write(COMMA);
-            declare(genName(a), a.type().must());
-        }
+        joinByComma(ps, this::declare);
         return this;
     }
 
-    CppGenerator writeArgs(ParameterSet ps) {
-        var first = true;
-        for (var v : ps.variables()) {
-            if (first) first = false;
-            else write(COMMA);
-            varName(v);
-        }
-        return this;
-    }
-
-    private CppGenerator writePrototype(String name, Prototype pt) {
+    private CppGenerator writePrototype(Runnable namer, Prototype pt) {
         var ps = pt.parameterSet();
         pt.returnSet().use(this::write, () -> write("void"));
-        write('(').write('*').write(name).write(')');
+        write('(').write('*');
+        namer.run();
+        write(')');
         write('(').write(ps).write(')');
         return this;
+    }
+
+    private CppGenerator write(Prototype pt) {
+        write("Feng$Prototype<");
+        pt.returnSet().use(this::write, () -> write("void"));
+        write('(').write(pt.parameterSet()).write(')');
+        return write('>');
     }
 
     private CppGenerator write(Runnable nameToken, Prototype pt) {
@@ -1459,12 +1472,12 @@ public class CppGenerator {
         return this;
     }
 
-    private CppGenerator writeData(StringLiteral e) {
-        write("{.values={");
+    private CppGenerator writeData(StringLiteral e, TypeDeclarer t) {
+        write(t).write('{');
         for (byte b : e.value()) {
             write(b).write(',');
         }
-        return write("}}");
+        return write('}');
     }
 
     private CppGenerator write(StringLiteral e) {
@@ -1476,7 +1489,7 @@ public class CppGenerator {
                 : e.resultType.must();
         var r = rt.maybeRefer();
         if (r.has()) {
-            return write("nullptr");
+            return write(e.literal());
         }
         write(e.literal());
         return this;
@@ -1512,22 +1525,25 @@ public class CppGenerator {
     }
 
     private CppGenerator enumMember(
-            PrimaryExpression s, EnumDefinition ed, Identifier m) {
+            MemberOfExpression e, EnumDefinition ed) {
         // TODO: check bounds
-        if (EnumDefinition.TokenFieldId.equals(m.value()))
-            return write(s);
-        return enumName(ed).write('[').write(s)
-                .write("].").write(m);
+        if (EnumDefinition.TokenFieldId.equals(e.member().value()))
+            return write(e.subject());
+        return enumName(ed).write('[').write(e.subject())
+                .write("].").write(e.member());
     }
 
     private CppGenerator write(MemberOfExpression e) {
         var td = e.subject().resultType.must();
         if (td instanceof EnumTypeDeclarer etd) {
-            return enumMember(e.subject(), etd.def(), e.member());
+            return enumMember(e, etd.def());
         }
 
         var dtd = (DerivedTypeDeclarer) td;
         var def = dtd.def();
+        if (def instanceof EnumDefinition ed) {
+            return enumMember(e, ed);
+        }
 
         ofMember(e.subject(), dtd);
         if (!e.generic().isEmpty()) return unreachable();
@@ -1557,7 +1573,7 @@ public class CppGenerator {
             ObjectExpression init) {
         joinByComma(fields.values(), f -> {
             var o = init.entries().tryGet(f.name());
-            if (o.has()) write(o.get());
+            if (o.has()) writeValue(o.get(), f.type());
             else defaultValue(f.type());
         });
         return this;
@@ -1636,23 +1652,18 @@ public class CppGenerator {
 
     private CppGenerator write(ObjectExpression oe) {
         var dt = oe.dtd();
-        write('(').write(dt).write(')');
+        write(dt);
 
         var def = dt.def();
-        if (def instanceof ClassDefinition cd
-                && !cd.isFinal()) {
+        if (def instanceof ClassDefinition cd) {
             return write('{').fieldInit(cd.allFields(),
                     oe).write('}');
         }
 
-        IdentifierTable<? extends Field> fields = switch (def) {
-            case ClassDefinition cd -> cd.allFields();
-            case StructureDefinition sd -> sd.fields();
-            case null, default -> unreachable();
-        };
+        var sd = (StructureDefinition) def;
         write('{');
         var data = new ArrayList<Groups.G2<Identifier, Expression>>();
-        for (var f : fields) {
+        for (var f : sd.fields()) {
             var o = oe.entries().tryGet(f.name());
             if (o.has()) data.add(Groups.g2(f.name(), o.get()));
         }
@@ -1674,8 +1685,8 @@ public class CppGenerator {
     }
 
     private CppGenerator write(CheckNilExpression e) {
-        write(e.subject());
         if (!e.nil()) write('!');
+        write(e.subject());
         return write(".absent()");
     }
 

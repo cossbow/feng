@@ -27,6 +27,10 @@ func array1() {
         var ar2 [2]*A = [new(A, aa[0])];
         ar2[0].run();
     }
+    {
+        var ar [*]A = nil;
+        ar = new([2]A);
+    }
 }
 
 
@@ -58,7 +62,6 @@ func test(n int) {
     array2();
 }
 
-func main() int32 {
+func main(args [&!#][*!#]byte) {
     test(5);
-    return 0;
 }

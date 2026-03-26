@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.proc;
 import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.dcl.Variable;
+import org.cossbow.feng.util.Groups;
 
 import java.util.AbstractList;
 import java.util.Iterator;
@@ -15,6 +16,11 @@ public class ParameterSet implements Iterable<Variable> {
 
     public ParameterSet(IdentifierTable<Variable> variables) {
         this.variables = variables;
+    }
+
+    public ParameterSet(List<Variable> list) {
+        this.variables = new IdentifierTable<>(list.stream()
+                .map(v -> Groups.g2(v.name(), v)).toList());
     }
 
     public IdentifierTable<Variable> variables() {

@@ -13,9 +13,8 @@ func test(n int) {
     new(A).run();
 }
 
-func main() int32 {
+func main(args [&!#][*!#]byte) {
     test(5);
-    return 0;
 }
 
 

@@ -109,7 +109,6 @@ func test(n int) {
     if (var r=map.get(101); r.ok){}
 }
 
-func main() int32 {
+func main(args [&!#][*!#]byte) {
     test(15);
-    return 0;
 }

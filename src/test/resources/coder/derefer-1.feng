@@ -21,7 +21,6 @@ func test(n int) {
 }
 
 
-func main() int32 {
+func main(args [&!#][*!#]byte) {
     test(17);
-    return 0;
 }

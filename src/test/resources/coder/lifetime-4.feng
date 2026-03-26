@@ -23,7 +23,6 @@ func test(n int) {
     array1();
 }
 
-func main() int32 {
+func main(args [&!#][*!#]byte) {
     test(15);
-    return 0;
 }

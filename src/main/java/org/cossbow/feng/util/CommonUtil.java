@@ -18,7 +18,8 @@ public class CommonUtil {
 
     public static Identifier rand(String prefix) {
         var h = rand();
-        return new Identifier(Position.ZERO, prefix + "_" + h);
+        return new Identifier(Position.ZERO,
+                "Feng$" + prefix + "_" + h, true);
     }
 
     public static String upperFirst(String s) {

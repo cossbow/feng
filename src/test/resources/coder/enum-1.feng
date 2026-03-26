@@ -9,7 +9,6 @@ func test(i int) {
     const n [&#]byte= E.Stop.name;
 }
 
-func main() int32 {
+func main(args [&!#][*!#]byte) {
     test(1);
-    return 0;
 }

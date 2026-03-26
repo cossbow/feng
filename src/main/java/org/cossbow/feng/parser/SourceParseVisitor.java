@@ -1442,7 +1442,7 @@ final class SourceParseVisitor
             var types = parseTypeDeclarerList(ctx.typeDeclarerList());
             for (int i = 0, typesSize = types.size(); i < typesSize; i++) {
                 var td = types.get(i);
-                var name = new Identifier(td.pos(), "feng$unnamedParameter" + i, true);
+                var name = new Identifier(td.pos(), "feng$arg" + i, true);
                 var v = new Variable(td.pos(), Modifier.empty(),
                         Declare.CONST, name, Lazy.of(td), Lazy.nil());
                 params.add(name, v);
@@ -1566,7 +1566,6 @@ final class SourceParseVisitor
         var modifier = parseModifier(ctx.modifier());
         var symbol = defineSymbol(ctx.name);
         var generic = typeParameters(ctx.typeParameters());
-        if (!generic.isEmpty()) unsupported("generic: %s", generic.pos());
         genericStack.push(generic);
         var prototype = (Prototype) visit(ctx.prototype());
         var def = new PrototypeDefinition(posOf(ctx), modifier,

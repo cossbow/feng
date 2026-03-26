@@ -54,7 +54,6 @@ func test(n int) {
     i = sb.get();
 }
 
-func main() int32 {
+func main(args [&!#][*!#]byte) {
     test(15);
-    return 0;
 }

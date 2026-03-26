@@ -148,14 +148,20 @@ func array3() {
             var x [*]U = a1;
         }
     }
-
+    {
+        var a *int = nil;
+        a = new(int);
+    }
+    {
+        var a [*]int = nil;
+        a = new([2]int);
+    }
 }
 
 func test(n int) {
     array3();
 }
 
-func main() int32 {
+func main(args [&!#][*!#]byte) {
     test(5);
-    return 0;
 }

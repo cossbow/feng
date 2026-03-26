@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.Optional;
 
 import java.util.stream.Collectors;
 
@@ -11,15 +12,22 @@ import java.util.stream.Collectors;
  */
 public class ObjectTypeDeclarer extends TypeDeclarer {
     private IdentifierTable<TypeDeclarer> entries;
+    private Optional<DerivedTypeDeclarer> dtd;
 
     public ObjectTypeDeclarer(Position pos,
-                              IdentifierTable<TypeDeclarer> entries) {
+                              IdentifierTable<TypeDeclarer> entries,
+                              Optional<DerivedTypeDeclarer> dtd) {
         super(pos);
         this.entries = entries;
+        this.dtd = dtd;
     }
 
     public IdentifierTable<TypeDeclarer> entries() {
         return entries;
+    }
+
+    public Optional<DerivedTypeDeclarer> dtd() {
+        return dtd;
     }
 
     // 左边的类型
