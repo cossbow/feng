@@ -1,0 +1,67 @@
+
+interface I{
+    run();
+}
+interface J{I;}
+
+class A (J) {
+    var id int;
+    func run() {
+    }
+}
+
+class B:A{}
+
+func get() *Object {
+    return new(B);
+}
+
+func test(n int) {
+    {
+        var o *Object = new(B);
+        var a = o?(*A);
+        a.run();
+        var b = o?(*B);
+        b.run();
+        {
+            var a = b?(*A);
+            a.run();
+        }
+        var i = o?(*I);
+        i.run();
+        var j = o?(*J);
+        j.run();
+        {
+            const o1 &Object = o;
+            const a = o1?(&A);
+            a.run();
+            const b = o1?(&B);
+            b.run();
+            {
+                const a = b?(&A);
+                a.run();
+            }
+            const i = o1?(&I);
+            i.run();
+            const j = o1?(&J);
+            j.run();
+        }
+    }
+    {
+        var o *Object = get();
+        var a = get()?(*A);
+        a.run();
+        var b = get()?(*B);
+        b.run();
+        var i = get()?(*I);
+        i.run();
+        var j = get()?(*J);
+        j.run();
+    }
+
+}
+
+
+func main(args [&!#][*!#]byte) {
+    test(1);
+}

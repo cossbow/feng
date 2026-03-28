@@ -4,7 +4,9 @@ import org.cossbow.feng.analysis.StackedContext;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
-import org.cossbow.feng.ast.gen.*;
+import org.cossbow.feng.ast.gen.DefinedType;
+import org.cossbow.feng.ast.gen.DerivedType;
+import org.cossbow.feng.ast.gen.PrimitiveType;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
@@ -98,6 +100,10 @@ public class LowCppGenerator {
 
     private LowCppGenerator write(Identifier name) {
         return write(name.value());
+    }
+
+    private LowCppGenerator write(Label label) {
+        return write(label.name());
     }
 
     private LowCppGenerator format(String fmt, Object... args) {

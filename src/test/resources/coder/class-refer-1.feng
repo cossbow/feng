@@ -26,6 +26,10 @@ func object1() {
         x=new(A);
     }
     {
+        var x *A ;
+        x=new(A);
+    }
+    {
         var x *A = new(A, {});
     }
     var a *A = new(B, {n=new(B,{s={tag=-1}})});

@@ -4,7 +4,6 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Scope;
 import org.cossbow.feng.ast.dcl.Variable;
 
-import java.util.ArrayList;
 import java.util.List;
 
 abstract

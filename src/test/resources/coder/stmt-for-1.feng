@@ -1,0 +1,76 @@
+func loop1(n int) {
+    var b = new(int);
+    for (var i=0; i<n; i+=1) {
+        var a = new(int);
+        if (i < 2) {
+            var a = new(int);
+            continue;
+        }
+        var b = new(int);
+        break;
+    }
+}
+func loop2(n int) {
+    for (var i=0; i<n; i+=1) {
+        var a = new(int);
+        if (i == 2) {
+            var a = new(int);
+            break;
+        }
+        var b = new(int);
+    }
+}
+func loop3(n int) {
+    var a = new(int);
+    for (var i=0; i<n; i+=1) {
+        var a = new(int);
+        if (i >=2 ) {
+            var a = new(int);
+            goto err;
+        }
+        var b = new(int);
+    }
+err:
+    a = new(int);
+}
+func loop4(n int) {
+    var a = new(int);
+    out:
+    for (var i=0; i<n; i+=1) {
+        var a = new(int);
+        for (var i=0; i<n; i+=1) {
+            var a = new(int);
+            if (i == 3) {
+                continue out;
+            }
+        }
+        var b = new(int);
+    }
+}
+func loop5(n int) {
+    var a = new(int);
+    out:
+    for (var i=0; i<n; i+=1) {
+        var a = new(int);
+        for (var i=0; i<n; i+=1) {
+            var a = new(int);
+            if (i > 3) {
+                break out;
+            }
+        }
+        var b = new(int);
+    }
+}
+
+func test(n int) {
+    loop1(n);
+    loop2(n);
+    loop3(n);
+    loop4(n);
+    loop5(n);
+}
+
+
+func main(args [&!#][*!#]byte) {
+    test(17);
+}

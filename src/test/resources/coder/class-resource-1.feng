@@ -1,0 +1,43 @@
+
+class Node {
+    var v int;
+    var prev,next *Node;
+}
+
+class List {
+    var head *Node;
+
+    func add(v int) {
+        var n = new(Node, {v=v});
+        if (head == nil) {
+            head = n;
+            return;
+        }
+        n.next = head;
+        head.prev = n;
+        head = n;
+    }
+
+    func release() {
+        var cur = head;
+        for (cur != nil) {
+            cur.prev = nil;
+            cur = cur.next;
+        }
+    }
+}
+
+func test(n int) {
+    var list = new(List);
+
+    for(var i=0; i<n; i+=1) {
+        list.add(i+100);
+    }
+
+    for(var c *Node=list.head; c!=nil; c=c.next) {
+    }
+}
+
+func main(args [&!#][*!#]byte) {
+    test(1);
+}

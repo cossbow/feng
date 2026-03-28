@@ -39,6 +39,14 @@ func use3() func(func(int)bool)func(int)bool {
     return use2;
 }
 
+func make(id int) *A{
+    return new(A,{id=id});
+}
+func use4(f func(int)*A) {
+    var i = f(123).id;
+}
+
+
 func test(n int) {
     var a1 A = {cb=run};
     var a2 A = {cb=run};
@@ -48,6 +56,7 @@ func test(n int) {
     var t Task`int` = myTask;
     var check = use2(positive);
     var r=check(2);
+    use4(make);
 }
 
 

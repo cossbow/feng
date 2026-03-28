@@ -61,6 +61,8 @@ public:
 
     $Object() = default;
 
+	virtual ~$Object() = default;
+
     $Object &operator=(const $Object &) = default;
 
     auto operator<=>(const $Object &) const = default;
@@ -417,18 +419,18 @@ struct Feng$PRefer {
 };
 
 template<class S, class T>
-static T *Feng$assert(S *p) {
-	return dynamic_cast<T *>(p);
+static Feng$Refer<T> Feng$assert(Feng$SRefer<S> &p) {
+	return Feng$Refer<T>{dynamic_cast<T *>(p.t)};
 }
 
 template<class S, class T>
-static Feng$SRefer<T> Feng$assert(Feng$SRefer<S> &p) {
-	return Feng$SRefer<T>{dynamic_cast<T *>(p.t)};
+static Feng$Refer<T> Feng$assert(Feng$SRefer<S> &&p) {
+	return Feng$Refer<T>{dynamic_cast<T *>(p.t)};
 }
 
 template<class S, class T>
-static Feng$SRefer<T> Feng$assert(Feng$SRefer<S> &&p) {
-	return Feng$SRefer<T>{dynamic_cast<T *>(p.t)};
+static Feng$PRefer<T> Feng$assert(Feng$PRefer<S> &p) {
+	return Feng$PRefer<T>{dynamic_cast<T *>(p.t)};
 }
 
 
@@ -471,7 +473,7 @@ struct Feng$Array {
 
 	Feng$Array<E, L> &operator=(Feng$Array<E, L> &&a) noexcept {
 		for (int i = 0; i < L; ++i) {
-			values[i] = a.values[i];
+			values[i] = std::forward<E>(a.values[i]);
 		}
 		return *this;
 	}

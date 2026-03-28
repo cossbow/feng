@@ -969,9 +969,11 @@ public class SemanticAnalysis {
         switch (r) {
             case 1 -> {
                 semantic("invalid main function argument: %s", fd.pos());
+                return;
             }
             case 2 -> {
                 semantic("invalid main function returns: %s", fd.pos());
+                return;
             }
         }
         fd.entry(true);
@@ -1597,7 +1599,7 @@ public class SemanticAnalysis {
 
         if (re.match(e -> e instanceof ArrayExpression)) {
             if (r.element() instanceof VoidTypeDeclarer) return true;
-            if (l.len() < r.len()) {
+            if (!l.literal() && l.len() < r.len()) {
                 return semantic("index out of bound: %s", r.pos());
             }
             return true;
@@ -1869,28 +1871,45 @@ public class SemanticAnalysis {
 
     private final Stack<ForStatement> loopStack = new Stack<>();
 
-    private void checkLabel(Identifier label) {
+    private LabeledStatement checkLabel(Identifier label) {
         assert enterProc != null;
-        if (enterProc.labels().contains(label)) return;
-        semantic("label not found: %s", label.pos());
+        var s = enterProc.labels().get(label);
+        if (s != null) return s;
+        return semantic("Use of undeclared label '%s': %s", label, label.pos());
     }
 
     private Statement analyse(BreakStatement e) {
-        e.label().use(this::checkLabel);
-
         if (loopStack.isEmpty())
-            return semantic("out of loop: %s", e.pos());
+            return semantic("break of loop: %s", e.pos());
 
-        return e;
+        if (e.label().none()) {
+            e.target.set(loopStack.peek());
+            return e;
+        }
+
+        var ls = checkLabel(e.label().get());
+        if (ls.target() instanceof ForStatement fs) {
+            e.target.set(fs);
+            return e;
+        }
+        return semantic("break label '%s' is marked for-loop: %s", e.pos());
     }
 
     private Statement analyse(ContinueStatement e) {
-        e.label().use(this::checkLabel);
-
         if (loopStack.isEmpty())
-            return semantic("out of loop: %s", e.pos());
+            return semantic("continue out of loop: %s", e.pos());
 
-        return e;
+        if (e.label().none()) {
+            e.target.set(loopStack.peek());
+            return e;
+        }
+
+        var ls = checkLabel(e.label().get());
+        if (ls.target() instanceof ForStatement fs) {
+            e.target.set(fs);
+            return e;
+        }
+        return semantic("continue label '%s' is marked for-loop: %s", e.pos());
     }
 
     private Statement analyse(ForStatement e) {
@@ -2029,7 +2048,7 @@ public class SemanticAnalysis {
     }
 
     private Statement analyse(GotoStatement e) {
-        checkLabel(e.label());
+        e.target.set(checkLabel(e.label()).label());
         return e;
     }
 
@@ -3449,6 +3468,16 @@ public class SemanticAnalysis {
         return findSymbol(e);
     }
 
+    private TypeDeclarer analyseArrayNest(
+            List<Groups.G2<Expression, TypeDeclarer>> gs) {
+        var o = gs.stream().max(Comparator.comparingLong(g -> {
+            var t = (ArrayTypeDeclarer) g.b();
+            return t.len();
+        }));
+        if (o.isEmpty()) return unreachable();
+        return o.get().b();
+    }
+
     private Groups.G2<Expression, TypeDeclarer> optimize(ArrayExpression e) {
         var es = e.elements();
         e.type().use(this::analyse);
@@ -3468,11 +3497,17 @@ public class SemanticAnalysis {
                     t.length(), t.pos());
         });
 
+        var gs = es.stream().map(this::optimize).toList();
+        var et = gs.getFirst().b();
+        if (gs.getFirst().b() instanceof ArrayTypeDeclarer _at
+                && _at.refer().none()) { // 如果是嵌套数组，找最长的
+            et = analyseArrayNest(gs);
+        }
         var values = new ArrayList<Expression>(e.size());
-        TypeDeclarer first = null;
-        for (var v : es) {
-            var g = optimize(v);
+        var i = 0;
+        for (var g : gs) {
             values.add(g.a());
+            var v = es.get(i);
 
             var a = Optional.of(g.a());
             if (e.type().has()) {
@@ -3480,14 +3515,13 @@ public class SemanticAnalysis {
                 if (!assignable(t.element(), g.b(), a))
                     return semantic("can't use '%s' as type '%s': %s",
                             v, t.element(), v.pos());
-            } else if (first != null) {
-                if (!assignable(first, g.b(), a)) {
-                    return semantic("type incompatible of value '%s' and value '%s': %s",
-                            first, v, v.pos());
-                }
-                g.a().resultType.set(first);
+                g.a().resultType.set(t);
             } else {
-                first = g.b();
+                if (!assignable(et, g.b(), a)) {
+                    return semantic("type incompatible of value '%s' and value '%s': %s",
+                            et, v, v.pos());
+                }
+                g.a().resultType.set(et);
             }
         }
         var n = new ArrayExpression(e.pos(), values, e.type());
@@ -3497,7 +3531,7 @@ public class SemanticAnalysis {
         var le = new LiteralExpression(e.pos(), length);
 
         var atd = new ArrayTypeDeclarer(e.pos(),
-                e.type().map(ArrayTypeDeclarer::element).getOrElse(first),
+                e.type().map(ArrayTypeDeclarer::element).getOrElse(et),
                 Optional.of(le), Optional.empty(), true);
         atd.len(es.size());
         return Groups.g2(n, atd);

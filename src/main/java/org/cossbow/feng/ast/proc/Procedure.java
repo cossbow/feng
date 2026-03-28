@@ -6,20 +6,20 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Scope;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.stmt.BlockStatement;
+import org.cossbow.feng.ast.stmt.LabeledStatement;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 public class Procedure extends Entity implements Scope {
     private final Prototype prototype;
     private final BlockStatement body;
-    private final Set<Identifier> labels;
+    private final Map<Identifier, LabeledStatement> labels;
 
     public Procedure(Position pos,
                      Prototype prototype,
                      BlockStatement body,
-                     Set<Identifier> labels) {
+                     Map<Identifier, LabeledStatement> labels) {
         super(pos);
         this.prototype = prototype;
         this.body = body;
@@ -34,7 +34,7 @@ public class Procedure extends Entity implements Scope {
         return body;
     }
 
-    public Set<Identifier> labels() {
+    public Map<Identifier, LabeledStatement> labels() {
         return labels;
     }
 

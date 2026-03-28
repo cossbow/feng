@@ -2,9 +2,10 @@ package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.util.Lazy;
 
 public class GotoStatement extends Statement {
-    private Identifier label;
+    private final Identifier label;
 
     public GotoStatement(Position pos,
                          Identifier label) {
@@ -16,4 +17,5 @@ public class GotoStatement extends Statement {
         return label;
     }
 
+    public final Lazy<Label> target = Lazy.nil();
 }

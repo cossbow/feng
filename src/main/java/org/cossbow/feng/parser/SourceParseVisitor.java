@@ -1391,14 +1391,12 @@ final class SourceParseVisitor
     @Override
     public Entity visitContinueStatement(FengParser.ContinueStatementContext ctx) {
         var label = identifierOptional(ctx.label);
-        if (label.has()) return unsupported("continue label");
         return new ContinueStatement(posOf(ctx), label);
     }
 
     @Override
     public Entity visitBreakStatement(FengParser.BreakStatementContext ctx) {
         var label = identifierOptional(ctx.label);
-        if (label.has()) return unsupported("break label");
         return new BreakStatement(posOf(ctx), label);
     }
 
@@ -1409,18 +1407,19 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitLabeledStatement(FengParser.LabeledStatementContext ctx) {
-        var label = identifier(ctx.label);
-        var ol = labels.put(label, label);
-        if (ol != null)
-            return semantic("label %s duplicate: %s <==> %s",
-                    label, label.pos(), ol.pos());
+        var label = new Label(identifier(ctx.label));
 
         var stmt = (Statement) visit(ctx.statement());
         if (stmt instanceof LabeledStatement)
             return semantic("can't use multi label: %s", label.pos());
         if (stmt instanceof DeclarationStatement)
             return semantic("can't use for declaration: %s", label.pos());
-        return new LabeledStatement(posOf(ctx), label, stmt);
+        var ls = new LabeledStatement(posOf(ctx), label, stmt);
+        var ol = labels.put(label.name(), ls);
+        if (ol != null)
+            return semantic("label %s duplicate: %s <==> %s",
+                    label, label.pos(), ol.pos());
+        return ls;
     }
 
 
@@ -1482,7 +1481,7 @@ final class SourceParseVisitor
         return new Prototype(posOf(ctx), parameters, returnSet);
     }
 
-    private volatile Map<Identifier, Identifier> labels;
+    private volatile Map<Identifier, LabeledStatement> labels;
 
     @Override
     public Entity visitProcedure(FengParser.ProcedureContext ctx) {
@@ -1490,7 +1489,7 @@ final class SourceParseVisitor
         assert labels == null;
         labels = new HashMap<>();
         var body = (BlockStatement) visit(ctx.blockStatement());
-        var l = Set.copyOf(labels.keySet());
+        var l = Map.copyOf(labels);
         labels = null;
         return new Procedure(posOf(ctx), prototype,
                 noScope(body), l);
