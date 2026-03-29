@@ -645,8 +645,7 @@ public class LowCppGenerator {
 
     private void writePrototype(PrototypeDefinition pd) {
         write("typedef ");
-        var td = new FuncTypeDeclarer(Position.ZERO, pd.prototype(),
-                FuncTypeDeclarer.Type.FUNC);
+        var td = new AnonFuncTypeDeclarer(Position.ZERO, true, pd.prototype());
         declare(pd.symbol().name(), td);
         endStmt();
     }

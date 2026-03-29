@@ -63,7 +63,7 @@ public class GenericMap {
 
     public FuncTypeDeclarer mapIf(FuncTypeDeclarer ftd) {
         var prot = instantiate(ftd.prototype());
-        return new FuncTypeDeclarer(ftd.pos(), prot, ftd.type());
+        return new AnonFuncTypeDeclarer(ftd.pos(), ftd.required(), prot);
     }
 
     public TypeDeclarer mapIf(TypeDeclarer td) {

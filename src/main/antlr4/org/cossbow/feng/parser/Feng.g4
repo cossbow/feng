@@ -330,7 +330,9 @@ refer
     : kind=(MUL|BITAND) required=NOT? immutable=HASH?
     ;
 funcTypeDeclarer
-    : FUNC prototype
+    : required=NOT? FUNC prototype
+    // 由于语法有冲突，仅匹配非空，可空的由definedTypeDeclarer代管
+    | required=NOT definedType
     ;
 // typeDeclarer list
 typeDeclarerList

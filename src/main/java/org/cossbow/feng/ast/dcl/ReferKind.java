@@ -5,6 +5,8 @@ public enum ReferKind {
     STRONG('*'),
     // 虚引用
     PHANTOM('&'),
+    // 恒引用
+    ETERNAL('$'),
     ;
 
     public final char symbol;

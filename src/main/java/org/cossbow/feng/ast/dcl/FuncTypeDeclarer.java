@@ -1,68 +1,30 @@
 package org.cossbow.feng.ast.dcl;
 
-import org.cossbow.feng.ast.Method;
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.proc.Prototype;
-import org.cossbow.feng.util.Lazy;
 
 /**
  * 临时及(AST)都有
  */
+abstract
 public class FuncTypeDeclarer extends TypeDeclarer {
-    private final Prototype prototype;
-    private final Type type;
+    private final boolean required;
 
     public FuncTypeDeclarer(Position pos,
-                            Prototype prototype,
-                            Type type) {
+                            boolean required) {
         super(pos);
-        this.prototype = prototype;
-        this.type = type;
+        this.required = required;
     }
 
-    public Prototype prototype() {
-        return prototype;
+    public boolean required() {
+        return required;
     }
 
-
-    public Type type() {
-        return type;
-    }
-
-    public boolean isRefer() {
-        return type == Type.REFER;
-    }
+    abstract
+    public Prototype prototype();
 
     public boolean hasTemplate() {
-        return prototype.hasTemplate();
+        return prototype().hasTemplate();
     }
 
-    public enum Type {
-        FUNC,
-        REFER,
-        METHOD,
-    }
-
-    //
-
-    @Override
-    public boolean equals(Object o) {
-        if (!(o instanceof FuncTypeDeclarer t))
-            return false;
-
-        return prototype.equals(t.prototype);
-    }
-
-    @Override
-    public int hashCode() {
-        return prototype.hashCode();
-    }
-
-    //
-
-    @Override
-    public String toString() {
-        return prototype.toString();
-    }
 }

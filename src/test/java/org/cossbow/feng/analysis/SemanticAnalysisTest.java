@@ -490,6 +490,20 @@ public class SemanticAnalysisTest {
     public void testPrototype7() {
         checkSucc("func C(); func F(C);");
         checkSucc("func C(); func F()C;");
+        checkFail("func C()C;");
+    }
+
+    @Test
+    public void testPrototype8() {
+        checkSucc("func C(); func f(c C) {var r C = c;}");
+        checkSucc("func C(); func f(c !C) {var r !C = c;}");
+        checkSucc("func C(); func f(c !C) {var r C = c;}");
+        checkFail("func C(); func f(c C) {var r !C = c;}");
+
+        checkSucc("func C(); func f(c func()) {var r C = c;}");
+        checkSucc("func C(); func f(c !func()) {var r !C = c;}");
+        checkSucc("func C(); func f(c !func()) {var r C = c;}");
+        checkFail("func C(); func f(c func()) {var r !C = c;}");
     }
 
     // assign

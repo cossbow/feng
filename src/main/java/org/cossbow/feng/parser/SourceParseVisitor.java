@@ -360,9 +360,14 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitFuncTypeDeclarer(FengParser.FuncTypeDeclarerContext ctx) {
-        var prototype = (Prototype) visit(ctx.prototype());
-        return new FuncTypeDeclarer(posOf(ctx), prototype,
-                FuncTypeDeclarer.Type.REFER);
+        var required = ctx.required != null;
+        var pt = this.<Prototype>visitOptional(ctx.prototype());
+        if (pt.has())
+            return new AnonFuncTypeDeclarer(posOf(ctx), required, pt.get());
+
+        var dt = (DerivedType) visit(ctx.definedType());
+        Objects.requireNonNull(dt);
+        return new NamedFuncTypeDeclarer(posOf(ctx), required, dt);
     }
 
     public List<TypeDeclarer> parseTypeDeclarerList(

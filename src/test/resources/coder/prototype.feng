@@ -46,6 +46,16 @@ func use4(f func(int)*A) {
     var i = f(123).id;
 }
 
+class Work`V` {
+    var cb Task`V`;
+    func start(v V) {
+        cb(v);
+    }
+}
+func create`E`(cb Task`E`) *Work`E` {
+    return new(Work`E`, {cb=cb});
+}
+
 
 func test(n int) {
     var a1 A = {cb=run};
@@ -57,6 +67,12 @@ func test(n int) {
     var check = use2(positive);
     var r=check(2);
     use4(make);
+    {
+        create`int`(myTask).cb(n);
+        var cb func(int) = create`int`(myTask).cb;
+        cb(n);
+        create`int`(myTask).start(n);
+    }
 }
 
 

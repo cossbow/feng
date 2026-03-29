@@ -65,6 +65,10 @@ public class TypeDeclarer extends Entity {
         return false;
     }
 
+    public boolean required() {
+        return maybeRefer().match(Refer::required);
+    }
+
     public boolean hasTemplate() {
         return false;
     }
