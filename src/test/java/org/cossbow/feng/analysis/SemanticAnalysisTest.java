@@ -1183,6 +1183,9 @@ public class SemanticAnalysisTest {
     @Test
     public void testConditionalExpression3() {
         checkSucc("func f(a bool){var v = a ? new(int) : new(byte);}");
+        checkSucc("func f(a bool){var v *byte = a ? new(int) : new(byte);}");
+        checkFail("func f(a bool){var v *int16 = a ? new(int) : new(byte);}");
+        checkFail("func f(a bool){var v *int = a ? new(int) : new(byte);}");
         checkSucc("func f(a bool){var v = a ? new(byte) : new(int);}");
         checkFail("func f(a bool){var v = a ? new(bool) : new(int);}");
 
@@ -1546,6 +1549,8 @@ public class SemanticAnalysisTest {
     @Test
     public void testRequired4() {
         checkSucc("func f(a *!int){if(a!=nil){}}");
+        checkSucc("func f(){var a int; const r &int = a;}");
+        checkSucc("func f(){var a int; const r &!int = a;}");
     }
 
     //

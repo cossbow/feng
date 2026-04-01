@@ -1,0 +1,37 @@
+
+class A{var id int;func run(){}}
+class B:A{}
+
+func conditional1(a int) {
+    var id = a > 0 ? a : -a;
+    {
+        var r1 = a>0 ? new(int) : new(byte);
+        var r2 *byte = a>0 ? new(int) : new(byte);
+    }
+    {
+        var r1 = a>0 ? new(A) : new(B);
+        var r2 *A = a>0 ? new(A) : new(B);
+    }
+    {
+        var v = a%3==0 ? a+1 : a-1;
+    }
+}
+
+func block1(n int) {
+    var r = {
+        var r1 = n > 1 ? new(int) : new(byte);
+        var r2 = n > 4 ? new(A,{id=n+1}) : new(B,{id=n-1});
+        r2
+    };
+    r.run();
+}
+
+
+func test(n int) {
+
+}
+
+func main(args [&!#][*!#]byte) {
+    test(5);
+}
+

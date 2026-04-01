@@ -7,7 +7,7 @@ class A {
 }
 
 func test(i int) {
-    var v1 = ["xxxyyy"];
+    var v1 = [][16]byte["xxxyyy"];
     var v2 = [][64]byte ["xxxyyy"];
 
     var a1 = A {name="fffff"};

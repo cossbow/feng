@@ -46,6 +46,15 @@ func use4(f func(int)*A) {
     var i = f(123).id;
 }
 
+class B:A{}
+func write(a&A) {
+    a.id=123;
+}
+func use5(f func(a&A)) {
+    var b B;
+    f(b);
+}
+
 class Work`V` {
     var cb Task`V`;
     func start(v V) {
@@ -73,6 +82,7 @@ func test(n int) {
         cb(n);
         create`int`(myTask).start(n);
     }
+    use5(write);
 }
 
 
