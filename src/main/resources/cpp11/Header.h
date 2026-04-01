@@ -769,6 +769,14 @@ public:
 		return fp(std::forward<Args>(args)...);
 	}
 
+	// 使用模板化的调用操作符，支持参数隐式转换
+	template<typename... CallArgs>
+	Ret operator()(CallArgs&&... args) const {
+		Feng$required(fp);
+		// 将参数转换为期望的类型
+		return fp(static_cast<Args>(std::forward<CallArgs>(args))...);
+	}
+
 	Feng$Prototype &operator=(Feng$CppFun fp) {
 		fp = fp;
 		return *this;

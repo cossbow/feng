@@ -1286,6 +1286,7 @@ public class CppGenerator {
             case EnumValueExpression ee -> write(ee);
             case EnumIdExpression ee -> write(ee);
             case ArrayLenExpression ee -> write(ee);
+            case ConditionalExpression ee -> write(ee);
             case BlockExpression ee -> write(ee);
             default -> unreachable();
         };
@@ -1688,6 +1689,15 @@ public class CppGenerator {
 
     private CppGenerator write(ArrayLenExpression e) {
         return write(e.subject()).write(".len");
+    }
+
+    private CppGenerator write(ConditionalExpression e) {
+        var rt = e.resultType.must();
+        write(e.condition()).write('?');
+        write('(').write(rt).write(')').write(e.yes());
+        write(':');
+        write('(').write(rt).write(')').write(e.not());
+        return this;
     }
 
     private CppGenerator write(BlockExpression e) {

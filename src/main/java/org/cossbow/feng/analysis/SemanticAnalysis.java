@@ -14,6 +14,7 @@ import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.dag.DAGGraph;
+import org.cossbow.feng.err.SemanticException;
 import org.cossbow.feng.layout.LayoutTool;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.*;
@@ -164,7 +165,7 @@ public class SemanticAnalysis {
                 case LiteralExpression e -> {
                 }
                 // 其他的Expression类型并不是通过解析创建的，这时不用管
-                case null, default -> semantic("can't depend: %s", c);
+                case null, default -> semantic("can't depend of global: %s", c);
             }
         }
         return deps;
@@ -584,18 +585,18 @@ public class SemanticAnalysis {
 
     //
 
-    private boolean checkPrototype(
+    private TypeValid checkParameter(
             TypeDeclarer l, TypeDeclarer r, Entity e) {
         if (l instanceof FuncTypeDeclarer lfd) {
             if (r instanceof FuncTypeDeclarer rfd)
                 return checkPrototype(lfd.prototype(),
-                        rfd.prototype(), e) == 0;
+                        rfd.prototype(), e);
 
             if (r instanceof DerivedTypeDeclarer dtd) {
                 var def = dtd.def();
                 if (def instanceof PrototypeDefinition pd)
                     return checkPrototype(lfd.prototype(),
-                            pd.prototype(), e) == 0;
+                            pd.prototype(), e);
             }
 
         } else if (l instanceof DerivedTypeDeclarer dtd) {
@@ -603,51 +604,51 @@ public class SemanticAnalysis {
                 var def = dtd.def();
                 if (def instanceof PrototypeDefinition pd)
                     return checkPrototype(pd.prototype(),
-                            rfd.prototype(), e) == 0;
+                            rfd.prototype(), e);
             }
         }
-        return l.equals(r);
+        if (l.equals(r)) return TypeValid.ok();
+        return TypeValid.err("incompatible parameter '%s' <> '%s': %s",
+                l, r, e.pos());
     }
 
-    private boolean checkParameters(
+    private TypeValid checkParameters(
             ParameterSet l, ParameterSet r, Entity e) {
-        if (l.size() != r.size()) return false;
+        if (l.size() < r.size()) return TypeValid.err(
+                "redundant arguments: %s", e.pos());
+        if (l.size() > r.size()) return TypeValid.err(
+                "missing arguments: %s", e.pos());
         var size = l.size();
         for (int i = 0; i < size; i++) {
             var v = r.getVar(i);
-            if (checkPrototype(l.getType(i), v.type().must(), e))
-                continue;
-            return false;
+            var vt = checkParameter(l.getType(i), v.type().must(), e);
+            if (vt.ok) continue;
+            return vt;
         }
-        return true;
+        return TypeValid.ok();
     }
 
-    private int checkPrototype(
+    private TypeValid checkPrototype(
             Prototype l, Prototype r, Entity e) {
-        if (!checkParameters(l.parameterSet(), r.parameterSet(), e))
-            return 1;
+        var vt = checkParameters(l.parameterSet(), r.parameterSet(), e);
+        if (!vt.ok) return vt;
         var lr = l.returnSet();
         var rr = r.returnSet();
         if (lr.none() != rr.none())
-            return 2;
-        if (lr.none()) return 0;
+            return TypeValid.err("returns not consistent '%s' <> '%s': %s",
+                    lr, rr, e.pos());
+        if (lr.none()) return TypeValid.ok();
         // 返回值协变（Covariance）：允许“r”的返回值是“l”返回值的子类或实现类
-        if (!assignable(lr.get(), rr.get(), Optional.empty(), e))
-            return 2;
-        return 0;
+        return assignable(lr.get(), rr.get(), Optional.empty(), e);
     }
 
-    private boolean compatible(Prototype l, Prototype r, Entity e) {
-        typeNest++;
-        var re = checkPrototype(l, r, e);
-        typeNest--;
-        return switch (re) {
-            case 1 -> semantic("parameters not same: %s -> %s",
-                    l.pos(), r.pos());
-            case 2 -> semantic("returns not compatible: %s -> %s",
-                    l.pos(), r.pos());
-            default -> true;
-        };
+    private TypeValid compatible(Prototype l, Prototype r, Entity e) {
+        try {
+            typeNest++;
+            return checkPrototype(l, r, e);
+        } finally {
+            typeNest--;
+        }
     }
 
     // class define
@@ -700,7 +701,7 @@ public class SemanticAnalysis {
                 return;
             }
             var pp = inherit.gm().instantiate(pm.prototype());
-            compatible(pp, cm.prototype(), pm);
+            compatible(pp, cm.prototype(), pm).valid();
             pm.override().add(cm);
         }
 
@@ -756,7 +757,7 @@ public class SemanticAnalysis {
             }
             var prot = dt.gm().instantiate(im.prototype());
             var cm = o.must();
-            compatible(prot, cm.prototype(), im);
+            compatible(prot, cm.prototype(), im).valid();
             im.override().add(cm);
         }
     }
@@ -989,17 +990,7 @@ public class SemanticAnalysis {
         var main = FunctionDefinition.MAIN_FUNC;
         if (!main.symbol().equals(fd.symbol()))
             return;
-        int r = checkPrototype(main.prototype(), fd.prototype(), fd);
-        switch (r) {
-            case 1 -> {
-                semantic("invalid main function argument: %s", fd.pos());
-                return;
-            }
-            case 2 -> {
-                semantic("invalid main function returns: %s", fd.pos());
-                return;
-            }
-        }
+        checkPrototype(main.prototype(), fd.prototype(), fd).valid();
         fd.entry(true);
 
     }
@@ -1067,6 +1058,7 @@ public class SemanticAnalysis {
             case IndexOfExpression ee -> enablePhantom(lr, ee);
             case MemberOfExpression ee -> enablePhantom(lr, ee);
             case ParenExpression ee -> enablePhantom(lr, ee.child());
+            case ConditionalExpression ee -> enablePhantom(lr, ee);
             case VariableExpression ee -> enablePhantom(lr, ee.variable());
             case SymbolExpression ee -> enablePhantom(lr, ee);
             case CurrentExpression ee -> true;
@@ -1113,6 +1105,10 @@ public class SemanticAnalysis {
         if (f.immutable())
             return enablePhantom(lr, e.subject());
         return semantic("can't convert var-refer-field to phantom-refer: %s", e.pos());
+    }
+
+    private boolean enablePhantom(Refer lr, ConditionalExpression e) {
+        return enablePhantom(lr, e.yes()) && enablePhantom(lr, e.not());
     }
 
     //
@@ -1217,39 +1213,42 @@ public class SemanticAnalysis {
         return ld instanceof EnumDefinition ed && r.def().equals(ed);
     }
 
-    private boolean
+    private TypeValid
     assignable(DerivedTypeDeclarer l,
                DerivedTypeDeclarer r,
                Entity e) {
         if (!l.generic().equals(r.generic()))
-            return semantic("type arguments not match '%s'%s <--> '%s'%s: %s",
+            return TypeValid.err("type arguments not match '%s'%s <--> '%s'%s: %s",
                     l, l.pos(), r, r.pos(), e.pos());
 
         var lt = l.def();
         var rt = r.def();
         if (lt instanceof ObjectDefinition lo &&
                 rt instanceof ObjectDefinition ro)
-            return assignable(lo, ro);
+            if (assignable(lo, ro)) return TypeValid.ok();
 
         if (lt instanceof EnumDefinition le &&
                 rt instanceof EnumDefinition re) {
-            return le.equals(re);
+            if (le.equals(re)) return TypeValid.ok();
         }
-        return false;
+        return TypeValid.err("can't use '%s' as '%s': %s", r, l, e.pos());
     }
 
-    private boolean compatible(
+    private TypeValid compatible(
             DerivedTypeDeclarer l, DerivedTypeDeclarer r, Entity e) {
-        return l.def() instanceof PrototypeDefinition ld &&
-                r.def() instanceof PrototypeDefinition rd &&
-                compatible(ld.prototype(), rd.prototype(), e);
+        if (l.def() instanceof PrototypeDefinition ld &&
+                r.def() instanceof PrototypeDefinition rd) {
+            return compatible(ld.prototype(), rd.prototype(), e);
+        }
+        return TypeValid.err("can't use '%s' as '%s': %s",
+                r, l, e.pos());
     }
 
     // 不可修改引用必须单向传递
-    private boolean checkImmutable(Refer lr, Refer rr) {
-        if (rr.immutable() && !lr.immutable())
-            return semantic("can't deliver: immutable -> mutable: %s", lr.pos());
-        return true;
+    private TypeValid checkImmutable(Refer lr, Refer rr) {
+        if (!rr.immutable() || lr.immutable())
+            return TypeValid.ok();
+        return TypeValid.err("can't deliver: immutable -> mutable: %s", lr.pos());
     }
 
     // 检查非空的传递
@@ -1258,56 +1257,61 @@ public class SemanticAnalysis {
         if (!l.required()) return true;
         if (r.required()) return true;
         // 检查是否允许反向传递
-        if (re.match(this::ifMarkNonNil))
-            return true;
+        return re.match(this::ifMarkNonNil);
+    }
 
-        return semantic("can't assign: optional '%s' -> required '%s', need explicitly checking: %s",
-                r, l, e.pos());
+    private boolean isByteArray(ArrayTypeDeclarer la) {
+        return la.element() instanceof PrimitiveTypeDeclarer lp
+                && lp.primitive() == Primitive.BYTE;
     }
 
     // 统一检查右边值是否能被引用
-    private boolean referable(Refer lr, Optional<Refer> r,
-                              Optional<Expression> re) {
+    private TypeValid referable(Refer lr, Optional<Refer> r,
+                                Optional<Expression> re, Entity e) {
         if (lr.kind() == PHANTOM) {
             // 检查虚引用是否允许
-            if (re.none()) return false;
-            var e = re.get();
-            if (enablePhantom(lr, e)) {
+            if (re.none()) return TypeValid.err(
+                    "can't assign '%s' to phantom-refer: %s", r, e.pos());
+            var v = re.get();
+            if (enablePhantom(lr, v)) {
                 // 不可修改引用必须单向传递
-                if (!immutable(e, false) || lr.immutable()) return true;
-                return semantic("can't convert: immutable -> mutable: %s", lr.pos());
+                if (!immutable(v, false) || lr.immutable())
+                    return TypeValid.ok();
+                return TypeValid.err("can't convert: immutable -> mutable: %s", lr.pos());
             }
-            return semantic("can't convert '%s' to phantom refer: %s",
-                    e, e.pos());
+            return TypeValid.err("can't convert '%s' to phantom refer: %s",
+                    v, v.pos());
         }
         assert lr.kind() == STRONG;
 
         if (!r.has())
-            return semantic("strong-refer can't refer value: %s", lr.pos());
+            return TypeValid.err("strong-refer can't refer value: %s", lr.pos());
 
         var rr = r.get();
         if (rr.isKind(PHANTOM))
-            return semantic("can't convert: phantom -> strong: %s", lr.pos());
+            return TypeValid.err("can't convert: phantom -> strong: %s", lr.pos());
 
         return checkImmutable(lr, rr);
     }
 
-    private boolean assignRefer(TypeDeclarer l, LiteralExpression re) {
+    private TypeValid assignRefer(TypeDeclarer l, LiteralExpression re) {
         re.lt.set(l);
         var lr = l.maybeRefer().must();
         if (re.literal() instanceof NilLiteral) {
             if (!lr.required()) {
-                return true;
+                return TypeValid.ok();
             }
-            return semantic("required-refer can't set nil: %s", re.pos());
+            return TypeValid.err("required-refer can't set nil: %s", re.pos());
         }
         if (re.literal() instanceof StringLiteral) {
             // 字符串字面量可以传递给数组引用，当然必须是不可修改的
-            return l instanceof ArrayTypeDeclarer la &&
-                    la.element() instanceof PrimitiveTypeDeclarer lp
-                    && lp.primitive() == Primitive.BYTE;
+            if (l instanceof ArrayTypeDeclarer la && isByteArray(la))
+                return TypeValid.ok();
+            return TypeValid.err(
+                    "string literal only can assign to byte-array: %s", re.pos());
         }
-        return false;
+        return TypeValid.err("can't assign '%s' to refer '%s': %s",
+                re, l, re.pos());
     }
 
     // 整数、浮点数、struct/union及其定长数组是可以相互转换引用的
@@ -1399,7 +1403,7 @@ public class SemanticAnalysis {
         }
     }
 
-    private boolean assignRefer(
+    private TypeValid assignRefer(
             TypeDeclarer l, TypeDeclarer r,
             Optional<Expression> re, Entity e) {
         var lRef = l.maybeRefer();
@@ -1408,26 +1412,29 @@ public class SemanticAnalysis {
         if (r instanceof LiteralTypeDeclarer)
             return assignRefer(l, (LiteralExpression) re.must());
 
-        if (!referable(lRef.get(), r.maybeRefer(), re))
-            return false;
+        var tv = referable(lRef.get(), r.maybeRefer(), re, e);
+        if (!tv.ok) return tv;
 
         if (mappable(l, false) &&
                 mappable(r, false)) {
             if (checkBounds(l, r))
-                return true;
+                return TypeValid.ok();
 
-            return semantic("out of bounds: convert %s(size=%d):%s to %s(size=%d):%s",
+            return TypeValid.err(
+                    "out of bounds: convert %s(size=%d):%s to %s(size=%d):%s",
                     l, l.size(), l.pos(), r, r.size(), r.pos());
         }
 
-        if (r instanceof PrimitiveTypeDeclarer rp) {
-            return l instanceof PrimitiveTypeDeclarer lp &&
-                    rp.primitive() == lp.primitive();
+        if (r instanceof PrimitiveTypeDeclarer rp &&
+                l instanceof PrimitiveTypeDeclarer lp) {
+            if (rp.primitive() == lp.primitive())
+                return TypeValid.ok();
         }
 
         if (r instanceof EnumTypeDeclarer rd) {
             if (l instanceof DerivedTypeDeclarer ld)
-                return assignable(ld, rd);
+                if (ld.def().equals(rd.def()))
+                    return TypeValid.ok();
         }
 
         // Objects
@@ -1444,7 +1451,7 @@ public class SemanticAnalysis {
                 typeNest += 2;
                 try {
                     if (la.element().equals(ra.element())) {
-                        return true;
+                        return TypeValid.ok();
                     }
                     if (la.element() instanceof DerivedTypeDeclarer ldt &&
                             ra.element() instanceof DerivedTypeDeclarer rdt) {
@@ -1456,92 +1463,88 @@ public class SemanticAnalysis {
             }
         }
 
-        return semantic("'%s' can't refer '%s': %s", l, r, l.pos());
+        return TypeValid.err("'%s' can't refer '%s': %s", l, r, l.pos());
     }
 
-    private boolean assignValue(TypeDeclarer l, LiteralExpression re) {
+    private TypeValid assignValue(
+            TypeDeclarer l, LiteralExpression re) {
         assert l.maybeRefer().none();
         re.lt.set(l);
 
-        if (re.literal() instanceof IntegerLiteral)
-            return l instanceof PrimitiveTypeDeclarer ptd
-                    && ptd.primitive().isInteger();
-
-        if (re.literal() instanceof FloatLiteral)
-            return l instanceof PrimitiveTypeDeclarer ptd
-                    && ptd.primitive().isFloat();
-
-        if (re.literal() instanceof BoolLiteral)
-            return l instanceof PrimitiveTypeDeclarer ptd
-                    && ptd.primitive().isBool();
+        if (l instanceof PrimitiveTypeDeclarer ptd) {
+            var c = re.literal().compatible();
+            if (c.has() && c.get().kind == ptd.primitive().kind)
+                return TypeValid.ok();
+            return TypeValid.err("can't assign '%s' to '%s': %s",
+                    ptd, re, re.pos());
+        }
 
         if (re.literal() instanceof NilLiteral) {
             if (l instanceof FuncTypeDeclarer ftd) {
-                if (!ftd.required()) return true;
-                return semantic("required '%s' can't set nil: %s",
+                if (!ftd.required()) return TypeValid.ok();
+                return TypeValid.err("required '%s' can't set nil: %s",
                         l, l.pos());
             }
         }
 
         if (re.literal() instanceof StringLiteral sl) {
             // 字符串字面量只能传递给[N]byte类型
-            if (!(l instanceof ArrayTypeDeclarer la))
-                return false;
-            if (la.refer().has()) return false;
-            if (!(la.element() instanceof PrimitiveTypeDeclarer lp))
-                return false;
-            if (lp.primitive() != Primitive.BYTE) return false;
-            if (la.len() >= sl.length()) return true;
-            return semantic("string data overflow: %s", sl.pos());
+            if (l instanceof ArrayTypeDeclarer la && isByteArray(la)) {
+                if (la.len() >= sl.length())
+                    return TypeValid.ok();
+                return TypeValid.err("string overflow: %s", re.pos());
+            }
+            return TypeValid.err(
+                    "string literal only can assign to byte-array: %s", re.pos());
         }
 
-        return false;
+        return TypeValid.err("can't assign '%s' to value '%s': %s",
+                l, re, re.pos());
     }
 
-    private boolean assignValue(
+    private TypeValid assignValue(
             ArrayTypeDeclarer l, ArrayTypeDeclarer r,
             Optional<Expression> re, Entity e) {
         assert l.refer().none();
 
-        if (r.refer().has()) return false; // Not: [value] = [refer]
+        if (r.refer().has()) return TypeValid.err(
+                "value-type '%s' can't assign to refer-type '%s': %s",
+                r, l, e.pos());
 
         if (re.has()) {
-            if (re.must() instanceof ArrayExpression ae) {
+            if (re.get() instanceof ArrayExpression ae) {
                 ae.lt.set(l);
                 // 数组初始化分析
-                var i = 0;
                 for (var ev : ae.elements()) {
-                    if (assignable(l.element(), r.element(),
-                            Optional.of(ev), e)) {
-                        i++;
-                        continue;
-                    }
-                    return semantic(
-                            "array element at %d not match type %s: %s",
-                            i, l.element(), ev.pos());
+                    var tv = assignable(l.element(), r.element(),
+                            Optional.of(ev), e);
+                    if (!tv.ok) return tv;
                 }
             } else {
                 // 分析元素
-                if (!assignable(l.element(), r.element(),
-                        Optional.empty(), e))
-                    return false;
+                var tv = assignable(l.element(), r.element(),
+                        Optional.empty(), e);
+                if (!tv.ok) return tv;
             }
         } else {
-            var elOk = assignable(l.element(), r.element(),
+            var tv = assignable(l.element(), r.element(),
                     Optional.empty(), e);
-            if (!elOk) return false;
+            if (!tv.ok) return tv;
         }
 
         if (re.match(v -> v instanceof ArrayExpression)) {
             if (!l.literal() && l.len() < r.len()) {
-                return semantic("index out of bound: %s", r.pos());
+                return TypeValid.err("index out of bound: %s", r.pos());
             }
-            return true;
+            return TypeValid.ok();
         }
-        return l.len().longValue() == r.len().longValue();
+        if (l.len().longValue() == r.len().longValue())
+            return TypeValid.ok();
+        return TypeValid.err("array length not equal '%s' -- '%s': %s",
+                l, r, e.pos());
     }
 
-    private boolean assignValue(
+    private TypeValid assignValue(
             TypeDeclarer l, TypeDeclarer r,
             Optional<Expression> re, Entity e) {
         assert l.maybeRefer().none();
@@ -1575,37 +1578,65 @@ public class SemanticAnalysis {
                 var eq = ld.derivedType().equals(rd.derivedType()) &&
                         (rd.refer().none() || re.match(v ->
                                 v instanceof CurrentExpression));
-                if (eq) return true;
-                if (compatible(ld, rd, e))
-                    return true;
+                if (eq) return TypeValid.ok();
+                return compatible(ld, rd, e);
             }
-            if (l instanceof EnumTypeDeclarer ld)
-                return ld.def().equals(rd.def());
+            if (l instanceof EnumTypeDeclarer ld &&
+                    ld.def().equals(rd.def()))
+                return TypeValid.ok();
         }
 
         if (r instanceof EnumTypeDeclarer rd) {
-            if (l instanceof DerivedTypeDeclarer ld) {
-                return rd.def().equals(ld.def());
-            }
+            if (l instanceof DerivedTypeDeclarer ld
+                    && rd.def().equals(ld.def()))
+                return TypeValid.ok();
         }
 
-        return false;
+        return TypeValid.err("can't use '%s' as '%s': %s",
+                r, l, e.pos());
     }
 
     // 赋值的类型检查入口
-    private boolean assignable(
+    private TypeValid assignable(
             TypeDeclarer l, TypeDeclarer r,
             Optional<Expression> re, Entity e) {
-        if (l.equals(r)) return true;
+        if (l.equals(r)) return TypeValid.ok();
 
         if (!checkRequired(l, r, re, e))
-            return false;
+            return TypeValid.err("can't assign: optional '%s' -> required '%s', "
+                    + "need nil checking: %s", r, l, e.pos());
 
         var lr = l.maybeRefer();
         if (lr.none())
             return assignValue(l, r, re, e);
 
         return assignRefer(l, r, re, e);
+    }
+
+    static class TypeValid {
+        final boolean ok;
+        final String err;
+
+        TypeValid(boolean ok, String err) {
+            this.ok = ok;
+            this.err = err;
+        }
+
+        static TypeValid ok() {
+            return OK;
+        }
+
+        static TypeValid err(String fmt, Object... args) {
+            return new TypeValid(false, fmt.formatted(args));
+        }
+
+        boolean valid() throws SemanticException {
+            if (ok) return true;
+            return semantic(err);
+        }
+
+        private static final TypeValid OK =
+                new TypeValid(true, "");
     }
 
     private int typeNest = -1;
@@ -1636,14 +1667,10 @@ public class SemanticAnalysis {
                     a.value(), a.value().pos());
             return;
         }
-        if (assignable(og.b(), vg.b(), Optional.of(vg.a()), a)) {
-            a.operand(og.a());
-            a.value(vg.a());
-            unmarkNonNilVar(a);
-            return;
-        }
-        semantic("incompatible %s = %s: %s",
-                a.operand(), a.value(), a.pos());
+        assignable(og.b(), vg.b(), Optional.of(vg.a()), a).valid();
+        a.operand(og.a());
+        a.value(vg.a());
+        unmarkNonNilVar(a);
     }
 
     private Statement analyse(AssignmentsStatement as) {
@@ -1685,11 +1712,7 @@ public class SemanticAnalysis {
         if (v.type().has()) {
             var l = v.type().must();
             // check type
-            if (assignable(l, t, Optional.of(g.a()), v)) {
-                return;
-            }
-            semantic("incompatible, can't use '%s' as '%s': %s",
-                    t, l, v.pos());
+            assignable(l, t, Optional.of(g.a()), v).valid();
         } else {
             v.type().set(fromLiteral(t));
         }
@@ -1705,7 +1728,9 @@ public class SemanticAnalysis {
             if (v.declare() == Declare.CONST) {
                 semantic("const must init: %s", v.pos());
             }
-            if (v.type().match(TypeDeclarer::required)) {
+            var t = v.type().must();
+            var or = t.maybeRefer();
+            if (or.match(Refer::required)) {
                 semantic("required refer must be init: %s", v.pos());
             }
         } else {
@@ -2043,8 +2068,8 @@ public class SemanticAnalysis {
         er.expectType.set(pr.get());
         var g = optimize(er);
         e.result(Optional.of(g.a()));
-        if (assignable(pr.get(), g.b(), e.result(), e)) return e;
-        return semantic("return not compatible: %s", e.pos());
+        assignable(pr.get(), g.b(), e.result(), e).valid();
+        return e;
     }
 
     private void checkConstantInteger(SwitchStatement s) {
@@ -2244,6 +2269,7 @@ public class SemanticAnalysis {
             case LiteralExpression ee -> left;
             case CheckNilExpression ee -> left;
             case ReferEqualExpression ee -> left;
+            case ConditionalExpression ee -> left;
             case BinaryExpression ee -> left;
             case UnaryExpression ee -> left;
             case EnumExpression ee -> true;
@@ -2407,6 +2433,7 @@ public class SemanticAnalysis {
             case ParenExpression ee -> optimize(ee);
             case SymbolExpression ee -> optimize(ee);
             case BlockExpression ee -> optimize(ee);
+            case ConditionalExpression ee -> optimize(ee);
             case VariableExpression ee -> Groups.g2(ee,
                     ee.variable().type().must());
             case DereferExpression ee -> optimize(ee);
@@ -2467,21 +2494,21 @@ public class SemanticAnalysis {
         return unreachable();
     }
 
-    private boolean referCompare(
+    private TypeValid referCompare(
             TypeDeclarer l, TypeDeclarer r, Entity e) {
         if (mappable(l) && mappable(r)) {
-            return true; // primitive, structure, and it's array
+            return TypeValid.ok(); // primitive, structure, and it's array
         }
         if (l instanceof DerivedTypeDeclarer ld &&
                 r instanceof DerivedTypeDeclarer rd) {
-            return objectBinOp(ld, rd);
-        }
-        if (l instanceof ArrayTypeDeclarer la &&
+            if (objectBinOp(ld, rd)) return TypeValid.ok();
+        } else if (l instanceof ArrayTypeDeclarer la &&
                 r instanceof ArrayTypeDeclarer ra) {
             return assignable(la.element(), ra.element(),
                     Optional.empty(), e);
         }
-        return false;
+        return TypeValid.err("can't compare references '%s' <> '%s': %s",
+                l, r, e.pos());
     }
 
     private Optional<TypeDeclarer> primitiveBinOp(
@@ -2564,7 +2591,7 @@ public class SemanticAnalysis {
                 e.operator() != BinaryOperator.NE)
             return Optional.empty();
 
-        if (assignable(l, r, Optional.empty(), e))
+        if (assignable(l, r, Optional.empty(), e).ok)
             return Optional.of(Primitive.BOOL.declarer(e.pos()));
 
         return Optional.empty();
@@ -2596,7 +2623,7 @@ public class SemanticAnalysis {
         }
 
         var isEqOp = BinaryOperator.SetEquals.contains(e.operator());
-        if (isEqOp && referCompare(l.b(), r.b(), e)) {
+        if (isEqOp && referCompare(l.b(), r.b(), e).ok) {
             var t = Primitive.BOOL.declarer(e.pos());
             var x = (PrimaryExpression) l.a();
             var y = (PrimaryExpression) r.a();
@@ -2711,7 +2738,7 @@ public class SemanticAnalysis {
         if (dr.get().required()) return semantic(
                 "assert result will be nil if failed: %s", dstType.pos());
 
-        if (!referable(dr.get(), sr, Optional.of(g.a())))
+        if (!referable(dr.get(), sr, Optional.of(g.a()), e).valid())
             return unreachable();
 
         var n = new AssertExpression(e.pos(),
@@ -2774,9 +2801,7 @@ public class SemanticAnalysis {
             var a = args.get(i);
             a.expectType.set(l);
             var ag = optimize(a);
-            if (!assignable(l, ag.b(), Optional.of(ag.a()), a))
-                return semantic("can't use %s(type '%s') as type '%s': %s",
-                        a, ag.b(), l, a.pos());
+            assignable(l, ag.b(), Optional.of(ag.a()), a).valid();
             nArgs.add(ag.a());
         }
 
@@ -3114,13 +3139,9 @@ public class SemanticAnalysis {
         }
         var g = optimize(e.arg().get());
         var argType = pt.primitive().declarer(e.pos(), Optional.empty());
-        if (assignable(argType, g.b(), Optional.of(g.a()), e)) {
-            var n = new NewExpression(e.pos(), e.type(), Optional.of(g.a()));
-            return Groups.g2(n, td);
-        }
-
-        return semantic("'%s' can't init with '%s' value: %s",
-                pt, g.b(), e.pos());
+        assignable(argType, g.b(), Optional.of(g.a()), e).valid();
+        var n = new NewExpression(e.pos(), e.type(), Optional.of(g.a()));
+        return Groups.g2(n, td);
     }
 
     private Groups.G2<Expression, TypeDeclarer>
@@ -3140,13 +3161,9 @@ public class SemanticAnalysis {
         var atd = new DerivedTypeDeclarer(e.pos(), dt, Optional.empty());
         arg.expectType.set(atd); // for ObjectExpression
         var g = optimize(arg);
-        if (assignable(atd, g.b(), Optional.of(g.a()), e)) {
-            var n = new NewExpression(e.pos(), e.type(), Optional.of(g.a()));
-            return Groups.g2(n, dtd);
-        }
-
-        return semantic("'%s' can't init with '%s': %s",
-                dt, arg, e.pos());
+        assignable(atd, g.b(), Optional.of(g.a()), e).valid();
+        var n = new NewExpression(e.pos(), e.type(), Optional.of(g.a()));
+        return Groups.g2(n, dtd);
     }
 
     private Groups.G2<Expression, TypeDeclarer>
@@ -3179,8 +3196,8 @@ public class SemanticAnalysis {
         var etd = ArrayTypeDeclarer.make(nt.element(), Optional.empty(), e);
         arg.expectType.set(etd); // for ArrayExpression
         var ag = optimize(arg);
-        if (ag.b() instanceof ArrayTypeDeclarer atd &&
-                assignable(nt.element(), atd.element(), Optional.empty(), e)) {
+        if (ag.b() instanceof ArrayTypeDeclarer atd) {
+            assignable(nt.element(), atd.element(), Optional.empty(), e).valid();
             var n = new NewExpression(e.pos(), nt, Optional.of(ag.a()));
             return Groups.g2(n, td);
         }
@@ -3303,11 +3320,14 @@ public class SemanticAnalysis {
 
     private boolean isCompoundLiteral(Expression e) {
         return e instanceof ArrayExpression ||
-                e instanceof ObjectExpression;
+                e instanceof ObjectExpression ||
+                (e instanceof ParenExpression pe &&
+                        isCompoundLiteral(pe.child()));
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(ArrayExpression e) {
         e.type().use(t -> {
+            analyse(t.element());
             if (t.length().none()) {
                 t.len(e.size());
                 return;
@@ -3347,11 +3367,8 @@ public class SemanticAnalysis {
             td.element(vt);
             v.expectType.set(vt);
             var g = optimize(v);
-            if (!isCompoundLiteral(v) &&
-                    !assignable(vt, g.b(), Optional.of(g.a()), v)) {
-                return semantic("can't use '%s' as type '%s': %s",
-                        v, vt, v.pos());
-            }
+            if (!isCompoundLiteral(v))
+                assignable(vt, g.b(), Optional.of(g.a()), v).valid();
             values.add(g.a());
         }
         e.elements(values);
@@ -3400,10 +3417,8 @@ public class SemanticAnalysis {
             var ft = dtd.gm().mapIf(f.type());
             v.expectType.set(ft);
             var g = optimize(v);
-            if (!isCompoundLiteral(v) &&
-                    !assignable(ft, g.b(), Optional.of(g.a()), v))
-                return semantic("can't use '%s' as type '%s': %s",
-                        v, ft, v.pos());
+            if (!isCompoundLiteral(v))
+                assignable(ft, g.b(), Optional.of(g.a()), v).valid();
             entries.add(n.key(), g.a());
         }
 
@@ -3411,8 +3426,39 @@ public class SemanticAnalysis {
         return Groups.g2(n, dtd);
     }
 
-    private Groups.G2<Expression, TypeDeclarer> optimize(ParenExpression e) {
+    private Groups.G2<Expression, TypeDeclarer>
+    optimize(ParenExpression e) {
+        e.child().expectType.set(e.expectType);
+        e.child().expectCallable(e.expectCallable());
         return optimize(e.child());
+    }
+
+    private Groups.G2<Expression, TypeDeclarer>
+    optimize(ConditionalExpression e) {
+        var cg = optimize(e.condition());
+        if (!cg.b().isBool())
+            return semantic("condition must be bool: %s",
+                    e.condition().pos());
+
+        var lt = e.expectType.get();
+        e.yes().expectType.set(lt);
+        var yg = optimize(e.yes());
+        e.not().expectType.set(lt);
+        var ng = optimize(e.not());
+
+        var n = new ConditionalExpression(e.pos(), cg.a(), yg.a(), ng.a());
+        if (lt.has()) {
+            assignable(lt.get(), yg.b(), Optional.of(yg.a()), e.yes()).valid();
+            assignable(lt.get(), ng.b(), Optional.of(ng.a()), e.not()).valid();
+            return Groups.g2(n, lt.get());
+        }
+        if (assignable(yg.b(), ng.b(), Optional.empty(), e).ok) {
+            return Groups.g2(n, yg.b());
+        }
+        if (assignable(ng.b(), yg.b(), Optional.empty(), e).ok) {
+            return Groups.g2(n, ng.b());
+        }
+        return semantic("type of branches must be compatible");
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(BlockExpression e) {

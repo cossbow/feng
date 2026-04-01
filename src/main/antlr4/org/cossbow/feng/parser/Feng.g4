@@ -532,6 +532,7 @@ expression
     | lhs=expression op=(LT|LE|EQ|NE|GT|GE) rhs=expression  # BinaryExpression
     | lhs=expression op=AND rhs=expression                  # BinaryExpression
     | lhs=expression op=OR rhs=expression                   # BinaryExpression
+    | c=expression QUESTION y=expression COLON n=expression # ConditionalExpression
     ;
 
 rightAssocExpr

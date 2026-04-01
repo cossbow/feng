@@ -898,6 +898,15 @@ final class SourceParseVisitor
     }
 
     @Override
+    public Entity visitConditionalExpression(
+            FengParser.ConditionalExpressionContext ctx) {
+        var c = (Expression) visit(ctx.c);
+        var y = (Expression) visit(ctx.y);
+        var n = (Expression) visit(ctx.n);
+        return new ConditionalExpression(posOf(ctx), c, y, n);
+    }
+
+    @Override
     public Entity visitBlockExpr(FengParser.BlockExprContext ctx) {
         var list = parseStatements(ctx.statementList());
         var result = (Expression) visit(ctx.expression());
@@ -934,20 +943,18 @@ final class SourceParseVisitor
     public Entity visitArrayExpr(FengParser.ArrayExprContext ctx) {
         var pos = posOf(ctx);
         var elements = parseExpressions(ctx.elements);
-        var atd = Optional.<ArrayTypeDeclarer>empty();
+        var otd = Optional.<ArrayTypeDeclarer>empty();
         if (ctx.et != null) {
             var et = (TypeDeclarer) visit(ctx.et);
-            var al = this.<Expression>visitOptional(ctx.len);
-            if (al.none()) {
-                var lit = new IntegerLiteral(pos, elements.size());
-                var len = new LiteralExpression(pos, lit);
-                al = Optional.of(len);
+            var len = this.<Expression>visitOptional(ctx.len);
+            if (len.none()) {
+                len = Optional.of(new IntegerLiteral(pos, elements.size()).expr());
             }
-            var at = new ArrayTypeDeclarer(pos, et, al, Optional.empty(), true);
-            if (al.none()) at.len(elements.size());
-            atd = Optional.of(at);
+            var td = new ArrayTypeDeclarer(pos, et, len, Optional.empty(), true);
+            if (len.none()) td.len(elements.size());
+            otd = Optional.of(td);
         }
-        return new ArrayExpression(pos, elements, atd);
+        return new ArrayExpression(pos, elements, otd);
     }
 
     @Override

@@ -1154,6 +1154,54 @@ public class SemanticAnalysisTest {
         }
     }
 
+    @Test
+    public void testConditionalExpression1() {
+        checkSucc("func f(a bool){var v = a ? 1 : 0;}");
+        checkFail("func f(a int){var v = a ? 1 : 0;}");
+        checkSucc("func f(a int){var v = a==2 ? 1 : 0;}");
+        checkFail("func f(a float){var v = a ? 1 : 0;}");
+        checkFail("func f(a *int){var v = a ? 1 : 0;}");
+        checkSucc("func f(a *int){var v = a!=nil ? 1 : 0;}");
+
+        checkSucc("func f(a int){var v = a>0 ? 1 : 0;}");
+        checkSucc("func f(a int){var v = a%2==0 ? 1 : 0;}");
+    }
+
+    @Test
+    public void testConditionalExpression2() {
+        checkSucc("func f(a bool){var v = a ? [1]int[1] : [1]int[0];}");
+        checkSucc("func f(a bool){var v = a ? [1]int[1] : [1]int[];}");
+        checkSucc("func f(a bool){var v = a ? [1]int[] : [1]int[1];}");
+        checkSucc("func f(a bool){var v = a ? [1]int[] : [1]int[];}");
+
+        checkSucc("func f(a bool){var v = a ? []int[1] : []int[0];}");
+        checkFail("func f(a bool){var v = a ? []int[1] : []int[];}");
+        checkFail("func f(a bool){var v = a ? []int[] : []int[1];}");
+        checkSucc("func f(a bool){var v = a ? []int[] : []int[];}");
+    }
+
+    @Test
+    public void testConditionalExpression3() {
+        checkSucc("func f(a bool){var v = a ? new(int) : new(byte);}");
+        checkSucc("func f(a bool){var v = a ? new(byte) : new(int);}");
+        checkFail("func f(a bool){var v = a ? new(bool) : new(int);}");
+
+        var d = "class A{} class B:A{} ";
+        checkSucc(d + "func f(a bool){var v = a ? new(A) : new(B);}");
+        checkSucc(d + "func f(a bool){var v = a ? new(B) : new(A);}");
+        checkSucc(d + "func f(a bool){var v *A = a ? new(A) : new(B);}");
+        checkFail(d + "func f(a bool){var v *B = a ? new(A) : new(B);}");
+    }
+
+    @Test
+    public void testConditionalExpression4() {
+        checkSucc("func f(a,b *int){const v &int = *a>*b ? a : b; }");
+        checkFail("func f(a,b *int){const v &int = *a>*b ? *a : b; }");
+        checkFail("func f(a,b *int){const v &int = *a>*b ? a : *b; }");
+
+        checkSucc("func f(a int, b*int){const v &#int = a>*b ? a : b; }");
+    }
+
     //
 
     @Test
@@ -1913,13 +1961,16 @@ public class SemanticAnalysisTest {
     @Test
     public void testArray14() {
         checkSucc("var a [2]int = [1,2];");
+        checkSucc("var a [2]int = ([1,2]);");
         checkSucc("var a [2]int = [2]int[1,2];");
+        checkSucc("var a [2]int = ([2]int[1,2]);");
         checkFail("var a [2]int = [1]int[1,2];");
         checkSucc("var a [2]int = []int[1,2];");
         checkFail("var a [2]int = []int[1,2,3];");
 
         var d = "struct A{id int;} ";
         checkSucc(d + "var a [2]A = [{id=1}];");
+        checkSucc(d + "var a [2]A = [({id=1})];");
         checkSucc(d + "var a [2]A = [2]A[{id=1}];");
         checkSucc(d + "var a [2]A = []A[{id=1}];");
 
@@ -2352,6 +2403,8 @@ public class SemanticAnalysisTest {
         checkSucc(d + "var s = S{tag=1}; ");
         checkSucc(d + "var c = C{id=3}; ");
         checkSucc(d + "var c = C{s={tag=5}}; ");
+
+        checkFail(d + "var c *C = {id=3}; ");
     }
 
     @Test
@@ -2363,6 +2416,11 @@ public class SemanticAnalysisTest {
         checkSucc(d + "var c C = {s=[{}]}; ");
         checkSucc(d + "var c C = {s=[{tag=[5]}]}; ");
         checkSucc(d + "var c C = {s=[{tag=[5]}, {tag=[7]} ]}; ");
+
+        checkSucc(d + "var c C = ({s=[{tag=[5]}, {tag=[7]} ]}); ");
+        checkSucc(d + "var c C = {s=[{tag=[5]}, ({tag=[7]}) ]}; ");
+        checkSucc(d + "var c C = {s=[{tag=[5]}, {tag=([7])} ]}; ");
+        checkSucc(d + "var c C = {s=[({tag=[5]}), {tag=[7]} ]}; ");
     }
 
     @Test

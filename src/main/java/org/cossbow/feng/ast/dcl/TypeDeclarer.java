@@ -70,7 +70,9 @@ public class TypeDeclarer extends Entity {
     }
 
     public boolean required() {
-        return maybeRefer().match(Refer::required);
+        var r = maybeRefer();
+        // 值类型直接判定为”required“
+        return r.none() || r.get().required();
     }
 
     public boolean hasTemplate() {
