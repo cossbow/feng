@@ -20,6 +20,9 @@ public class TypeDefinition extends Definition {
         return domain;
     }
 
+    public boolean newable() {
+        return false;
+    }
 
     //
 

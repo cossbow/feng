@@ -9,7 +9,7 @@ import org.cossbow.feng.util.Optional;
 import java.util.List;
 
 public class ArrayExpression extends PrimaryExpression {
-    private final List<Expression> elements;
+    private List<Expression> elements;
     private final Optional<ArrayTypeDeclarer> type;
 
     public ArrayExpression(Position pos,
@@ -29,12 +29,24 @@ public class ArrayExpression extends PrimaryExpression {
         return elements;
     }
 
+    public void elements(List<Expression> elements) {
+        this.elements = elements;
+    }
+
     public Optional<ArrayTypeDeclarer> type() {
         return type;
     }
 
     public int size() {
         return elements.size();
+    }
+
+    public boolean isEmpty() {
+        return elements.isEmpty();
+    }
+
+    public Expression get(int i) {
+        return elements.get(i);
     }
 
     @Override

@@ -1,9 +1,11 @@
 package org.cossbow.feng.ast.dcl;
 
+import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Field;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.util.Optional;
 
 public class ArrayTypeDeclarer extends TypeDeclarer
@@ -82,6 +84,21 @@ public class ArrayTypeDeclarer extends TypeDeclarer
     }
 
     //
+
+    public static ArrayTypeDeclarer make(
+            TypeDeclarer et, int len, Entity e) {
+        var l = new IntegerLiteral(e.pos(), len).expr();
+        var t = new ArrayTypeDeclarer(e.pos(), et,
+                Optional.of(l), Optional.empty(), true);
+        t.len(len);
+        return t;
+    }
+
+    public static ArrayTypeDeclarer make(
+            TypeDeclarer et, Optional<Refer> r, Entity e) {
+        return new ArrayTypeDeclarer(e.pos(), et, Optional.empty(),
+                r, false);
+    }
 
     public Optional<ArrayField> getField(Identifier name) {
         if (LengthField.name().equals(name))

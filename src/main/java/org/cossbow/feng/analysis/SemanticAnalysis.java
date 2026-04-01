@@ -386,9 +386,9 @@ public class SemanticAnalysis {
         td.element(analyse(td.element()));
         if (td.length().has()) {
             var l = td.length().get();
-            var s = calcSize(l);
-            td.length(Optional.of(new LiteralExpression(l.pos(), s)));
-            td.len(s.value().longValue());
+            var g = calcSize(l);
+            td.length(Optional.of(g.b()));
+            td.len(g.a().value().longValue());
         } else {
             analyse(td.refer().must());
         }
@@ -530,7 +530,7 @@ public class SemanticAnalysis {
             return;
         }
 
-        var v = calcSize(bf).value().intValue();
+        var v = calcSize(bf).a().value().intValue();
         if (v > 0 && v <= ptd.primitive().width) {
             sf.bits(v);
             return;
@@ -1065,7 +1065,6 @@ public class SemanticAnalysis {
     private boolean enablePhantom(Refer lr, Expression e) {
         return switch (e) {
             case IndexOfExpression ee -> enablePhantom(lr, ee);
-            case LiteralExpression ee -> enablePhantom(lr, ee);
             case MemberOfExpression ee -> enablePhantom(lr, ee);
             case ParenExpression ee -> enablePhantom(lr, ee.child());
             case VariableExpression ee -> enablePhantom(lr, ee.variable());
@@ -1116,11 +1115,6 @@ public class SemanticAnalysis {
         return semantic("can't convert var-refer-field to phantom-refer: %s", e.pos());
     }
 
-    private boolean enablePhantom(Refer lr, LiteralExpression e) {
-        return e.literal() instanceof StringLiteral
-                || e.literal() instanceof NilLiteral;
-    }
-
     //
 
     private Statement analyse(Statement s) {
@@ -1160,77 +1154,6 @@ public class SemanticAnalysis {
             analyse(s);
         if (bs.newScope()) context.exitScope(bs);
         return bs;
-    }
-
-    private <F extends Field> void checkInitField(
-            GenericMap gm, IdentifierTable<F> fields,
-            ObjectTypeDeclarer odt, ObjectExpression oe) {
-        for (var f : fields) {
-            var o = oe.entries().tryGet(f.name());
-            if (o.none()) {
-                if (!f.immutable()) continue;
-                semantic("const field must init: %s",
-                        oe.pos());
-                return;
-            }
-
-            var v = o.get();
-            var l = gm.mapIf(f.type());
-            var r = odt.entries().get(f.name());
-            var able = assignable(l, r, o, v);
-            if (!able) {
-                semantic(
-                        "incompatible field '%s' and value '%s': %s",
-                        f.name(), v, v.pos());
-                return;
-            }
-        }
-    }
-
-    private boolean initializable(
-            DerivedTypeDeclarer dtd, StructureDefinition sd,
-            ObjectTypeDeclarer odt, ObjectExpression oe) {
-        if (sd.domain() == TypeDomain.UNION) {
-            if (oe.entries().size() > 1)
-                return semantic("union only can init one field: %s",
-                        oe.entries().getKey(1).pos());
-        }
-        checkInitField(dtd.gm(), sd.fields(), odt, oe);
-        for (var k : oe.entries().keys()) {
-            if (sd.fields().exists(k)) continue;
-            return semantic("field '%s' not defined: %s", k, k.pos());
-        }
-        return true;
-    }
-
-    private boolean initializable(
-            DerivedTypeDeclarer dtd, ClassDefinition cd,
-            ObjectTypeDeclarer odt, ObjectExpression oe) {
-        var fields = cd.allFields();
-        checkInitField(dtd.gm(), fields, odt, oe);
-        for (var k : oe.entries().keys()) {
-            if (fields.exists(k)) continue;
-            return semantic("unknown field '%s': %s", k, k.pos());
-        }
-        return true;
-    }
-
-    // 字段初始化分析
-    private boolean initializable(
-            DerivedTypeDeclarer l,
-            ObjectTypeDeclarer o, ObjectExpression oe) {
-        o.lt.set(l);
-
-        if (oe.entries().isEmpty()) return true;
-        var lt = l.def();
-
-        if (lt instanceof StructureDefinition def)
-            return initializable(l, def, o, oe);
-
-        if (lt instanceof ClassDefinition def)
-            return initializable(l, def, o, oe);
-
-        return unreachable();
     }
 
     private boolean assignable(ClassDefinition l, ClassDefinition r) {
@@ -1610,7 +1533,6 @@ public class SemanticAnalysis {
         }
 
         if (re.match(v -> v instanceof ArrayExpression)) {
-            if (r.element() instanceof VoidTypeDeclarer) return true;
             if (!l.literal() && l.len() < r.len()) {
                 return semantic("index out of bound: %s", r.pos());
             }
@@ -1626,23 +1548,6 @@ public class SemanticAnalysis {
 
         if (r instanceof LiteralTypeDeclarer)
             return assignValue(l, (LiteralExpression) re.must());
-
-        if (r instanceof ObjectTypeDeclarer ro) {
-            if (l instanceof DerivedTypeDeclarer ld)
-                return initializable(ld, ro,
-                        (ObjectExpression) re.must());
-            if (l instanceof ObjectTypeDeclarer lo) {
-                var oe = (ObjectExpression) re.must();
-                if (lo.dtd().has()) {
-                    if (ro.dtd().has())
-                        return lo.dtd().equals(ro.dtd());
-                    return initializable(lo.dtd().get(), ro, oe);
-                } else {
-                    if (ro.dtd().none()) return true;
-                    return initializable(ro.dtd().get(), lo, oe);
-                }
-            }
-        }
 
         if (r instanceof ArrayTypeDeclarer ra) {
             // 数组比较复杂，虚比较每一层的元素
@@ -1674,10 +1579,6 @@ public class SemanticAnalysis {
                 if (compatible(ld, rd, e))
                     return true;
             }
-            if (l instanceof ObjectTypeDeclarer lo) {
-                if (re.must() instanceof ObjectExpression oe)
-                    return initializable(rd, lo, oe);
-            }
             if (l instanceof EnumTypeDeclarer ld)
                 return ld.def().equals(rd.def());
         }
@@ -1701,7 +1602,8 @@ public class SemanticAnalysis {
             return false;
 
         var lr = l.maybeRefer();
-        if (lr.none()) return assignValue(l, r, re, e);
+        if (lr.none())
+            return assignValue(l, r, re, e);
 
         return assignRefer(l, r, re, e);
     }
@@ -1727,6 +1629,7 @@ public class SemanticAnalysis {
 
     private void analyse(Assignment a) {
         var og = optimize(a.operand());
+        a.value().expectType.set(og.b());
         var vg = optimize(a.value());
         if (vg.b() instanceof VoidTypeDeclarer) {
             semantic("%s used as a value, but it returns nothing: %s",
@@ -1749,44 +1652,23 @@ public class SemanticAnalysis {
         return as;
     }
 
-    private TypeDeclarer fromLiteral(TypeDeclarer td, boolean enablePhantom) {
+    private TypeDeclarer fromLiteral(TypeDeclarer td) {
         if (td instanceof LiteralTypeDeclarer ltd) {
             var p = ltd.literal().compatible();
             if (p.has())
                 return p.must().declarer(td.pos());
             if (ltd.literal() instanceof StringLiteral sl) {
-                return sl.array(Optional.of(enablePhantom ? PHANTOM : STRONG));
+                return sl.array(Optional.of(PHANTOM));
             }
             return semantic("auto type-infer can't support %s: %s",
-                    td, td.pos());
-        } else if (td instanceof ArrayTypeDeclarer atd) {
-            var ntd = fromLiteral(atd.element(), false);
-            var na = new ArrayTypeDeclarer(atd.pos(), ntd,
-                    atd.length(), atd.refer(), atd.literal());
-            na.len(atd.len());
-            na.unit(atd.unit());
-            analyse(na);
-            return na;
-        } else if (td instanceof ObjectTypeDeclarer ||
-                td instanceof VoidTypeDeclarer) {
-            return semantic("can't infer type from %s: %s",
                     td, td.pos());
         }
         return td;
     }
 
-    private TypeDeclarer literal2Std(TypeDeclarer t) {
-        if (t instanceof ObjectTypeDeclarer ||
-                t instanceof LiteralTypeDeclarer ||
-                (t instanceof ArrayTypeDeclarer at
-                        && at.literal())) {
-            return fromLiteral(t, true);
-        }
-        return t;
-    }
-
     private void initVar(Variable v) {
         var e = v.value().must();
+        e.expectType.set(v.type());
         var g = optimize(e);
         v.value().set(g.a());
         var t = g.b();
@@ -1809,7 +1691,7 @@ public class SemanticAnalysis {
             semantic("incompatible, can't use '%s' as '%s': %s",
                     t, l, v.pos());
         } else {
-            v.type().set(literal2Std(t));
+            v.type().set(fromLiteral(t));
         }
     }
 
@@ -1897,7 +1779,8 @@ public class SemanticAnalysis {
             e.target.set(fs);
             return e;
         }
-        return semantic("break label '%s' is marked for-loop: %s", e.pos());
+        return semantic("break label '%s' is marked for-loop: %s",
+                e.label(), e.pos());
     }
 
     private Statement analyse(ContinueStatement e) {
@@ -1914,7 +1797,8 @@ public class SemanticAnalysis {
             e.target.set(fs);
             return e;
         }
-        return semantic("continue label '%s' is marked for-loop: %s", e.pos());
+        return semantic("continue label '%s' is marked for-loop: %s",
+                e.label(), e.pos());
     }
 
     private Statement analyse(ForStatement e) {
@@ -2156,6 +2040,7 @@ public class SemanticAnalysis {
                     protName(), e.pos());
 
         var er = e.result().get();
+        er.expectType.set(pr.get());
         var g = optimize(er);
         e.result(Optional.of(g.a()));
         if (assignable(pr.get(), g.b(), e.result(), e)) return e;
@@ -2579,7 +2464,7 @@ public class SemanticAnalysis {
             return Groups.g2(new LiteralExpression(e.pos(), lit), td);
         }
 
-        return semantic("not support %s %s %s: %s", l, op, r, e.pos());
+        return unreachable();
     }
 
     private boolean referCompare(
@@ -2597,24 +2482,6 @@ public class SemanticAnalysis {
                     Optional.empty(), e);
         }
         return false;
-    }
-
-    private Optional<TypeDeclarer> referBinOp(
-            TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
-        Optional<TypeDeclarer> ret = Optional.of(
-                Primitive.BOOL.declarer(e.pos()));
-
-        var lr = l.maybeRefer();
-        var rr = r.maybeRefer();
-        if (lr.none() && rr.none()) // value type, directly compare
-            return l.equals(r) ? ret : Optional.empty();
-
-        if (lr.has() || rr.has()) {
-            if (referCompare(l, r, e))
-                return ret;
-        }
-
-        return Optional.empty();
     }
 
     private Optional<TypeDeclarer> primitiveBinOp(
@@ -2905,6 +2772,7 @@ public class SemanticAnalysis {
         for (int i = 0; i < left.size(); i++) {
             var l = left.get(i);
             var a = args.get(i);
+            a.expectType.set(l);
             var ag = optimize(a);
             if (!assignable(l, ag.b(), Optional.of(ag.a()), a))
                 return semantic("can't use %s(type '%s') as type '%s': %s",
@@ -3236,117 +3104,99 @@ public class SemanticAnalysis {
                 e.member(), e.pos());
     }
 
-    private TypeDeclarer optimize(NewArrayType e) {
-        analyse(e.element());
-
-        var ref = new Refer(e.pos(), STRONG, true, false);
-        var lg = optimize(e.length());
-        if (lg.b() instanceof PrimitiveTypeDeclarer ptd &&
-                ptd.primitive().isInteger() ||
-                lg.b() instanceof LiteralTypeDeclarer ltd &&
-                        ltd.isInteger()) {
-            e.length(lg.a());
-            return new ArrayTypeDeclarer(e.pos(), e.element(),
-                    Optional.empty(), Optional.of(ref));
+    private Groups.G2<Expression, TypeDeclarer>
+    analyseNewType(NewExpression e, PrimitiveType pt) {
+        var ref = Optional.of(new Refer(
+                e.pos(), STRONG, true, false));
+        var td = pt.primitive().declarer(e.pos(), ref);
+        if (e.arg().none()) {
+            return Groups.g2(e, td);
+        }
+        var g = optimize(e.arg().get());
+        var argType = pt.primitive().declarer(e.pos(), Optional.empty());
+        if (assignable(argType, g.b(), Optional.of(g.a()), e)) {
+            var n = new NewExpression(e.pos(), e.type(), Optional.of(g.a()));
+            return Groups.g2(n, td);
         }
 
-        return semantic("array length must be integer: %s",
-                e.length().pos());
+        return semantic("'%s' can't init with '%s' value: %s",
+                pt, g.b(), e.pos());
     }
 
-    private TypeDeclarer optimize(NewDefinedType e) {
-        var ref = new Refer(e.pos(), STRONG, true, false);
-        if (e.type() instanceof PrimitiveType pt) {
-            return new PrimitiveTypeDeclarer(e.pos(),
-                    pt.primitive(), Optional.of(ref));
+    private Groups.G2<Expression, TypeDeclarer>
+    analyseNewType(NewExpression e, DerivedType dt) {
+        var def = findDef(dt);
+        if (!def.newable()) {
+            return semantic("can't new type %s: %s", e.type(), e.type().pos());
         }
-        if (e.type() instanceof DerivedType dt) {
-            var def = findDef(dt);
-            if (def instanceof StructureDefinition ||
-                    def instanceof ClassDefinition ||
-                    def instanceof EnumDefinition) {
-                return new DerivedTypeDeclarer(e.pos(),
-                        dt, Optional.of(ref));
-            }
+
+        var ref = Optional.of(new Refer(
+                e.pos(), STRONG, true, false));
+        var dtd = new DerivedTypeDeclarer(e.pos(), dt, ref);
+        if (e.arg().none()) {
+            return Groups.g2(e, dtd);
         }
-        return semantic("can't new type %s: %s",
-                e.type(), e.type().pos());
+        var arg = e.arg().get();
+        var atd = new DerivedTypeDeclarer(e.pos(), dt, Optional.empty());
+        arg.expectType.set(atd); // for ObjectExpression
+        var g = optimize(arg);
+        if (assignable(atd, g.b(), Optional.of(g.a()), e)) {
+            var n = new NewExpression(e.pos(), e.type(), Optional.of(g.a()));
+            return Groups.g2(n, dtd);
+        }
+
+        return semantic("'%s' can't init with '%s': %s",
+                dt, arg, e.pos());
     }
 
-    private TypeDeclarer optimize(NewType e) {
-        return switch (e) {
-            case NewArrayType ee -> optimize(ee);
-            case NewDefinedType ee -> optimize(ee);
+    private Groups.G2<Expression, TypeDeclarer>
+    analyseNewType(NewExpression e, NewDefinedType nt) {
+        return switch (nt.type()) {
+            case PrimitiveType pt -> analyseNewType(e, pt);
+            case DerivedType dt -> analyseNewType(e, dt);
             case null, default -> unreachable();
         };
     }
 
-    private boolean newInitializable(
-            NewExpression e, TypeDeclarer dstType,
-            TypeDeclarer argType, Expression arg) {
-        if (e.type() instanceof NewDefinedType ndt) {
-            if (ndt.type() instanceof PrimitiveType pt) {
-                if (argType instanceof PrimitiveTypeDeclarer ptd) {
-                    // 初始化检查
-                    return pt.primitive() == ptd.primitive();
-                } else if (argType instanceof LiteralTypeDeclarer ltd) {
-                    return ltd.literal().compatible()
-                            .match(k -> k.kind == pt.primitive().kind);
-                }
-            } else if (ndt.type() instanceof DerivedType dt) {
-                // 定义类型检查
-                if (argType instanceof DerivedTypeDeclarer atd) {
-                    return dt.equals(atd.derivedType());
-                } else if (argType instanceof ObjectTypeDeclarer atd) {
-                    // 对象初始化表达式
-                    var dtd = (DerivedTypeDeclarer) dstType.derefer().must();
-                    return initializable(dtd, atd, (ObjectExpression) arg);
-                }
-            }
-        } else if (e.type() instanceof NewArrayType nat) {
-            if (argType instanceof ArrayTypeDeclarer atd) {
-                var net = nat.element();
-                var aet = atd.element();
-                if (!(arg instanceof ArrayExpression ae))
-                    return assignable(net, aet, Optional.empty(), arg);
+    private Groups.G2<Expression, TypeDeclarer>
+    analyseNewArray(NewExpression e, NewArrayType nt) {
+        nt.element(analyse(nt.element()));
 
-                var i = 0;
-                for (var ev : ae.elements()) {
-                    if (assignable(net, aet, Optional.of(ev), ev)) {
-                        i++;
-                        continue;
-                    }
-                    return semantic(
-                            "array element at %d not match type %s: %s",
-                            i, nat.element(), ev.pos());
-                }
-                return true;
-            }
+        var lg = optimize(nt.length());
+        if (!(lg.b().isInteger())) {
+            return semantic("array length need integer: '%s' %s",
+                    nt.length(), nt.length().pos());
+        }
+        nt.length(lg.a());
+
+        var ref = new Refer(nt.pos(), STRONG, true, false);
+        var td = ArrayTypeDeclarer.make(nt.element(), Optional.of(ref), e);
+        if (e.arg().none()) {
+            return Groups.g2(e, td);
         }
 
-        return false;
+        var arg = e.arg().get();
+        var etd = ArrayTypeDeclarer.make(nt.element(), Optional.empty(), e);
+        arg.expectType.set(etd); // for ArrayExpression
+        var ag = optimize(arg);
+        if (ag.b() instanceof ArrayTypeDeclarer atd &&
+                assignable(nt.element(), atd.element(), Optional.empty(), e)) {
+            var n = new NewExpression(e.pos(), nt, Optional.of(ag.a()));
+            return Groups.g2(n, td);
+        }
+
+        return semantic("value '%s' can't init array '%s': %s",
+                arg, nt, arg.pos());
     }
 
-    private Groups.G2<Expression, TypeDeclarer> optimize(NewExpression e) {
-        var dstType = optimize(e.type());
-        var ea = e.arg().map(this::optimize);
-        if (ea.none()) {
-            var n = new NewExpression(e.pos(), e.type(), Optional.empty());
-            n.resultType.set(dstType);
-            return Groups.g2(n, dstType);
+    private Groups.G2<Expression, TypeDeclarer>
+    optimize(NewExpression e) {
+        if (e.type() instanceof NewDefinedType nt) {
+            return analyseNewType(e, nt);
+        } else if (e.type() instanceof NewArrayType nt) {
+            return analyseNewArray(e, nt);
         }
-        var ag = ea.get();
-        var arg = ag.a();
-        var argType = ag.b();
-        var n = new NewExpression(e.pos(), e.type(), Optional.of(arg));
-        n.resultType.set(dstType);
-
-        if (newInitializable(e, dstType, argType, arg)) {
-            return Groups.g2(n, dstType);
-        }
-
-        return semantic("new-type %s and init-type %s not match: %s",
-                e.type(), argType, arg.pos());
+        return unreachable();
     }
 
 
@@ -3451,93 +3301,114 @@ public class SemanticAnalysis {
         return findSymbol(e);
     }
 
-    private TypeDeclarer analyseArrayNest(
-            List<Groups.G2<Expression, TypeDeclarer>> gs) {
-        var o = gs.stream().max(Comparator.comparingLong(g -> {
-            var t = (ArrayTypeDeclarer) g.b();
-            return t.len();
-        }));
-        if (o.isEmpty()) return unreachable();
-        return o.get().b();
+    private boolean isCompoundLiteral(Expression e) {
+        return e instanceof ArrayExpression ||
+                e instanceof ObjectExpression;
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(ArrayExpression e) {
-        var es = e.elements();
-        e.type().use(this::analyse);
-
-        if (es.isEmpty()) {
-            if (e.type().has()) return Groups.g2(e, e.type().get());
-
-            var l = new LiteralExpression(e.pos(), new IntegerLiteral(e.pos(), 0));
-            var t = new ArrayTypeDeclarer(e.pos(), new VoidTypeDeclarer(e.pos()),
-                    Optional.of(l), Optional.empty(), true);
-            t.len(0);
-            return Groups.g2(e, t);
-        }
         e.type().use(t -> {
-            if (t.len() >= e.size()) return;
-            semantic("array length '%s' less than number of values: %s",
-                    t.length(), t.pos());
+            if (t.length().none()) {
+                t.len(e.size());
+                return;
+            }
+            var l = t.length().get();
+            var g = calcSize(l);
+            t.length(Optional.of(g.b()));
+            t.len(g.a().value().longValue());
         });
 
-        var gs = es.stream().map(this::optimize).toList();
-        var et = gs.getFirst().b();
-        if (gs.getFirst().b() instanceof ArrayTypeDeclarer _at
-                && _at.refer().none()) { // 如果是嵌套数组，找最长的
-            et = analyseArrayNest(gs);
-        }
-        var values = new ArrayList<Expression>(e.size());
-        var i = 0;
-        for (var g : gs) {
-            values.add(g.a());
-            var v = es.get(i);
-
-            var a = Optional.of(g.a());
-            if (e.type().has()) {
-                var t = e.type().get();
-                if (!assignable(t.element(), g.b(), a, g.a()))
-                    return semantic("can't use '%s' as type '%s': %s",
-                            v, t.element(), v.pos());
-                g.a().resultType.set(t);
-            } else {
-                if (!assignable(et, g.b(), a, g.a())) {
-                    return semantic("type incompatible of value '%s' and value '%s': %s",
-                            et, v, v.pos());
-                }
-                g.a().resultType.set(et);
+        ArrayTypeDeclarer td;
+        if (e.type().has()) {
+            td = e.type().get();
+        } else {
+            var o = e.expectType.get();
+            if (o.none()) return semantic("missing type-declarer: %s", e.pos());
+            if (!(o.get() instanceof ArrayTypeDeclarer atd)) {
+                return semantic("can't use '%s' as type '%s': %s",
+                        e, o, e.pos());
             }
+            if (atd.refer().has())
+                return semantic("can't init an array-reference: %s", e.pos());
+            if (atd.length().none()) atd.len(e.size());
+            td = atd;
         }
-        var n = new ArrayExpression(e.pos(), values, e.type());
-        if (e.type().has()) return Groups.g2(n, e.type().get());
 
-        var length = new IntegerLiteral(e.pos(), es.size());
-        var le = new LiteralExpression(e.pos(), length);
+        if (td.len() < e.size()) {
+            var v = e.elements().get(td.len().intValue());
+            return semantic("excess elements in array initializer: %s", v.pos());
+        }
+        if (e.isEmpty()) return Groups.g2(e, td);
 
-        var atd = new ArrayTypeDeclarer(e.pos(),
-                e.type().map(ArrayTypeDeclarer::element).getOrElse(et),
-                Optional.of(le), Optional.empty(), true);
-        atd.len(es.size());
-        return Groups.g2(n, atd);
+        var es = e.elements();
+        var values = new ArrayList<Expression>(e.size());
+        for (var v : es) {
+            var vt = analyse(td.element());
+            td.element(vt);
+            v.expectType.set(vt);
+            var g = optimize(v);
+            if (!isCompoundLiteral(v) &&
+                    !assignable(vt, g.b(), Optional.of(g.a()), v)) {
+                return semantic("can't use '%s' as type '%s': %s",
+                        v, vt, v.pos());
+            }
+            values.add(g.a());
+        }
+        e.elements(values);
+        return Groups.g2(e, td);
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(ObjectExpression oe) {
-        oe.type().use(this::analyse);
-
-        var entries = new IdentifierTable<Expression>(oe.entries().size());
-        var types = new IdentifierTable<TypeDeclarer>(oe.entries().size());
-        for (var n : oe.entries().nodes()) {
-            var g = optimize(n.value());
-            entries.add(n.key(), g.a());
-            types.add(n.key(), g.b());
+        TypeDeclarer t;
+        if (oe.type().has()) {
+            t = analyse(oe.type().get());
+        } else {
+            var o = oe.expectType.get();
+            if (o.none()) return semantic("missing type-declarer: %s", oe.pos());
+            t = o.get();
         }
-        var ot = new ObjectTypeDeclarer(oe.pos(), types, oe.type());
+        if (!(t instanceof DerivedTypeDeclarer dtd))
+            return semantic("type '%s' can't init by '%s': %s", t, oe, oe.pos());
+        var def = dtd.def();
+        if (dtd.refer().has())
+            return semantic("can't init %s-reference: %s",
+                    dtd.derivedType(), oe.pos());
+
+        IdentifierTable<? extends Field> fields = switch (def) {
+            case StructureDefinition sd -> sd.fields();
+            case ClassDefinition cd -> cd.allFields();
+            case null, default -> semantic("type '%s' can't define fields: %s", def, oe.pos());
+        };
+        if (def.domain() == TypeDomain.UNION && oe.entries().size() > 1) {
+            return semantic("union only can init one field: %s",
+                    oe.entries().getKey(1).pos());
+        }
+        for (var f : fields) {
+            if (oe.entries().exists(f.name())) continue;
+            if (!f.immutable()) continue;
+            return semantic("const field '%s' must init: %s", f.name(), oe.pos());
+        }
+        var entries = new IdentifierTable<Expression>(oe.entries().size());
+        for (var n : oe.entries().nodes()) {
+            var o = fields.tryGet(n.key());
+            if (o.none()) {
+                return semantic("type '%s' had no field '%s': %s",
+                        def, n.key(), n.key().pos());
+            }
+            var f = o.get();
+            var v = n.value();
+            var ft = dtd.gm().mapIf(f.type());
+            v.expectType.set(ft);
+            var g = optimize(v);
+            if (!isCompoundLiteral(v) &&
+                    !assignable(ft, g.b(), Optional.of(g.a()), v))
+                return semantic("can't use '%s' as type '%s': %s",
+                        v, ft, v.pos());
+            entries.add(n.key(), g.a());
+        }
+
         var n = new ObjectExpression(oe.pos(), entries, oe.type());
-        if (!oe.type().has()) return Groups.g2(n, ot);
-
-        var dtd = oe.type().get();
-        if (initializable(dtd, ot, n)) return Groups.g2(n, dtd);
-
-        return semantic("can't init: %s", n.pos());
+        return Groups.g2(n, dtd);
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(ParenExpression e) {
@@ -3576,27 +3447,22 @@ public class SemanticAnalysis {
         return unsupported("pairs");
     }
 
-    private Optional<IntegerLiteral> tryCalcInteger(Expression s) {
-        var g = optimize(s);
+    private IntegerLiteral calcInteger(Expression e) {
+        var g = optimize(e);
         if (g.a() instanceof LiteralExpression le &&
                 le.literal() instanceof IntegerLiteral il) {
-            return Optional.of(il);
+            return il;
         }
-        return Optional.empty();
-    }
-
-    private IntegerLiteral calcInteger(Expression e) {
-        var v = tryCalcInteger(e);
-        if (v.has()) return v.get();
         return semantic("require integer: %s %s", e, e.pos());
     }
 
-    private IntegerLiteral calcSize(Expression e) {
+    private Groups.G2<IntegerLiteral, LiteralExpression>
+    calcSize(Expression e) {
         var g = optimize(e);
         if (g.a() instanceof LiteralExpression le &&
                 le.literal() instanceof IntegerLiteral il &&
                 il.value().compareTo(BigInteger.ZERO) >= 0) {
-            return il;
+            return Groups.g2(il, le);
         }
         return semantic("require non-negative integer: %s", e);
     }

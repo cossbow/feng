@@ -19,6 +19,10 @@ public class NewArrayType extends NewType {
         return element;
     }
 
+    public void element(TypeDeclarer element) {
+        this.element = element;
+    }
+
     public Expression length() {
         return length;
     }

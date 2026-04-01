@@ -94,6 +94,9 @@ public class ClassDefinition extends ObjectDefinition {
         return macros;
     }
 
+    public boolean newable() {
+        return true;
+    }
 
     //
 

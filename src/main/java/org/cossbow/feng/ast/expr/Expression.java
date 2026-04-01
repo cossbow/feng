@@ -20,6 +20,8 @@ public class Expression extends Entity {
     // 表达式推导出来的类型缓存在这里
     public final Lazy<TypeDeclarer> resultType = Lazy.nil();
 
+    // 对于复合字面量，需要在顶层指定类型，这里放置左边的类型
+    public final Lazy<TypeDeclarer> expectType = Lazy.nil();
 
     //
 

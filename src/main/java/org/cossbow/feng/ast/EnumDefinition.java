@@ -34,6 +34,11 @@ public class EnumDefinition extends TypeDefinition {
         return values.getValue(id);
     }
 
+    public boolean newable() {
+        return true;
+    }
+
+
     public static final class Value extends Entity {
         private final int id;
         private final Identifier name;

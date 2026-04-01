@@ -4,7 +4,6 @@ import org.cossbow.feng.ast.Field;
 import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
-import org.cossbow.feng.ast.dcl.ObjectTypeDeclarer;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
 
@@ -46,8 +45,6 @@ public class ObjectExpression extends PrimaryExpression {
         var t = resultType.must();
         if (t instanceof DerivedTypeDeclarer dtd)
             return dtd;
-        if (t instanceof ObjectTypeDeclarer otd)
-            return otd.lt.must();
         throw new ErrorUtil.UnreachableException();
     }
 

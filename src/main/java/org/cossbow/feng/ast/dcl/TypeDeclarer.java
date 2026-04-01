@@ -61,6 +61,10 @@ public class TypeDeclarer extends Entity {
         return false;
     }
 
+    public boolean isInteger() {
+        return false;
+    }
+
     public boolean isVoid() {
         return false;
     }

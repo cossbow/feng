@@ -24,6 +24,10 @@ public class StructureDefinition extends TypeDefinition {
         return fields;
     }
 
+    public boolean newable() {
+        return true;
+    }
+
     //
 
     private int pack = 0;

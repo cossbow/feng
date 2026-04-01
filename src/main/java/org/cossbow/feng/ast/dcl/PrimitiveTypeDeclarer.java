@@ -29,7 +29,12 @@ public class PrimitiveTypeDeclarer extends TypeDeclarer
         return primitive.isBool();
     }
 
+    public boolean isInteger() {
+        return primitive.isInteger();
+    }
+
     public Optional<TypeDeclarer> derefer() {
+        if (refer.none()) return Optional.of(this);
         var n = new PrimitiveTypeDeclarer(pos(), primitive,
                 Optional.empty());
         return Optional.of(n);
