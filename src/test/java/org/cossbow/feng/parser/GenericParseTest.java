@@ -83,7 +83,7 @@ public class GenericParseTest extends BaseParseTest {
     public void testTypeConstraint2() {
         for (var g2 : simpleGlobalDefineFmt) {
             for (var d : TypeDomain.values()) {
-                if (d.builtin) continue;
+                if (!d.keyword) continue;
                 var type = randTypeName(2);
                 var param = doParse(g2, type + " " + d.name)
                         .params().get(type);

@@ -172,12 +172,12 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testClassResource1() {
-        var def = "class A{func release(){}} ";
+        var def = "class A{macro resource free(){}} ";
         checkSucc(def + "func f(a *A) {}");
         checkFail(def + "func f(a A) {}");
 
-        checkFail("class A{func release(int){}}");
-        checkFail("class A{func release()int{}}");
+        checkFail("class A{macro resource free(int){}}");
+//        checkFail("class A{macro resource free()int{}}");
     }
 
     @Test

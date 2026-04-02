@@ -108,7 +108,7 @@ public class ClassDefinition extends ObjectDefinition {
     private IdentifierTable<ClassField> allFields = new IdentifierTable<>();
     private IdentifierTable<ClassField> inheritFields = new IdentifierTable<>();
     private IdentifierTable<ClassMethod> allMethods = new IdentifierTable<>();
-    private volatile boolean resource;
+    private final Lazy<ClassMethod> resourceFree = Lazy.nil();
 
     public int id() {
         return id;
@@ -142,16 +142,12 @@ public class ClassDefinition extends ObjectDefinition {
         return allMethods;
     }
 
-    public void allMethods(IdentifierTable<ClassMethod> allMethods) {
-        this.allMethods = allMethods;
-    }
-
     public boolean resource() {
-        return resource;
+        return resourceFree.has() || macros.resourceFree().has();
     }
 
-    public void resource(boolean resource) {
-        this.resource = resource;
+    public Lazy<ClassMethod> resourceFree() {
+        return resourceFree;
     }
 
     //
@@ -164,9 +160,6 @@ public class ClassDefinition extends ObjectDefinition {
     public static int maxId() {
         return IdGenerator.get();
     }
-
-    public static final Identifier ReleaseName = new Identifier(
-            Position.ZERO, "release");
 
     public static final Identifier ObjectName = new Identifier(
             Position.ZERO, "Object");

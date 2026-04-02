@@ -2,7 +2,6 @@ package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 import org.cossbow.feng.util.Lazy;
 
@@ -12,7 +11,8 @@ public class IterableForStatement extends ForStatement {
     private List<Identifier> arguments;
     private PrimaryExpression iterable;
 
-    public IterableForStatement(Position pos, Statement body,
+    public IterableForStatement(Position pos,
+                                BlockStatement body,
                                 List<Identifier> arguments,
                                 PrimaryExpression iterable) {
         super(pos, body);

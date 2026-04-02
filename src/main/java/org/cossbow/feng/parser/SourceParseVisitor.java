@@ -462,7 +462,6 @@ final class SourceParseVisitor
                     name, name.pos(), tp.pos());
         });
         var constraint = this.<TypeConstraint>visitOptional(ctx.typeConstraint());
-        if (constraint.has()) unsupported("generic constraint");
         return new TypeParameter(posOf(ctx), name, constraint);
     }
 
@@ -552,7 +551,6 @@ final class SourceParseVisitor
         var domain = parseDomain(ctx.domain);
         var symbol = defineSymbol(ctx.name);
         var generic = typeParameters(ctx.typeParameters());
-        if (!generic.isEmpty()) unsupported("generic: %s", generic.pos());
         genericStack.push(generic);
         var fields = parseStructureMembers(ctx.structureFieldsDef());
         var def = new StructureDefinition(posOf(ctx), modifier, symbol,
@@ -1276,9 +1274,9 @@ final class SourceParseVisitor
         return new CallStatement(call.pos(), call);
     }
 
-    private Statement wrapInScope(Statement yes) {
-        if (yes instanceof BlockStatement)
-            return yes;
+    private BlockStatement wrapInScope(Statement yes) {
+        if (yes instanceof BlockStatement bs)
+            return bs;
         return new BlockStatement(yes.pos(), List.of(yes));
     }
 

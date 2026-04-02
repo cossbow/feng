@@ -13,7 +13,6 @@ public class MacroFunc extends Macro {
         this.procedure = procedure;
     }
 
-    @Override
     public Identifier name() {
         return procedure.name();
     }

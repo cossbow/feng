@@ -1,14 +1,11 @@
 package org.cossbow.feng.ast.expr;
 
-import org.cossbow.feng.ast.Field;
 import org.cossbow.feng.ast.IdentifierTable;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.stream.Collectors;
 
 public class ObjectExpression extends PrimaryExpression {
@@ -53,8 +50,6 @@ public class ObjectExpression extends PrimaryExpression {
         return true;
     }
 
-    @Deprecated
-    public final List<List<Field>> initStack = new ArrayList<>();
 
     //
 

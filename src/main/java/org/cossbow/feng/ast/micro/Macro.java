@@ -20,4 +20,13 @@ public class Macro extends Entity {
 
     abstract
     public Identifier name();
+
+    public Identifier makeId() {
+        return new Identifier("feng$macro$" + type() + "$" + name());
+    }
+
+    //
+    public String toString() {
+        return type + ":" + name();
+    }
 }

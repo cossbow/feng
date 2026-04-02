@@ -12,7 +12,7 @@ public class ConditionalForStatement extends ForStatement {
     private Optional<Statement> updater;
 
     public ConditionalForStatement(Position pos,
-                                   Statement body,
+                                   BlockStatement body,
                                    Optional<Statement> initializer,
                                    Expression condition,
                                    Optional<Statement> updater) {

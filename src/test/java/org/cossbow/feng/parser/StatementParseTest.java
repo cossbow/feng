@@ -103,7 +103,7 @@ public class StatementParseTest extends BaseParseTest {
         var stmt = (IfStatement) parseStmt(code);
         Assertions.assertTrue(stmt.init().none());
         Assertions.assertEquals(a, varName(stmt.condition()));
-        var call = (CallStatement) stmt.yes();
+        var call = (CallStatement) stmt.yes().get(0);
         Assertions.assertEquals(b, varName(call.call().callee()));
         Assertions.assertTrue(stmt.not().none());
     }
@@ -117,10 +117,11 @@ public class StatementParseTest extends BaseParseTest {
         var stmt = (IfStatement) parseStmt(code);
         Assertions.assertTrue(stmt.init().none());
         Assertions.assertEquals(a, varName(stmt.condition()));
-        var yes = (CallStatement) stmt.yes();
-        Assertions.assertEquals(b, varName(yes.call().callee()));
-        var not = (CallStatement) stmt.not().must();
-        Assertions.assertEquals(c, varName(not.call().callee()));
+        var c1 = (CallStatement) stmt.yes().get(0);
+        Assertions.assertEquals(b, varName(c1.call().callee()));
+        var not = (BlockStatement) stmt.not().must();
+        var c2 = (CallStatement) not.get(0);
+        Assertions.assertEquals(c, varName(c2.call().callee()));
     }
 
     @Test
@@ -133,11 +134,11 @@ public class StatementParseTest extends BaseParseTest {
         var stmt = (IfStatement) parseStmt(code);
         Assertions.assertTrue(stmt.init().none());
         Assertions.assertEquals(a, varName(stmt.condition()));
-        var yes = (CallStatement) stmt.yes();
+        var yes = (CallStatement) stmt.yes().get(0);
         Assertions.assertEquals(b, varName(yes.call().callee()));
         var stmt2 = (IfStatement) stmt.not().must();
         Assertions.assertEquals(c, varName(stmt2.condition()));
-        var yes2 = (CallStatement) stmt2.yes();
+        var yes2 = (CallStatement) stmt2.yes().get(0);
         Assertions.assertEquals(d, varName(yes2.call().callee()));
     }
 
@@ -216,7 +217,7 @@ public class StatementParseTest extends BaseParseTest {
         Assertions.assertSame(BinaryOperator.LT, cond.operator());
         Assertions.assertEquals(i, varName(cond.left()));
         Assertions.assertEquals(n, varName(cond.right()));
-        var assign = (AssignmentsStatement) stmt.body();
+        var assign = (AssignmentsStatement) stmt.body().get(0);
         var lhs = (VariableOperand) assign.list().getFirst().operand();
         Assertions.assertEquals(i, lhs.symbol());
     }
@@ -236,7 +237,7 @@ public class StatementParseTest extends BaseParseTest {
         Assertions.assertSame(BinaryOperator.LT, cond.operator());
         Assertions.assertEquals(symbol(i), varName(cond.left()));
         Assertions.assertEquals(n, varName(cond.right()));
-        var call = ((CallStatement) stmt.body()).call();
+        var call = ((CallStatement) stmt.body().get(0)).call();
         Assertions.assertEquals(c, varName(call.callee()));
         Assertions.assertEquals(symbol(i), varName(call.arguments().getFirst()));
 
@@ -266,7 +267,7 @@ public class StatementParseTest extends BaseParseTest {
         var forStmt = (IterableForStatement) parseStmt(code);
         Assertions.assertEquals(names, forStmt.arguments());
         Assertions.assertEquals(src, varName(forStmt.iterable()));
-        var call = (CallStatement) forStmt.body();
+        var call = (CallStatement) forStmt.body().get(0);
         Assertions.assertEquals(body, varName(call.call().callee()));
     }
 
@@ -356,7 +357,7 @@ public class StatementParseTest extends BaseParseTest {
     public void testLabelBlock() {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":{}");
-        Assertions.assertEquals(name, stmt.label());
+        Assertions.assertEquals(name, stmt.label().name());
         Assertions.assertInstanceOf(BlockStatement.class, stmt.target());
     }
 
@@ -364,7 +365,7 @@ public class StatementParseTest extends BaseParseTest {
     public void testLabelDeclaration() {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ": a();");
-        Assertions.assertEquals(name, stmt.label());
+        Assertions.assertEquals(name, stmt.label().name());
         Assertions.assertInstanceOf(CallStatement.class, stmt.target());
     }
 
@@ -372,7 +373,7 @@ public class StatementParseTest extends BaseParseTest {
     public void testLabelAssignment() {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":a,b,c=1,2,3;");
-        Assertions.assertEquals(name, stmt.label());
+        Assertions.assertEquals(name, stmt.label().name());
         Assertions.assertInstanceOf(AssignmentsStatement.class, stmt.target());
     }
 
@@ -380,7 +381,7 @@ public class StatementParseTest extends BaseParseTest {
     public void testLabelAssignmentOperation() {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":a+=3;");
-        Assertions.assertEquals(name, stmt.label());
+        Assertions.assertEquals(name, stmt.label().name());
         Assertions.assertInstanceOf(AssignmentsStatement.class, stmt.target());
     }
 
@@ -388,7 +389,7 @@ public class StatementParseTest extends BaseParseTest {
     public void testLabelCall() {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":a();");
-        Assertions.assertEquals(name, stmt.label());
+        Assertions.assertEquals(name, stmt.label().name());
         Assertions.assertInstanceOf(CallStatement.class, stmt.target());
     }
 
@@ -396,7 +397,7 @@ public class StatementParseTest extends BaseParseTest {
     public void testLabelIf() {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":if(a>0)acc();");
-        Assertions.assertEquals(name, stmt.label());
+        Assertions.assertEquals(name, stmt.label().name());
         Assertions.assertInstanceOf(IfStatement.class, stmt.target());
     }
 
@@ -404,7 +405,7 @@ public class StatementParseTest extends BaseParseTest {
     public void testLabelSwitch() {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":switch(a){}");
-        Assertions.assertEquals(name, stmt.label());
+        Assertions.assertEquals(name, stmt.label().name());
         Assertions.assertInstanceOf(SwitchStatement.class, stmt.target());
     }
 
@@ -412,7 +413,7 @@ public class StatementParseTest extends BaseParseTest {
     public void testLabelFor() {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":for(a>0)a-=1;");
-        Assertions.assertEquals(name, stmt.label());
+        Assertions.assertEquals(name, stmt.label().name());
         Assertions.assertInstanceOf(ConditionalForStatement.class, stmt.target());
     }
 
@@ -420,7 +421,7 @@ public class StatementParseTest extends BaseParseTest {
     public void testLabelThrow() {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":throw e;");
-        Assertions.assertEquals(name, stmt.label());
+        Assertions.assertEquals(name, stmt.label().name());
         Assertions.assertInstanceOf(ThrowStatement.class, stmt.target());
     }
 
@@ -428,7 +429,7 @@ public class StatementParseTest extends BaseParseTest {
     public void testLabelTry() {
         var name = randVarName(32);
         var stmt = (LabeledStatement) parseStmt(name + ":try{e();}final{}");
-        Assertions.assertEquals(name, stmt.label());
+        Assertions.assertEquals(name, stmt.label().name());
         Assertions.assertInstanceOf(TryStatement.class, stmt.target());
     }
 

@@ -717,8 +717,10 @@ public class CppGenerator {
     void defaultDeconstruct(ObjectDefinition def) {
         if (def instanceof ClassDefinition cd && cd.resource()) {
             write("virtual ~").write(def.symbol().name())
-                    .write("() {");
-            write("this->$release()").endStmt();
+                    .write("() {").newLine();
+            write("this->");
+            write(cd.resourceFree().must().name());
+            write("()").endStmt();
             write('}').newLine();
             return;
         }

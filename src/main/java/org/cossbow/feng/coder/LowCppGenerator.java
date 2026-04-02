@@ -19,6 +19,7 @@ import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.RepeatList;
+import org.cossbow.feng.util.Stack;
 import org.cossbow.feng.visit.SymbolContext;
 
 import java.io.BufferedReader;
@@ -27,6 +28,7 @@ import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
 import static org.cossbow.feng.util.ErrorUtil.*;
@@ -779,7 +781,9 @@ public class LowCppGenerator {
     private void classRelease(ClassDefinition cd) {
         write(cd.symbol()).write("& Feng$release() {").newLine();
         if (cd.resource()) {
-            write("this->release()").endStmt();
+            write("this->");
+            write(cd.resourceFree().must().name());
+            write("()").endStmt();
         }
         cd.inherit().use(pdt -> {
             var pd = (ClassDefinition) findType(pdt);
@@ -1702,30 +1706,48 @@ public class LowCppGenerator {
         };
     }
 
+    private <T> void joinByComma(Iterable<T> s, Consumer<T> w) {
+        var first = true;
+        for (var t : s) {
+            if (first) first = false;
+            else write(',');
+            w.accept(t);
+        }
+    }
+
     private boolean objectInit(
             IdentifierTable<Expression> entries,
-            Iterator<List<Field>> stack) {
+            Iterator<List<? extends Field>> stack) {
         if (!stack.hasNext()) return false;
         var fields = stack.next();
         write('{');
         if (objectInit(entries, stack)) write(',');
-        boolean first = true;
-        for (var f : fields) {
-            if (first) first = false;
-            else write(',');
+        joinByComma(fields, f -> {
             var v = entries.get(f.name());
             write('.').write(f.name()).write('=')
                     .writeValue(v, f.type(), false);
-        }
+        });
         write('}');
         return true;
     }
 
     private LowCppGenerator write(ObjectExpression oe) {
-        if (oe.initStack.isEmpty())
-            return write("{}");
+        if (oe.entries().isEmpty()) return write("{}");
 
-        objectInit(oe.entries(), oe.initStack.iterator());
+        var dtd = oe.dtd();
+        var def = dtd.def();
+        var initStack = new Stack<List<? extends Field>>();
+        if (def instanceof StructureDefinition sd) {
+            initStack.push(sd.fields().values());
+        } else if (def instanceof ClassDefinition cd) {
+            while (true) {
+                initStack.push(cd.fields().values());
+                if (cd.parent().none()) break;
+                cd = cd.parent().must();
+            }
+        }
+
+        objectInit(oe.entries(), initStack.iterator());
 
         return this;
     }

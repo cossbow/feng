@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.micro;
 
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.util.Optional;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,29 +16,40 @@ public class MacroTable {
         add(macro.type(), macro.name(), macro);
     }
 
-    void add(Identifier group, Identifier id, Macro value) {
-        tables.computeIfAbsent(group, g -> new IdentifierTable<>())
+    void add(Identifier type, Identifier id, Macro value) {
+        tables.computeIfAbsent(type, g -> new IdentifierTable<>())
                 .add(id, value);
     }
 
-    public IdentifierTable<Macro> get(Identifier group) {
-        var table = tables.get(group);
+    public IdentifierTable<Macro> get(Identifier type) {
+        var table = tables.get(type);
         if (table == null) {
-            throw new NoSuchElementException("not exists '" + group + "'");
+            throw new NoSuchElementException("not exists '" + type + "'");
         }
         return table;
     }
 
-    public Macro get(Identifier group, Identifier id) {
-        return get(group).get(id);
+    public Macro get(Identifier type, Identifier id) {
+        return get(type).get(id);
     }
 
-    public boolean exists(Identifier group, Identifier id) {
-        var table = tables.get(group);
-        return table != null && table.exists(id);
+    public Optional<Macro> tryGet(Identifier type, Identifier id) {
+        var tab = tables.get(type);
+        if (tab == null) return Optional.empty();
+        return tab.tryGet(id);
     }
 
     public boolean isEmpty() {
         return tables.isEmpty();
     }
+
+    public Optional<Macro> resourceFree() {
+        return tryGet(TYPE_RESOURCE, RESOURCE_FREE);
+    }
+
+    //
+
+    public static final Identifier TYPE_RESOURCE = new Identifier("resource");
+    public static final Identifier RESOURCE_FREE = new Identifier("free");
+
 }

@@ -23,6 +23,10 @@ public class ParameterSet implements Iterable<Variable> {
                 .map(v -> Groups.g2(v.name(), v)).toList());
     }
 
+    public ParameterSet() {
+        variables = new IdentifierTable<>();
+    }
+
     public IdentifierTable<Variable> variables() {
         return variables;
     }

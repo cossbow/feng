@@ -7,6 +7,7 @@ import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
+import org.cossbow.feng.ast.micro.MacroFunc;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
@@ -714,19 +715,6 @@ public class SemanticAnalysis {
         return semantic("require class: %s", dt.symbol());
     }
 
-    private void checkResource(ClassDefinition cd) {
-        var res = cd.allMethods().tryGet(ClassDefinition.ReleaseName);
-        if (res.none()) return;
-        var m = res.get();
-        if (!m.prototype().parameterSet().isEmpty()) {
-            semantic("release method can't has parameter");
-        }
-        if (m.prototype().returnSet().has()) {
-            semantic("release method can't has return");
-        }
-        cd.resource(true);
-    }
-
     private void checkAllInherits(ClassDefinition cd) {
         if (cd.builtin()) return;
         var inheritFields = new IdentifierTable<ClassField>();
@@ -742,7 +730,6 @@ public class SemanticAnalysis {
         cd.allFields().addAll(cd.fields());
         cd.allMethods().addAll(inheritMethods);
         cd.allMethods().addAll(cd.methods());
-        checkResource(cd);
     }
 
     private void checkImplList(
@@ -850,6 +837,8 @@ public class SemanticAnalysis {
 
         declareMethod(cd);
 
+        macro(cd);
+
         enterClass = null;
     }
 
@@ -872,8 +861,6 @@ public class SemanticAnalysis {
         enterClass = cd;
 
         for (var m : cd.methods()) analyse(m);
-
-        macro(cd);
 
         enterClass = null;
     }
@@ -2558,16 +2545,16 @@ public class SemanticAnalysis {
         var t = new PrimitiveTypeDeclarer(e.pos(),
                 Primitive.BOOL, Optional.empty());
 
+        if (!(g.b() instanceof FuncTypeDeclarer)
+                && g.b().maybeRefer().none())
+            return semantic("'%s' can't check-nil: %s", g.a(), e.pos());
+
         if (g.b().required()) {
             // required refer cannot be empty, so direct set to literal-bool
             var n = new LiteralExpression(e.pos(),
                     new BoolLiteral(e.pos(), nil));
             return Groups.g2(n, t);
         }
-
-        if (!(g.b() instanceof FuncTypeDeclarer)
-                && g.b().maybeRefer().none())
-            return semantic("'%s' can't check-nil: %s", g.a(), e.pos());
 
         var s = (PrimaryExpression) g.a();
         var n = wrapRelayExpr(s, t, a -> {
@@ -3646,9 +3633,28 @@ public class SemanticAnalysis {
     // macro
 
     private void macro(ClassDefinition cd) {
-        // TODO: macro
+        var o = cd.macros().resourceFree();
+        o.use(m -> {
+            if (m instanceof MacroFunc mf) {
+                macroResFree(cd, mf);
+            } else {
+                semantic("'%s' must be fun-macro: %s", m, m.pos());
+            }
+        });
     }
 
+    private void macroResFree(ClassDefinition cd, MacroFunc mf) {
+        if (!mf.procedure().params().isEmpty())
+            semantic("'%s' has no parameters: %s", mf, mf.pos());
+
+        var pt = new Prototype(mf.pos(), new ParameterSet(), Optional.empty());
+        var body = new BlockStatement(mf.pos(), mf.procedure().body(), false);
+        var proc = new Procedure(mf.pos(), pt, body, Map.of());
+        var cm = new ClassMethod(mf.pos(), false, Modifier.empty(),
+                mf.makeId(), TypeParameters.empty(), pt, proc, false);
+        cd.methods().add(cm.name(), cm);
+        cd.resourceFree().set(cm);
+    }
 
     // attribute
 

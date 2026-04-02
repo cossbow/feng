@@ -18,7 +18,7 @@ class List {
         head = n;
     }
 
-    func release() {
+    macro resource free() {
         var cur = head;
         for (cur != nil) {
             cur.prev = nil;

@@ -8,14 +8,14 @@ import java.util.List;
 
 abstract
 public class ForStatement extends Statement implements Scope {
-    private Statement body;
+    private BlockStatement body;
 
-    public ForStatement(Position pos, Statement body) {
+    public ForStatement(Position pos, BlockStatement body) {
         super(pos);
         this.body = body;
     }
 
-    public Statement body() {
+    public BlockStatement body() {
         return body;
     }
 
