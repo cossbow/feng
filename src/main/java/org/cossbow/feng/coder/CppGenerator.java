@@ -1284,14 +1284,20 @@ public class CppGenerator {
         return this;
     }
 
-    private CppGenerator writePow(Expression left, Expression right) {
-        return unsupported("幂运算");
-    }
-
     private CppGenerator write(BinaryExpression e) {
         var op = e.operator();
-        if (op == BinaryOperator.POW)
-            return writePow(e.left(), e.right());
+        if (op == BinaryOperator.POW) {
+            if (e.right().resultType.must().isInteger()) {
+                write("Feng$fastPow(");
+                if (e.left().resultType.must().isInteger()) {
+                    write("(Int64)");
+                }
+            } else {
+                write("std::powl(");
+            }
+            write(e.left()).write(',').write(e.right());
+            return write(')');
+        }
 
         String o = switch (op) {
             case MUL -> "*";

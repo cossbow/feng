@@ -15,7 +15,22 @@ public class LiteralComputer {
     static final BigInteger MaxBits = BigInteger.valueOf(64);
     static final BigInteger MaxInt32 = BigInteger.valueOf(Integer.MAX_VALUE);
 
-    static BigInteger pow(BigInteger base, BigInteger exp) {
+    public static BigDecimal pow(BigDecimal base, BigInteger exp) {
+        if (BigInteger.ZERO.equals(exp)) return BigDecimal.ONE;
+        if (BigInteger.ONE.equals(exp)) return base;
+        if (BigInteger.TWO.equals(exp)) return base.multiply(base);
+        if (exp.compareTo(MaxInt32) < 0) return base.pow(exp.intValue());
+
+        BigDecimal result = BigDecimal.ONE;
+        BigInteger i = BigInteger.ZERO;
+        while (i.compareTo(exp) < 0) {
+            result = result.multiply(base);
+            i = i.add(BigInteger.ONE);
+        }
+        return result;
+    }
+
+    public static BigInteger pow(BigInteger base, BigInteger exp) {
         if (BigInteger.ZERO.equals(exp)) return BigInteger.ONE;
         if (BigInteger.ONE.equals(exp)) return base;
         if (BigInteger.TWO.equals(exp)) return base.multiply(base);
@@ -104,7 +119,7 @@ public class LiteralComputer {
         return semantic("float overflow");
     }
 
-    static BigDecimal pow(BigDecimal a, BigDecimal b) {
+    public static BigDecimal pow(BigDecimal a, BigDecimal b) {
         double va = a.doubleValue(), vb = b.doubleValue();
         double vr = Math.pow(va, vb);
         if (Double.isInfinite(vr))

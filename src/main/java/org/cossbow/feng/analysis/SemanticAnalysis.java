@@ -2436,6 +2436,12 @@ public class SemanticAnalysis {
         var op = e.operator();
         var lv = l.literal();
         var rv = r.literal();
+        if (op == BinaryOperator.POW) {
+            var n = new BinaryExpression(e.pos(), op, l, r);
+            var t = l.resultType.must();
+            return Groups.g2(n, t);
+        }
+
         if (lv instanceof IntegerLiteral ill &&
                 rv instanceof IntegerLiteral irl) {
             var lit = computer.calc(op, ill, irl);
@@ -2504,11 +2510,16 @@ public class SemanticAnalysis {
             return Optional.empty();
 
         Primitive.Kind lp = lk.must().kind, rp = rk.must().kind;
-        if (lp != rp)
-            return semantic("require same type: %s", e.pos());
+
+        var op = e.operator();
+        if (op == BinaryOperator.POW) {
+            if (lp == Primitive.Kind.BOOL || rp == Primitive.Kind.BOOL)
+                return Optional.empty();
+            return Optional.of(l);
+        }
+        if (lp != rp) return Optional.empty();
 
         var expect = l instanceof PrimitiveTypeDeclarer ? l : r;
-        var op = e.operator();
         switch (lp) {
             case INTEGER -> {
                 if (BinaryOperator.SetMath.contains(op) ||

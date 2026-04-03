@@ -48,6 +48,31 @@ static T Feng$checkIndex(T index, T bounds) {
 	throw Feng$OutOfBounds();
 }
 
+// 快速幂：计算 a^b
+Int64 Feng$fastPow(Int64 a, Int64 b) {
+	Int64 result = 1;
+	while (b > 0) {
+		if (b & 1) {  // 如果b的二进制位为1
+			result *= a;
+		}
+		a *= a;  // 底数平方
+		b >>= 1; // 右移一位
+	}
+	return result;
+}
+// 快速幂：计算 a^b
+Float64 Feng$fastPow(Float64 a, Int64 b) {
+	Float64 result = 1;
+	while (b > 0) {
+		if (b & 1) {  // 如果b的二进制位为1
+			result *= a;
+		}
+		a *= a;  // 底数平方
+		b >>= 1; // 右移一位
+	}
+	return result;
+}
+
 template<typename T>
 static T *Feng$required(T *p) {
 	if (p != nullptr) return p;
@@ -291,7 +316,7 @@ struct Feng$SRefer {
 	}
 
 	// t.start();
-	T *&operator->() {
+	T *operator->() {
 		Feng$required(t);
 		return t;
 	}
@@ -406,7 +431,7 @@ struct Feng$PRefer {
 	}
 
 	// t.start();
-	T *&operator->() {
+	T *operator->() {
 		Feng$required(t);
 		return t;
 	}

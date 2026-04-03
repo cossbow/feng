@@ -1403,14 +1403,23 @@ public class LowCppGenerator {
         return this;
     }
 
-    private LowCppGenerator writePow(Expression left, Expression right) {
-        return unsupported("幂运算");
+    private LowCppGenerator writePow(BinaryExpression e) {
+        if (e.right().resultType.must().isInteger()) {
+            write("Feng$fastPow(");
+            if (e.left().resultType.must().isInteger()) {
+                write("(Int64)");
+            }
+        } else {
+            write("std::powl(");
+        }
+        write(e.left()).write(',').write(e.right());
+        return write(')');
     }
 
     private LowCppGenerator write(BinaryExpression e) {
         var op = e.operator();
         if (op == BinaryOperator.POW)
-            return writePow(e.left(), e.right());
+            return writePow(e);
 
         String o = switch (op) {
             case MUL -> "*";
