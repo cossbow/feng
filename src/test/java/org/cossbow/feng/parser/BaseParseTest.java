@@ -54,40 +54,29 @@ public class BaseParseTest {
     static final int EDGE_LOWERCASE = EDGE_UPPERCASE + 26;
     static final int EDGE_ALL = EDGE_LOWERCASE + 1;
 
-    static ParseResult doParse(CharStream cs) {
-        return new SourceParser("", StandardCharsets.UTF_8,
-                new ParseSymbolTable()).parse(cs);
+    static Source doParse(CharStream cs) {
+        return new SourceParser(StandardCharsets.UTF_8,
+                new ParseSymbolTable()).parse("", cs);
     }
 
     public static Source doParseFile(String code) {
-        var r = doParse(CharStreams.fromString(code, "test"));
-        Assertions.assertTrue(r.errors().isEmpty(),
-                "parse error: %s".formatted(code));
-        return r.root();
+        return doParse(CharStreams.fromString(code, "test"));
     }
 
     public static Source doParseFile(InputStream is) {
         try {
-            var r = doParse(CharStreams.fromStream(is));
-            Assertions.assertTrue(r.errors().isEmpty(),
-                    "parse error: %s".formatted(r.errors()));
-            return r.root();
+            return doParse(CharStreams.fromStream(is));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    public static Definition doParseFirstDef(String def) {
-        var src = doParseFile(def);
-        return firstDef(src);
-    }
-
     public static Definition firstDef(Source src) {
-        var type = src.types().stream()
+        var type = src.table().namedTypes.stream()
                 .filter(t -> t != ClassDefinition.ObjectClass).findFirst();
         if (type.isPresent()) return type.get();
-        var functions = src.functions();
-        if (!functions.isEmpty()) return functions.getFirst();
+        var functions = src.table().namedFunctions;
+        if (!functions.isEmpty()) return functions.getValue(0);
         return ErrorUtil.syntax("parse fail");
     }
 
@@ -115,7 +104,7 @@ public class BaseParseTest {
 
     public static GlobalVariable doParseDeclaration(String def) {
         var src = doParseFile(def);
-        return src.variables().getFirst();
+        return src.table().variables.getValue(0);
     }
 
     public static final Map<Enum<?>, String> operatorSymbols = Map.ofEntries(
@@ -156,7 +145,7 @@ public class BaseParseTest {
 
     public static FunctionDefinition doParseProc(String def) {
         var src = doParseFile(def);
-        return src.functions().getFirst();
+        return src.table().namedFunctions.getValue(0);
     }
 
     public static Statement doParseLocal(String stmt) {

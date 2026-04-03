@@ -25,6 +25,8 @@ public class ParseSymbolTable {
     public final SymbolTable<GlobalVariable> exportedVariables = new SymbolTable<>();
     public final MacroTable exportedMacros = new MacroTable();
 
+    public final Map<Identifier, Entity> globalNames = new HashMap<>();
+
     //
 
     public final IdentifierTable<TypeDefinition> builtinTypes = new IdentifierTable<>();

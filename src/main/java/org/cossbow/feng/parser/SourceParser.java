@@ -4,31 +4,39 @@ import org.antlr.v4.runtime.*;
 import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.util.ErrorUtil;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 public class SourceParser {
-
-    private final String file;
     private final Charset charset;
-    private final ParseSymbolTable tab;
+    private final ParseSymbolTable table;
 
-    public SourceParser(String file, Charset charset, ParseSymbolTable tab) {
-        this.file = file;
+    public SourceParser(Charset charset, ParseSymbolTable table) {
         this.charset = charset;
-        this.tab = tab;
+        this.table = table;
     }
 
-    public ParseResult parse(CharStream cs) {
+    public Source parse(String file, CharStream cs) {
         var lexer = new FengLexer(cs);
         var ts = new CommonTokenStream(lexer);
         var parser = new FengParser(ts);
         var ec = new ErrorCollector();
         parser.addErrorListener(ec);
-        var visitor = new SourceParseVisitor(file, charset, tab);
-        var root = (Source) visitor.visit(parser.source());
-        return new ParseResult(root, ec.errors);
+        var visitor = new SourceParseVisitor(file, charset, table);
+        return (Source) visitor.visit(parser.source());
+    }
+
+    public Source parse(Path file) {
+        try {
+            return parse(file.toString(),
+                    CharStreams.fromPath(file, charset));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     static class ErrorCollector extends BaseErrorListener

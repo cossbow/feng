@@ -1,14 +1,14 @@
 package org.cossbow.feng.parser;
 
-import org.antlr.v4.runtime.CharStreams;
-import org.cossbow.feng.ast.FModule;
+import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Source;
+import org.cossbow.feng.ast.mod.FModule;
+import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.util.Constants;
-import org.cossbow.feng.util.ErrorUtil;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -22,29 +22,28 @@ public class ModuleParser {
         this.charset = charset;
     }
 
-    private FModule parse(List<Path> list) throws IOException {
+    private FModule parse(Path module, List<Path> files) {
         var table = new ParseSymbolTable();
-        var sources = new ArrayList<Source>(list.size());
-        for (var f : list) {
-            try (var is = Files.newInputStream(f)) {
-                var fn = f.getFileName().toString();
-                if (!fn.endsWith(Constants.SRC_EXT)) continue;
-
-                var cs = CharStreams.fromStream(is, charset);
-                var pr = new SourceParser(fn, charset, table).parse(cs);
-                if (!pr.errors().isEmpty())
-                    ErrorUtil.syntax("parse error: %s", pr.errors());
-                sources.add(pr.root());
-            }
+        var sources = new ArrayList<Source>(files.size());
+        var parser = new SourceParser(charset, table);
+        for (var f : files) {
+            var src = parser.parse(f);
+            sources.add(src);
         }
-        return new FModule(sources, table);
+        var path = new Identifier[module.getNameCount()];
+        for (int i = 0; i < path.length; i++) {
+            path[i] = new Identifier(module.getName(i).toString());
+        }
+        return new FModule(new ModulePath(path), sources, table);
     }
 
-    public FModule parse(Path base, Path module) throws IOException {
+    public FModule parse(Path base, Path module) {
         var fp = base.resolve(module);
         try (var ls = Files.list(fp)) {
-            var list = ls.filter(Files::isRegularFile).toList();
-            return parse(list);
+            var a = ls.filter(Constants.srcTest()).toList();
+            return parse(module, a);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

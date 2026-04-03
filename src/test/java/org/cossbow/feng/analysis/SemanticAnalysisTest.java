@@ -5,16 +5,18 @@ import org.cossbow.feng.ast.UnaryOperator;
 import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.err.SemanticException;
 import org.cossbow.feng.parser.BaseParseTest;
-import org.cossbow.feng.parser.SampleParseTest;
-import org.cossbow.feng.visit.GlobalSymbolContext;
+import org.cossbow.feng.parser.ParseSymbolTable;
+import org.cossbow.feng.parser.SourceParser;
+import org.cossbow.feng.util.Constants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
+import java.io.File;
 import java.util.Arrays;
 import java.util.List;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.cossbow.feng.util.CommonUtil.required;
 
 public class SemanticAnalysisTest {
 
@@ -23,8 +25,7 @@ public class SemanticAnalysisTest {
         System.out.println(code);
         System.out.println("<<<");
         var src = BaseParseTest.doParseFile(code);
-        var ctx = new GlobalSymbolContext(src.table());
-        new SemanticAnalysis(ctx, false).analyse(src);
+        new SemanticAnalysis(src.table(), false).analyse();
     }
 
     void checkFail(String code) {
@@ -2977,29 +2978,21 @@ public class SemanticAnalysisTest {
 
     //
 
-    static InputStream getSample(String name) {
-        return SampleParseTest.class.getResourceAsStream("/analysis/" + name + ".feng");
-    }
-
-    static void parseSample(String name) {
-        System.out.printf("[test]%s.feng\n", name);
-        try (var is = getSample(name)) {
-            Assertions.assertNotNull(is);
-            var src = BaseParseTest.doParseFile(is);
-            var ctx = new GlobalSymbolContext(src.table());
-            new SemanticAnalysis(ctx, false).analyse(src);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    static void parseSample(File file) {
+        System.out.printf("[test]%s.feng\n", file.getName());
+        var parser = new SourceParser(UTF_8, new ParseSymbolTable());
+        var src = parser.parse(file.toPath());
+        new SemanticAnalysis(src.table(), false).analyse();
     }
 
     @Test
     public void testSample() {
-        parseSample("string");
-        parseSample("queue");
-        parseSample("hashmap");
-        parseSample("hashmap-generic");
-        parseSample("generic");
+        var cl = Thread.currentThread().getContextClassLoader();
+        var res=cl.getResource("analysis");
+        var dir = new File(required(res).getFile());
+        for (var file : required(dir.listFiles(Constants.srcFilter()))) {
+            parseSample(file);
+        }
     }
 
 }

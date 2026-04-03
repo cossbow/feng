@@ -16,6 +16,7 @@ import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.micro.*;
 import org.cossbow.feng.ast.mod.Import;
+import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
@@ -53,12 +54,12 @@ final class SourceParseVisitor
 
     final String file;
     final Charset charset;
-    final ParseSymbolTable gst;
+    final ParseSymbolTable tbl;
 
-    public SourceParseVisitor(String file, Charset charset, ParseSymbolTable gst) {
+    public SourceParseVisitor(String file, Charset charset, ParseSymbolTable tbl) {
         this.file = file;
         this.charset = charset;
-        this.gst = gst;
+        this.tbl = tbl;
     }
 
     final IdentifierTable<Import> importModName = new IdentifierTable<>();
@@ -144,10 +145,8 @@ final class SourceParseVisitor
     // module: start
     //
 
-    final Map<Identifier, Entity> globalNames = new HashMap<>();
-
     private void checkGlobalName(Identifier name, Entity def) {
-        var old = globalNames.putIfAbsent(name, def);
+        var old = tbl.globalNames.putIfAbsent(name, def);
         if (old == null) return;
         var m = switch (old) {
             case TypeDefinition d -> d.domain();
@@ -162,21 +161,22 @@ final class SourceParseVisitor
     @Override
     public Entity visitSource(FengParser.SourceContext ctx) {
         var imports = this.<Import>visitList(ctx.import_());
-        var set = new HashSet<List<Identifier>>(imports.size());
+        var set = new HashSet<ModulePath>(imports.size());
         for (var i : imports)
             if (!set.add(i.path()))
                 semantic("duplicate import: %s", i.path());
 
         visitList(ctx.global());
-        return new Source(posOf(ctx), imports, gst);
+        return new Source(posOf(ctx), imports, tbl);
     }
 
     @Override
     public Entity visitImport_(FengParser.Import_Context ctx) {
         var mod = identifiers(ctx.module().Identifier());
+        var path = new ModulePath(mod);
         var alias = identifierOptional(ctx.alias);
         var flat = ctx.flat != null;
-        var im = new Import(posOf(ctx), mod, alias, flat);
+        var im = new Import(posOf(ctx), path, alias, flat);
         if (flat) return im;
         if (alias.has()) importModName.add(alias.get(), im);
         else importModName.add(mod.getLast(), im);
@@ -187,9 +187,9 @@ final class SourceParseVisitor
     public Entity visitGlobalTypeDefinition(FengParser.GlobalTypeDefinitionContext ctx) {
         var def = (TypeDefinition) visit(ctx.def);
         checkGlobalName(def.symbol().name(), def);
-        gst.namedTypes.add(def.symbol().name(), def);
+        tbl.namedTypes.add(def.symbol().name(), def);
         if (isExport(ctx.exportable()))
-            gst.exportedTypes.add(def.symbol(), def);
+            tbl.exportedTypes.add(def.symbol(), def);
         return def;
     }
 
@@ -198,9 +198,9 @@ final class SourceParseVisitor
             FengParser.GlobalFunctionDefinitionContext ctx) {
         var def = (FunctionDefinition) visit(ctx.def);
         checkGlobalName(def.symbol().name(), def);
-        gst.namedFunctions.add(def.symbol().name(), def);
+        tbl.namedFunctions.add(def.symbol().name(), def);
         if (isExport(ctx.exportable()))
-            gst.exportedFunctions.add(def.symbol(), def);
+            tbl.exportedFunctions.add(def.symbol(), def);
         return def;
     }
 
@@ -222,11 +222,11 @@ final class SourceParseVisitor
             gvs.add(gv);
         }
         if (isExport(ctx.exportable())) {
-            for (var v : gvs) gst.exportedVariables.add(v.symbol(), v);
+            for (var v : gvs) tbl.exportedVariables.add(v.symbol(), v);
         }
         for (var v : gvs) {
             checkGlobalName(v.symbol().name(), v);
-            gst.variables.add(v.name(), v);
+            tbl.variables.add(v.name(), v);
         }
         return stmt;
     }
@@ -235,8 +235,8 @@ final class SourceParseVisitor
     public Entity visitGlobalMacro(FengParser.GlobalMacroContext ctx) {
         var exported = isExport(ctx.exportable());
         var macro = (Macro) visit(ctx.macro());
-        if (exported) gst.exportedMacros.add(macro);
-        gst.macros.add(macro);
+        if (exported) tbl.exportedMacros.add(macro);
+        tbl.macros.add(macro);
         return macro;
     }
 
@@ -296,7 +296,7 @@ final class SourceParseVisitor
         var text = tn.getText();
         text = text.substring(1, text.length() - 1);
         var sl = new StringLiteral(posOf(tn), charset, text.getBytes(charset)); // 去掉引号
-        var old = gst.stringCache.putIfAbsent(sl, sl);
+        var old = tbl.stringCache.putIfAbsent(sl, sl);
         return old != null ? old : sl;
     }
 
@@ -569,7 +569,7 @@ final class SourceParseVisitor
         var symbol = defineSymbol(CommonUtil.rand(domain.name));
         var def = new StructureDefinition(pos, Modifier.empty(),
                 symbol, TypeParameters.empty(), domain, fields);
-        gst.namedTypes.add(symbol.name(), def);
+        tbl.namedTypes.add(symbol.name(), def);
         for (var f : fields) f.master().set(def);
         return def;
     }
@@ -647,7 +647,7 @@ final class SourceParseVisitor
             var name = identifier(vc.name);
             var sl = new StringLiteral(name.pos(), charset,
                     name.value().getBytes(charset));
-            var old = gst.stringCache.putIfAbsent(sl, sl);
+            var old = tbl.stringCache.putIfAbsent(sl, sl);
             if (old != null) sl = old;
             var value = this.<Expression>visitOptional(vc.value);
             var ev = new EnumDefinition.Value(posOf(vc), id++,

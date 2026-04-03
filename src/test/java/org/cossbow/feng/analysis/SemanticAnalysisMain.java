@@ -2,7 +2,6 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.parser.BaseParseTest;
-import org.cossbow.feng.visit.GlobalSymbolContext;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -21,8 +20,7 @@ public class SemanticAnalysisMain {
     static void checkSucc(String file) {
         System.out.printf("[check]>>> %s\n", file);
         var src = doParse(file);
-        var ctx = new GlobalSymbolContext(src.table());
-        new SemanticAnalysis(ctx, false).analyse(src);
+        new SemanticAnalysis(src.table(), false).analyse();
     }
 
     public static void main(String[] args) {

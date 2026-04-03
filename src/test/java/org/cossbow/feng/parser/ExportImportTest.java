@@ -11,6 +11,7 @@ import org.cossbow.feng.ast.dcl.NewDefinedType;
 import org.cossbow.feng.ast.expr.BinaryExpression;
 import org.cossbow.feng.ast.expr.NewExpression;
 import org.cossbow.feng.ast.gen.DerivedType;
+import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.stmt.AssignmentsStatement;
@@ -26,8 +27,8 @@ import java.util.stream.Collectors;
 
 public class ExportImportTest extends BaseParseTest {
 
-    static List<Identifier> mod(String... values) {
-        return identifiers(values);
+    static ModulePath mod(String... values) {
+        return new ModulePath(identifiers(values));
     }
 
     // import
@@ -237,7 +238,7 @@ public class ExportImportTest extends BaseParseTest {
             for (var gc : globalCodes) {
                 var code = (i > 0 ? "export " : "") + gc;
                 var src = doParseFile(code);
-                var v = src.variables().getFirst();
+                var v = src.table().variables.getValue(0);
                 var tab = src.table().exportedVariables;
                 Assertions.assertEquals(i > 0, tab.exists(symbol(v.name())));
             }

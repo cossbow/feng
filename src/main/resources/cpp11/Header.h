@@ -620,6 +620,8 @@ private:
 template<typename E>
 struct Feng$ArrayPRefer : public Feng$ArrayRefer<E> {
 
+	Feng$ArrayPRefer() : Feng$ArrayRefer<E>() {}
+
 	Feng$ArrayPRefer(std::nullptr_t) : Feng$ArrayRefer<E>() {}
 
 	Feng$ArrayPRefer(E *start, int64_t len) : Feng$ArrayRefer<E>(start, len) {}

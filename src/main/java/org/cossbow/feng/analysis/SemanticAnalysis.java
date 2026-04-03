@@ -21,7 +21,7 @@ import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.*;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.Stack;
-import org.cossbow.feng.visit.SymbolContext;
+import org.cossbow.feng.visit.GlobalSymbolContext;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -38,15 +38,18 @@ import static org.cossbow.feng.util.CommonUtil.subtract;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class SemanticAnalysis {
-
+    private final ParseSymbolTable table;
     private final StackedContext context;
     private final boolean low;
 
     private final LiteralComputer computer = new LiteralComputer();
     private final ReturnAnalyzer analyzer = new ReturnAnalyzer();
 
-    public SemanticAnalysis(SymbolContext parent, boolean low) {
-        context = new StackedContext(parent);
+    public SemanticAnalysis(ParseSymbolTable table,
+                            boolean low) {
+        this.table = table;
+        context = new StackedContext(
+                new GlobalSymbolContext(table));
         this.low = low;
     }
 
@@ -204,44 +207,39 @@ public class SemanticAnalysis {
         return dag;
     }
 
-    private ParseSymbolTable gst;
 
-    public Entity analyse(Source s) {
-        var tab = s.table();
-        gst = tab;
-
+    public void analyse() {
         // 先分析全局常量：必须是const的基本类型才能是常量
-        var constValues = tab.variables.stream()
+        var constValues = table.variables.stream()
                 .filter(v -> v.declare() == Declare.CONST)
                 .collect(Collectors.toSet());
-        tab.dagConst = globalVarInit(constValues, tab.variables, true);
+        table.dagConst = globalVarInit(constValues, table.variables, true);
 
         // 再依次分析定义的类型：先分析各类型的依赖图，检查循环依赖后再按BFS分析
         // 枚举只可能依赖常量，第一个分析
-        tab.enumList = visitEnum(tab.namedTypes);
+        table.enumList = visitEnum(table.namedTypes);
         // 结构类型也只依赖常量：优先分析
-        tab.dagStructures = visitStructures(tab.namedTypes);
+        table.dagStructures = visitStructures(table.namedTypes);
         // 原型定义先分析：！！！这个可能有问题
-        tab.dagPrototypes = visitPrototype(tab.namedTypes);
+        table.dagPrototypes = visitPrototype(table.namedTypes);
         // 先分析接口
-        tab.dagInterfaces = visitInterfaces(tab.namedTypes);
+        table.dagInterfaces = visitInterfaces(table.namedTypes);
         // 最后分析类
-        tab.dagClasses = visitClasses(tab.namedTypes);
+        table.dagClasses = visitClasses(table.namedTypes);
 
         // 然后分析其他全局变量
-        var rest = subtract(tab.variables.values(), constValues);
-        tab.dagVars = globalVarInit(rest, tab.variables, false);
+        var rest = subtract(table.variables.values(), constValues);
+        table.dagVars = globalVarInit(rest, table.variables, false);
 
         // 分析类的方法：包括方法中的语句
-        tab.dagClasses.use(this::visitMethods);
+        table.dagClasses.use(this::visitMethods);
 
         // 【未实现】属性
-        visitAttribute(tab.namedTypes);
+        visitAttribute(table.namedTypes);
 
         // 分析函数：包括函数中的语句
-        for (var f : tab.namedFunctions) analyse(f);
+        for (var f : table.namedFunctions) analyse(f);
 
-        return s;
     }
 
     private Entity analyse(Modifier m) {
@@ -2465,7 +2463,7 @@ public class SemanticAnalysis {
         if (lv instanceof StringLiteral sll &&
                 rv instanceof StringLiteral srl) {
             var lit = computer.calc(op, sll, srl);
-            var old = gst.stringCache.putIfAbsent(lit, lit);
+            var old = table.stringCache.putIfAbsent(lit, lit);
             if (old != null) lit = old;
             var td = new LiteralTypeDeclarer(e.pos(), lit);
             return Groups.g2(new LiteralExpression(e.pos(), lit), td);

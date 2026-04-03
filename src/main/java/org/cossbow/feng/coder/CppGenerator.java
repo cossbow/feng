@@ -1,6 +1,5 @@
 package org.cossbow.feng.coder;
 
-import org.cossbow.feng.analysis.StackedContext;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
@@ -18,7 +17,6 @@ import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.RepeatList;
-import org.cossbow.feng.visit.SymbolContext;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -34,14 +32,14 @@ import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class CppGenerator {
-    private final StackedContext context;
+    private final ParseSymbolTable table;
     private final Appendable out;
     private final boolean debug;
 
-    public CppGenerator(SymbolContext parent,
+    public CppGenerator(ParseSymbolTable table,
                         Appendable out,
                         boolean debug) {
-        this.context = new StackedContext(parent);
+        this.table = table;
         this.out = out;
         this.debug = debug;
     }
@@ -159,10 +157,10 @@ public class CppGenerator {
         };
     }
 
-    private void definePre(Source src) {
+    private void definePre() {
         if (debug) write("#define FENG_DEBUG_MEMORY").newLine();
 
-        var ml = src.table().enumList.stream().flatMapToInt(ed ->
+        var ml = table.enumList.stream().flatMapToInt(ed ->
                         ed.values().keys().stream().mapToInt(n -> n.value().length()))
                 .max();
         ml.ifPresent(l -> {
@@ -170,7 +168,7 @@ public class CppGenerator {
         });
 
         write("#define FENG_MAX_CLASS_NUM ").write(ClassDefinition.maxId()).newLine();
-        src.table().dagClasses.use(cg -> {
+        table.dagClasses.use(cg -> {
             var ma = cg.all().stream()
                     .mapToInt(d -> d.ancestors().size()).max();
             ma.ifPresent(s -> {
@@ -192,49 +190,44 @@ public class CppGenerator {
 */
     }
 
-    public void write(Source src) {
-        if (!src.imports().isEmpty()) {
-            unsupported("import");
-            return;
-        }
-
-        definePre(src);
+    public void write() {
+        definePre();
         start();
 
         writeComment("type metadata");
-        typesMetadata(src);
+        typesMetadata();
         writeComment("type declaration");
-        for (var t : src.types()) declareType(t);
+        for (var t : table.namedTypes) declareType(t);
         writeComment("prototype definition");
-        src.table().dagPrototypes.use(dag ->
+        table.dagPrototypes.use(dag ->
                 dag.bfs(this::writePrototype));
         writeComment("function declaration");
-        declareFunctions(src);
+        declareFunctions();
 
         writeComment("global const");
-        declareGlobalVar(src.table().dagConst);
+        declareGlobalVar(table.dagConst);
 
         writeComment("string cache");
-        literalStringCache(src);
+        literalStringCache();
         writeComment("enum definition");
-        visitEnums(src);
+        visitEnums();
         writeComment("struct definition");
-        visitStructures(src);
+        visitStructures();
         writeComment("class/interface definition");
-        src.table().dagClasses.use(this::classRelation);
-        src.table().dagInterfaces.use(dag ->
+        table.dagClasses.use(this::classRelation);
+        table.dagInterfaces.use(dag ->
                 dag.bfs(this::declareInterface));
-        src.table().dagClasses.use(dag ->
+        table.dagClasses.use(dag ->
                 dag.bfs(this::declareClass));
-        src.table().dagClasses.use(dag ->
+        table.dagClasses.use(dag ->
                 dag.bfs(this::implClass));
         newLine();
 
         writeComment("global variable");
-        declareGlobalVar(src.table().dagVars);
+        declareGlobalVar(table.dagVars);
 
         writeComment("function definition");
-        visitFunctions(src.table());
+        visitFunctions();
 
     }
 
@@ -249,7 +242,7 @@ public class CppGenerator {
 
     private Optional<ClassDefinition> findClass(TypeDeclarer td) {
         if (td instanceof DerivedTypeDeclarer dtd) {
-            var def = findType(dtd.derivedType());
+            var def = dtd.def();
             if (def instanceof ClassDefinition cd) {
                 return Optional.of(cd);
             }
@@ -257,28 +250,14 @@ public class CppGenerator {
         return Optional.empty();
     }
 
-    private TypeDefinition findType(TypeDeclarer td) {
-        if (td instanceof DerivedTypeDeclarer dtd) {
-            return findType(dtd.derivedType());
-        }
-        if (td instanceof PrimitiveTypeDeclarer ptd) {
-            return ptd.primitive().type();
-        }
-        return unreachable();
-    }
-
-    private TypeDefinition findType(DerivedType dt) {
-        return context.findType(dt.symbol()).must();
-    }
-
     private TypeDefinition findType(DefinedType dt) {
         if (dt instanceof PrimitiveType pt) {
             return pt.primitive().type();
         }
-        return findType((DerivedType) dt);
+        return ((DerivedType) dt).def.must();
     }
 
-    void typesMetadata(Source src) {
+    void typesMetadata() {
         newLine();
         writeComment("define primitives");
         for (var p : Primitive.values()) {
@@ -289,8 +268,8 @@ public class CppGenerator {
     }
 
     // 写入全局的字符串常量池：非C-type字符串，没有尾部的'0'
-    private void literalStringCache(Source src) {
-        var list = src.table().stringCache
+    private void literalStringCache() {
+        var list = table.stringCache
                 .keySet().stream()
                 .sorted(Comparator.comparingInt(StringLiteral::id))
                 .toList();
@@ -370,30 +349,32 @@ public class CppGenerator {
     }
 
 
-    void visitEnums(Source src) {
-        for (var ed : src.table().enumList) {
+    void visitEnums() {
+        for (var ed : table.enumList) {
             visitEnum(ed);
         }
     }
 
     void visitEnum(EnumDefinition ed) {
-        write("static Feng$Enum ").enumName(ed).write("[] = {").newLine();
+        write("static Feng$Array<Feng$Enum").write(',');
+        write(ed.size()).write("> ");
+        enumName(ed).write(" = {").newLine();
         for (var v : ed.values()) {
-            write('{').write(v.val()).write(',');
+            write("Feng$Enum{").write(v.val()).write(',');
             write(v.nameLit()).write(".sr()},").newLine();
         }
         write('}').endStmt().newLine();
     }
 
-    void visitStructures(Source src) {
-        var dag = src.table().dagStructures;
+    void visitStructures() {
+        var dag = table.dagStructures;
         if (dag.none()) return;
         dag.get().bfs(this::write);
         newLine();
     }
 
-    void declareFunctions(Source src) {
-        for (var fd : src.table().namedFunctions) {
+    void declareFunctions() {
+        for (var fd : table.namedFunctions) {
             declareFunction(fd);
             newLine();
         }
@@ -407,7 +388,7 @@ public class CppGenerator {
         endStmt();
     }
 
-    void visitFunctions(ParseSymbolTable table) {
+    void visitFunctions() {
         var list = table.namedFunctions.stream()
                 .filter(f -> !table.builtinFunctions.exists(f.symbol().name()))
                 .toList();
@@ -1485,7 +1466,6 @@ public class CppGenerator {
 
     private CppGenerator enumMember(
             MemberOfExpression e, EnumDefinition ed) {
-        // TODO: check bounds
         if (EnumDefinition.TokenFieldId.equals(e.member().value()))
             return write(e.subject());
         return enumName(ed).write('[').write(e.subject())

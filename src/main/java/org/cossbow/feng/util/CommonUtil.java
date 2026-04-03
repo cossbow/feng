@@ -3,7 +3,6 @@ package org.cossbow.feng.util;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -67,4 +66,10 @@ public class CommonUtil {
         return difference;
     }
 
+    //
+
+    public static <T> T required(T t) {
+        if (t != null) return t;
+        throw new NullPointerException();
+    }
 }

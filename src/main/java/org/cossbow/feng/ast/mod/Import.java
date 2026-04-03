@@ -2,18 +2,16 @@ package org.cossbow.feng.ast.mod;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
-
-import java.util.List;
+import org.cossbow.feng.util.Optional;
 
 public class Import extends Entity {
-    private List<Identifier> path;
+    private ModulePath path;
     private Optional<Identifier> alias;
     private boolean flat;
 
     public Import(Position pos,
-                  List<Identifier> path,
+                  ModulePath path,
                   Optional<Identifier> alias,
                   boolean flat) {
         super(pos);
@@ -22,12 +20,12 @@ public class Import extends Entity {
         this.flat = flat;
     }
 
-    public List<Identifier> path() {
+    public ModulePath path() {
         return path;
     }
 
     public Identifier module() {
-        return alias.getOrElse(path.getLast());
+        return alias.getOrElse(path.values().getLast());
     }
 
     public Optional<Identifier> alias() {
