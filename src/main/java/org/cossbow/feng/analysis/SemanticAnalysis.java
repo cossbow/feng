@@ -1,7 +1,10 @@
 package org.cossbow.feng.analysis;
 
+import org.cossbow.feng.analysis.layout.LayoutTool;
 import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.attr.Attribute;
 import org.cossbow.feng.ast.attr.AttributeDefinition;
+import org.cossbow.feng.ast.attr.AttributeField;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
@@ -15,13 +18,12 @@ import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.dag.DAGGraph;
+import org.cossbow.feng.dag.DAGUtil;
 import org.cossbow.feng.err.SemanticException;
-import org.cossbow.feng.layout.LayoutTool;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.*;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.Stack;
-import org.cossbow.feng.visit.GlobalSymbolContext;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -44,30 +46,39 @@ public class SemanticAnalysis {
 
     private final LiteralComputer computer = new LiteralComputer();
     private final ReturnAnalyzer analyzer = new ReturnAnalyzer();
+    private final DedupCache<StringLiteral> stringCache;
+    private final Lazy<FunctionDefinition> main = Lazy.nil();
+
+    public SemanticAnalysis(ParseSymbolTable table,
+                            SymbolContext root,
+                            boolean low) {
+        this.table = table;
+        this.context = new StackedContext(root);
+        this.low = low;
+        stringCache = new DedupCache<>(table.stringCache);
+    }
 
     public SemanticAnalysis(ParseSymbolTable table,
                             boolean low) {
-        this.table = table;
-        context = new StackedContext(
-                new GlobalSymbolContext(table));
-        this.low = low;
+        this(table, new GlobalSymbolContext(table), low);
+    }
+
+    public SemanticAnalysis(ParseSymbolTable table) {
+        this(table, false);
     }
 
     //
 
     private <Key> DAGGraph<Key> makeDAG(Collection<Key> nodes,
                                         Iterable<Groups.G2<Key, Key>> edges) {
-        var dag = DAGGraph.make(nodes, edges);
-        var c = dag.checkCyclic();
-        if (c.isEmpty()) return dag;
-        return semantic("cyclic dependence: %s", c);
+        return DAGUtil.make(nodes, edges);
     }
 
     //
 
 
     private List<EnumDefinition>
-    visitEnum(IdentifierTable<TypeDefinition> types) {
+    visitEnum(IdentifierMap<TypeDefinition> types) {
         var enums = new ArrayList<EnumDefinition>();
         for (var t : types) {
             if (t instanceof EnumDefinition ed) {
@@ -99,8 +110,8 @@ public class SemanticAnalysis {
         return list;
     }
 
-    private Optional<DAGGraph<PrototypeDefinition>>
-    visitPrototype(IdentifierTable<TypeDefinition> types) {
+    private DAGGraph<PrototypeDefinition>
+    visitPrototype(IdentifierMap<TypeDefinition> types) {
         var all = new HashSet<PrototypeDefinition>(types.size());
         var edges = new ArrayList<Groups.G2<PrototypeDefinition,
                 PrototypeDefinition>>();
@@ -112,20 +123,20 @@ public class SemanticAnalysis {
                 edges.add(Groups.g2(d, pd));
             }
         }
-        if (all.isEmpty()) return Optional.empty();
+        if (all.isEmpty()) return DAGGraph.empty();
         var dag = makeDAG(all, edges);
         dag.bfs(this::analyse);
-        return Optional.of(dag);
+        return dag;
     }
 
-    private void visitAttribute(IdentifierTable<TypeDefinition> types) {
+    private void visitAttribute(IdentifierMap<TypeDefinition> types) {
         for (var t : types) {
             if (t instanceof AttributeDefinition ad) analyse(ad);
         }
     }
 
     private Set<GlobalVariable> searchDependencies(
-            IdentifierTable<GlobalVariable> all,
+            IdentifierMap<GlobalVariable> all,
             Expression expr, boolean isConst) {
         var deps = new HashSet<GlobalVariable>();
         var q = new ArrayDeque<Expression>();
@@ -176,13 +187,13 @@ public class SemanticAnalysis {
     }
 
     // 创建全局变量的依赖图：便于bfs遍历分析
-    private Optional<DAGGraph<GlobalVariable>>
+    private DAGGraph<GlobalVariable>
     globalGraph(Collection<GlobalVariable> list,
-                IdentifierTable<GlobalVariable> all,
+                IdentifierMap<GlobalVariable> all,
                 boolean isConst) {
-        if (list.isEmpty()) return Optional.empty();
+        if (list.isEmpty()) return DAGGraph.empty();
 
-        var gvs = new IdentifierTable<GlobalVariable>(list.size());
+        var gvs = new IdentifierMap<GlobalVariable>(list.size());
         for (var gv : list) gvs.add(gv.name(), gv);
 
         var edges = new ArrayList<Groups.G2<
@@ -193,58 +204,73 @@ public class SemanticAnalysis {
                     gv.value().must(), isConst);
             for (var dep : deps) edges.add(Groups.g2(dep, gv));
         }
-        var dag = makeDAG(gvs.values(), edges);
-        return Optional.of(dag);
+        return makeDAG(gvs.values(), edges);
     }
 
-    private Optional<DAGGraph<GlobalVariable>>
+    private DAGGraph<GlobalVariable>
     globalVarInit(Collection<GlobalVariable> list,
-                  IdentifierTable<GlobalVariable> all,
+                  IdentifierMap<GlobalVariable> all,
                   boolean isConst) {
         var dag = globalGraph(list, all, isConst);
-        if (dag.none()) return dag;
-        dag.get().bfs(this::analyse);
+        if (dag.isEmpty()) return dag;
+        dag.bfs(this::analyse);
         return dag;
     }
 
+    private boolean isConstVar(Variable v) {
+        var t = v.type().must();
+        if (t instanceof PrimitiveTypeDeclarer)
+            return v.declare() == Declare.CONST;
+        return t instanceof LiteralTypeDeclarer;
+    }
 
-    public void analyse() {
+    public AnalyseSymbolTable analyse() {
+        var result = new AnalyseSymbolTable();
         // 先分析全局常量：必须是const的基本类型才能是常量
         var constValues = table.variables.stream()
                 .filter(v -> v.declare() == Declare.CONST)
                 .collect(Collectors.toSet());
-        table.dagConst = globalVarInit(constValues, table.variables, true);
+        var dagConst = globalVarInit(constValues, table.variables, true);
+        result.constVars = dagConst.stream().filter(this::isConstVar).toList();
 
         // 再依次分析定义的类型：先分析各类型的依赖图，检查循环依赖后再按BFS分析
         // 枚举只可能依赖常量，第一个分析
-        table.enumList = visitEnum(table.namedTypes);
+        result.enumList = visitEnum(table.types);
         // 结构类型也只依赖常量：优先分析
-        table.dagStructures = visitStructures(table.namedTypes);
+        result.dagStructures = visitStructures(table.types);
         // 原型定义先分析：！！！这个可能有问题
-        table.dagPrototypes = visitPrototype(table.namedTypes);
+        result.dagPrototypes = visitPrototype(table.types);
         // 先分析接口
-        table.dagInterfaces = visitInterfaces(table.namedTypes);
+        result.dagInterfaces = visitInterfaces(table.types);
         // 最后分析类
-        table.dagClasses = visitClasses(table.namedTypes);
+        result.dagClasses = visitClasses(table.types);
 
         // 然后分析其他全局变量
-        var rest = subtract(table.variables.values(), constValues);
-        table.dagVars = globalVarInit(rest, table.variables, false);
+        var rest = subtract(table.variables.values(),
+                result.constVars);
+        result.dagVars = globalVarInit(rest, table.variables, false);
 
         // 分析类的方法：包括方法中的语句
-        table.dagClasses.use(this::visitMethods);
+        result.dagClasses.bfs(this::implMethod);
 
         // 【未实现】属性
-        visitAttribute(table.namedTypes);
+        visitAttribute(table.types);
 
         // 分析函数：包括函数中的语句
-        for (var f : table.namedFunctions) analyse(f);
+        result.functionList = table.functions
+                .stream().map(this::analyse)
+                .filter(f -> !f.entry())
+                .toList();
 
+        result.typeList = table.types.stream().toList();
+
+        result.stringCache = stringCache;
+        result.main.set(main);
+        return result;
     }
 
     private Entity analyse(Modifier m) {
-        if (!m.attributes().isEmpty())
-            unsupported("attribute");
+        analyse(m.attributes());
         return m;
     }
 
@@ -484,8 +510,8 @@ public class SemanticAnalysis {
         return semantic("illegal type: %s%s", td, td.pos());
     }
 
-    private Optional<DAGGraph<StructureDefinition>>
-    visitStructures(IdentifierTable<TypeDefinition> types) {
+    private DAGGraph<StructureDefinition>
+    visitStructures(IdentifierMap<TypeDefinition> types) {
         var all = new ArrayList<StructureDefinition>(types.size());
         var edges = new ArrayList<Groups.G2<StructureDefinition, StructureDefinition>>();
         for (var def : types) {
@@ -501,7 +527,7 @@ public class SemanticAnalysis {
                     .forEach(d -> edges.add(Groups.g2(d, sd)));
             all.add(sd);
         }
-        if (all.isEmpty()) return Optional.empty();
+        if (all.isEmpty()) return DAGGraph.empty();
         var dag = makeDAG(all, edges);
         var layoutTool = new LayoutTool(context);
         dag.bfs(sd -> {
@@ -510,10 +536,11 @@ public class SemanticAnalysis {
             var layout = layoutTool.buildLayout(sd);
             sd.layout().set(layout);
         });
-        return Optional.of(dag);
+        return (dag);
     }
 
     private void visitStructure(StructureDefinition sd) {
+        analyse(sd.modifier());
         for (var sf : sd.fields()) {
             visitBitfield(sf);
             analyse(sf.type());
@@ -543,9 +570,11 @@ public class SemanticAnalysis {
 
     // enum
 
-    private Entity analyse(EnumDefinition def) {
+    private Entity analyse(EnumDefinition ed) {
+        analyse(ed.modifier());
+
         var i = 0;
-        for (var v : def.values()) {
+        for (var v : ed.values()) {
             v.val(i);
             if (v.init().none()) {
                 i++;
@@ -558,7 +587,7 @@ public class SemanticAnalysis {
             i++;
         }
 
-        return def;
+        return ed;
     }
 
     //
@@ -654,8 +683,8 @@ public class SemanticAnalysis {
 
     private void checkInherit(
             ClassDefinition parent, ClassDefinition child,
-            IdentifierTable<ClassField> inheritFields,
-            IdentifierTable<ClassMethod> inheritMethods) {
+            IdentifierMap<ClassField> inheritFields,
+            IdentifierMap<ClassMethod> inheritMethods) {
         var inherit = child.inherit().must();
         parent.children().add(child);
         if (parent.isFinal()) {
@@ -715,8 +744,8 @@ public class SemanticAnalysis {
 
     private void checkAllInherits(ClassDefinition cd) {
         if (cd.builtin()) return;
-        var inheritFields = new IdentifierTable<ClassField>();
-        var inheritMethods = new IdentifierTable<ClassMethod>();
+        var inheritFields = new IdentifierMap<ClassField>();
+        var inheritMethods = new IdentifierMap<ClassMethod>();
         if (cd.parent().has()) {
             checkInherit(cd.parent().must(), cd, inheritFields, inheritMethods);
         }
@@ -726,6 +755,7 @@ public class SemanticAnalysis {
         cd.inheritFields().addAll(inheritFields);
         cd.allFields().addAll(inheritFields);
         cd.allFields().addAll(cd.fields());
+        cd.inheritMethods().addAll(inheritMethods);
         cd.allMethods().addAll(inheritMethods);
         cd.allMethods().addAll(cd.methods());
     }
@@ -792,20 +822,22 @@ public class SemanticAnalysis {
                 .peek(p -> cd.parent().setIfNone(p));
         var fields = cd.fields().stream().map(ClassField::type)
                 .map(this::getClassTypeField).flatMap(Optional::stream);
-        return Stream.concat(inherit, fields).toList();
+        return Stream.concat(inherit, fields)
+                .filter(d -> !d.builtin()).toList();
     }
 
-    private Optional<DAGGraph<ClassDefinition>>
-    visitClasses(IdentifierTable<TypeDefinition> types) {
+    private DAGGraph<ClassDefinition>
+    visitClasses(IdentifierMap<TypeDefinition> types) {
         var all = new ArrayList<ClassDefinition>(types.size());
         var edges = new ArrayList<Groups.G2<ClassDefinition, ClassDefinition>>();
         for (var t : types) {
+            if (t.builtin()) continue;
             if (!(t instanceof ClassDefinition cd)) continue;
             var deps = findInitDeps(cd);
             for (var dep : deps) edges.add(Groups.g2(dep, cd));
             all.add(cd);
         }
-        if (all.isEmpty()) return Optional.empty();
+        if (all.isEmpty()) return DAGGraph.empty();
         var dag = makeDAG(all, edges);
         // 先分析类的结构
         dag.bfs(this::visitClass);
@@ -815,11 +847,7 @@ public class SemanticAnalysis {
         dag.bfs(this::checkImplList);
         // 分析方法是否修改字段：暂时没用，期望用于检查到不可变示例是否调用到了updater
         dag.bfs(cd -> new UpdaterAnalyzer().analyse(cd));
-        return Optional.of(dag);
-    }
-
-    private void visitMethods(DAGGraph<ClassDefinition> dag) {
-        dag.bfs(this::implMethod);
+        return (dag);
     }
 
     private ClassDefinition enterClass;
@@ -827,6 +855,8 @@ public class SemanticAnalysis {
 
     private void visitClass(ClassDefinition cd) {
         if (cd.builtin()) return;
+
+        analyse(cd.modifier());
 
         assert enterClass == null;
         enterClass = cd;
@@ -918,8 +948,8 @@ public class SemanticAnalysis {
         return Optional.empty();
     }
 
-    private Optional<DAGGraph<InterfaceDefinition>>
-    visitInterfaces(IdentifierTable<TypeDefinition> types) {
+    private DAGGraph<InterfaceDefinition>
+    visitInterfaces(IdentifierMap<TypeDefinition> types) {
         var all = new ArrayList<InterfaceDefinition>(types.size());
         var edges = new ArrayList<Groups.G2<InterfaceDefinition, InterfaceDefinition>>();
         for (var t : types) {
@@ -932,29 +962,31 @@ public class SemanticAnalysis {
             id.partDefs.addAll(parts);
             all.add(id);
         }
-        if (all.isEmpty()) return Optional.empty();
+        if (all.isEmpty()) return DAGGraph.empty();
         var dag = makeDAG(all, edges);
         dag.bfs(this::analyse);
-        return Optional.of(dag);
+        return (dag);
     }
 
-    private Entity analyse(InterfaceDefinition def) {
-        if (def.builtin()) return def;
+    private Entity analyse(InterfaceDefinition id) {
+        if (id.builtin()) return id;
 
-        for (var m : def.methods()) analyse(m);
+        analyse(id.modifier());
+
+        for (var m : id.methods()) analyse(m);
 
         var all = new HashMap<Identifier, InterfaceMethod>();
-        for (var m : def.methods()) all.put(m.name(), m);
-        for (var dep : def.partDefs) {
+        for (var m : id.methods()) all.put(m.name(), m);
+        for (var dep : id.partDefs) {
             var c = compatible(dep, all);
             c.use(g -> {
                 semantic("duplicate method %s <--> %s",
                         g.a().pos(), g.b().pos());
             });
         }
-        all.forEach(def.allMethods::add);
+        all.forEach(id.allMethods::add);
 
-        return def;
+        return id;
     }
 
     private Entity analyse(InterfaceMethod m) {
@@ -964,6 +996,8 @@ public class SemanticAnalysis {
     }
 
     private Entity analyse(PrototypeDefinition pd) {
+        analyse(pd.modifier());
+
         analyse(pd.generic());
         analyse(pd.prototype(), false);
         return pd;
@@ -972,22 +1006,41 @@ public class SemanticAnalysis {
     //
 
     private void checkMain(FunctionDefinition fd) {
-        var main = FunctionDefinition.MAIN_FUNC;
-        if (!main.symbol().equals(fd.symbol()))
-            return;
-        checkPrototype(main.prototype(), fd.prototype(), fd).valid();
-        fd.entry(true);
+        if (!fd.entry())return;
 
+        var prot = fd.prototype();
+        if (prot.returnSet().has()) {
+            semantic("func main can't has return: %s",
+                    prot.returnSet().get().pos());
+            return;
+        }
+        if (prot.parameterSet().size() > 1) {
+            semantic("func main can't has more parameters: %s",
+                    prot.parameterSet().getVar(1).pos());
+            return;
+        }
+        var t = prot.parameterSet().getType(0);
+        if (t instanceof ArrayTypeDeclarer at &&
+                at.refer().match(r -> r.isKind(PHANTOM) && r.required() && r.immutable())
+                && at.element() instanceof ArrayTypeDeclarer et &&
+                et.refer().match(r -> r.required() && r.immutable()) &&
+                et.element() instanceof PrimitiveTypeDeclarer pt &&
+                pt.primitive() == Primitive.BYTE) {
+            main.set(fd);
+            return;
+        }
+
+        semantic("func main required parameter type as '[&!#][*!#]byte': %s", t.pos());
     }
 
     private FunctionDefinition enterFunc;
 
-    private Entity analyse(FunctionDefinition fd) {
+    private FunctionDefinition analyse(FunctionDefinition fd) {
+        analyse(fd.modifier());
         assert enterFunc == null;
         enterFunc = fd;
-        checkMain(fd);
-        analyse(fd.modifier());
         analyse(fd.procedure());
+        checkMain(fd);
         enterFunc = null;
         return fd;
     }
@@ -2079,7 +2132,7 @@ public class SemanticAnalysis {
 
     private void checkConstantEnum(
             SwitchStatement s, EnumDefinition type) {
-        var set = new UniqueTable<Identifier, Identifier>();
+        var set = new OrderlyMap<Identifier, Identifier>();
         for (var b : s.branches()) {
             for (var c : b.constants()) {
                 if (c instanceof SymbolExpression le) {
@@ -2469,8 +2522,7 @@ public class SemanticAnalysis {
         if (lv instanceof StringLiteral sll &&
                 rv instanceof StringLiteral srl) {
             var lit = computer.calc(op, sll, srl);
-            var old = table.stringCache.putIfAbsent(lit, lit);
-            if (old != null) lit = old;
+            lit = stringCache.dedup(lit);
             var td = new LiteralTypeDeclarer(e.pos(), lit);
             return Groups.g2(new LiteralExpression(e.pos(), lit), td);
         }
@@ -2561,7 +2613,7 @@ public class SemanticAnalysis {
         if (g.b().required()) {
             // required refer cannot be empty, so direct set to literal-bool
             var n = new LiteralExpression(e.pos(),
-                    new BoolLiteral(e.pos(), nil));
+                    new BoolLiteral(e.pos(), !nil));
             return Groups.g2(n, t);
         }
 
@@ -3232,6 +3284,7 @@ public class SemanticAnalysis {
             var gm = genericMap(re, od.get().generic(), re.generic());
             var prot = gm.instantiate(od.get().prototype());
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
+            re.symbol(od.get().symbol());
             return Groups.g2(re, td);
         }
 
@@ -3283,6 +3336,7 @@ public class SemanticAnalysis {
             var gm = genericMap(re, f.get().generic(), re.generic());
             var prot = gm.instantiate(f.get().prototype());
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
+            re.symbol(f.get().symbol());
             return Groups.g2(re, td);
         }
 
@@ -3290,6 +3344,7 @@ public class SemanticAnalysis {
         if (t.has()) {
             invalid(re.generic());
             var td = new DefinitionDeclarer(s.pos(), t.get());
+            re.symbol(t.get().symbol());
             return Groups.g2(re, td);
         }
 
@@ -3387,7 +3442,7 @@ public class SemanticAnalysis {
             return semantic("can't init %s-reference: %s",
                     dtd.derivedType(), oe.pos());
 
-        IdentifierTable<? extends Field> fields = switch (def) {
+        IdentifierMap<? extends Field> fields = switch (def) {
             case StructureDefinition sd -> sd.fields();
             case ClassDefinition cd -> cd.allFields();
             case null, default -> semantic("type '%s' can't define fields: %s", def, oe.pos());
@@ -3401,7 +3456,7 @@ public class SemanticAnalysis {
             if (!f.immutable()) continue;
             return semantic("const field '%s' must init: %s", f.name(), oe.pos());
         }
-        var entries = new IdentifierTable<Expression>(oe.entries().size());
+        var entries = new IdentifierMap<Expression>(oe.entries().size());
         for (var n : oe.entries().nodes()) {
             var o = fields.tryGet(n.key());
             if (o.none()) {
@@ -3659,15 +3714,74 @@ public class SemanticAnalysis {
         var pt = new Prototype(mf.pos(), new ParameterSet(), Optional.empty());
         var body = new BlockStatement(mf.pos(), mf.procedure().body(), false);
         var proc = new Procedure(mf.pos(), pt, body, Map.of());
-        var cm = new ClassMethod(mf.pos(), false, Modifier.empty(),
-                mf.makeId(), TypeParameters.empty(), pt, proc, false);
+        var cm = new ClassMethod(mf.pos(), Modifier.empty(),
+                mf.makeId(), TypeParameters.empty(), proc, false);
         cd.methods().add(cm.name(), cm);
         cd.resourceFree().set(cm);
     }
 
     // attribute
 
-    private Entity analyse(AttributeDefinition ad) {
-        return unsupported("attribute");
+    private void analyse(AttributeDefinition ad) {
+        for (var af : ad.fields()) analyse(af);
     }
+
+    private void analyse(AttributeField af) {
+        if (af.init().none()) return;
+        analyse(af, af.init().get());
+    }
+
+    private void analyse(AttributeField f, Expression v) {
+        var g = optimize(v);
+        if (!(g.a() instanceof LiteralExpression le)) {
+            semantic("required const value '%s': %s", v, v.pos());
+            return;
+        }
+        var t = (LiteralTypeDeclarer) g.b();
+        switch (f.type()) {
+            case INT -> {
+                if (t.isInteger()) return;
+            }
+            case FLOAT -> {
+                if (t.isFloat()) return;
+            }
+            case BOOL -> {
+                if (t.isBool()) return;
+            }
+            case STRING -> {
+                if (t.isString()) return;
+            }
+            case null -> unreachable();
+        }
+        semantic("can't use '%s' as type '%s': %s",
+                v, t.literal().type(), v.pos());
+    }
+
+    private void analyse(SymbolMap<Attribute> attributes) {
+        for (var a : attributes) analyse(a);
+    }
+
+    private void analyse(Attribute a) {
+        var o = context.findType(a.type());
+        if (o.none()) {
+            semantic("attribute %s not defined: %s", a.type(), a.pos());
+            return;
+        }
+        if (!(o.get() instanceof AttributeDefinition ad)) {
+            semantic("'%s' is not attribute: %s", a.type(), a.pos());
+            return;
+        }
+        if (a.init().none()) return;
+        var init = a.init().get();
+        for (var n : init.entries().nodes()) {
+            var of = ad.fields().tryGet(n.key());
+            if (of.none()) {
+                semantic("field '%s.%s' not defined: %s",
+                        a.type(), n.key(), n.key().pos());
+                return;
+            }
+            analyse(of.get(), n.value());
+        }
+    }
+
 }

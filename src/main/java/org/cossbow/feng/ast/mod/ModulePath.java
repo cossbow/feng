@@ -1,31 +1,79 @@
 package org.cossbow.feng.ast.mod;
 
+import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.Position;
 
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public class ModulePath {
-    private final List<Identifier> values;
+public class ModulePath extends Entity
+        implements Iterable<Identifier> {
+    private final Identifier[] values;
 
-    public ModulePath(List<Identifier> values) {
-        this.values = List.copyOf(values);
+    private transient volatile Path path;
+
+    public ModulePath(Position pos, List<Identifier> values) {
+        super(pos);
+        this.values = values.toArray(new Identifier[0]);
     }
 
-    public ModulePath(Identifier... values) {
-        this.values = List.of(values);
+    public ModulePath(Path path) {
+        super(Position.ZERO);
+        values = new Identifier[path.getNameCount()];
+        for (int i = 0; i < values.length; i++) {
+            values[i] = new Identifier(path.getName(i).toString());
+        }
     }
 
-    public List<Identifier> values() {
-        return values;
+    public Path toPath() {
+        var path = this.path;
+        if (path == null) {
+            var more = new String[values.length - 1];
+            for (int i = 1; i < values.length; i++) {
+                more[i] = values[i].value();
+            }
+            path = Path.of(values[0].value(), more);
+            this.path = path;
+        }
+        return path;
+    }
+
+    public Identifier name() {
+        return values[values.length - 1];
     }
 
     public int size() {
-        return values.size();
+        return values.length;
     }
 
-    public Identifier get(int i) {
-        return values.get(i);
+    public Identifier get(int index) {
+        return values[index];
+    }
+
+    public Iterator<Identifier> iterator() {
+        return Arrays.asList(values).iterator();
+    }
+
+    public Stream<String> stream() {
+        return Arrays.stream(values).map(Identifier::value);
+    }
+
+    //
+
+    private transient String filename;
+
+    public String filename() {
+        var fn = filename;
+        if (fn == null) {
+            fn = stream().collect(Collectors.joining("_"));
+            filename = fn;
+        }
+        return fn;
     }
 
     //
@@ -33,18 +81,17 @@ public class ModulePath {
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof ModulePath t)) return false;
-        return values.equals(t.values);
+        return Arrays.equals(values, t.values);
     }
 
     @Override
     public int hashCode() {
-        return values.hashCode();
+        return Arrays.hashCode(values);
     }
 
     //
     @Override
     public String toString() {
-        return values.stream().map(Identifier::value)
-                .collect(Collectors.joining("."));
+        return stream().collect(Collectors.joining("."));
     }
 }

@@ -1,6 +1,5 @@
 package org.cossbow.feng.ast.oop;
 
-import org.cossbow.feng.ast.Exportable;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Method;
 import org.cossbow.feng.ast.Position;
@@ -14,9 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-public class ClassMethod extends Method
-        implements Exportable {
-    private boolean export;
+public class ClassMethod extends Method {
     private Modifier modifier;
     private Identifier name;
     private TypeParameters generic;
@@ -25,7 +22,6 @@ public class ClassMethod extends Method
     private boolean returnThis;
 
     public ClassMethod(Position pos,
-                       boolean export,
                        Modifier modifier,
                        Identifier name,
                        TypeParameters generic,
@@ -33,7 +29,6 @@ public class ClassMethod extends Method
                        Optional<Procedure> procedure,
                        boolean returnThis) {
         super(pos);
-        this.export = export;
         this.modifier = modifier;
         this.name = name;
         this.generic = generic;
@@ -43,19 +38,28 @@ public class ClassMethod extends Method
     }
 
     public ClassMethod(Position pos,
-                       boolean export,
+                       Modifier modifier,
+                       Identifier name,
+                       TypeParameters generic,
+                       Procedure procedure,
+                       boolean returnThis) {
+        this(pos, modifier, name, generic,
+                procedure.prototype(),
+                Optional.of(procedure), returnThis);
+    }
+
+    public ClassMethod(Position pos,
                        Modifier modifier,
                        Identifier name,
                        TypeParameters generic,
                        Prototype prototype,
-                       Procedure procedure,
                        boolean returnThis) {
-        this(pos, export, modifier, name, generic, prototype,
-                Optional.of(procedure), returnThis);
+        this(pos, modifier, name, generic,
+                prototype, Optional.empty(), returnThis);
     }
 
     public boolean export() {
-        return export;
+        return modifier().export();
     }
 
     public Modifier modifier() {
@@ -87,9 +91,8 @@ public class ClassMethod extends Method
     }
 
     public ClassMethod declaration() {
-        return new ClassMethod(pos(), export, modifier,
-                name, generic, prototype, Optional.empty(),
-                returnThis);
+        return new ClassMethod(pos(), modifier,
+                name, generic, prototype, returnThis);
     }
 
     //

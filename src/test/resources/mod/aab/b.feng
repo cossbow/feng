@@ -1,0 +1,35 @@
+
+export
+class Vector final {
+    export
+    var x1,x2,x3 float64;
+
+    export
+    func add(o Vector) Vector {
+        return {
+            x1=x1+o.x1,
+            x2=x2+o.x2,
+            x3=x3+o.x3,
+        };
+    }
+
+    export
+    func sub(o Vector) Vector {
+        return {
+            x1=x1-o.x1,
+            x2=x2-o.x2,
+            x3=x3-o.x3,
+        };
+    }
+
+    export
+    func dot(o Vector) float64 {
+        return x1*o.x1+x2*o.x2+x3*o.x3;
+    }
+
+}
+
+export const VectorZero Vector = {};
+
+export
+func Calculator = (Vector,Vector)Vector;

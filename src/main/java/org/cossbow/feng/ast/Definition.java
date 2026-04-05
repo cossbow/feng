@@ -3,14 +3,14 @@ package org.cossbow.feng.ast;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.util.Lazy;
 
 import java.util.HashMap;
 import java.util.Map;
 
 abstract
-public class Definition extends Entity {
+public class Definition extends Entity
+        implements Exportable {
     private Modifier modifier;
     private Symbol symbol;
     private TypeParameters generic;
@@ -23,6 +23,10 @@ public class Definition extends Entity {
         this.modifier = modifier;
         this.symbol = symbol;
         this.generic = generic;
+    }
+
+    public boolean export() {
+        return modifier.export();
     }
 
     public Modifier modifier() {
@@ -39,7 +43,7 @@ public class Definition extends Entity {
 
     //
 
-    private volatile boolean builtin;
+    private boolean builtin;
     public final Map<TypeArguments, Definition> instantiated = new HashMap<>();
     public final Lazy<Definition> template = Lazy.nil();
 

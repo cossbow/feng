@@ -1,7 +1,7 @@
 package org.cossbow.feng.ast.gen;
 
 import org.cossbow.feng.ast.Entity;
-import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.Position;
 
 import java.util.Iterator;
@@ -9,15 +9,15 @@ import java.util.stream.Collectors;
 
 public class TypeParameters extends Entity
         implements Iterable<TypeParameter> {
-    private IdentifierTable<TypeParameter> params;
+    private IdentifierMap<TypeParameter> params;
 
     public TypeParameters(Position pos,
-                          IdentifierTable<TypeParameter> params) {
+                          IdentifierMap<TypeParameter> params) {
         super(pos);
         this.params = params;
     }
 
-    public IdentifierTable<TypeParameter> params() {
+    public IdentifierMap<TypeParameter> params() {
         return params;
     }
 
@@ -50,7 +50,7 @@ public class TypeParameters extends Entity
     //
 
     public static TypeParameters empty() {
-        return new TypeParameters(Position.ZERO, new IdentifierTable<>());
+        return new TypeParameters(Position.ZERO, new IdentifierMap<>());
     }
 
 }

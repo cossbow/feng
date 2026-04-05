@@ -1,9 +1,9 @@
-package org.cossbow.feng.layout;
+package org.cossbow.feng.analysis.layout;
 
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
-import org.cossbow.feng.visit.SymbolContext;
+import org.cossbow.feng.analysis.SymbolContext;
 
 import java.util.ArrayList;
 import java.util.List;

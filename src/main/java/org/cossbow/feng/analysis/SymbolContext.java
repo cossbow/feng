@@ -1,4 +1,4 @@
-package org.cossbow.feng.visit;
+package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;

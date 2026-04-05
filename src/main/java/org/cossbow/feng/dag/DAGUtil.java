@@ -1,8 +1,14 @@
-package org.cossbow.feng.util;
+package org.cossbow.feng.dag;
 
-import java.util.*;
-import java.util.function.BiConsumer;
+import org.cossbow.feng.util.Groups;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
 import java.util.function.Function;
+
+import static org.cossbow.feng.util.ErrorUtil.semantic;
 
 final
 public class DAGUtil {
@@ -62,20 +68,14 @@ public class DAGUtil {
     }
 
 
-    public static <A> void bfsVisit(
-            A master, Function<A, Iterable<A>> slaveOf,
-            BiConsumer<A, A> user) {
-        var dedup = new HashSet<A>();
-        var queue = new ArrayDeque<Groups.G2<A, A>>();
-        queue.addFirst(Groups.g2(null, master));
-        while (!queue.isEmpty()) {
-            var cur = queue.removeLast();
-            user.accept(cur.a(), cur.b());
-            for (A slave : slaveOf.apply(cur.b())) {
-                if (dedup.add(slave))
-                    queue.addFirst(Groups.g2(cur.b(), slave));
-            }
-        }
+    public static <Key> DAGGraph<Key> make(
+            Collection<Key> nodes,
+            Iterable<Groups.G2<Key, Key>> edges) {
+        var dag = DAGGraph.make(nodes, edges);
+        var c = dag.checkCyclic();
+        if (c.isEmpty()) return dag;
+        return semantic("cyclic dependence: %s", c);
     }
+
 
 }

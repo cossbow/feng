@@ -1,6 +1,6 @@
 package org.cossbow.feng.ast.gen;
 
-import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.proc.ParameterSet;
 import org.cossbow.feng.ast.proc.Prototype;
@@ -79,7 +79,7 @@ public class GenericMap {
     }
 
     public Prototype instantiate(Prototype p0) {
-        var vs = new IdentifierTable<Variable>(p0.parameterSet().size());
+        var vs = new IdentifierMap<Variable>(p0.parameterSet().size());
         for (var v0 : p0.parameterSet()) {
             var v1 = (Variable) v0.clone();
             v1.type().update(mapper());

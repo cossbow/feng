@@ -1,14 +1,13 @@
 package org.cossbow.feng.dag;
 
 import org.cossbow.feng.util.Counter;
-import org.cossbow.feng.util.DAGUtil;
 import org.cossbow.feng.util.Groups;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static org.cossbow.feng.util.CommonUtil.subtract;
 
@@ -21,7 +20,8 @@ import static org.cossbow.feng.util.CommonUtil.subtract;
  * @author jiangjianjun5
  */
 final
-public class DAGGraph<Key> {
+public class DAGGraph<Key>
+        implements Iterable<Key> {
 
     private final Set<Key> all;
 
@@ -38,6 +38,21 @@ public class DAGGraph<Key> {
         this.reverse = Map.copyOf(reverse);
         this.tails = Set.copyOf(subtract(all, this.forward.keySet()));
         this.heads = Set.copyOf(subtract(all, this.reverse.keySet()));
+    }
+
+    private DAGGraph() {
+        this.all = Set.of();
+        this.heads = Set.of();
+        this.tails = Set.of();
+        this.forward = Map.of();
+        this.reverse = Map.of();
+    }
+
+    private static final DAGGraph<?> EMPTY = new DAGGraph<>();
+
+    @SuppressWarnings("unchecked")
+    public static <Key> DAGGraph<Key> empty() {
+        return (DAGGraph<Key>) EMPTY;
     }
 
     public static <Key> DAGGraph<Key> make(Collection<Key> nodes,
@@ -73,6 +88,22 @@ public class DAGGraph<Key> {
     }
 
     //
+
+    public boolean isEmpty() {
+        return all.isEmpty();
+    }
+
+    public int size() {
+        return all.size();
+    }
+
+    public Iterator<Key> iterator() {
+        return all.iterator();
+    }
+
+    public Stream<Key> stream() {
+        return all.stream();
+    }
 
     public Set<Key> all() {
         return all;

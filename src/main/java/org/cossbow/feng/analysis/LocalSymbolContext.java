@@ -1,6 +1,6 @@
-package org.cossbow.feng.visit;
+package org.cossbow.feng.analysis;
 
-import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.dcl.Variable;
@@ -19,7 +19,7 @@ public class LocalSymbolContext implements SymbolContext {
         this.parent = parent;
     }
 
-    private final IdentifierTable<Variable> variables = new IdentifierTable<>();
+    private final IdentifierMap<Variable> variables = new IdentifierMap<>();
     private final HashMap<Integer, Variable> lockedVars = new HashMap<>();
     private final HashMap<Integer, Variable> checkedNonNil = new HashMap<>();
 

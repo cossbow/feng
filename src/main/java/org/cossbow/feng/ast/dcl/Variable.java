@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.dcl;
 
 import org.cossbow.feng.ast.Entity;
+import org.cossbow.feng.ast.Exportable;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
@@ -9,7 +10,8 @@ import org.cossbow.feng.util.Lazy;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class Variable extends Entity {
+public class Variable extends Entity
+        implements Exportable {
     private final Modifier modifier;
     private final Declare declare;
     private final Identifier name;
@@ -28,6 +30,10 @@ public class Variable extends Entity {
         this.name = name;
         this.type = type;
         this.value = value;
+    }
+
+    public boolean export() {
+        return modifier().export();
     }
 
     public Modifier modifier() {

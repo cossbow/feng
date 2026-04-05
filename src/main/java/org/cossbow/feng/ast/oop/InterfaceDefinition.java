@@ -14,16 +14,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 public class InterfaceDefinition extends ObjectDefinition {
-    private IdentifierTable<InterfaceMethod> methods;
-    private SymbolTable<DerivedType> parts;
+    private IdentifierMap<InterfaceMethod> methods;
+    private SymbolMap<DerivedType> parts;
     private MacroTable macros;
 
     public InterfaceDefinition(Position pos,
                                Modifier modifier,
                                Symbol symbol,
                                TypeParameters generic,
-                               IdentifierTable<InterfaceMethod> methods,
-                               SymbolTable<DerivedType> parts,
+                               IdentifierMap<InterfaceMethod> methods,
+                               SymbolMap<DerivedType> parts,
                                MacroTable macros) {
         super(pos, modifier, symbol, generic, TypeDomain.INTERFACE);
         this.methods = methods;
@@ -31,11 +31,11 @@ public class InterfaceDefinition extends ObjectDefinition {
         this.macros = macros;
     }
 
-    public IdentifierTable<InterfaceMethod> methods() {
+    public IdentifierMap<InterfaceMethod> methods() {
         return methods;
     }
 
-    public SymbolTable<DerivedType> parts() {
+    public SymbolMap<DerivedType> parts() {
         return parts;
     }
 
@@ -47,7 +47,7 @@ public class InterfaceDefinition extends ObjectDefinition {
 
     private final int id = IdGenerator.getAndIncrement();
     public final List<InterfaceDefinition> partDefs = new ArrayList<>();
-    public final IdentifierTable<InterfaceMethod> allMethods = new IdentifierTable<>();
+    public final IdentifierMap<InterfaceMethod> allMethods = new IdentifierMap<>();
     public final Set<ClassDefinition> impls = new HashSet<>();
 
     public int id() {

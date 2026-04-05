@@ -12,18 +12,23 @@ public class Constants {
 
 
     public static final String SRC_EXT = ".feng";
+    public static final String META = "feng.meta";
+
+    public static boolean isSource(Path path) {
+        return path.getFileName().toString().endsWith(SRC_EXT);
+    }
 
     public static boolean isSource(String name) {
         return name.endsWith(SRC_EXT);
     }
 
     public static FileFilter srcFilter() {
-        return f -> f.isFile() && f.getName().endsWith(SRC_EXT);
+        return f -> f.isFile() && isSource(f.getName());
     }
 
     public static Predicate<Path> srcTest() {
         return p -> Files.isRegularFile(p) &&
-                p.getFileName().toString().endsWith(SRC_EXT);
+                isSource(p.getFileName().toString());
     }
 
 }

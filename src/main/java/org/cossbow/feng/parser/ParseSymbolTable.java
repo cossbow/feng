@@ -1,53 +1,73 @@
 package org.cossbow.feng.parser;
 
-import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.GlobalVariable;
+import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.IdentifierMap;
+import org.cossbow.feng.ast.TypeDefinition;
+import org.cossbow.feng.ast.attr.AttributeDefinition;
+import org.cossbow.feng.ast.dcl.PrimitiveDefinition;
+import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.micro.MacroTable;
+import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.ast.oop.ClassDefinition;
-import org.cossbow.feng.ast.oop.InterfaceDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.ast.proc.PrototypeDefinition;
-import org.cossbow.feng.ast.struct.StructureDefinition;
-import org.cossbow.feng.dag.DAGGraph;
+import org.cossbow.feng.util.DedupCache;
 import org.cossbow.feng.util.Optional;
 
-import java.util.*;
-
 public class ParseSymbolTable {
+    public final Optional<ModulePath> module;
 
-    public final IdentifierTable<TypeDefinition> namedTypes = new IdentifierTable<>();
-    public final IdentifierTable<FunctionDefinition> namedFunctions = new IdentifierTable<>();
-    public final IdentifierTable<GlobalVariable> variables = new IdentifierTable<>();
+    public ParseSymbolTable(Optional<ModulePath> module) {
+        this.module = module;
+    }
+
+    public final IdentifierMap<TypeDefinition> types = new IdentifierMap<>();
+    public final IdentifierMap<FunctionDefinition> functions = new IdentifierMap<>();
+    public final IdentifierMap<GlobalVariable> variables = new IdentifierMap<>();
     public final MacroTable macros = new MacroTable();
+    public final DedupCache<StringLiteral> stringCache = new DedupCache<>();
 
-    public final SymbolTable<TypeDefinition> exportedTypes = new SymbolTable<>();
-    public final SymbolTable<FunctionDefinition> exportedFunctions = new SymbolTable<>();
-    public final SymbolTable<GlobalVariable> exportedVariables = new SymbolTable<>();
-    public final MacroTable exportedMacros = new MacroTable();
+    public void merge(ParseSymbolTable ot) {
+        types.addAll(ot.types);
+        functions.addAll(ot.functions);
+        variables.addAll(ot.variables);
+        macros.addAll(ot.macros);
+    }
 
-    public final Map<Identifier, Entity> globalNames = new HashMap<>();
+    @SuppressWarnings("unchecked")
+    private <T> Optional<T> find(Identifier name, IdentifierMap<T>... maps) {
+        for (IdentifierMap<T> map : maps) {
+            var o = map.tryGet(name);
+            if (o.has()) return o;
+        }
+        return Optional.empty();
+    }
+
+    @SuppressWarnings("unchecked")
+    public Optional<TypeDefinition> findType(Identifier name) {
+        return find(name, BUILTIN.types, types);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Optional<FunctionDefinition> findFunc(Identifier name) {
+        return find(name, BUILTIN.functions, functions);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Optional<Variable> findVar(Identifier name) {
+        return find(name, BUILTIN.variables, variables).map(v -> v);
+    }
 
     //
 
-    public final IdentifierTable<TypeDefinition> builtinTypes = new IdentifierTable<>();
-    public final IdentifierTable<FunctionDefinition> builtinFunctions = new IdentifierTable<>();
 
-    //
+    public static final ParseSymbolTable BUILTIN = new ParseSymbolTable(Optional.empty());
 
-    public Optional<DAGGraph<GlobalVariable>> dagConst;
-    public Optional<DAGGraph<GlobalVariable>> dagVars;
-    public List<EnumDefinition> enumList;
-    public Optional<DAGGraph<PrototypeDefinition>> dagPrototypes;
-    public Optional<DAGGraph<StructureDefinition>> dagStructures;
-    public Optional<DAGGraph<InterfaceDefinition>> dagInterfaces;
-    public Optional<DAGGraph<ClassDefinition>> dagClasses;
-
-    public final Map<StringLiteral, StringLiteral> stringCache = new HashMap<>();
-
-    //
-
-    public ParseSymbolTable() {
-        namedTypes.add(ClassDefinition.ObjectName, ClassDefinition.ObjectClass);
-        builtinTypes.add(ClassDefinition.ObjectName, ClassDefinition.ObjectClass);
+    static {
+        PrimitiveDefinition.types.forEach((k, v) ->
+                BUILTIN.types.add(new Identifier(k.code), v));
+        BUILTIN.types.add(AttributeDefinition.InheritName, AttributeDefinition.InheritDef);
+        BUILTIN.types.add(ClassDefinition.ObjectName, ClassDefinition.ObjectClass);
     }
 }

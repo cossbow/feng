@@ -1,5 +1,6 @@
 package org.cossbow.feng.coder;
 
+import org.cossbow.feng.analysis.AnalyseSymbolTable;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
@@ -7,6 +8,7 @@ import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.PrimitiveType;
 import org.cossbow.feng.ast.lit.*;
+import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
@@ -14,7 +16,6 @@ import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.dag.DAGGraph;
-import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.RepeatList;
@@ -32,11 +33,11 @@ import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class LowCppGenerator {
-    private final ParseSymbolTable table;
+    private final AnalyseSymbolTable table;
     private final Appendable out;
     private final boolean debug;
 
-    public LowCppGenerator(ParseSymbolTable table,
+    public LowCppGenerator(AnalyseSymbolTable table,
                            Appendable out,
                            boolean debug) {
         this.table = table;
@@ -166,17 +167,15 @@ public class LowCppGenerator {
         });
 
         write("#define FENG_MAX_CLASS_NUM ").write(ClassDefinition.maxId()).newLine();
-        table.dagClasses.use(cg -> {
-            var ma = cg.all().stream()
-                    .mapToInt(d -> d.ancestors().size()).max();
-            ma.ifPresent(s -> {
-                write("#define FENG_MAX_INHERIT_SIZE ").write(s).newLine();
-            });
-            var mi = cg.all().stream()
-                    .mapToInt(d -> d.allImpls().size()).max();
-            mi.ifPresent(s -> {
-                write("#define FENG_MAX_IMPLS_SIZE ").write(s).newLine();
-            });
+        var ma = table.dagClasses.all().stream()
+                .mapToInt(d -> d.ancestors().size()).max();
+        ma.ifPresent(s -> {
+            write("#define FENG_MAX_INHERIT_SIZE ").write(s).newLine();
+        });
+        var mi = table.dagClasses.all().stream()
+                .mapToInt(d -> d.allImpls().size()).max();
+        mi.ifPresent(s -> {
+            write("#define FENG_MAX_IMPLS_SIZE ").write(s).newLine();
         });
 
 /*
@@ -195,15 +194,18 @@ public class LowCppGenerator {
         writeComment("type metadata");
         typesMetadata();
         writeComment("type declaration");
-        for (var t : table.namedTypes) declareType(t);
+        for (var t : table.enumList) declareType(t);
+        for (var t : table.dagStructures) declareType(t);
+        for (var t : table.dagInterfaces) declareType(t);
+        for (var t : table.dagClasses) declareType(t);
+        newLine();
         writeComment("prototype definition");
-        table.dagPrototypes.use(dag ->
-                dag.bfs(this::writePrototype));
+        table.dagPrototypes.bfs(this::writePrototype);
         writeComment("function declaration");
         declareFunctions();
 
         writeComment("global const");
-        declareGlobalVar(table.dagConst);
+        declareGlobalVar(table.constVars);
 
         writeComment("string cache");
         literalStringCache();
@@ -212,16 +214,12 @@ public class LowCppGenerator {
         writeComment("struct definition");
         visitStructures();
         writeComment("class/interface definition");
-        table.dagClasses.use(this::classRelation);
-        table.dagInterfaces.use(dag ->
-                dag.bfs(this::declareInterface));
-        table.dagClasses.use(dag ->
-                dag.bfs(this::declareClass));
-        table.dagClasses.use(this::addClassReleasers);
-        table.dagInterfaces.use(dag ->
-                dag.bfs(this::implInterface));
-        table.dagClasses.use(dag ->
-                dag.bfs(this::implClass));
+        classRelation(table.dagClasses);
+        table.dagInterfaces.bfs(this::declareInterface);
+        table.dagClasses.bfs(this::declareClass);
+        addClassReleasers(table.dagClasses);
+        table.dagInterfaces.bfs(this::implInterface);
+        table.dagClasses.bfs(this::implClass);
         newLine();
 
         writeComment("global variable");
@@ -233,12 +231,15 @@ public class LowCppGenerator {
     }
 
     private void declareGlobalVar(
-            Optional<DAGGraph<GlobalVariable>> vars) {
-        vars.use(dag -> {
-            dag.bfs(this::write);
-            newLine();
-        });
-        newLine();
+            List<GlobalVariable> vars) {
+        vars.forEach(this::write);
+        newLine().newLine();
+    }
+
+    private void declareGlobalVar(
+            DAGGraph<GlobalVariable> vars) {
+        vars.bfs(this::write);
+        newLine().newLine();
     }
 
     private Optional<ClassDefinition> findClass(TypeDeclarer td) {
@@ -328,18 +329,6 @@ public class LowCppGenerator {
         write("class ").write(def.symbol().name()).endStmt();
     }
 
-    void declareType(TypeDefinition def) {
-        switch (def) {
-            case StructureDefinition cd -> declareType(cd);
-            case ClassDefinition cd -> declareType(cd);
-            case EnumDefinition cd -> declareType(cd);
-            case PrototypeDefinition cd -> declareType(cd);
-            case InterfaceDefinition cd -> declareType(cd);
-            case null, default -> unreachable();
-        }
-        newLine();
-    }
-
 
     void visitEnums() {
         for (var ed : table.enumList) {
@@ -357,14 +346,12 @@ public class LowCppGenerator {
     }
 
     void visitStructures() {
-        var dag = table.dagStructures;
-        if (dag.none()) return;
-        dag.get().bfs(this::write);
+        table.dagStructures.bfs(this::write);
         newLine();
     }
 
     void declareFunctions() {
-        for (var fd : table.namedFunctions) {
+        for (var fd : table.functionList) {
             declareFunction(fd);
             newLine();
         }
@@ -390,10 +377,8 @@ public class LowCppGenerator {
     }
 
     void visitFunctions() {
-        var list = table.namedFunctions.stream()
-                .filter(f -> !table.builtinFunctions.exists(f.symbol().name()))
-                .toList();
-        for (var fd : list) {
+        for (var fd : table.functionList) {
+            if (fd.builtin()) continue;
             implFunc(fd);
             newLine();
         }
@@ -925,6 +910,9 @@ public class LowCppGenerator {
         return this;
     }
 
+    private LowCppGenerator write(ModulePath path) {
+        return write(path.toString());
+    }
 
     private LowCppGenerator write(DerivedType dt) {
         write(dt.symbol());
@@ -1718,7 +1706,7 @@ public class LowCppGenerator {
     }
 
     private boolean objectInit(
-            IdentifierTable<Expression> entries,
+            IdentifierMap<Expression> entries,
             Iterator<List<? extends Field>> stack) {
         if (!stack.hasNext()) return false;
         var fields = stack.next();

@@ -1,0 +1,15 @@
+
+import mod$aab v;
+import mod$aac r;
+
+func foo(a,b v$Vector) v$Vector {
+    return a.sub(b);
+}
+
+func test(n int) {
+    r$use2(foo);
+}
+
+func main(args [&!#][*!#]byte) {
+    test(5);
+}

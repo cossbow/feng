@@ -66,6 +66,13 @@ public class CommonUtil {
         return difference;
     }
 
+    public static <K, V> Map<K, V>
+    extract(Map<K, V> src, Collection<K> keys) {
+        var result = new HashMap<K, V>(keys.size());
+        for (K k : keys) result.put(k, src.get(k));
+        return result;
+    }
+
     //
 
     public static <T> T required(T t) {

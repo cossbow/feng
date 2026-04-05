@@ -11,18 +11,18 @@ import org.cossbow.feng.util.Optional;
 import static org.cossbow.feng.ast.Position.*;
 
 public class EnumDefinition extends TypeDefinition {
-    private IdentifierTable<Value> values;
+    private IdentifierMap<Value> values;
 
     public EnumDefinition(Position pos,
                           Modifier modifier,
                           Symbol name,
-                          IdentifierTable<Value> values) {
+                          IdentifierMap<Value> values) {
         super(pos, modifier, name, TypeParameters.empty(),
                 TypeDomain.ENUM);
         this.values = values;
     }
 
-    public IdentifierTable<Value> values() {
+    public IdentifierMap<Value> values() {
         return values;
     }
 

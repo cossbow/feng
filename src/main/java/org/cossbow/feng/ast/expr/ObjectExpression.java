@@ -1,6 +1,6 @@
 package org.cossbow.feng.ast.expr;
 
-import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.util.ErrorUtil;
@@ -9,11 +9,11 @@ import org.cossbow.feng.util.Optional;
 import java.util.stream.Collectors;
 
 public class ObjectExpression extends PrimaryExpression {
-    private final IdentifierTable<Expression> entries;
+    private final IdentifierMap<Expression> entries;
     private final Optional<DerivedTypeDeclarer> type;
 
     public ObjectExpression(Position pos,
-                            IdentifierTable<Expression> entries,
+                            IdentifierMap<Expression> entries,
                             Optional<DerivedTypeDeclarer> type) {
         super(pos);
         this.entries = entries;
@@ -21,15 +21,15 @@ public class ObjectExpression extends PrimaryExpression {
     }
 
     public ObjectExpression(Position pos,
-                            IdentifierTable<Expression> entries) {
+                            IdentifierMap<Expression> entries) {
         this(pos, entries, Optional.empty());
     }
 
     public ObjectExpression(Position pos) {
-        this(pos, new IdentifierTable<>(), Optional.empty());
+        this(pos, new IdentifierMap<>(), Optional.empty());
     }
 
-    public IdentifierTable<Expression> entries() {
+    public IdentifierMap<Expression> entries() {
         return entries;
     }
 

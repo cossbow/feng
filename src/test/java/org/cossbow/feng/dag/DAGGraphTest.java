@@ -1,6 +1,7 @@
 package org.cossbow.feng.dag;
 
 
+import org.cossbow.feng.util.Counter;
 import org.cossbow.feng.util.Groups;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -130,6 +131,15 @@ public class DAGGraphTest {
         System.out.println("size=" + size);
         var r = randDAG(size);
         r.bfs(System.out::println);
+    }
+
+    @Test
+    public void testEmpty() {
+        var dag = DAGGraph.empty();
+        Assertions.assertTrue(dag.checkCyclic().isEmpty());
+        var ct = new Counter(0);
+        dag.bfs(k -> ct.inc());
+        Assertions.assertEquals(0, ct.value());
     }
 
     //

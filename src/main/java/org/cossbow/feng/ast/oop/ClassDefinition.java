@@ -18,9 +18,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ClassDefinition extends ObjectDefinition {
     private boolean isFinal;
     private Optional<DerivedType> inherit;
-    private SymbolTable<DerivedType> impl;
-    private IdentifierTable<ClassField> fields;
-    private IdentifierTable<ClassMethod> methods;
+    private SymbolMap<DerivedType> impl;
+    private IdentifierMap<ClassField> fields;
+    private IdentifierMap<ClassMethod> methods;
     private MacroTable macros;
 
     public ClassDefinition(Position pos,
@@ -29,9 +29,9 @@ public class ClassDefinition extends ObjectDefinition {
                            TypeParameters generic,
                            boolean isFinal,
                            Optional<DerivedType> inherit,
-                           SymbolTable<DerivedType> impl,
-                           IdentifierTable<ClassField> fields,
-                           IdentifierTable<ClassMethod> methods,
+                           SymbolMap<DerivedType> impl,
+                           IdentifierMap<ClassField> fields,
+                           IdentifierMap<ClassMethod> methods,
                            MacroTable macros) {
         super(pos, modifier, symbol, generic, TypeDomain.CLASS);
         this.isFinal = isFinal;
@@ -47,9 +47,9 @@ public class ClassDefinition extends ObjectDefinition {
                            Symbol symbol,
                            TypeParameters generic,
                            Optional<DerivedType> inherit,
-                           SymbolTable<DerivedType> impl,
-                           IdentifierTable<ClassField> fields,
-                           IdentifierTable<ClassMethod> methods,
+                           SymbolMap<DerivedType> impl,
+                           IdentifierMap<ClassField> fields,
+                           IdentifierMap<ClassMethod> methods,
                            MacroTable macros) {
         this(pos, modifier, symbol, generic, false,
                 inherit, impl, fields, methods, macros);
@@ -59,11 +59,11 @@ public class ClassDefinition extends ObjectDefinition {
                            Modifier modifier,
                            Symbol symbol,
                            TypeParameters generic,
-                           IdentifierTable<ClassField> fields,
-                           IdentifierTable<ClassMethod> methods,
+                           IdentifierMap<ClassField> fields,
+                           IdentifierMap<ClassMethod> methods,
                            MacroTable macros) {
         this(pos, modifier, symbol, generic, true, Optional.empty(),
-                new SymbolTable<>(), fields, methods, macros);
+                new SymbolMap<>(), fields, methods, macros);
     }
 
     public boolean isFinal() {
@@ -74,19 +74,19 @@ public class ClassDefinition extends ObjectDefinition {
         return inherit;
     }
 
-    public SymbolTable<DerivedType> impl() {
+    public SymbolMap<DerivedType> impl() {
         return impl;
     }
 
-    public IdentifierTable<ClassField> fields() {
+    public IdentifierMap<ClassField> fields() {
         return fields;
     }
 
-    public void fields(IdentifierTable<ClassField> fields) {
+    public void fields(IdentifierMap<ClassField> fields) {
         this.fields = fields;
     }
 
-    public IdentifierTable<ClassMethod> methods() {
+    public IdentifierMap<ClassMethod> methods() {
         return methods;
     }
 
@@ -105,9 +105,10 @@ public class ClassDefinition extends ObjectDefinition {
     private final List<ClassDefinition> ancestors = new ArrayList<>();
     private final Set<ClassDefinition> children = new HashSet<>();
     private final List<InterfaceDefinition> allImpls = new ArrayList<>();
-    private IdentifierTable<ClassField> allFields = new IdentifierTable<>();
-    private IdentifierTable<ClassField> inheritFields = new IdentifierTable<>();
-    private IdentifierTable<ClassMethod> allMethods = new IdentifierTable<>();
+    private IdentifierMap<ClassField> allFields = new IdentifierMap<>();
+    private IdentifierMap<ClassField> inheritFields = new IdentifierMap<>();
+    private IdentifierMap<ClassMethod> allMethods = new IdentifierMap<>();
+    private IdentifierMap<ClassMethod> inheritMethods = new IdentifierMap<>();
     private final Lazy<ClassMethod> resourceFree = Lazy.nil();
 
     public int id() {
@@ -130,16 +131,20 @@ public class ClassDefinition extends ObjectDefinition {
         return allImpls;
     }
 
-    public IdentifierTable<ClassField> allFields() {
+    public IdentifierMap<ClassField> allFields() {
         return allFields;
     }
 
-    public IdentifierTable<ClassField> inheritFields() {
+    public IdentifierMap<ClassField> inheritFields() {
         return inheritFields;
     }
 
-    public IdentifierTable<ClassMethod> allMethods() {
+    public IdentifierMap<ClassMethod> allMethods() {
         return allMethods;
+    }
+
+    public IdentifierMap<ClassMethod> inheritMethods() {
+        return inheritMethods;
     }
 
     public boolean resource() {
@@ -171,8 +176,8 @@ public class ClassDefinition extends ObjectDefinition {
             new ClassDefinition(Position.ZERO, Modifier.empty(),
                     new Symbol(new Identifier(Position.ZERO, "Object")),
                     TypeParameters.empty(), Optional.empty(),
-                    new SymbolTable<>(), new IdentifierTable<>(),
-                    new IdentifierTable<>(), new MacroTable());
+                    new SymbolMap<>(), new IdentifierMap<>(),
+                    new IdentifierMap<>(), new MacroTable());
 
     static {
         ObjectClass.builtin(true);

@@ -1,7 +1,7 @@
 package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.Symbol;
-import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.TypeDomain;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.struct.*;
@@ -27,7 +27,7 @@ public class StructureParseTest extends BaseParseTest {
         }
     }
 
-    IdentifierTable<StructureField> parseFields(String names) {
+    IdentifierMap<StructureField> parseFields(String names) {
         var code = "struct Foo { %s }".formatted(names);
         var def = (StructureDefinition) doParseType(code, "Foo");
         return def.fields();
@@ -112,7 +112,7 @@ public class StructureParseTest extends BaseParseTest {
         var bt = randTypeSymbol(12);
         var code = "struct Foo { %s struct{%s %s;}; }".formatted(a, b, bt);
         var src = doParseFile(code);
-        var tbl = src.table().namedTypes;
+        var tbl = src.table().types;
         var foo = (StructureDefinition) tbl.get(identifier("Foo"));
         Assertions.assertEquals(1, foo.fields().size());
         var f = foo.fields().get(a);
@@ -120,7 +120,7 @@ public class StructureParseTest extends BaseParseTest {
 
         var dt = ((DerivedTypeDeclarer) f.type()).derivedType();
         Assertions.assertTrue(dt.symbol().module().none());
-        var def = (StructureDefinition) src.table().namedTypes.get(dt.symbol().name());
+        var def = (StructureDefinition) src.table().types.get(dt.symbol().name());
         Assertions.assertEquals(1, def.fields().size());
         var bf = def.fields().get(b);
         Assertions.assertEquals(b, bf.name());

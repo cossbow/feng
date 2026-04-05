@@ -1,6 +1,6 @@
 package org.cossbow.feng.parser;
 
-import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.oop.ClassDefinition;
@@ -75,7 +75,7 @@ public class ClassParseTest extends BaseParseTest {
     }
 
 
-    private IdentifierTable<ClassField> parseFields(String fields) {
+    private IdentifierMap<ClassField> parseFields(String fields) {
         var def = (ClassDefinition) doParseType("class A {" + fields + "}", "A");
         return def.fields();
     }

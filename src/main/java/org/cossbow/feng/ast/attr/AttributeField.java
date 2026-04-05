@@ -6,15 +6,17 @@ import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
+import java.util.Map;
+
 public class AttributeField extends Entity {
     private Identifier name;
-    private Identifier type;
+    private Type type;
     private boolean array;
     private Optional<Expression> init;
 
     public AttributeField(Position pos,
                           Identifier name,
-                          Identifier type,
+                          Type type,
                           boolean array,
                           Optional<Expression> init) {
         super(pos);
@@ -28,7 +30,7 @@ public class AttributeField extends Entity {
         return name;
     }
 
-    public Identifier type() {
+    public Type type() {
         return type;
     }
 
@@ -39,4 +41,30 @@ public class AttributeField extends Entity {
     public Optional<Expression> init() {
         return init;
     }
+
+    //
+    public enum Type {
+        INT("int"),
+        FLOAT("float"),
+        BOOL("bool"),
+        STRING("string"),
+        ;
+        public final String symbol;
+
+        Type(String symbol) {
+            this.symbol = symbol;
+        }
+
+        public String toString() {
+            return symbol;
+        }
+    }
+
+    public static final Map<String, Type> TYPE_MAP = Map.of(
+            Type.INT.symbol, Type.INT,
+            Type.FLOAT.symbol, Type.FLOAT,
+            Type.BOOL.symbol, Type.BOOL,
+            Type.STRING.symbol, Type.STRING
+    );
+
 }

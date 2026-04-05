@@ -7,8 +7,6 @@ import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.Stack;
-import org.cossbow.feng.visit.LocalSymbolContext;
-import org.cossbow.feng.visit.SymbolContext;
 
 import java.util.ArrayList;
 import java.util.List;

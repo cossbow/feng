@@ -1,5 +1,6 @@
 package org.cossbow.feng.coder;
 
+import org.cossbow.feng.analysis.AnalyseSymbolTable;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
@@ -12,7 +13,6 @@ import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.dag.DAGGraph;
-import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Optional;
@@ -22,8 +22,10 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -32,45 +34,59 @@ import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
 public class CppGenerator {
-    private final ParseSymbolTable table;
+    private final AnalyseSymbolTable table;
     private final Appendable out;
+    private final boolean header;
     private final boolean debug;
 
-    public CppGenerator(ParseSymbolTable table,
-                        Appendable out,
+    public CppGenerator(AnalyseSymbolTable table,
+                        Appendable out, boolean header,
                         boolean debug) {
         this.table = table;
         this.out = out;
+        this.header = header;
         this.debug = debug;
+    }
+
+    public CppGenerator(AnalyseSymbolTable table,
+                        Appendable out,
+                        boolean debug) {
+        this(table, out, false, debug);
     }
 
     //
 
-    static final AtomicInteger tmpId = new AtomicInteger();
-
-    static String tmpName() {
-        return "Feng$TmpName_" + (tmpId.incrementAndGet());
-    }
-
-    static final List<String> headers = List.of(
-            "cpp11/Header.h"
-    );
+    static final String baseHeader = "cpp11/Header.h";
     static final String mainFile = "cpp11/Main.cpp";
 
-    private void start() {
+    public static void copyBaseHeader(Path dir) {
         var cl = Thread.currentThread().getContextClassLoader();
-        for (var hf : headers) {
-            try (var is = cl.getResourceAsStream(hf);
-                 var r = new InputStreamReader(Objects.requireNonNull(is));
-                 var br = new BufferedReader(r)) {
-                String l;
-                while ((l = br.readLine()) != null) {
-                    write(l).write('\n');
-                }
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
+        try (var is = cl.getResourceAsStream(baseHeader)) {
+            assert is != null;
+            Files.copy(is, dir.resolve("Header.h"),
+                    StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
+    }
+
+
+    private void includeHeader(String file) {
+        write("#include ").write('"').write(file)
+                .write(".h").write('"').newLine();
+    }
+
+    private void includeHeaders() {
+        writeComment("base inner headers");
+        includeHeader("Header");
+
+        table.module.use(fm -> {
+            if (fm.imports().isEmpty()) return;
+            writeComment("import headers");
+            for (var i : fm.imports()) {
+                includeHeader(i.filename());
+            }
+        });
     }
 
     private CppGenerator write(char c) {
@@ -108,8 +124,10 @@ public class CppGenerator {
         return write(label.name()).write('_').write(label.id());
     }
 
-    private CppGenerator format(String fmt, Object... args) {
-        return write(fmt.formatted(args));
+    private CppGenerator declareStatic(boolean export) {
+        if (header) return write("extern");
+        if (export) return this;
+        return write("static");
     }
 
     private static final String COMMA = ", ";
@@ -158,28 +176,28 @@ public class CppGenerator {
     }
 
     private void definePre() {
+        if (header) {
+            var name = table.module.must()
+                    .path().filename().toUpperCase();
+            write("#ifndef __HEADER_").write(name).newLine();
+            write("#define __HEADER_").write(name).newLine();
+            return;
+        }
         if (debug) write("#define FENG_DEBUG_MEMORY").newLine();
 
-        var ml = table.enumList.stream().flatMapToInt(ed ->
-                        ed.values().keys().stream().mapToInt(n -> n.value().length()))
-                .max();
-        ml.ifPresent(l -> {
-            write("#define FENG_MAX_ENUM_NAME_LEN ").write(l + 1).newLine();
-        });
-
+/*
         write("#define FENG_MAX_CLASS_NUM ").write(ClassDefinition.maxId()).newLine();
-        table.dagClasses.use(cg -> {
-            var ma = cg.all().stream()
-                    .mapToInt(d -> d.ancestors().size()).max();
-            ma.ifPresent(s -> {
-                write("#define FENG_MAX_INHERIT_SIZE ").write(s).newLine();
-            });
-            var mi = cg.all().stream()
-                    .mapToInt(d -> d.allImpls().size()).max();
-            mi.ifPresent(s -> {
-                write("#define FENG_MAX_IMPLS_SIZE ").write(s).newLine();
-            });
+        var ma = table.dagClasses.all().stream()
+                .mapToInt(d -> d.ancestors().size()).max();
+        ma.ifPresent(s -> {
+            write("#define FENG_MAX_INHERIT_SIZE ").write(s).newLine();
         });
+        var mi = table.dagClasses.all().stream()
+                .mapToInt(d -> d.allImpls().size()).max();
+        mi.ifPresent(s -> {
+            write("#define FENG_MAX_IMPLS_SIZE ").write(s).newLine();
+        });
+*/
 
 /*
         for (var d : TypeDomain.values()) {
@@ -190,54 +208,59 @@ public class CppGenerator {
 */
     }
 
+    private void endFile() {
+        if (!header) return;
+        write("#endif ").newLine();
+    }
+
+    private void declareType() {
+        writeComment("type declarations");
+//        declarePrimitive();
+        writeComment("declare primitive");
+        for (var t : table.enumList) declareType(t);
+        writeComment("declare structure");
+        for (var t : table.dagStructures) declareType(t);
+        writeComment("declare interface");
+        for (var t : table.dagInterfaces) declareType(t);
+        writeComment("declare class");
+        for (var t : table.dagClasses) declareType(t);
+        newLine();
+    }
+
     public void write() {
         definePre();
-        start();
+        includeHeaders();
 
-        writeComment("type metadata");
-        typesMetadata();
-        writeComment("type declaration");
-        for (var t : table.namedTypes) declareType(t);
-        writeComment("prototype definition");
-        table.dagPrototypes.use(dag ->
-                dag.bfs(this::writePrototype));
-        writeComment("function declaration");
-        declareFunctions();
+        declareType();
+
+        declareFunction();
 
         writeComment("global const");
-        declareGlobalVar(table.dagConst);
+        declareGlobalVar(table.constVars);
 
-        writeComment("string cache");
         literalStringCache();
-        writeComment("enum definition");
-        visitEnums();
-        writeComment("struct definition");
-        visitStructures();
-        writeComment("class/interface definition");
-        table.dagClasses.use(this::classRelation);
-        table.dagInterfaces.use(dag ->
-                dag.bfs(this::declareInterface));
-        table.dagClasses.use(dag ->
-                dag.bfs(this::declareClass));
-        table.dagClasses.use(dag ->
-                dag.bfs(this::implClass));
-        newLine();
+        enumDefinition();
+        structureDefinition();
+        classesDefinition();
 
         writeComment("global variable");
         declareGlobalVar(table.dagVars);
 
-        writeComment("function definition");
-        visitFunctions();
+        functionDefinition();
 
+        endFile();
     }
 
     private void declareGlobalVar(
-            Optional<DAGGraph<GlobalVariable>> vars) {
-        vars.use(dag -> {
-            dag.bfs(this::write);
-            newLine();
-        });
-        newLine();
+            List<GlobalVariable> vars) {
+        vars.forEach(this::write);
+        newLine().newLine();
+    }
+
+    private void declareGlobalVar(
+            DAGGraph<GlobalVariable> vars) {
+        vars.bfs(this::write);
+        newLine().newLine();
     }
 
     private Optional<ClassDefinition> findClass(TypeDeclarer td) {
@@ -257,9 +280,9 @@ public class CppGenerator {
         return ((DerivedType) dt).def.must();
     }
 
-    void typesMetadata() {
-        newLine();
-        writeComment("define primitives");
+    void declarePrimitive() {
+        if (header) return;
+        writeComment("declare primitives");
         for (var p : Primitive.values()) {
             write("typedef ").write(toCType(p)).write(' ')
                     .write(p).endStmt();
@@ -269,6 +292,7 @@ public class CppGenerator {
 
     // 写入全局的字符串常量池：非C-type字符串，没有尾部的'0'
     private void literalStringCache() {
+        writeComment("string cache");
         var list = table.stringCache
                 .keySet().stream()
                 .sorted(Comparator.comparingInt(StringLiteral::id))
@@ -283,6 +307,7 @@ public class CppGenerator {
             }
             write("}}").endStmt();
         }
+        newLine();
     }
 
     // 用于引用全局字符串常量
@@ -314,13 +339,13 @@ public class CppGenerator {
     void declareType(StructureDefinition def) {
         write(def.generic());
         write(def.domain().name).write(' ');
-        write(def.symbol().name());
+        write(def.symbol());
         endStmt();
     }
 
     void declareType(ClassDefinition def) {
         write(def.generic());
-        write("class ").write(def.symbol().name()).endStmt();
+        write("class ").write(def.symbol()).endStmt();
     }
 
     CppGenerator enumName(EnumDefinition ed) {
@@ -332,33 +357,25 @@ public class CppGenerator {
 
     void declareType(InterfaceDefinition def) {
         write(def.generic());
-        write("class ").write(def.symbol().name()).endStmt();
+        write("class ").write(def.symbol()).endStmt();
     }
 
-    void declareType(TypeDefinition def) {
-        if (def.builtin()) return;
-        switch (def) {
-            case StructureDefinition cd -> declareType(cd);
-            case ClassDefinition cd -> declareType(cd);
-            case EnumDefinition cd -> declareType(cd);
-            case InterfaceDefinition cd -> declareType(cd);
-            default -> {
-            }
+    void enumDefinition() {
+        writeComment("enum definition");
+        for (var ed : table.enumList) {
+            visitEnum(ed);
         }
         newLine();
     }
 
-
-    void visitEnums() {
-        for (var ed : table.enumList) {
-            visitEnum(ed);
-        }
-    }
-
     void visitEnum(EnumDefinition ed) {
-        write("static Feng$Array<Feng$Enum").write(',');
-        write(ed.size()).write("> ");
-        enumName(ed).write(" = {").newLine();
+        declareStatic(true).write(" Feng$Array<Feng$Enum").write(',');
+        write(ed.size()).write("> ").enumName(ed);
+        if (header) {
+            endStmt();
+            return;
+        }
+        write(" = {").newLine();
         for (var v : ed.values()) {
             write("Feng$Enum{").write(v.val()).write(',');
             write(v.nameLit()).write(".sr()},").newLine();
@@ -366,15 +383,19 @@ public class CppGenerator {
         write('}').endStmt().newLine();
     }
 
-    void visitStructures() {
-        var dag = table.dagStructures;
-        if (dag.none()) return;
-        dag.get().bfs(this::write);
+    void structureDefinition() {
+        writeComment("struct definition");
+        table.dagStructures.bfs(this::write);
         newLine();
     }
 
-    void declareFunctions() {
-        for (var fd : table.namedFunctions) {
+    void declareFunction() {
+        writeComment("prototype definition");
+        table.dagPrototypes.bfs(this::writePrototype);
+        newLine();
+
+        writeComment("function declaration");
+        for (var fd : table.functionList) {
             declareFunction(fd);
             newLine();
         }
@@ -384,33 +405,27 @@ public class CppGenerator {
     void declareFunction(FunctionDefinition fd) {
         if (fd.entry()) return;
         write(fd.generic());
-        write(fd.symbol().name(), fd.procedure().prototype());
+        write(fd.symbol(), fd.procedure().prototype());
         endStmt();
     }
 
-    void visitFunctions() {
-        var list = table.namedFunctions.stream()
-                .filter(f -> !table.builtinFunctions.exists(f.symbol().name()))
-                .toList();
-        FunctionDefinition main = null;
-        for (var fd : list) {
-            if (fd.entry()) {
-                main = fd;
-                continue;
-            }
+    void functionDefinition() {
+        if (header) return;
+        writeComment("function definition");
+        for (var fd : table.functionList) {
+            if (fd.builtin()) continue;
             implFunc(fd);
             newLine();
         }
-        if (main != null) {
-            newLine();
-            writeComment("main entry function");
-            implFunc(main);
-            newLine();
-            writeMain(main);
-        }
+        newLine();
+        table.main.use(this::writeMain);
+        newLine();
     }
 
     void writeMain(FunctionDefinition main) {
+        writeComment("entry function");
+        implFunc(main);
+        newLine();
         var ld = Thread.currentThread().getContextClassLoader();
         try (var is = ld.getResourceAsStream(mainFile);
              var ir = new InputStreamReader(Objects.requireNonNull(is));
@@ -421,11 +436,9 @@ public class CppGenerator {
         }
     }
 
-    static final String STATIC = "static";
 
     private CppGenerator write(GlobalVariable v) {
-        write(STATIC);
-        write(' ');
+        declareStatic(v.export()).write(' ');
         return declareVar(v);
     }
 
@@ -522,7 +535,12 @@ public class CppGenerator {
     }
 
     private CppGenerator varName(Variable v) {
-        return write(v.name()).write('_').write(v.id());
+        if (v instanceof GlobalVariable gv) {
+            write(gv.symbol());
+        } else {
+            write(v.name());
+        }
+        return write('_').write(v.id());
     }
 
     private CppGenerator declare(Variable v) {
@@ -531,7 +549,9 @@ public class CppGenerator {
 
     private CppGenerator declareVar(Variable v) {
         var t = v.type().must();
-        declare(v).write(" = ");
+        declare(v);
+        if (header) return endStmt();
+        write(" = ");
         v.value().use(e -> {
             writeValue(e, t);
         }, () -> {
@@ -660,7 +680,7 @@ public class CppGenerator {
 
     private CppGenerator write(StructureDefinition sd) {
         write(sd.domain().name).write(' ');
-        write(sd.symbol().name());
+        write(sd.symbol());
         write('{').newLine();
         for (var sf : sd.fields()) {
             write(sf);
@@ -668,7 +688,7 @@ public class CppGenerator {
         write('}').endStmt();
         write("static_assert(sizeof(");
         write(sd.domain().name).write(' ');
-        write(sd.symbol().name()).write(") == ");
+        write(sd.symbol()).write(") == ");
         write(sd.layout().must().size()).write(')');
         return endStmt();
     }
@@ -681,6 +701,20 @@ public class CppGenerator {
         write(pd.prototype());
         endStmt().newLine();
     }
+
+
+    // class & interface definition
+
+    private void classesDefinition() {
+        writeComment("class/interface definition");
+//        classRelation(table.dagClasses);
+        table.dagInterfaces.bfs(this::declareInterface);
+        table.dagClasses.bfs(this::declareClass);
+        if (!header)
+            table.dagClasses.bfs(this::implClass);
+        newLine();
+    }
+
 
     // interface definition
 
@@ -697,7 +731,7 @@ public class CppGenerator {
 
     void defaultDeconstruct(ObjectDefinition def) {
         if (def instanceof ClassDefinition cd && cd.resource()) {
-            write("virtual ~").write(def.symbol().name())
+            write("virtual ~").write(def.symbol())
                     .write("() {").newLine();
             write("this->");
             write(cd.resourceFree().must().name());
@@ -705,15 +739,16 @@ public class CppGenerator {
             write('}').newLine();
             return;
         }
-        write("virtual ~").write(def.symbol().name())
+        write("virtual ~").write(def.symbol())
                 .write("() = default").endStmt();
     }
 
     void declareInterface(InterfaceDefinition id) {
+        if (header) return;
         if (id.builtin()) return;
         write(id.generic());
         write("class ");
-        write(id.symbol().name());
+        write(id.symbol());
         writeExtends(id.parts().values());
         write(" {\n").indent();
         write("public:\n");
@@ -738,7 +773,7 @@ public class CppGenerator {
         enterClass = cd;
         write(cd.generic());
         write("class ");
-        write(cd.symbol().name());
+        write(cd.symbol());
         write(' ');
         var pubs = Stream.concat(cd.inherit().stream(),
                 cd.impl().stream()).toList();
@@ -778,7 +813,7 @@ public class CppGenerator {
     }
 
     private void emptyConstruct(ClassDefinition cd) {
-        write(cd.symbol().name());
+        write(cd.symbol());
         write("() = default").endStmt();
     }
 
@@ -786,7 +821,7 @@ public class CppGenerator {
         if (cd.allFields().isEmpty()) return;
         write("explicit ");
         var inherit = cd.inherit().must();
-        write(cd.symbol().name());
+        write(cd.symbol());
         write('(');
         joinByComma(cd.allFields().values(), f -> {
             var t = inherit.gm().mapIf(f.type());
@@ -807,7 +842,7 @@ public class CppGenerator {
     }
 
     private void copyConstruct(ClassDefinition cd, boolean tmp) {
-        write(cd.symbol().name());
+        write(cd.symbol());
         write('(');
         definedToken(cd);
         if (tmp) write("&&");
@@ -861,7 +896,7 @@ public class CppGenerator {
 
     private CppGenerator declareMethod(Method m) {
         write(m.generic());
-        return write(m.name(), m.prototype());
+        return write(() -> write(m.name()), m.prototype());
     }
 
     private void implClass(ClassDefinition cd) {
@@ -898,11 +933,15 @@ public class CppGenerator {
     }
 
     private CppGenerator write(Symbol s) {
-        s.module().use(this::write);
+        s.module().use(mp -> {
+            for (int i = 0; i < mp.size(); i++) {
+                if (i > 0) write('$');
+                write(mp.get(i).value());
+            }
+        });
         write(s.name());
         return this;
     }
-
 
     private CppGenerator write(DerivedType dt) {
         return write(dt.symbol()).write(dt.generic());
@@ -963,8 +1002,8 @@ public class CppGenerator {
         return this;
     }
 
-    private CppGenerator write(Identifier name, Prototype prototype) {
-        return write(() -> write(name), prototype);
+    private CppGenerator write(Symbol symbol, Prototype prototype) {
+        return write(() -> write(symbol), prototype);
     }
 
     private void implFunc(FunctionDefinition fd) {
@@ -972,7 +1011,7 @@ public class CppGenerator {
         enterFunc = fd;
         write(fd.generic());
         var proc = fd.procedure();
-        write(fd.symbol().name(), proc.prototype());
+        write(fd.symbol(), proc.prototype());
         newLine();
         write(proc);
         enterFunc = null;
@@ -1514,7 +1553,7 @@ public class CppGenerator {
     }
 
     private CppGenerator fieldInit(
-            IdentifierTable<? extends Field> fields,
+            IdentifierMap<? extends Field> fields,
             ObjectExpression init) {
         joinByComma(fields.values(), f -> {
             var o = init.entries().tryGet(f.name());

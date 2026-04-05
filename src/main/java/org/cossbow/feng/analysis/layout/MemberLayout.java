@@ -1,4 +1,4 @@
-package org.cossbow.feng.layout;
+package org.cossbow.feng.analysis.layout;
 
 /**
  * 计算出的字段布局信息

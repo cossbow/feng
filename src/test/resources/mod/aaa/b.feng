@@ -1,9 +1,0 @@
-
-func main([&!#][*!#]byte) {
-    var a, b Complex = {real=1.1,imag=2.3},{real=0.75,imag=0.1133};
-    var s = a.add(b);
-    var d = a.sub(b);
-    var p = a.mul(b);
-    var q = a.div(b);
-}
-

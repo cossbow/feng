@@ -13,7 +13,12 @@ public class ErrorUtil {
     private ErrorUtil() {
     }
 
-    public static <T> T unsupported(String fmt, Object... args) throws UnsupportedOperationException {
+    public static <T>T argument(String fmt, Object... args) {
+        throw new IllegalArgumentException(String.format(fmt, args));
+    }
+
+    public static <T> T unsupported(String fmt, Object... args)
+            throws UnsupportedOperationException {
         throw new UnsupportedOperationException(fmt.formatted(args));
     }
 
@@ -33,6 +38,10 @@ public class ErrorUtil {
         throw new SemanticException(fmt.formatted(arg));
     }
 
+    public static <T> T modFail(String fmt, Object... arg) {
+        throw new ModuleException(fmt.formatted(arg));
+    }
+
     public static <T> T binExpr(Position pos) {
         return semantic("operands of binary-expression must same type: %s", pos);
     }
@@ -48,5 +57,11 @@ public class ErrorUtil {
     }
 
     public static class UnreachableException extends RuntimeException {
+    }
+
+    public static class ModuleException extends RuntimeException {
+        public ModuleException(String message) {
+            super(message);
+        }
     }
 }

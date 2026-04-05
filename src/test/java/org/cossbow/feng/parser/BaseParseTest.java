@@ -12,7 +12,6 @@ import org.cossbow.feng.ast.expr.SymbolExpression;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.lit.Literal;
 import org.cossbow.feng.ast.lit.StringLiteral;
-import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.stmt.CallStatement;
 import org.cossbow.feng.ast.stmt.Statement;
@@ -55,8 +54,8 @@ public class BaseParseTest {
     static final int EDGE_ALL = EDGE_LOWERCASE + 1;
 
     static Source doParse(CharStream cs) {
-        return new SourceParser(StandardCharsets.UTF_8,
-                new ParseSymbolTable()).parse("", cs);
+        return new SourceParser(StandardCharsets.UTF_8)
+                .parse("", cs);
     }
 
     public static Source doParseFile(String code) {
@@ -71,18 +70,26 @@ public class BaseParseTest {
         }
     }
 
+    public static ParseSymbolTable parseTable(String code) {
+        return doParseFile(code).table();
+    }
+
+    public static ParseSymbolTable parseTable(InputStream is) {
+        return doParseFile(is).table();
+    }
+
     public static Definition firstDef(Source src) {
-        var type = src.table().namedTypes.stream()
-                .filter(t -> t != ClassDefinition.ObjectClass).findFirst();
+        var type = src.table().types.stream()
+                .filter(t -> !t.builtin()).findFirst();
         if (type.isPresent()) return type.get();
-        var functions = src.table().namedFunctions;
+        var functions = src.table().functions;
         if (!functions.isEmpty()) return functions.getValue(0);
         return ErrorUtil.syntax("parse fail");
     }
 
     public static TypeDefinition doParseType(String def, Identifier name) {
         var src = doParseFile(def);
-        return src.table().namedTypes.get(name);
+        return src.table().types.get(name);
     }
 
     public static TypeDefinition doParseType(String def, Symbol name) {
@@ -95,7 +102,7 @@ public class BaseParseTest {
 
     public static FunctionDefinition doParseFunc(String def, Identifier name) {
         var src = doParseFile(def);
-        return src.table().namedFunctions.get(name);
+        return src.table().functions.get(name);
     }
 
     public static FunctionDefinition doParseFunc(String def, String name) {
@@ -145,7 +152,7 @@ public class BaseParseTest {
 
     public static FunctionDefinition doParseProc(String def) {
         var src = doParseFile(def);
-        return src.table().namedFunctions.getValue(0);
+        return src.table().functions.getValue(0);
     }
 
     public static Statement doParseLocal(String stmt) {
@@ -253,8 +260,9 @@ public class BaseParseTest {
         return varName(((CallStatement) stmt).call().callee());
     }
 
-    public static <T, R> void checkIds(List<R> names,
-                                       IdentifierTable<T> table) {
+    public static <T, R extends Entity>
+    void checkIds(List<R> names,
+                  OrderlyMap<R, T> table) {
         Assertions.assertEquals(names.size(), table.size());
         for (int i = 0; i < names.size(); i++) {
             Assertions.assertEquals(names.get(i), table.getKey(i));

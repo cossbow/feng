@@ -1,7 +1,10 @@
 
+export
 class Complex final {
+    export
     var real,imag float;
 
+    export
     func neg() Complex {
         return {
             real = -real,
@@ -9,6 +12,7 @@ class Complex final {
         };
     }
 
+    export
     func add(c &!#Complex) Complex {
         return {
             real = real + c.real,
@@ -16,6 +20,7 @@ class Complex final {
         };
     }
 
+    export
     func sub(c &!#Complex) Complex {
         return {
             real = real - c.real,
@@ -23,6 +28,7 @@ class Complex final {
         };
     }
 
+    export
     func mul(c &!#Complex) Complex {
         return {
             real = real*c.real - imag*c.imag,
@@ -30,6 +36,7 @@ class Complex final {
         };
     }
 
+    export
     func div(c &!#Complex) Complex {
         var d = c.real*c.real + c.imag* c.imag;
         return {
@@ -40,3 +47,4 @@ class Complex final {
 
 }
 
+export const ComplexZero Complex = {};

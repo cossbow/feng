@@ -19,7 +19,7 @@ public class FunctionParseTest extends BaseParseTest {
     public void testPrototype() {
         var name = randVarSymbol(16);
         var pt = (PrototypeDefinition) doParseType(
-                "func %s();".formatted(name), name);
+                "func %s=();".formatted(name), name);
         Assertions.assertEquals(name, pt.symbol());
         Assertions.assertTrue(pt.generic().isEmpty());
     }

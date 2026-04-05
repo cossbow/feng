@@ -1,13 +1,14 @@
 package org.cossbow.feng.ast;
 
+import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.util.Optional;
 
 public class Symbol extends Entity {
-    private final Optional<Identifier> module;
+    private final Optional<ModulePath> module;
     private final Identifier name;
 
     public Symbol(Position pos,
-                  Optional<Identifier> module,
+                  Optional<ModulePath> module,
                   Identifier name) {
         super(pos);
         this.module = module;
@@ -22,7 +23,7 @@ public class Symbol extends Entity {
         this(name.pos(), Optional.empty(), name);
     }
 
-    public Optional<Identifier> module() {
+    public Optional<ModulePath> module() {
         return module;
     }
 
@@ -45,7 +46,7 @@ public class Symbol extends Entity {
     @Override
     public String toString() {
         if (module.none()) return name.toString();
-        return module.get().toString() +
+        return module.get().name().toString() +
                 DELIMITER + name.toString();
     }
 

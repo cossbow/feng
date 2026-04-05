@@ -17,10 +17,10 @@ source
     : import_* global* EOF
     ;
 import_
-    : IMPORT module (alias=Identifier | flat=MUL)? SEMI
+    : IMPORT module (alias=Identifier)? SEMI
     ;
 module
-    : Identifier (DOT Identifier)*
+    : Identifier (DOLLAR Identifier)*
     ;
 symbol
     : (mod=Identifier DOLLAR)? name=Identifier
@@ -36,10 +36,10 @@ exportable
 // global
 //
 global
-    : exportable def=typeDefinition         # GlobalTypeDefinition
-    | exportable def=functionDefinition     # GlobalFunctionDefinition
-    | exportable declaration SEMI           # GlobalDeclaration
-    | exportable macro                      # GlobalMacro
+    : def=typeDefinition            # GlobalTypeDefinition
+    | def=functionDefinition        # GlobalFunctionDefinition
+    | exportable declaration SEMI   # GlobalDeclaration
+    | macro                         # GlobalMacro
     ;
 
 
@@ -83,7 +83,7 @@ attributeMemberArray
     ;
 // attribute: declaration
 attribute
-    : AT type=Identifier ('(' init=objectExpr ')')?
+    : AT symbol ('(' init=objectExpr ')')?
     ;
 attributes
     : attribute*
@@ -93,7 +93,7 @@ attributes
 
 
 modifier
-    : attributes
+    : exportable attributes
     ;
 
 
@@ -170,7 +170,7 @@ classExtension
     | classInherit? classImpl?
     ;
 classMember
-    : modifier exportable classMemberImpl
+    : modifier classMemberImpl
     ;
 classMemberImpl
     : fields=classMemberFields
@@ -181,7 +181,7 @@ classMemberFields
     : declare=(VAR|CONST) identifierList typeDeclarer SEMI
     ;
 classMemberMethod
-    : FUNC name=Identifier typeParameters? procedure
+    : def=funcDef
     ;
 classInherit
     : COLON definedType
@@ -208,11 +208,14 @@ enumValue
 //
 // function
 //
+funcDef
+    : FUNC name=Identifier typeParameters? (procedure|prototype SEMI)
+    ;
 functionDefinition
-    : modifier FUNC name=Identifier typeParameters? procedure
+    : modifier def=funcDef
     ;
 prototypeDefinition
-    : modifier FUNC name=Identifier typeParameters? prototype SEMI
+    : modifier FUNC name=Identifier ASSIGN typeParameters? prototype SEMI
     ;
 
 
@@ -247,8 +250,8 @@ returnSet
 // macros
 //
 macro
-    : MACRO type=Identifier macroType        # MacroClass
-    | MACRO type=Identifier macroProcedure   # MacroFunc
+    : modifier MACRO type=Identifier macroType        # MacroClass
+    | modifier MACRO type=Identifier macroProcedure   # MacroFunc
     ;
 macroType
     : name=Identifier '{' fields=macroVariables SEMI macroProcedure+ '}'
@@ -298,7 +301,7 @@ assignedDeclaration
     : declaredNames typeDeclarer? ASSIGN values=expressionList
     ;
 declaredNames
-    : modifier declare=(VAR|CONST) identifierList
+    : attributes declare=(VAR|CONST) identifierList
     ;
 
 
@@ -699,6 +702,8 @@ fragment UnicodeEscape  : '\\' 'u'+ HexDigit HexDigit HexDigit HexDigit;
 FloatLiteral
     : Digits DOT Digits? ExponentPart?
     | Digits ExponentPart
+    | Digits DOT
+    | DOT Digits
     ;
 fragment ExponentPart               : [eE] [+-]? Digits ;
 

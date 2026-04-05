@@ -5,6 +5,8 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -26,11 +28,15 @@ public class PrimitiveDefinition extends TypeDefinition {
 
     //
 
-    static final Map<Primitive, PrimitiveDefinition> types;
+    public static final Map<Primitive, PrimitiveDefinition> types;
 
     static {
-        types = Arrays.stream(Primitive.values()).collect(
-                Collectors.toUnmodifiableMap(Function.identity(),
-                        PrimitiveDefinition::new));
+        var map = new HashMap<Primitive, PrimitiveDefinition>();
+        for (Primitive p : Primitive.values()) {
+            var def = new PrimitiveDefinition(p);
+            def.builtin(true);
+            map.put(p, def);
+        }
+        types = Collections.unmodifiableMap(map);
     }
 }

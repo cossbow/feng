@@ -2,31 +2,51 @@ package org.cossbow.feng.parser;
 
 import org.antlr.v4.runtime.*;
 import org.cossbow.feng.ast.Source;
-import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.ast.mod.ModulePath;
+import org.cossbow.feng.err.SyntaxException;
+import org.cossbow.feng.util.Optional;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 
 public class SourceParser {
+    private final Optional<ModulePath> module;
     private final Charset charset;
-    private final ParseSymbolTable table;
+    private final boolean metadata;
 
-    public SourceParser(Charset charset, ParseSymbolTable table) {
+    public SourceParser(Optional<ModulePath> module,
+                        Charset charset,
+                        boolean metadata) {
+        this.module = module;
         this.charset = charset;
-        this.table = table;
+        this.metadata = metadata;
+    }
+
+    public SourceParser(ModulePath module,
+                        Charset charset,
+                        boolean metadata) {
+        this(Optional.of(module), charset, metadata);
+    }
+
+    public SourceParser(ModulePath module,
+                        Charset charset) {
+        this(Optional.of(module), charset, false);
+    }
+
+    public SourceParser(Charset charset) {
+        this(Optional.empty(), charset, false);
     }
 
     public Source parse(String file, CharStream cs) {
         var lexer = new FengLexer(cs);
         var ts = new CommonTokenStream(lexer);
         var parser = new FengParser(ts);
-        var ec = new ErrorCollector();
+        var ec = new ErrorCollector(file);
         parser.addErrorListener(ec);
-        var visitor = new SourceParseVisitor(file, charset, table);
+        var visitor = new SourceParseVisitor(file, module,
+                charset, new ParseSymbolTable(module), metadata);
         return (Source) visitor.visit(parser.source());
     }
 
@@ -41,15 +61,19 @@ public class SourceParser {
 
     static class ErrorCollector extends BaseErrorListener
             implements ANTLRErrorListener {
-        private final List<SyntaxErrorMsg> errors = new ArrayList<>();
+        private final String file;
+
+        ErrorCollector(String file) {
+            this.file = file;
+        }
 
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer,
                                 Object offendingSymbol, int line,
                                 int charPositionInLine, String msg,
                                 RecognitionException e) {
-            ErrorUtil.syntax("parse error at (%d:%d): %s: \n",
-                    line, charPositionInLine, msg);
+            throw new SyntaxException("parse error at %s(%d:%d): \n%s"
+                    .formatted(file, line, charPositionInLine, msg));
         }
     }
 }

@@ -1,5 +1,6 @@
 package org.cossbow.feng.util;
 
+import org.cossbow.feng.dag.DAGUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

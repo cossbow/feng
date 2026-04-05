@@ -6,9 +6,9 @@ class A {
 
 func run() {}
 
-func Task`T`(t T);
+func Task=`T`(t T);
 
-func Callable();
+func Callable=();
 
 func get() func() {
     return run;
@@ -23,7 +23,7 @@ func using2(a func(), b Callable) {
     if (a==b){}
 }
 
-func Callback(int)bool;
+func Callback=(int)bool;
 
 func positive(a int)bool{
     return a > 0;

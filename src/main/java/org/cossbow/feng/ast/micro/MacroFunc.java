@@ -2,14 +2,16 @@ package org.cossbow.feng.ast.micro;
 
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.attr.Modifier;
 
 public class MacroFunc extends Macro {
     private MacroProcedure procedure;
 
     public MacroFunc(Position pos,
+                     Modifier modifier,
                      Identifier type,
                      MacroProcedure procedure) {
-        super(pos, type);
+        super(pos, modifier, type);
         this.procedure = procedure;
     }
 

@@ -1,0 +1,12 @@
+import mod$aaa;
+
+func test1() {
+    var a aaa$Complex = {real=1.1,imag=2.3};
+    var b aaa$Complex = {real=0.75,imag=0.1133};
+    var s = a.add(b);
+    var d = a.sub(b);
+    var p = a.mul(b);
+    var q = a.div(b);
+    if (q == aaa$ComplexZero) {
+    }
+}

@@ -1,0 +1,21 @@
+import mod$aab;
+
+const Unit1 aab$Vector = {x1=1.,x2=.0,x3=.0};
+
+
+func test2() {
+    var a aab$Vector = {x1=1.1,x2=2.3,x3=0.43};
+    var b aab$Vector = {x1=0.75,x2=0.113,x3=3.9};
+    var x = a.add(b);
+    var y = a.sub(b);
+    if (y == aab$VectorZero) {
+    }
+}
+
+export
+func use2(calc aab$Calculator) {
+    var a aab$Vector = {x1=1.1,x2=2.3,x3=0.43};
+    var b aab$Vector = {x1=0.75,x2=0.113,x3=3.9};
+    var r = calc(a,b);
+    if (r == Unit1) {}
+}

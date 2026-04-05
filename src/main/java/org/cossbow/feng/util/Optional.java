@@ -2,10 +2,7 @@ package org.cossbow.feng.util;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
+import java.util.function.*;
 import java.util.stream.Stream;
 
 public class Optional<T> {
@@ -21,6 +18,14 @@ public class Optional<T> {
 
     public T getOrElse(T defVal) {
         return has() ? value : defVal;
+    }
+
+    public Optional<T> orElse(Optional<T> defOpt) {
+        return has() ? this : defOpt;
+    }
+
+    public Optional<T> orElse(Supplier<Optional<T>> defOpt) {
+        return has() ? this : defOpt.get();
     }
 
     public boolean has() {
@@ -88,12 +93,12 @@ public class Optional<T> {
 
     @Override
     public int hashCode() {
-        return value != null ? value.hashCode() : 0;
+        return has() ? value.hashCode() : 0;
     }
 
     @Override
     public String toString() {
-        if (value == null) return "nil";
+        if (none()) return "<>";
         return value.toString();
     }
 

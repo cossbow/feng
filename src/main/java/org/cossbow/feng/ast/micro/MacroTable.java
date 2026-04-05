@@ -1,7 +1,7 @@
 package org.cossbow.feng.ast.micro;
 
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.IdentifierTable;
+import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.util.Optional;
 
 import java.util.HashMap;
@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 public class MacroTable {
-    private Map<Identifier, IdentifierTable<Macro>> tables
+    private Map<Identifier, IdentifierMap<Macro>> tables
             = new HashMap<>();
 
     public void add(Macro macro) {
@@ -17,11 +17,20 @@ public class MacroTable {
     }
 
     void add(Identifier type, Identifier id, Macro value) {
-        tables.computeIfAbsent(type, g -> new IdentifierTable<>())
+        tables.computeIfAbsent(type, g -> new IdentifierMap<>())
                 .add(id, value);
     }
 
-    public IdentifierTable<Macro> get(Identifier type) {
+    public void addAll(MacroTable ot) {
+        for (var e : ot.tables.entrySet()) {
+            tables.merge(e.getKey(), e.getValue(), (has, more) -> {
+                has.addAll(more);
+                return has;
+            });
+        }
+    }
+
+    public IdentifierMap<Macro> get(Identifier type) {
         var table = tables.get(type);
         if (table == null) {
             throw new NoSuchElementException("not exists '" + type + "'");

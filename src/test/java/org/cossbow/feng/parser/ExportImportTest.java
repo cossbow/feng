@@ -3,7 +3,6 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 import org.cossbow.feng.ast.dcl.NewArrayType;
@@ -13,7 +12,6 @@ import org.cossbow.feng.ast.expr.NewExpression;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.ast.oop.ClassDefinition;
-import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.stmt.AssignmentsStatement;
 import org.cossbow.feng.ast.stmt.CallStatement;
 import org.cossbow.feng.ast.stmt.DeclarationStatement;
@@ -22,62 +20,55 @@ import org.cossbow.feng.util.Optional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.*;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.cossbow.feng.ast.Position.ZERO;
 
 public class ExportImportTest extends BaseParseTest {
 
-    static ModulePath mod(String... values) {
-        return new ModulePath(identifiers(values));
+    static ModulePath mod(String first, String... more) {
+        return new ModulePath(Path.of(first, more));
     }
 
     // import
 
     @Test
     public void testImport1() {
-        var code = "import a.b;";
+        var code = "import a$b;";
         var file = doParseFile(code);
         var imports = file.imports();
         Assertions.assertEquals(1, imports.size());
 
         var i = imports.getFirst();
-        Assertions.assertEquals(mod("a", "b"), i.path());
+        Assertions.assertEquals(mod("a", "b"), i);
 
-        Assertions.assertFalse(i.alias().has());
-        Assertions.assertFalse(i.flat());
+        Assertions.assertEquals(identifier("b"), i.name());
     }
 
     @Test
     public void testImport2() {
-        var code = "import b.c.d dist;";
+        var code = "import b$c$d dist;";
         var file = doParseFile(code);
         var imports = file.imports();
         Assertions.assertEquals(1, imports.size());
 
         var i = imports.getFirst();
-        Assertions.assertEquals(mod("b", "c", "d"), i.path());
-        Assertions.assertEquals(identifier("dist"), i.alias().must());
-        Assertions.assertFalse(i.flat());
-    }
-
-    @Test
-    public void testImport3() {
-        var code = "import b.c.d *;";
-        var file = doParseFile(code);
-        var imports = file.imports();
-        Assertions.assertEquals(1, imports.size());
-
-        var i = imports.getFirst();
-        Assertions.assertEquals(mod("b", "c", "d"), i.path());
-        Assertions.assertTrue(i.flat());
+        Assertions.assertEquals(mod("b", "c", "d"), i);
+        Assertions.assertEquals(identifier("d"), i.name());
     }
 
     // module prefix
 
     private Symbol randVar(int ml, int nl) {
-        var mod = ml > 0 ? randVarName(ml) : null;
-        return new Symbol(Position.ZERO,
-                Optional.of(mod),
+        if (ml <= 0)
+            return new Symbol(ZERO, Optional.empty(), randVarName(nl));
+
+        return new Symbol(ZERO, Optional.of(mod(randVarName(ml).value())),
                 randVarName(nl));
     }
 
@@ -86,14 +77,10 @@ public class ExportImportTest extends BaseParseTest {
                 .collect(Collectors.joining("\n"));
     }
 
-    private String makeImports(Identifier... arr) {
-        return makeImports(Set.of(arr));
-    }
-
     private String makeImports(Symbol... ss) {
         var mod = new ArrayList<Identifier>(ss.length);
         for (Symbol s : ss) {
-            if (s.module().has()) mod.add(s.module().must());
+            s.module().use(i -> mod.add(i.name()));
         }
         return makeImports(mod);
     }
@@ -101,7 +88,7 @@ public class ExportImportTest extends BaseParseTest {
     private void testTypeDeclarer(String flag) {
         var name = randVarName(12);
         var type = randVar(12, 32);
-        var im = makeImports(type.module().must());
+        var im = makeImports(type);
         var code = "var %s %s%s = {};".formatted(name, flag, type);
         var ds = (DeclarationStatement) parseLocal(im, code);
         var v = ds.variables().getFirst();
@@ -174,7 +161,7 @@ public class ExportImportTest extends BaseParseTest {
     @Test
     public void testCallee() {
         var name = randVar(16, 32);
-        var im = makeImports(List.of(name.module().must()));
+        var im = makeImports(name);
         var code = name + "();";
         var cs = (CallStatement) parseLocal(im, code);
         Assertions.assertEquals(name, varName(cs.call().callee()));
@@ -185,11 +172,11 @@ public class ExportImportTest extends BaseParseTest {
         var parent = randVar(10, 32);
         var ifs = new Symbol[10];
         var mods = new HashSet<Identifier>(16);
-        mods.add(parent.module().must());
+        mods.add(parent.module().must().name());
         var impls = new String[ifs.length];
         for (int i = 0; i < ifs.length; i++) {
             ifs[i] = randVar(i + 1, 32);
-            mods.add(ifs[i].module().must());
+            mods.add(ifs[i].module().must().name());
             impls[i] = ifs[i].toString();
         }
         var code = makeImports(mods) + "class Dev:%s(%s){}".formatted(parent,
@@ -206,24 +193,30 @@ public class ExportImportTest extends BaseParseTest {
     @Test
     public void testExportGlobalDefinition() {
         var globalCodes = List.of(
-                "func sin(){}",
-                "func Run();",
-                "class Cat{}",
-                "interface Driver{}",
-                "enum Status{A,}",
-                "struct Block{}",
-                "union Result{}",
-                "attribute Section{}"
+                "func ggyy(){}",
+                "func ggyy=();",
+                "class ggyy{}",
+                "interface ggyy{}",
+                "enum ggyy{A,}",
+                "struct ggyy{}",
+                "union ggyy{}",
+                "attribute ggyy{}"
         );
         for (int i = 0; i <= 1; i++) {
+            var func = true;
+            var export = i > 0;
             for (var gc : globalCodes) {
-                var code = (i > 0 ? "export " : "") + gc;
-                var src = doParseFile(code);
-                var def = firstDef(src);
-                var exported = def instanceof FunctionDefinition ?
-                        src.table().exportedFunctions.exists(def.symbol()) :
-                        src.table().exportedTypes.exists(def.symbol());
-                Assertions.assertEquals(i > 0, exported);
+                var code = (export ? "export " : "") + gc;
+                var tlb = doParseFile(code).table();
+                var name = identifier("ggyy");
+                if (func) {
+                    var def = tlb.functions.get(name);
+                    Assertions.assertEquals(export, def.export(), code);
+                } else {
+                    var def = tlb.types.get(name);
+                    Assertions.assertEquals(export, def.export(), code);
+                }
+                func = false;
             }
         }
     }
@@ -239,8 +232,7 @@ public class ExportImportTest extends BaseParseTest {
                 var code = (i > 0 ? "export " : "") + gc;
                 var src = doParseFile(code);
                 var v = src.table().variables.getValue(0);
-                var tab = src.table().exportedVariables;
-                Assertions.assertEquals(i > 0, tab.exists(symbol(v.name())));
+                Assertions.assertEquals(i > 0, v.export(), code);
             }
         }
     }

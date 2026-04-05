@@ -1,10 +1,10 @@
 attribute Document {}
 
 attribute Proxy {
-    name uint8;
+    name int;
     code int = 0;
     tags []int;
-    props []Property = [Property.ID];
+    props []string = ["gg"];
 }
 
 

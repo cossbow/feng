@@ -16,7 +16,7 @@ public class GenericParseTest extends BaseParseTest {
 
     static final List<Groups.G2<String, Boolean>> simpleGlobalDefineFmt = List.of(
             Groups.g2("func foo`%s`(){}", false),
-            Groups.g2("func Foo`%s`();", true),
+            Groups.g2("func Foo=`%s`();", true),
             Groups.g2("class Foo`%s`{}", true),
             Groups.g2("interface Foo`%s`{}", true),
             Groups.g2("struct Foo`%s`{}", true),

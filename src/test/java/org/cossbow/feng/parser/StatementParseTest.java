@@ -71,7 +71,7 @@ public class StatementParseTest extends BaseParseTest {
             for (int vn = 1; vn <= 10; vn++) {
                 var type = symbol(randTypeName(16));
                 var code = new StringBuilder();
-                var attrs = anyNames(RandTypeName, 16, an);
+                var attrs = anyNames(RandTypeSymbol, 16, an);
                 appendList(code, attrs, "@", "");
                 var names = anyNames(RandVarFuncName, 8, vn);
                 code.append(" var ").append(idList(names)).append(" ").append(type).append(";");

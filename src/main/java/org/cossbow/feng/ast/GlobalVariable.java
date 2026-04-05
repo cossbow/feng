@@ -1,13 +1,17 @@
 package org.cossbow.feng.ast;
 
+import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.Variable;
-import org.cossbow.feng.util.Lazy;
 
 public class GlobalVariable extends Variable {
     private final Symbol symbol;
 
-    public GlobalVariable(Variable v, Symbol symbol) {
-        super(v.pos(), v.modifier(), v.declare(), v.name(), v.type(), v.value());
+    public GlobalVariable(boolean export,
+                          Variable v,
+                          Symbol symbol) {
+        super(v.pos(), new Modifier(v.modifier().pos(),
+                        export, v.modifier().attributes()),
+                v.declare(), v.name(), v.type(), v.value());
         this.symbol = symbol;
     }
 

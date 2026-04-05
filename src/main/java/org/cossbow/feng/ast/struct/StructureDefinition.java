@@ -3,11 +3,11 @@ package org.cossbow.feng.ast.struct;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.layout.StructureLayout;
+import org.cossbow.feng.analysis.layout.StructureLayout;
 import org.cossbow.feng.util.Lazy;
 
 public class StructureDefinition extends TypeDefinition {
-    private IdentifierTable<StructureField> fields;
+    private IdentifierMap<StructureField> fields;
 
 
     public StructureDefinition(Position pos,
@@ -15,12 +15,12 @@ public class StructureDefinition extends TypeDefinition {
                                Symbol symbol,
                                TypeParameters generic,
                                TypeDomain domain,
-                               IdentifierTable<StructureField> fields) {
+                               IdentifierMap<StructureField> fields) {
         super(pos, modifier, symbol, generic, domain);
         this.fields = fields;
     }
 
-    public IdentifierTable<StructureField> fields() {
+    public IdentifierMap<StructureField> fields() {
         return fields;
     }
 

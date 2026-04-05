@@ -8,32 +8,31 @@ import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-public class UniqueTable<K extends Entity, V> implements Iterable<V> {
-    private final HashMap<K, Node<K, V>> table;
+public class OrderlyMap<K extends Entity, V> implements Iterable<V> {
+    private final HashMap<K, Node<K, V>> index;
     private final List<Node<K, V>> nodes;
 
-    public UniqueTable() {
-        table = new HashMap<>();
+    public OrderlyMap() {
+        index = new HashMap<>();
         nodes = new ArrayList<>();
     }
 
-    public UniqueTable(int initCapacity) {
-        table = new HashMap<>(initCapacity);
+    public OrderlyMap(int initCapacity) {
+        index = new HashMap<>(initCapacity);
         nodes = new ArrayList<>(initCapacity);
     }
 
-    public UniqueTable(List<Groups.G2<K, V>> data) {
-        table = new HashMap<>(data.size());
+    public OrderlyMap(List<Groups.G2<K, V>> data) {
+        index = new HashMap<>(data.size());
         nodes = new ArrayList<>(data.size());
         for (var g : data) add(g.a(), g.b());
     }
 
     private void addIndex(Node<K, V> node) {
-        var old = table.putIfAbsent(node.key, node);
+        var old = index.putIfAbsent(node.key, node);
         if (old != null)
             ErrorUtil.duplicate(node.key, old.key);
     }
@@ -44,7 +43,7 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
         nodes.add(node);
     }
 
-    public void addAll(UniqueTable<K, V> other) {
+    public void addAll(OrderlyMap<K, V> other) {
         nodes.addAll(other.nodes);
         for (var n : other.nodes) {
             addIndex(n);
@@ -52,7 +51,7 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
     }
 
     public V get(K key) {
-        var node = table.get(key);
+        var node = index.get(key);
         if (node != null) {
             return node.value;
         }
@@ -60,7 +59,7 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
     }
 
     public Optional<V> tryGet(K key) {
-        var node = table.get(key);
+        var node = index.get(key);
         if (node != null) {
             return Optional.of(node.value);
         }
@@ -76,7 +75,7 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
     }
 
     public boolean exists(K key) {
-        return table.containsKey(key);
+        return index.containsKey(key);
     }
 
     public List<Node<K, V>> nodes() {
@@ -84,7 +83,7 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
     }
 
     public Set<K> keys() {
-        return table.keySet();
+        return index.keySet();
     }
 
     public List<V> values() {
@@ -96,7 +95,7 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
     }
 
     public boolean isEmpty() {
-        return table.isEmpty();
+        return index.isEmpty();
     }
 
     public void each(BiConsumer<K, V> c) {
@@ -126,7 +125,7 @@ public class UniqueTable<K extends Entity, V> implements Iterable<V> {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof UniqueTable<?, ?> t)) return false;
+        if (!(o instanceof OrderlyMap<?, ?> t)) return false;
         return nodes.equals(t.nodes);
     }
 

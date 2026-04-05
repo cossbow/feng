@@ -1,29 +1,56 @@
 package org.cossbow.feng.ast.mod;
 
-import org.cossbow.feng.ast.Source;
+import org.cossbow.feng.analysis.AnalyseSymbolTable;
 import org.cossbow.feng.parser.ParseSymbolTable;
+import org.cossbow.feng.util.Lazy;
 
+import java.nio.file.Path;
 import java.util.List;
 
 public class FModule {
-    private ModulePath path;
-    private List<Source> sources;
-    private ParseSymbolTable table;
+    private final Path dir;
+    private final ModulePath path;
+    private final List<ModulePath> imports;
+    private final ParseSymbolTable table;
 
-    public FModule(ModulePath path,
-                   List<Source> sources,
+    public FModule(Path dir,
+                   ModulePath path,
+                   List<ModulePath> imports,
                    ParseSymbolTable table) {
+        this.dir = dir;
         this.path = path;
-        this.sources = sources;
+        this.imports = imports;
         this.table = table;
     }
 
-    public List<Source> sources() {
-        return sources;
+    public Path dir() {
+        return dir;
+    }
+
+    public ModulePath path() {
+        return path;
+    }
+
+    public List<ModulePath> imports() {
+        return imports;
     }
 
     public ParseSymbolTable table() {
         return table;
+    }
+
+    public final Lazy<AnalyseSymbolTable> result = Lazy.nil();
+
+    //
+
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof FModule m && path.equals(m.path);
+    }
+
+    @Override
+    public int hashCode() {
+        return path.hashCode();
     }
 
     //

@@ -8,31 +8,49 @@ import org.cossbow.feng.util.Optional;
 public class Import extends Entity {
     private ModulePath path;
     private Optional<Identifier> alias;
-    private boolean flat;
 
     public Import(Position pos,
                   ModulePath path,
-                  Optional<Identifier> alias,
-                  boolean flat) {
+                  Optional<Identifier> alias) {
         super(pos);
         this.path = path;
         this.alias = alias;
-        this.flat = flat;
+    }
+
+    public Identifier name() {
+        return alias.getOrElse(path.name());
     }
 
     public ModulePath path() {
         return path;
     }
 
-    public Identifier module() {
-        return alias.getOrElse(path.values().getLast());
-    }
-
     public Optional<Identifier> alias() {
         return alias;
     }
 
-    public boolean flat() {
-        return flat;
+    //
+
+    @Override
+    public final boolean equals(Object o) {
+        return o instanceof Import i &&
+                path.equals(i.path) &&
+                alias.equals(i.alias);
+
+    }
+
+    @Override
+    public int hashCode() {
+        int result = path.hashCode();
+        result = 31 * result + alias.hashCode();
+        return result;
+    }
+
+    //
+    @Override
+    public String toString() {
+        if (alias.none())
+            return path.toString();
+        return path + " " + alias.get();
     }
 }

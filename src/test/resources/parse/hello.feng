@@ -1,5 +1,5 @@
-import xxx.io *;
+import xxx$io ;
 
 func main() {
-    println("Hello Fèng!");
+    io.println("Hello Fèng!");
 }

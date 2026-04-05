@@ -1,4 +1,4 @@
-package org.cossbow.feng.layout;
+package org.cossbow.feng.analysis.layout;
 
 import java.util.List;
 

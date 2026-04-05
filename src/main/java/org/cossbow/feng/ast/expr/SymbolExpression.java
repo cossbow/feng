@@ -20,6 +20,10 @@ public class SymbolExpression extends PrimaryExpression {
         return symbol;
     }
 
+    public void symbol(Symbol symbol) {
+        this.symbol = symbol;
+    }
+
     public TypeArguments generic() {
         return generic;
     }

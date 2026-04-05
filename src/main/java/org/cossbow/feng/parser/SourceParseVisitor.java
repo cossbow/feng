@@ -23,8 +23,7 @@ import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.ast.var.*;
-import org.cossbow.feng.util.CommonUtil;
-import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.*;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.Stack;
 
@@ -53,16 +52,22 @@ final class SourceParseVisitor
     //
 
     final String file;
+    final Optional<ModulePath> module;
     final Charset charset;
-    final ParseSymbolTable tbl;
+    final ParseSymbolTable table;
+    final boolean metadata;
 
-    public SourceParseVisitor(String file, Charset charset, ParseSymbolTable tbl) {
+    public SourceParseVisitor(String file,
+                              Optional<ModulePath> module,
+                              Charset charset,
+                              ParseSymbolTable table,
+                              boolean metadata) {
         this.file = file;
+        this.module = module;
         this.charset = charset;
-        this.tbl = tbl;
+        this.table = table;
+        this.metadata = metadata;
     }
-
-    final IdentifierTable<Import> importModName = new IdentifierTable<>();
 
     //
     // utils
@@ -85,7 +90,7 @@ final class SourceParseVisitor
         return result;
     }
 
-    private <K extends Entity, E extends Entity, T extends UniqueTable<K, E>>
+    private <K extends Entity, E extends Entity, T extends OrderlyMap<K, E>>
     T parseUniques(T tab, List<? extends ParseTree> trees, Function<E, K> identify) {
         var list = this.<E>visitList(trees);
         for (var e : list) {
@@ -134,7 +139,7 @@ final class SourceParseVisitor
     }
 
     Symbol defineSymbol(Identifier id) {
-        return new Symbol(id.pos(), Optional.empty(), id);
+        return new Symbol(id.pos(), module, id);
     }
 
     Symbol defineSymbol(Token tn) {
@@ -145,8 +150,10 @@ final class SourceParseVisitor
     // module: start
     //
 
+    public final Map<Identifier, Entity> globalNames = new HashMap<>();
+
     private void checkGlobalName(Identifier name, Entity def) {
-        var old = tbl.globalNames.putIfAbsent(name, def);
+        var old = globalNames.putIfAbsent(name, def);
         if (old == null) return;
         var m = switch (old) {
             case TypeDefinition d -> d.domain();
@@ -158,38 +165,34 @@ final class SourceParseVisitor
                 name, def.pos(), m, old.pos());
     }
 
+    private Map<Identifier, ModulePath> importMap = new HashMap<>();
+
     @Override
     public Entity visitSource(FengParser.SourceContext ctx) {
         var imports = this.<Import>visitList(ctx.import_());
-        var set = new HashSet<ModulePath>(imports.size());
-        for (var i : imports)
-            if (!set.add(i.path()))
-                semantic("duplicate import: %s", i.path());
-
+        var cache = new DedupCache<ModulePath>();
+        for (var i : imports) {
+            importMap.put(i.name(), cache.dedup(i.path()));
+        }
+        // 语法格式是import在最前面，所以先缓存起来，下面解析symbol时直接替换成路径
         visitList(ctx.global());
-        return new Source(posOf(ctx), imports, tbl);
+        return new Source(posOf(ctx), cache.toList(), table);
     }
 
     @Override
     public Entity visitImport_(FengParser.Import_Context ctx) {
+        var pos = posOf(ctx);
         var mod = identifiers(ctx.module().Identifier());
-        var path = new ModulePath(mod);
+        var path = new ModulePath(pos, mod);
         var alias = identifierOptional(ctx.alias);
-        var flat = ctx.flat != null;
-        var im = new Import(posOf(ctx), path, alias, flat);
-        if (flat) return im;
-        if (alias.has()) importModName.add(alias.get(), im);
-        else importModName.add(mod.getLast(), im);
-        return im;
+        return new Import(pos, path, alias);
     }
 
     @Override
     public Entity visitGlobalTypeDefinition(FengParser.GlobalTypeDefinitionContext ctx) {
         var def = (TypeDefinition) visit(ctx.def);
         checkGlobalName(def.symbol().name(), def);
-        tbl.namedTypes.add(def.symbol().name(), def);
-        if (isExport(ctx.exportable()))
-            tbl.exportedTypes.add(def.symbol(), def);
+        table.types.add(def.symbol().name(), def);
         return def;
     }
 
@@ -198,9 +201,7 @@ final class SourceParseVisitor
             FengParser.GlobalFunctionDefinitionContext ctx) {
         var def = (FunctionDefinition) visit(ctx.def);
         checkGlobalName(def.symbol().name(), def);
-        tbl.namedFunctions.add(def.symbol().name(), def);
-        if (isExport(ctx.exportable()))
-            tbl.exportedFunctions.add(def.symbol(), def);
+        table.functions.add(def.symbol().name(), def);
         return def;
     }
 
@@ -214,29 +215,21 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitGlobalDeclaration(FengParser.GlobalDeclarationContext ctx) {
+        var export = isExport(ctx.exportable());
         var stmt = (DeclarationStatement) visit(ctx.declaration());
-        var gvs = new ArrayList<GlobalVariable>(stmt.size());
         for (var v : stmt.variables()) {
             globalVarCheck(v);
-            var gv = new GlobalVariable(v, defineSymbol(v.name()));
-            gvs.add(gv);
-        }
-        if (isExport(ctx.exportable())) {
-            for (var v : gvs) tbl.exportedVariables.add(v.symbol(), v);
-        }
-        for (var v : gvs) {
-            checkGlobalName(v.symbol().name(), v);
-            tbl.variables.add(v.name(), v);
+            var gv = new GlobalVariable(export, v, defineSymbol(v.name()));
+            checkGlobalName(gv.name(), gv);
+            table.variables.add(gv.name(), gv);
         }
         return stmt;
     }
 
     @Override
     public Entity visitGlobalMacro(FengParser.GlobalMacroContext ctx) {
-        var exported = isExport(ctx.exportable());
         var macro = (Macro) visit(ctx.macro());
-        if (exported) tbl.exportedMacros.add(macro);
-        tbl.macros.add(macro);
+        table.macros.add(macro);
         return macro;
     }
 
@@ -296,8 +289,7 @@ final class SourceParseVisitor
         var text = tn.getText();
         text = text.substring(1, text.length() - 1);
         var sl = new StringLiteral(posOf(tn), charset, text.getBytes(charset)); // 去掉引号
-        var old = tbl.stringCache.putIfAbsent(sl, sl);
-        return old != null ? old : sl;
+        return table.stringCache.dedup(sl);
     }
 
     private BoolLiteral parseBool(TerminalNode tn) {
@@ -415,15 +407,17 @@ final class SourceParseVisitor
             }
 
             // 然后解析基本类型
-            var pd = Primitive.ofCode(symbol.name().value());
+            var pd = Primitive.ofCode(name.value());
             if (pd.has()) {
                 var ta = ctx.typeArguments();
                 if (ta != null)
                     return semantic("%s have no generic: %s",
                             name, posOf(ta));
 
-                return new PrimitiveType(posOf(ctx), symbol.name(), pd.get());
+                return new PrimitiveType(posOf(ctx), name, pd.get());
             }
+
+            symbol = defineSymbol(name);
         }
         var args = typeArguments(ctx.typeArguments());
         return new DerivedType(posOf(ctx), symbol, args);
@@ -468,7 +462,7 @@ final class SourceParseVisitor
     private TypeParameters typeParameters(FengParser.TypeParametersContext ctx) {
         if (ctx == null) return TypeParameters.empty();
         var pList = this.<TypeParameter>visitList(ctx.typeParameter());
-        var params = new IdentifierTable<TypeParameter>();
+        var params = new IdentifierMap<TypeParameter>();
         for (var p : pList) params.add(p.name(), p);
         return new TypeParameters(posOf(ctx), params);
     }
@@ -486,7 +480,7 @@ final class SourceParseVisitor
     public Entity visitAttributeDefinition(FengParser.AttributeDefinitionContext ctx) {
         var modifier = parseModifier(ctx.modifier());
         var name = defineSymbol(ctx.name);
-        var fields = this.parseUniques(new IdentifierTable<>(),
+        var fields = this.parseUniques(new IdentifierMap<>(),
                 ctx.attributeMember(), AttributeField::name);
         return new AttributeDefinition(posOf(ctx), modifier, name, fields);
     }
@@ -495,43 +489,45 @@ final class SourceParseVisitor
     public Entity visitAttributeMemberField(FengParser.AttributeMemberFieldContext ctx) {
         var name = identifier(ctx.name);
         var type = identifier(ctx.type);
+        var ft = AttributeField.TYPE_MAP.get(type.value());
+        if (ft == null) return semantic("invalid type '%s': %s", type, type.pos());
         var value = this.<Expression>visitOptional(ctx.value);
-        return new AttributeField(posOf(ctx), name, type, false, value);
+        return new AttributeField(posOf(ctx), name, ft, false, value);
     }
 
     @Override
     public Entity visitAttributeMemberArray(FengParser.AttributeMemberArrayContext ctx) {
         var name = identifier(ctx.name);
         var type = identifier(ctx.type);
+        var ft = AttributeField.TYPE_MAP.get(type.value());
+        if (ft == null) return semantic("invalid type '%s': %s", type, type.pos());
         var value = this.<Expression>visitOptional(ctx.values);
-        return new AttributeField(posOf(ctx), name, type, true, value);
+        return new AttributeField(posOf(ctx), name, ft, true, value);
     }
 
     @Override
     public Entity visitAttribute(FengParser.AttributeContext ctx) {
-        var type = identifier(ctx.type);
-        var init = this.<Expression>visitOptional(ctx.init);
-        return new Attribute(posOf(ctx), type, init);
+        var symbol = parseSymbol(ctx.symbol());
+        var init = this.<ObjectExpression>visitOptional(ctx.init);
+        return new Attribute(posOf(ctx), symbol, init);
     }
 
-    private IdentifierTable<Attribute> parseAttributes(FengParser.AttributesContext ctx) {
+    private SymbolMap<Attribute> parseAttributes(FengParser.AttributesContext ctx) {
         var list = this.<Attribute>visitList(ctx.attribute());
-        var table = new IdentifierTable<Attribute>();
+        var table = new SymbolMap<Attribute>();
         for (var attr : list) table.add(attr.type(), attr);
         return table;
     }
 
     private Modifier parseModifier(FengParser.ModifierContext ctx) {
+        var export = isExport(ctx.exportable());
         var attributes = parseAttributes(ctx.attributes());
-        return new Modifier(posOf(ctx), attributes);
+        return new Modifier(posOf(ctx), export, attributes);
     }
 
     private Symbol parseSymbol(FengParser.SymbolContext ctx) {
-        var mod = identifierOptional(ctx.mod);
-        if (mod.has() && importModName.get(mod.get()) == null) {
-            return semantic(
-                    "module %s not imported", mod.get());
-        }
+        var mod = identifierOptional(ctx.mod)
+                .map(importMap::get);
         var name = identifier(ctx.name);
         return new Symbol(posOf(ctx), mod, name);
     }
@@ -569,7 +565,7 @@ final class SourceParseVisitor
         var symbol = defineSymbol(CommonUtil.rand(domain.name));
         var def = new StructureDefinition(pos, Modifier.empty(),
                 symbol, TypeParameters.empty(), domain, fields);
-        tbl.namedTypes.add(symbol.name(), def);
+        table.types.add(symbol.name(), def);
         for (var f : fields) f.master().set(def);
         return def;
     }
@@ -582,9 +578,9 @@ final class SourceParseVisitor
         };
     }
 
-    private IdentifierTable<StructureField> parseStructureMembers(
+    private IdentifierMap<StructureField> parseStructureMembers(
             List<FengParser.StructureFieldsDefContext> membersCtx) {
-        var fields = new IdentifierTable<StructureField>();
+        var fields = new IdentifierMap<StructureField>();
         for (var ctx : membersCtx) {
             var type = (TypeDeclarer) visit(ctx.type);
             for (var fc : ctx.fields.structureField()) {
@@ -641,14 +637,13 @@ final class SourceParseVisitor
     public Entity visitEnumDefinition(FengParser.EnumDefinitionContext ctx) {
         var modifier = parseModifier(ctx.modifier());
         var symbol = defineSymbol(ctx.name);
-        var values = new IdentifierTable<EnumDefinition.Value>();
+        var values = new IdentifierMap<EnumDefinition.Value>();
         var id = 0;
         for (var vc : ctx.enumValue()) {
             var name = identifier(vc.name);
             var sl = new StringLiteral(name.pos(), charset,
                     name.value().getBytes(charset));
-            var old = tbl.stringCache.putIfAbsent(sl, sl);
-            if (old != null) sl = old;
+            sl = table.stringCache.dedup(sl);
             var value = this.<Expression>visitOptional(vc.value);
             var ev = new EnumDefinition.Value(posOf(vc), id++,
                     name, value, sl);
@@ -672,8 +667,8 @@ final class SourceParseVisitor
         var symbol = defineSymbol(ctx.name);
         var generic = typeParameters(ctx.typeParameters());
         genericStack.push(generic);
-        var methods = new IdentifierTable<InterfaceMethod>();
-        var parts = new SymbolTable<DerivedType>();
+        var methods = new IdentifierMap<InterfaceMethod>();
+        var parts = new SymbolMap<DerivedType>();
         var macros = new MacroTable();
         for (var imc : ctx.interfaceMember()) {
             if (imc.part != null) {
@@ -702,7 +697,6 @@ final class SourceParseVisitor
             FengParser.InterfaceMemberMethodContext ctx) {
         var pos = posOf(ctx);
         var modifier = parseModifier(ctx.modifier());
-        nestedDefineMethod(pos);
         var name = identifier(ctx.name);
         enterMethodName = name;
         methodReturnThis = false;
@@ -727,9 +721,9 @@ final class SourceParseVisitor
     //
 
 
-    private SymbolTable<DerivedType> parseClassImpl(
+    private SymbolMap<DerivedType> parseClassImpl(
             FengParser.ClassImplContext ctx) {
-        var tab = new SymbolTable<DerivedType>();
+        var tab = new SymbolMap<DerivedType>();
         if (ctx == null) return tab;
         var dts = this.<DefinedType>visitList(ctx.definedType());
         for (var dt : dts) {
@@ -763,11 +757,6 @@ final class SourceParseVisitor
             syntax("must use in method: %s", pos);
     }
 
-    private void nestedDefineMethod(Position pos) {
-        if (enterMethodName != null)
-            syntax("nested define method: %s", pos);
-    }
-
     @Override
     public Entity visitClassDefinition(FengParser.ClassDefinitionContext ctx) {
         var modifier = parseModifier(ctx.modifier());
@@ -783,35 +772,49 @@ final class SourceParseVisitor
             inherit = Optional.of(ClassDefinition.ObjectType);
         var impl = parseClassImpl(ext.classImpl());
 
-        var methods = new IdentifierTable<ClassMethod>();
-        var fields = new IdentifierTable<ClassField>();
+        var methods = new IdentifierMap<ClassMethod>();
+        var fields = new IdentifierMap<ClassField>();
         var macros = new MacroTable();
         for (var cmc : ctx.classMember()) {
             var mModifier = parseModifier(cmc.modifier());
-            var mExport = isExport(cmc.exportable());
             var mi = cmc.classMemberImpl();
 
             if (mi.method != null) {
-                var mName = identifier(mi.method.name);
-                nestedDefineMethod(posOf(mi.method));
+                var def = mi.method.def;
+                var mName = identifier(def.name);
                 enterMethodName = mName;
                 methodReturnThis = false;
-                var mGeneric = typeParameters(mi.method.typeParameters());
+                var mGeneric = typeParameters(def.typeParameters());
                 genericStack.push(mGeneric);
-                var procedure = (Procedure) visit(mi.method.procedure());
-                var method = new ClassMethod(posOf(mi), mExport, mModifier, mName,
-                        mGeneric, procedure.prototype(), procedure, methodReturnThis);
+                var proc = this.<Procedure>visitOptional(def.procedure());
+                var pt = this.<Prototype>visitOptional(def.prototype());
                 methodReturnThis = false;
-                methods.add(mName, method);
                 genericStack.pop();
                 enterMethodName = null;
+                ClassMethod method;
+                if (proc.has()) {
+                    if (metadata) {
+                        return semantic("method implementation can't be in metadata: %s",
+                                posOf(def));
+                    }
+                    method = new ClassMethod(posOf(mi), mModifier, mName,
+                            mGeneric, proc.get(), methodReturnThis);
+                } else {
+                    if (!metadata) {
+                        return semantic("method declaration can't be in source: %s",
+                                posOf(def));
+                    }
+                    method = new ClassMethod(posOf(mi), mModifier, mName,
+                            mGeneric, pt.must(), methodReturnThis);
+                }
+                methods.add(mName, method);
             } else if (mi.fields != null) {
                 var dcl = parseDeclare(mi.fields.declare);
                 var td = (TypeDeclarer) visit(mi.fields.typeDeclarer());
                 var fNames = identifiers(mi.fields.identifierList());
                 for (var fName : fNames) {
                     var field = new ClassField(fName.pos(), mModifier,
-                            mExport, dcl, fName, td);
+                            dcl, fName, td);
                     fields.add(fName, field);
                 }
             } else {
@@ -928,7 +931,7 @@ final class SourceParseVisitor
                     dt, dt.pos());
         });
 
-        var entries = new IdentifierTable<Expression>();
+        var entries = new IdentifierMap<Expression>();
         for (var oec : ctx.objectEntry()) {
             var key = identifier(oec.name);
             var value = (Expression) visit(oec.value);
@@ -1120,7 +1123,8 @@ final class SourceParseVisitor
     private List<Variable> parseVariables(
             FengParser.DeclaredNamesContext dnCtx,
             Optional<TypeDeclarer> type) {
-        var modifier = parseModifier(dnCtx.modifier());
+        var attrs = parseAttributes(dnCtx.attributes());
+        var modifier = new Modifier(posOf(dnCtx), false, attrs);
         var dcl = parseDeclare(dnCtx.declare);
         type.use(td -> {
             var r = td.maybeRefer();
@@ -1130,10 +1134,11 @@ final class SourceParseVisitor
         });
         var names = identifiers(dnCtx.identifierList());
         var vars = new ArrayList<Variable>(names.size());
-        var unique = new UniqueTable<Identifier, Identifier>(names.size());
+        var unique = new OrderlyMap<Identifier, Identifier>(names.size());
         for (var name : names) {
             unique.add(name, name);
-            vars.add(new Variable(name.pos(), modifier, dcl, name, Lazy.of(type), Lazy.nil()));
+            vars.add(new Variable(name.pos(), modifier, dcl, name,
+                    Lazy.of(type), Lazy.nil()));
         }
         return vars;
     }
@@ -1442,7 +1447,7 @@ final class SourceParseVisitor
     //
 
     private ParameterSet parseParameters(FengParser.ParametersSetContext ctx) {
-        var params = new IdentifierTable<Variable>();
+        var params = new IdentifierMap<Variable>();
 
         if (ctx == null) return new ParameterSet(params);
 
@@ -1516,16 +1521,17 @@ final class SourceParseVisitor
 
     @Override
     public MacroClass visitMacroClass(FengParser.MacroClassContext ctx) {
+        var modifier = parseModifier(ctx.modifier());
         var type = identifier(ctx.type);
         var typeCtx = ctx.macroType();
         var name = identifier(typeCtx.name);
         var fields = parseMacroVariables(typeCtx.fields);
 
         var mList = this.<MacroProcedure>visitList(typeCtx.macroProcedure());
-        var methods = new IdentifierTable<MacroProcedure>();
+        var methods = new IdentifierMap<MacroProcedure>();
         for (var mp : mList) methods.add(mp.name(), mp);
 
-        return new MacroClass(posOf(ctx), type, name, fields, methods);
+        return new MacroClass(posOf(ctx), modifier, type, name, fields, methods);
     }
 
     @Override
@@ -1539,14 +1545,15 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitMacroFunc(FengParser.MacroFuncContext ctx) {
+        var modifier = parseModifier(ctx.modifier());
         var type = identifier(ctx.type);
         var proc = (MacroProcedure) visit(ctx.macroProcedure());
-        return new MacroFunc(posOf(ctx), type, proc);
+        return new MacroFunc(posOf(ctx), modifier, type, proc);
     }
 
-    private IdentifierTable<MacroVariable> parseMacroVariables(
+    private IdentifierMap<MacroVariable> parseMacroVariables(
             FengParser.MacroVariablesContext ctx) {
-        var vars = new IdentifierTable<MacroVariable>();
+        var vars = new IdentifierMap<MacroVariable>();
         if (ctx == null) return vars;
         var li = this.<MacroVariable>visitList(ctx.macroVariable());
         for (var v : li) vars.add(v.name(), v);
@@ -1587,16 +1594,28 @@ final class SourceParseVisitor
     public Entity visitFunctionDefinition(
             FengParser.FunctionDefinitionContext ctx) {
         var modifier = parseModifier(ctx.modifier());
-        var name = defineSymbol(ctx.name);
-        var generic = typeParameters(ctx.typeParameters());
+        var name = defineSymbol(ctx.def.name);
+        var generic = typeParameters(ctx.def.typeParameters());
         genericStack.push(generic);
-        var procedure = (Procedure) visit(ctx.procedure());
-        var def = new FunctionDefinition(posOf(ctx), modifier,
-                name, generic, procedure);
+        var proc = this.<Procedure>visitOptional(ctx.def.procedure());
+        var pt = this.<Prototype>visitOptional(ctx.def.prototype());
         genericStack.pop();
-        return def;
-    }
 
+        if (proc.has()) {
+            if (metadata) return semantic(
+                    "function implementation can't be in metadata: %s",
+                    posOf(ctx));
+
+            return new FunctionDefinition(posOf(ctx), modifier,
+                    name, generic, proc.get());
+        }
+
+        if (!metadata) {
+            return semantic("function declaration can't be in source: %s",
+                    posOf(ctx));
+        }
+        return new FunctionDefinition(posOf(ctx), modifier, name, generic, pt.must());
+    }
 
     //
     // function: end

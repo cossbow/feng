@@ -49,7 +49,7 @@ static T Feng$checkIndex(T index, T bounds) {
 }
 
 // 快速幂：计算 a^b
-Int64 Feng$fastPow(Int64 a, Int64 b) {
+static Int64 Feng$fastPow(Int64 a, Int64 b) {
 	Int64 result = 1;
 	while (b > 0) {
 		if (b & 1) {  // 如果b的二进制位为1
@@ -61,7 +61,7 @@ Int64 Feng$fastPow(Int64 a, Int64 b) {
 	return result;
 }
 // 快速幂：计算 a^b
-Float64 Feng$fastPow(Float64 a, Int64 b) {
+static Float64 Feng$fastPow(Float64 a, Int64 b) {
 	Float64 result = 1;
 	while (b > 0) {
 		if (b & 1) {  // 如果b的二进制位为1
