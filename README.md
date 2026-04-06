@@ -1,113 +1,112 @@
-【Fèng】编程语言
+**【Fèng】Programming Language**
 ===================
 
-C++最初在C基础上扩展了面向对象，但是没有内存安全的语义。
-内存安全的安全（safety）和系统安全（security）不是一个概念，内存安全特指开发者在内存使用上由于犯错导致难以预料问题。
-这些错可以用ASAN辅助检查，但不能完全检查出来，另外系统也能判断出一些内存安全问题，比如空指针、缺页等。
-但是这些能检查出来的问题并没有造成实际意义上的危害，真正发生的危害，比如通过悬空的指针修改了一块正在使用的，
-系统与ASAN并不能判断出来，然而这类问题才是真的有害，它甚至会意外修改别人的数据，而系统却无法察觉。
+C++ initially extended C by adding object-oriented features, but it lacks memory safety semantics.
+Memory safety (safety) and system security are different concepts. Memory safety specifically refers to hard-to-predict issues caused by developer mistakes in memory usage.
+These mistakes can be partially checked with ASAN, but not completely detected. Additionally, the system can identify some memory safety issues, such as null pointers and page faults.
+However, these detectable issues do not cause actual harm. The real harm comes from issues like modifying in-use memory through dangling pointers.
+Neither the system nor ASAN can detect such issues. Yet these are the truly harmful problems—they can even accidentally modify other processes' data without the system noticing.
 
-Fèng语言也是在C语言基础上扩展面向对象特性，但比C++多做一点，即引入内存安全设计。
-目标是能代替C语言的大部分工作，提升系统开发的效率，开发者更轻松。
+The Fèng language also extends C with object-oriented features, but goes one step further than C++ by introducing memory safety design.
+The goal is to replace most of C's use cases, improve system development efficiency, and make developers' work easier.
 
-# 特性简介
+# Feature Overview
 
-仅仅引入内存安全设计而尽量与C语言一致，其实这样也要大改。比如去掉C语言的指针，代替方案是引用。
-增加类来实现面向对象，而结构体还是和原来一样，但是限制其字段为非引用类型。
+Simply introducing memory safety design while staying as consistent as possible with C would still require major changes. For example, removing C pointers and replacing them with references.
+Adding classes for object-oriented programming, while keeping structs unchanged but restricting their fields to non-reference types.
 
-主要设计的特性：
+Main designed features:
 
-1. 内存安全机制的设计：
-    1. 自动内存管理：指针必须指向一个对象或者为空，而对象在没有被指针时将被释放，释放的对象可以立即或延迟回收空间。
-    2. 指针安全使用：指针不能通过运算生成，不能将任意整数转换成指针值，这也包括对指针进行自增自减。
-    3. 强制检查边界：比如数组及buffer空间的操作。
-    4. 强制检查类型：类型转换时必须检查是否允许转换，即使编译时无法分析时，也要在运行时做检查。
-    5. 虚引用：用虚引用代替C语言取地址运算（&），限制在实例生命周期内进行使用。
-2. 面向对象的基本元素，包括继承多态和接口抽象。
-3. 资源类是参考C++析构函数设计的，可用回收底层库分配的资源、处理循环引用等。
-4. 允许一部分类型可以自由转换，主要是struct和union。
-5. 值类型变量，变量就是实例本身，不需要额外分配内存。
-6. 模块化代码管理，模块之间使用符号需要导出和导入。_[*未完成*]_
+1. Memory safety mechanisms:
+    1. Automatic memory management: Pointers must point to an object or be null. Objects will be freed when no longer referenced. Freed objects can have their space reclaimed immediately or deferred.
+    2. Safe pointer usage: Pointers cannot be generated through arithmetic operations, nor can arbitrary integers be converted to pointer values. This also includes pointer increment and decrement.
+    3. Mandatory bounds checking: For arrays and buffer space operations.
+    4. Mandatory type checking: Type conversions must be checked for permissibility. Even when compile-time analysis is impossible, runtime checks must be performed.
+    5. Virtual references: Replace C's address-of operator (&) with virtual references, restricting usage to within the instance's lifetime.
+2. Basic object-oriented elements, including inheritance, polymorphism, and interface abstraction.
+3. Resource classes: Designed with reference to C++ destructors, used to reclaim resources allocated by underlying libraries and handle circular references.
+4. Allow free conversion for certain types, mainly struct and union.
+5. Value type variables: Variables are the instances themselves, requiring no additional memory allocation.
+6. Modular code management: Symbols require export and import between modules. _[*Incomplete*]_
 
-以及几个次要的特性：
+Plus several minor features:
 
-7. 异常处理机制。_[*未完成*]_
-8. 泛型或者模版，泛型参数可以加约束条件，类成员方法也可以带参数。
-9. 允许给类自定义运算符，从C++的运算符重载简化来。_[*未完成*]_
+7. Exception handling mechanism. _[*Incomplete*]_
+8. Generics or templates: Generic parameters can have constraints, and class member methods can also take parameters.
+9. Allow custom operators for classes, simplified from C++ operator overloading. _[*Incomplete*]_
 
-设计的语法细节以[手册](reference.md)的形式列出。
+Designed syntax details are listed in the [reference manual](reference.md).
 
-# 开发进展
+# Development Progress
 
-## 语法解析
+## Syntax Parsing
 
-解析程序采用ANTLR4生成，设计参考[grammar](src/main/antlr4/org/cossbow/feng/parser/Feng.g4)。
-在构建时通过maven插件自动生成解析程序类，然后IDEA打开就能正常调试了。
-文件解析重新[SourceParser](src/main/java/org/cossbow/feng/parser/SourceParser.java)通过
-[SourceParseVisitor.java](src/main/java/org/cossbow/feng/parser/SourceParseVisitor.java)遍历解析结果并构建AST。
+The parser is generated using ANTLR4, designed with reference to [grammar](src/main/antlr4/org/cossbow/feng/parser/Feng.g4).
+During build, parser classes are automatically generated via Maven plugins, then IDEA can be used for normal debugging.
+File parsing reuses [SourceParser](src/main/java/org/cossbow/feng/parser/SourceParser.java), which traverses the parse results and builds the AST using [SourceParseVisitor.java](src/main/java/org/cossbow/feng/parser/SourceParseVisitor.java).
 
-## 语义分析
+## Semantic Analysis
 
-分析工具主类[SemanticAnalysis](src/main/java/org/cossbow/feng/analysis/SemanticAnalysis.java)。
+The main analysis class is [SemanticAnalysis](src/main/java/org/cossbow/feng/analysis/SemanticAnalysis.java).
 
-已完成的语义分析包括：
+Completed semantic analyses include:
 
-1. 符号检查：检查类型、函数是否定义，变量是否声明。
-2. 常量计算，常量直接计算出结果。
-3. 类型检查：变量赋值、返回值的类型检查，函数原型比较，可转换类型的检查。
-4. 类的继承与实现接口的检查。
-5. 检查缺少return的路径。
-6. 变量生命周期检查。
-7. 表达式中匿名对象检查。
-8. 引用和函数类型变量的required检查。
-9. 引用的immutable检查。
-10. 语句上下文检查。
-11. 泛型类型参数检查。
+1. Symbol checking: Check whether types and functions are defined, and whether variables are declared.
+2. Constant folding: Evaluate constants directly.
+3. Type checking: Check variable assignments, return value types, function prototype comparisons, and convertible type checks.
+4. Class inheritance and interface implementation checks.
+5. Check for missing return paths.
+6. Variable lifetime checking.
+7. Check for anonymous objects in expressions.
+8. Required checks for reference and function type variables.
+9. Immutable checks for references.
+10. Statement context checking.
+11. Generic type parameter checking.
 
-## 目标代码生成
+## Target Code Generation
 
-仅完成生成C++代码的功能，工具类[CppGenerator](src/main/java/org/cossbow/feng/coder/CppGenerator.java)。
+Only C++ code generation is currently implemented, with the tool class [CppGenerator](src/main/java/org/cossbow/feng/coder/CppGenerator.java).
 
-已完成代码功能：
+Completed code features:
 
-1. 衍生类定义：类、接口、结构类型、函数类型完成，属性*未完成*
-2. 表达式：幂运算*未完成*
-3. 语句：异常*未完成*
-4. 变量：完成
-5. 类型：完成
-6. 类的多态调用：完成
-7. 运行时类型检查：完成
-8. 变量的清理和引用实例管理：完成
-9. 字面量与初始化：完成
-10. 泛型：完成
-11. 字符串格式化：*未完成*
+1. Derived class definitions: Classes, interfaces, struct types, function types completed; properties _[*Incomplete*]_
+2. Expressions: Power operation _[*Incomplete*]_
+3. Statements: Exceptions _[*Incomplete*]_
+4. Variables: Completed
+5. Types: Completed
+6. Polymorphic calls for classes: Completed
+7. Runtime type checking: Completed
+8. Variable cleanup and reference instance management: Completed
+9. Literals and initialization: Completed
+10. Generics: Completed
+11. String formatting: _[*Incomplete*]_
 
-# 工具构建
+# Tool Building
 
-当前构建的工具支持编译单个源文件或单个模块，模块之间导出导入*未完成*
+The current build tool supports compiling a single source file or a single module. Module export/import _[*Incomplete*]_
 
-项目是用maven构建的，只依赖【antlr4-runtime】包及3个maven插件，会自动下载。建议打包命令：
+The project is built with Maven, depending only on the `antlr4-runtime` package and 3 Maven plugins, which will be downloaded automatically. Recommended packaging command:
 
 ```shell
 mvn clean package -Dmaven.test.skip=true
 ```
 
-打包好的jar包在target目录下：feng-${tag}.jar
-比如当前tag为“0.0.1-dev”，构建的包为“feng-0.0.1-dev.jar”，执行需要安装java运行环境。
+The packaged JAR will be in the target directory: `feng-${tag}.jar`
+For example, with the current tag "0.0.1-dev", the built package is `feng-0.0.1-dev.jar`. Execution requires a Java runtime environment.
 
-编译单个源文件：
+Compile a single source file:
 
 ```shell
 java -jar feng-0.0.1-dev.jar jjj.feng jjj.cpp
 ```
 
-编译单个模块：
+Compile a single module:
 
 ```shell
 java -jar feng-0.0.1-dev.jar jjj jjj.cpp
 ```
 
-生成的C++需要C/C++编译环境，并且编译时需要指定C++20版本：
+The generated C++ requires a C/C++ compilation environment, and the C++20 standard must be specified during compilation:
 
 ```shell
 c++ --std=c++20 jjj.cpp -o jjj.o

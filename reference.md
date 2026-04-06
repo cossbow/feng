@@ -1,28 +1,27 @@
-【Fèng】编程语言
+**【Fèng】Programming Language**
 ===================
 
-# 语法
+# Syntax
 
-## 语句与表达式
+## Statements and Expressions
 
-语句是程序序列的基本指令单元，除了块语句和控制语句外需要以`;`结尾：
+Statements are the basic instruction units of a program sequence. Except for block statements and control statements, they must end with a `;`:
 
-比如赋值语句，等号分割成左右两个部分，左边是需要被赋值的操作数，右边是计算值的表达式：
-`var s = a + b;`。
+For example, an assignment statement, where the equal sign separates the left and right parts—the left is the operand to be assigned, and the right is the expression that computes the value:
+`var s = a + b;`.
 
-再比如调用语句也是常用的，仅包含一个call表达式：
-`start();`。
+Another commonly used statement is the call statement, which contains only a call expression:
+`start();`.
 
-语句右边的表达式是计算的主体，由多个运算根据优先级组合成：`a + (b + c) * d - sin(e)`。
+The expression on the right side of a statement is the main body of computation, composed of multiple operations combined according to precedence: `a + (b + c) * d - sin(e)`.
 
-## 函数和方法
+## Functions and Methods
 
-[函数](#函数)和[方法](#方法)，是一个可重用、独立执行的代码块，它接收输入（参数），执行一系列操作，并可以选择性地返回一组输出值，
-用于将复杂任务分解成更小、更易管理和维护的模块，提高代码复用性。
+[Functions](#functions) and [methods](#methods) are reusable, independently executable blocks of code that take input (parameters), perform a series of operations, and optionally return a set of output values. They are used to decompose complex tasks into smaller, more manageable, and maintainable modules, improving code reusability.
 
-下面举例子来说明函数格式，这些格式也适用于方法。
+Examples below illustrate function formats, which also apply to methods.
 
-定义`sum`函数，两个`int`参数，返回`int`类型值
+Define a `sum` function with two `int` parameters, returning an `int` value:
 
 ```feng
 func sum(a, b int) int {
@@ -30,7 +29,7 @@ func sum(a, b int) int {
 }
 ```
 
-假设`printf`是module`fmt`提供的打印到终端的函数：
+Assume `printf` is a function provided by module `fmt` for printing to the terminal:
 
 ```feng
 import fmt *;
@@ -39,7 +38,7 @@ func main() {
 }
 ```
 
-可以没有返回值的函数：
+A function with no return value:
 
 ```feng
 import fmt *;
@@ -48,7 +47,7 @@ func test(a, b int) {
 }
 ```
 
-有返回值的函数：
+A function with a return value:
 
 ```feng
 import fmt *;
@@ -62,12 +61,12 @@ func main() {
 }
 ```
 
-## 派生类型
+## Derived Types
 
-开发者可以自定义以下类型：
-[类](#类)与[接口](#接口)、[结构](#结构类型)、[枚举](#枚举)和[属性](#属性-_未完成_)。
+Developers can define the following custom types:
+[Classes](#classes) and [interfaces](#interfaces), [structs](#struct-types), [enumerations](#enumerations), and [attributes](#attributes-_[Incomplete]_).
 
-例如自定义派生类`Complex`以及使用它定义变量`c1`和`c2`：
+For example, define a custom derived class `Complex` and use it to define variables `c1` and `c2`:
 
 ```feng
 class Complex {
@@ -79,35 +78,35 @@ func sample() {
 }
 ```
 
-## module _[未完成]_
+## Module _[Incomplete]_
 
-作为代码组织单元，同一个目录下的文件都属于一个module，且module名与目录名相同，因此无需在文件里声明。
+As a code organization unit, all files in the same directory belong to the same module, and the module name is the same as the directory name, so no declaration is needed in the file.
 
-1. module内定义的符号在内部都可使用，但是如果在外部则需要使用`export`导出。
-2. 如果想使用其他module里的符号，需先要`import`对应的module路径：
+1. Symbols defined within a module are usable internally, but must be `export`ed for external use.
+2. To use symbols from another module, you must first `import` the corresponding module path.
 
-# 概念
+# Concepts
 
-下面将详细描述各个语法元素的定义及用法。
+The following sections describe the definitions and usage of each syntactic element in detail.
 
-## module _[未完成]_
+## Module _[Incomplete]_
 
-module是代码的基本管理单元。
+A module is the basic unit of code management.
 
-1. 在module内部所有的内容都可见，跨module只能访问导出的符号。
-2. module名称与路径一一对应，在文件中不声明module名称。要求目录名称的规则和变量名称一样。
-   例如在Linux下，module`com.jjj.base.util`对应的相对路径为`com/jjj/base/util`。
+1. Everything inside a module is visible internally. Cross-module access is limited to exported symbols.
+2. Module names correspond one-to-one with paths; module names are not declared in files. Directory names must follow the same rules as variable names.
+   For example, on Linux, module `com.jjj.base.util` corresponds to the relative path `com/jjj/base/util`.
 
-### 导出符号
+### Exporting Symbols
 
-支持导出任何全局符号；比较特殊的是成员：
+Any global symbol can be exported. Special cases for members:
 
-1. 导出的类，其成员不跟随导出的，需要单独导出。
-2. 导出的接口的方法默认跟随导出。
-3. 导出的结构类型的字段跟随导出，
-4. 导出的枚举类型的所有值都跟随导出。
+1. For an exported class, its members are not exported by default and must be exported individually.
+2. Methods of an exported interface are exported by default.
+3. Fields of an exported struct type are exported by default.
+4. All values of an exported enumeration type are exported by default.
 
-例如，下面导出全局变量`gFoo`、函数`aFoo`、类`Foo`及其字段`bar`和方法`go`：
+For example, the following exports global variable `gFoo`, function `aFoo`, class `Foo` along with its field `bar` and method `go`:
 
 ```feng
 export var gFoo Foo;
@@ -126,9 +125,9 @@ class Foo {
 }
 ```
 
-### 导入符号
+### Importing Symbols
 
-声明导入`com.cossbow.fmt`模块：
+Declare importing the `com.cossbow.fmt` module:
 
 ```feng
 import com.cossbow.fmt;
@@ -137,7 +136,7 @@ func main() {
 }
 ```
 
-可以导入全部可见的符号，就不需要加module前缀了：
+You can import all visible symbols, eliminating the need for the module prefix:
 
 ```feng
 import com.cossbow.fmt *;
@@ -146,7 +145,7 @@ func main() {
 }
 ```
 
-可以设置module别名：
+You can set a module alias:
 
 ```feng
 import com.cossbow.fmt ccfmt;
@@ -156,154 +155,151 @@ func main() {
 }
 ```
 
-## 基本类型
+## Basic Types
 
-基本类型是语言内置的类型，从内存角度看都能直接放在寄存器中。基本类型包含整数、浮点数和布尔三种类型。
+Basic types are built into the language and, from a memory perspective, can be placed directly in registers. Basic types include integers, floating-point numbers, and booleans.
 
-虽然有字符串字面量，但没有内置字符串类型：字符串不能被寄存器直接存放，且字符串只在字符处理时才有意义。
+Although string literals exist, there is no built-in string type: strings cannot be stored directly in registers, and strings are only meaningful when processing characters.
 
-### 整数类型
+### Integer Types
 
-内置的全部整数类型如下：
+All built-in integer types are as follows:
 
-- 有符号：`int8`/`int16`/`int32`/`int64`/`int`
-- 无符号：`uint8`/`uint16`/`uint32`/`uint64`/`uint`
+- Signed: `int8`/`int16`/`int32`/`int64`/`int`
+- Unsigned: `uint8`/`uint16`/`uint32`/`uint64`/`uint`
 
-后缀的数字表示其位宽，无位数字后缀的是根据编译的目标平台决定。
+The suffix number indicates bit width; types without a suffix are determined by the compilation target platform.
 
-有符号数最高位为符号位：默认`0`为正数，`1`为负数。因此有符号数数值的位宽少了一位。
+The highest bit of signed numbers is the sign bit: `0` for positive, `1` for negative. Thus, signed numbers have one fewer bit for the numeric value.
 
-支持[算术运算](#算术运算)、[位运算](#位运算)和[关系运算](#关系运算)。
+Supports [arithmetic operations](#arithmetic-operations), [bitwise operations](#bitwise-operations), and [relational operations](#relational-operations).
 
-不同整数类型之间必须显式转换：
+Explicit conversion is required between different integer types:
 
 ```feng
 func main() {
    var a uint16 = 123;
-   var b int32 = int32(a); // 将uint16转换为int32
+   var b int32 = int32(a); // Convert uint16 to int32
 }
 ```
 
-整数类型显式转换，相当于从低位到高位按位复制，因此可能会出现整数溢出：
+Explicit conversion of integer types is equivalent to bitwise copying from low to high bits, which may cause integer overflow:
 
-1. 如果位宽从大的转到小的会被截断，造成整数溢出。
-2. 有符号与无符号之间转换时，符号位会复制到对应数位上，导致整数值发生变化。
+1. Converting from a larger bit width to a smaller one truncates, causing overflow.
+2. When converting between signed and unsigned, the sign bit is copied to the corresponding bit position, causing the integer value to change.
 
-语言本身不检查溢出，需要程序员自行处理。
+The language itself does not check for overflow; programmers must handle it themselves.
 
-### 浮点数类型
+### Floating-Point Types
 
-浮点数是由[IEEE 754标准](https://standards.ieee.org/ieee/754/6210/)定义的，
-包括单精度数`float32`和双精度数`float64`两种。
+Floating-point types are defined by the [IEEE 754 standard](https://standards.ieee.org/ieee/754/6210/), including single-precision `float32` and double-precision `float64`.
 
-浮点数支持[算术运算](#算术运算)和[关系运算](#关系运算)。
+Floating-point types support [arithmetic operations](#arithmetic-operations) and [relational operations](#relational-operations).
 
-### 布尔类型
+### Boolean Type
 
-类型符号为`bool`，且只有`true`/`false`两种取值：
+The type symbol is `bool`, and it has only two values: `true`/`false`:
 
-* 支持逻辑运算，关系运算（但只支持相等和不等），及位运算（与、或、异或三种）。
-* 关系运算的结果一定是布尔值。
-* 不支持和整数、浮点数的互相转换。
-* `if`、`for`中的条件表达式返回值必须是`bool`类型的。
+* Supports logical operations, relational operations (equality and inequality only), and bitwise operations (AND, OR, XOR).
+* The result of a relational operation is always a boolean.
+* No conversion to/from integers or floating-point numbers.
+* Conditional expressions in `if` and `for` statements must evaluate to `bool`.
 
-布尔类型占1个字节，只使用最低位表示，且其他位的值不能影响布尔运算结果。
-最低位的值与布尔值对应：
+The boolean type occupies 1 byte, using only the lowest bit; the values of other bits do not affect boolean operation results.
+The mapping between the lowest bit and boolean value:
 
-| 布尔值   | 整数值 |
-|-------|-----|
-| false | 0   |
-| true  | 1   |
+| Boolean | Integer Value |
+|---------|---------------|
+| false   | 0             |
+| true    | 1             |
 
-布尔类型支持[逻辑运算](#逻辑运算)，而[关系运算](#关系运算)的结果为布尔类型。
+Boolean type supports [logical operations](#logical-operations), and the results of [relational operations](#relational-operations) are of boolean type.
 
-## 运算符与表达式
+## Operators and Expressions
 
-### 基本性质
+### Basic Properties
 
-#### 优先级
+#### Precedence
 
-下表列出了主要运算符的优先级（自上而下优先级递减）：
+The following table lists the precedence of major operators (decreasing from top to bottom):
 
-| 顺序 | 运算符集              | 备注    |
-|----|-------------------|-------|
-| 1  | new(),圆括号,字面量     |       |
-| 2  | 断言,索引,引用字段,函数调用,块 |       |
-| 3  | +,-,!             | 一元运算符 |
-| 4  | ^                 | 幂运算   |
-| 5  | *,/,%             |       |
-| 6  | +,-               |       |
-| 7  | <<,>>             |       |
-| 8  | &                 |       |
-| 9  | ~                 |       |
-| 10 | \|                |       |
-| 11 | <,<=,==,!=,>,>=   |       |
-| 12 | &&                |       |
-| 13 | \|\|              |       |
+| Level | Operator Set                     | Notes              |
+|-------|----------------------------------|--------------------|
+| 1     | new(), parentheses, literals     |                    |
+| 2     | assertion, index, field access, function call, block | |
+| 3     | +, -, !                          | Unary operators    |
+| 4     | ^                                | Exponentiation     |
+| 5     | *, /, %                          |                    |
+| 6     | +, -                             |                    |
+| 7     | <<, >>                           |                    |
+| 8     | &                                |                    |
+| 9     | ~                                |                    |
+| 10    | \|                               |                    |
+| 11    | <, <=, ==, !=, >, >=             |                    |
+| 12    | &&                               |                    |
+| 13    | \|\|                             |                    |
 
-显然第1、2行是特殊的操作符，且都是左结合的。
-而第3行的一元运算符是右结合的，而二元运算符除了幂运算均是左结合的。
-这里特殊的是幂运算，是右结合的，其优先级高于左边的一元运算，而低于右边的：
+Levels 1 and 2 are special operators and are left-associative.
+Level 3 unary operators are right-associative, while binary operators (except exponentiation) are left-associative.
+Exponentiation is special: it is right-associative, with precedence higher than unary operators on the left but lower than those on the right:
 
 ```feng
 func test(a,b int) {
    var x int;
-   x = -a^b;   // 等效于：-(a^b)
-   x = a^-b;   // 等效于：a^(-b)
+   x = -a^b;   // Equivalent to: -(a^b)
+   x = a^-b;   // Equivalent to: a^(-b)
 }
 ```
 
-### 运算表达式
+### Operation Expressions
 
-#### 算术运算
+#### Arithmetic Operations
 
-| 运算符 | 描述  |
-|-----|-----|
-| ^   | 幂运算 |
-| *   | 乘法  |
-| /   | 除法  |
-| %   | 取模  |
-| +   | 加法  |
-| -   | 减法  |
+| Operator | Description |
+|----------|-------------|
+| ^        | Exponentiation |
+| *        | Multiplication |
+| /        | Division |
+| %        | Modulo |
+| +        | Addition |
+| -        | Subtraction |
 
-#### 位运算
+#### Bitwise Operations
 
-| 运算符  | 描述   |
-|------|------|
-| !    | 按位取反 |
-| <<   | 左位移  |
-| \>\> | 右位移  |
-| &    | 位与   |
-| ~    | 位异或  |
-| \|   | 位或   |
+| Operator | Description |
+|----------|-------------|
+| !        | Bitwise NOT |
+| <<       | Left shift |
+| >>       | Right shift |
+| &        | Bitwise AND |
+| ~        | Bitwise XOR |
+| \|       | Bitwise OR |
 
-#### 关系运算
+#### Relational Operations
 
-| 运算符 | 描述（左边*右边） |
-|-----|-----------|
-| <   | 小于        |
-| <=  | 小于或等于     |
-| ==  | 等于        |
-| !=  | 不等于       |
-| \>  | 大于        |
-| \>= | 大于或等于     |
+| Operator | Description (left * right) |
+|----------|----------------------------|
+| <        | Less than |
+| <=       | Less than or equal to |
+| ==       | Equal to |
+| !=       | Not equal to |
+| >        | Greater than |
+| >=       | Greater than or equal to |
 
-#### 逻辑运算
+#### Logical Operations
 
-| 运算符  | 描述   |
-|------|------|
-| !    | 逻辑非  |
-| &    | 按位与  |
-| ~    | 按位异或 |
-| \|   | 按位或  |
-| &&   | 逻辑与  |
-| \|\| | 逻辑或  |
+| Operator | Description |
+|----------|-------------|
+| !        | Logical NOT |
+| &        | Bitwise AND |
+| ~        | Bitwise XOR |
+| \|       | Bitwise OR |
+| &&       | Logical AND |
+| \|\|     | Logical OR |
 
-因为[布尔类型](#布尔类型)只有最低位有效，其他位忽略，则位运算的`&`、`~`、`|`对布尔值运算的结构依然是有效的布尔值，
-且运算结果`&`与`&&`一致、`|`与`||`一致，差别是`&&`和`||`具有“短路”效应：
-即当左边的计算结果可以决定最终结果时，右边的表达式就不会被执行了。
+Since the [boolean type](#boolean-type) only uses the lowest bit (others ignored), bitwise operations `&`, `~`, `|` on boolean values still produce valid boolean results. The results of `&` and `&&` are consistent, as are `|` and `||`. The difference is that `&&` and `||` have "short-circuit" behavior: when the left operand's result determines the final outcome, the right expression is not executed.
 
-下面举例说明`&&`的“短路”效应：
+Example illustrating the short-circuit behavior of `&&`:
 
 ```feng
 func contains(v int) bool {
@@ -311,147 +307,146 @@ func contains(v int) bool {
 }
 func isEmpty() bool { return true; }
 func test(v int) bool {
-    // isEmpty返回true，显然右边就不需要再计算了，即contains不会被调用
+    // isEmpty returns true, so the right side need not be evaluated; contains will not be called
     return !isEmpty() && contains(v);
 }
 ```
 
-### 其他表达式
+### Other Expressions
 
-#### 索引表达式
+#### Index Expression
 
-仅数组默认支持这种运算符。索引运算符是由中括号组成，括号中是获取索引值的表达式。
-其用法有两种：
+Only arrays support this operator by default. The index operator consists of square brackets containing an expression that evaluates to the index value.
+There are two usage patterns:
 
-1. 索引表达式在右边是读操作，即获取索引对应元素的值作为运算结果。在语句中可以有两种方式接收取值：
-    1. 左边用两个变量接收：第一个接收的是值；第二个接收的是布尔值，表示索引对应元素是否存在。_[未完成]_
+1. Index expression on the right side is a read operation, retrieving the value of the element at the index as the result. There are two ways to receive the value in a statement:
+    1. Use two variables on the left: the first receives the value; the second receives a boolean indicating whether the element exists. _[Incomplete]_
        ```feng
        func test(arr [16]int) {
            if (var v, exists = arr[16]; exists) {
-               // 索引16越界了，也就是不存在，所以exists=false，无法进入这个分支
+               // Index 16 is out of bounds, so exists=false, this branch cannot be entered
            }
        }
        ```
-    2. 左边一个变量或者在表达式中使用时，仅返回元素值，如果元素不存在则终止运行并抛出[异常](#异常-_未完成_)。
+    2. When using a single variable on the left or using it in an expression, only the element value is returned. If the element does not exist, execution terminates and an [exception](#exceptions-_[Incomplete]_) is thrown.
        ```feng
        func test(arr [16]int) int {
-           return arr[16]; // 索引越界，终止运行并抛出异常
+           return arr[16]; // Index out of bounds, terminates and throws an exception
        }
        ```
-2. 放左边为写操作，即修改索引对应元素的值。
+2. On the left side as a write operation, modifying the value of the element at the index.
    ```feng
    func test() {
        var arr [16]int;
-       arr[15] = 0; // 修改索引为15的元素值为0
+       arr[15] = 0; // Modify element at index 15 to value 0
    }
    ```
-   数组的容量是创建之后就不能变了，所以索引越界自然也要终止运行并抛出[异常](#异常-_未完成_)。
+   The capacity of an array cannot change after creation, so out-of-bounds access also terminates execution and throws an [exception](#exceptions-_[Incomplete]_).
 
-#### new表达式
+#### new Expression
 
-用于动态创建实例，使用格式：new(类型, 初始化参数)，例如：
+Used to dynamically create instances. Format: `new(type, initialization parameters)`. Example:
 
 ```feng
-// 创建类Device的实例
+// Create an instance of class Device
 var a *Device = new(Device);
-// 后面的参数为初始化
+// The following parameter is for initialization
 var b *Device = new(Device, {});
 ```
 
-[引用类型](#引用类型变量)的变量和实例是分离的，其中[强引用](#强引用类型)只能引用通过`new`创建的实例。
+[Reference type variables](#reference-type-variables) are separate from instances; [strong references](#strong-reference-type) can only reference instances created via `new`.
 
-参数是可选的，无参数则初始化为默认值。
-对于数组可以传递[数组表达式](#数组表达式)，而对类和结构体可以传递[字段表达式](#字段表达式)。
+The parameter is optional; without it, the instance is initialized to default values. For arrays, you can pass an [array expression](#array-expression); for classes and structs, you can pass a [field expression](#field-expression).
 
-#### 数组表达式
+#### Array Expression
 
-特殊的字面量表达式，专门给数组初始化用的，即直接列举出数组的所有元素，元素可以是任意表达式。
+A special literal expression specifically for array initialization, listing all elements of the array directly. Elements can be arbitrary expressions.
 
-例如初始化一个`int`的数组类型变量，这里直接列举了全部元素：
+Example: initialize an `int` array variable by listing all elements:
 
 ```feng
 var a [4]int = [1,2,3,4];
 ```
 
-##### 数组表达式长度
+##### Array Expression Length
 
-在初始化数组时，实际列举的元素可以少于数组大小，后续元素将置默认值：
+When initializing an array, the number of elements listed can be less than the array size; subsequent elements are set to default values:
 
 ```feng
 var a [4]int = [1,2,3,4];
 var a [4]int = [1,2,3];
 ```
 
-当然可以为空：
+It can also be empty:
 
 ```feng
 var a [4]int = [];
 ```
 
-表达式前可以指定数组类型，当然数组元素必须与变量相同，且长度不能大于变量长度：
+You can specify the array type before the expression. The element types must match the variable, and the length cannot exceed the variable's length:
 
 ```feng
 var a [4]int = [4]int[1,2,3,4];
 var a [4]int = [3]int[1,2,3];
-// var a [4]int = [5]int[1,2,3]; // 错误×：指定的长度大于变量长度
+// var a [4]int = [5]int[1,2,3]; // Error: specified length exceeds variable length
 ```
 
-指定数组类型的长度不能少于实际元素数量：
+The specified array type length cannot be less than the actual number of elements:
 
 ```feng
 var a [4]int = [3]int[1,2,3];
-// var a [4]int = [3]int[1,2,3,4]; // 错误×：元素个数超出了指定长度3
-var a [4]int = [4]int[1,2,3,4]; // 应该这样
+// var a [4]int = [3]int[1,2,3,4]; // Error: number of elements exceeds specified length 3
+var a [4]int = [4]int[1,2,3,4]; // Correct
 ```
 
-指定类型的长度可以省略，那么长度等于实际元素个数：
+The specified type length can be omitted, in which case the length equals the actual number of elements:
 
 ```feng
 var a [4]int = []int[1,2,3];
 ```
 
-如果省略变量类型，就可以根据元素个数自动推断变量的类型和长度了：
+If the variable type is omitted, the variable's type and length are automatically inferred from the number of elements:
 
 ```feng
-var a = []int[1,2,3]; // a的类型为：[3]int
+var a = []int[1,2,3]; // a's type is: [3]int
 ```
 
-##### 数组表达式类型
+##### Array Expression Type
 
-元素类型必须与数组类型匹配，要求符合允许赋值的规则，具体参考变量类型及各自定义类型，下面举两个简单的错误例子：
+The element type must match the array type, following the assignment rules. Refer to variable types and their definitions. Two simple error examples:
 
 ```feng
-// var a = []int[1,false]; // 第2个元素是bool值
-// var a = []int[1,3.1];   // 第2个元素是float值
+// var a = []int[1,false]; // Second element is bool
+// var a = []int[1,3.1];   // Second element is float
 ```
 
-如果不指定类型，则以第一个元素自动推导出元素类型：
+If the type is not specified, the element type is inferred from the first element:
 
 ```feng
-var a = [1,2,3];     // a的类型自动推导为：[3]int
-// var a = [1,3.1];  // 根据第1个元素推导类型是int，而第2个元素是float值
+var a = [1,2,3];     // a's type inferred as: [3]int
+// var a = [1,3.1];  // First element infers type int, but second is float
 ```
 
-举个比较复杂的例子：
+A more complex example:
 
 ```feng
 class Animal {}
 class Cat : Animal {}
-var a = [new(Animal), new(Cat)];    // 推导数组类型为：[2]*Animal
-// var a = [new(Cat), new(Animal)]; // 错误×：推导类型为[2]*Cat，不能存放*Animal元素
+var a = [new(Animal), new(Cat)];    // Inferred array type: [2]*Animal
+// var a = [new(Cat), new(Animal)]; // Error: inferred type [2]*Cat, cannot store *Animal element
 ```
 
-##### 数组表达式嵌套
+##### Array Expression Nesting
 
-可以嵌套用于多维数组初始化：
+Can be nested for multi-dimensional array initialization:
 
 ```feng
 var a = [2][3]int[[1,2],[3,4]];
-// var a = [2][3]int[[],[],[]];  // 错误×：第一维度超了
-// var a = [2][3]int[[1,2,3,4]]; // 错误×：第二维度超了
+// var a = [2][3]int[[],[],[]];  // Error: first dimension exceeds
+// var a = [2][3]int[[1,2,3,4]]; // Error: second dimension exceeds
 ```
 
-与字段表达式嵌套：
+Nesting with field expressions:
 
 ```feng
 class Car {
@@ -460,9 +455,9 @@ class Car {
 var ca [2]Car = [{id=1},{id=2}];
 ```
 
-#### 字段表达式
+#### Field Expression
 
-特殊的字面量表达式，专门用于初始化可定义字段的派生类型，比如结构类型和类：
+A special literal expression for initializing derived types with definable fields, such as struct types and classes:
 
 ```feng
 class Car {
@@ -472,49 +467,47 @@ class Car {
 var car Car = {id=10,speed=80.5};
 ```
 
-初始化的字段无需按定义的顺序填写，并且不能重复指定初始化字段。
+Initialized fields need not be in the order defined, and fields cannot be initialized repeatedly.
 
 ```feng
-// var car Car = {id=10,id=100}; // 错误×：重复指定id字段
+// var car Car = {id=10,id=100}; // Error: duplicate field id
 ```
 
-初始化的其他细节请参考[类](#类)和[结构类型](#结构类型)。
+Refer to [Classes](#classes) and [Struct Types](#struct-types) for other initialization details.
 
-#### 断言表达式
+#### Assertion Expression
 
-用于判断是否能类的引用是否能进行转换的语法，比如类的实例的引用传递可以给接口或父类指针，反过来则需要判断其类型。
+Used to check whether a class reference can be converted. For example, a reference to a class instance can be passed to an interface or parent class pointer; conversion back requires type checking.
 
-返回的是对应类型的引用，如果类型不能匹配则返回`nil`，因此可能引发空指针：
+Returns a reference of the corresponding type. If the type does not match, it returns `nil`, which may cause a null pointer:
 
 ```feng
 func test(o *Object) {
-   var f *File = o?(*File);   // 转换成File类的引用
-   var w Writer = o?(*Writer);  // 转换成Writer接口
-   o?(*Writer).write("Hello!"); // 在表达式中使用，有空指针风险
+   var f *File = o?(*File);   // Convert to File class reference
+   var w Writer = o?(*Writer);  // Convert to Writer interface
+   o?(*Writer).write("Hello!"); // Used in an expression, risk of null pointer
    if (var w Writer = o?(*Writer); w != nil) {
-      // 这样避免空指针
+      // This avoids null pointer
    }
 }
 ```
 
-#### sizeof表达式
+#### sizeof Expression
 
-用于编译期计算类型的占内存大小（单位字节），适用类型必须是编译器已知的，支持的类型有：
+Used at compile time to calculate the memory size (in bytes) of a type. The type must be known to the compiler. Supported types:
 
-1. 整数与浮点数类型。
-2. 结构类型。
-3. 以上两种的定长数组（也支持多维数组）
+1. Integer and floating-point types.
+2. Struct types.
+3. Fixed-length arrays of the above (including multi-dimensional arrays)
 
-比如数组引用`[*]int`就不能使用，因为其大小只能在运行时获取。
-类允许字段重排序，因此不能使用。
-枚举类型要保持简单，不能使用。
-`bool`类型是特殊的基本类型，编译器可以采用高效的方式存储，因此不能使用。
+For example, array reference `[*]int` cannot be used because its size is only known at runtime.
+Classes do not support `sizeof` because field reordering is allowed.
+Enumerations must remain simple and do not support `sizeof`.
+`bool` is a special basic type that the compiler may store efficiently, so `sizeof` is not supported.
 
-#### 赋值运算
+#### Assignment Operation
 
-赋值运算符相当于运算的一种简写，即左操作数自己与右操作数参与对应的运算后再赋值给左操作数。因此也要求赋值运算的左右操作数是同类型的。
-也就是说，赋值运算对应的运算是操作数与结果都是类型相同的。那也可以约定，支持了自定义运算符的类型，也可以采用相应的赋值运算符。
-比如：
+Assignment operators are shorthand for operations: the left operand participates in the operation with the right operand, and the result is assigned back to the left operand. This requires that both operands be of the same type. If a type supports custom operators, the corresponding assignment operator is also supported. For example:
 
 ```feng
 func test() {
@@ -523,14 +516,13 @@ func test() {
 }
 ```
 
-如果实现了运算符`+`，作用是按左右顺序拼接字符串，那就可以使用`+=`运算符，其作用是：
-右边字符串拼接到左边的字符串变量的右边，再将结果传递给左边变量。
+If an operator `+` is implemented to concatenate strings in order, then the `+=` operator appends the right string to the left string variable and assigns the result back to the left variable.
 
-这类运算符没有返回值，不能用于表达式中，只能用于[特定语句](#赋值运算语句)。
+Assignment operators have no return value and cannot be used in expressions; they can only be used in [specific statements](#assignment-operation-statement).
 
-#### 块表达式
+#### Block Expression
 
-块表达式像块语句，只不过最后必须有个表达式作为返回值：
+A block expression resembles a block statement but must end with an expression as the return value:
 
 ```feng
 class Foo {var id int;}
@@ -538,62 +530,61 @@ func test() {
    var r *Foo = {
       var f = new(Foo);
       f.id = 0;
-      f // 表达式值
+      f // expression value
    };
 }
 ```
 
-进入块内部后是新的作用域，退出时里面的变量会自动清理。
+Entering the block creates a new scope; variables are automatically cleaned up upon exit.
 
-### 自定义运算 _[未完成]_
+### Custom Operations _[Incomplete]_
 
-[类](#类)是不支持运算符的，但是可自定义一部分运算实现。
+[Classes](#classes) do not support operators by default, but some operations can be custom-implemented.
 
-自定义的运算功能代码段与方法跟函数都不一样，而是由operator[宏](#宏-_未完成_)实现的。
-每一种运算符都有固定名称和原型及操作数列表：
+Custom operation code segments differ from methods and functions; they are implemented via `operator` [macros](#macros-_[Incomplete]_). Each operator has a fixed name, prototype, and operand list:
 
-* 每种运算符有固定名称。
-* 具体因不同运算符定义操作数（就是宏参数）。
-* 名称和其他方法名称可以相同。
+* Each operator has a fixed name.
+* Operands are defined per operator (as macro parameters).
+* Names can be the same as other method names.
 
-#### 自定义表达式运算符
+#### Custom Expression Operators
 
-仅有一部分支持自定义：
+Only certain operators support customization:
 
-| 运算符 | 宏名称   | 右操作数类型 | 结果类型  |
-|-----|-------|--------|-------|
-| *   | mul   | 同左操作数  | 同左操作数 |   
-| /   | div   | 同左操作数  | 同左操作数 |   
-| +   | add   | 同左操作数  | 同左操作数 |   
-| -   | sub   | 同左操作数  | 同左操作数 |   
-| <   | less  | 同左操作数  | 布尔类型  |   
-| <=  | 无     | 同左操作数  | 布尔类型  |   
-| ==  | equal | 同左操作数  | 布尔类型  |   
-| !=  | 无     | 同左操作数  | 布尔类型  |   
-| \>  | more  | 同左操作数  | 布尔类型  |   
-| \>= | 无     | 同左操作数  | 布尔类型  |   
+| Operator | Macro Name | Right Operand Type | Result Type |
+|----------|------------|--------------------|--------------|
+| *        | mul        | Same as left       | Same as left |
+| /        | div        | Same as left       | Same as left |
+| +        | add        | Same as left       | Same as left |
+| -        | sub        | Same as left       | Same as left |
+| <        | less       | Same as left       | Boolean      |
+| <=       | N/A        | Same as left       | Boolean      |
+| ==       | equal      | Same as left       | Boolean      |
+| !=       | N/A        | Same as left       | Boolean      |
+| >        | more       | Same as left       | Boolean      |
+| >=       | N/A        | Same as left       | Boolean      |
 
-类型是指实际表达式中的操作数类型，实现中不需要指定：
+Type refers to the operand type in the actual expression; no specification is needed in the implementation:
 
-1. 表中的类型相同，不仅是类相同，而是全相同，包括是否是引用类型。
-2. 如果结果的类型是引用，那会自动创建一个初始化的实例给结果
-3. 表中无宏名称的运算符，是依赖其他运算符的实现：
-    1. `<=`依赖的`<`和`==`都实现了就可以直接使用了，相当于这两个运算的结果的或`||`。
-    2. `>=`依赖的是`>`和`==`，也是两个结果的或。
-    3. `!=`仅依赖`==`，就是后者的结果取反`!`。
+1. "Same type" means not only the same class but identical in all aspects, including whether it is a reference type.
+2. If the result type is a reference, an initialized instance is automatically created for the result.
+3. Operators without macro names depend on other operators:
+    1. `<=` depends on implementations of `<` and `==`; it is equivalent to the logical OR `||` of the two results.
+    2. `>=` depends on `>` and `==`, also the OR of the two results.
+    3. `!=` depends only on `==` and is the logical NOT `!` of the latter.
 
-举个复数的例子：
+Example with complex numbers:
 
 ```feng
 class Complex {
    var real,imag float64;
-   // 实现+运算
-   // result存放结果，并计算完成后返回
+   // Implement + operation
+   // result holds the result and is returned after computation
    macro operator add(lhs, rhs, result) {
       result.real = lhs.real + rhs.real;
       result.imag = lhs.imag + rhs.imag;
    }
-   // 实现*运算
+   // Implement * operation
    macro operator mul(lhs, rhs, result) {
       result.real = lhs.real * rhs.real + lhs.imag * rhs.imag;
       result.imag = lhs.real * rhs.imag + lhs.imag * rhs.real;
@@ -607,23 +598,23 @@ func testMul(a,b *Complex) *Complex {
 }
 ```
 
-#### 自定义特殊运算 _[未完成]_
+#### Custom Special Operations _[Incomplete]_
 
-##### 自定义索引运算
+##### Custom Index Operation
 
-默认只有数组支持的[索引表达式](#索引表达式)也可以自定义。
-由于索引运算符分有读和写两种操作，因此分成`indexGet`和`indexSet`两个过程宏。
+The [index expression](#index-expression), which is only supported by arrays by default, can also be customized.
+Index operations are divided into read and write operations, implemented via two procedural macros: `indexGet` and `indexSet`.
 
-比如自定义一个字典类`Map`，功能是提供派生类型的Key和Value的索引。用法示例：
+For example, a custom dictionary class `Map` providing indexed access with derived key and value types. Usage example:
 
 ```feng
 class Map {
-   // 索引读
+   // Index read
    macro operator indexGet(key, operand, exists) {
       var n = getNode(key);
       operand, exists = if (n != nil) n.value, true else nil, nil;
    }
-   // 索引写
+   // Index write
    macro operator indexSet(key int, value String) {
       set(key, value);
    }
@@ -631,23 +622,23 @@ class Map {
 func main() {
    var m Map;
    m[100] = 159;
-   // 带检查读：运行时如果key不存在则exists为false
+   // Checked read: if key does not exist at runtime, exists is false
    var v, exists = m[100];
-   // 直接读：运行时如果key不存在（exists为false）则终止执行并抛出异常
+   // Direct read: if key does not exist (exists false), execution terminates and an exception is thrown
    var v int64 = m[100];
    printf("m[100] = %s\n", v);
 }
 ```
 
-在写操作时索引不存在是否终止执行取决于内部实现：
-比如一般情况的Map是可以新增key的，而数组是不能自动扩容的。
+Whether a write operation terminates execution when an index does not exist depends on the implementation:
+For a typical Map, new keys can be added; arrays cannot be automatically resized.
 
-## 类
+## Classes
 
-[类](https://en.wikipedia.org/wiki/Class_(programming))是面向对象编程的核心概念，描述了所创建的实例共同的特性和方法。
-类对应在现实世界中人类知识中的分类，在程序中则是对实例（对象）的分类，并且定义了这些实例的共性（字段）和行为（方法）。
+[Classes](https://en.wikipedia.org/wiki/Class_(programming)) are a core concept of object-oriented programming, describing the common characteristics and methods of the instances they create.
+Classes correspond to categories in human knowledge and, in programs, classify instances (objects) and define their common properties (fields) and behaviors (methods).
 
-一个常规的类定义如下（包含一个字段和一个方法）：
+A typical class definition (containing one field and one method):
 
 ```feng
 class Car {
@@ -658,23 +649,23 @@ class Car {
 }
 ```
 
-定义了类之后需要实例化才能使用：声明一个类的值类型，或者使用`new`动态的创建一个类的实例。
+After defining a class, it must be instantiated for use: declare a value type variable of the class, or use `new` to dynamically create an instance.
 
 ```feng
 func sample(engine *Engine) {
    var c1 Car = {engine=engine};
-   // 或者
+   // Or
    var c2 *Car = new(Car);
    c2.engine = engine;
 }
 ```
 
-### 字段
+### Fields
 
-[变量](#变量)的类型定义基本都适用于类的字段，除了：
+Most [variable](#variables) type definitions apply to class fields, except:
 
-1. 字段不能定义为[虚引用类型](#虚引用类型)，但可以定义为[弱引用类型](#弱引用类型)。
-2. 字段只能用`const`和`var`定义。
+1. Fields cannot be of [phantom reference type](#phantom-reference-type), but can be of [weak reference type](#weak-reference-type).
+2. Fields can only be defined with `const` and `var`.
 
 ```feng
 class Cat {
@@ -686,37 +677,36 @@ class Cat {
 }
 ```
 
-类的字段的定义不要求顺序，和实际内存布局中的位置不需要一一对应。
-不同于[结构类型](#结构类型)的字段。
+The order of field definitions in a class does not need to correspond to actual memory layout. This differs from [struct types](#struct-types).
 
-#### 实例初始化
+#### Instance Initialization
 
-在实例化时，`const`字段则必须初始化指定，`var`字段则可选初始化。
-比如上面的`Cat`类，`id`必须指定初始化值，`name`则不强制：
+When instantiating, `const` fields must be initialized; `var` fields are optional.
+In the `Cat` class above, `id` must be initialized, while `name` is optional:
 
 ```feng
 func main() {
    var c1 Cat = {id=1001};
    var c2 Cat = {id=1001, name="Tom"};
-   // 下面是错误用法
+   // Incorrect usage below
    // var c3 Cat = {name="Tom"};
    // var c4 Cat;
    // var c5 Cat = {};
 }
 ```
 
-同样通过`new`动态实例化也是一样：
+The same applies to dynamic instantiation via `new`:
 
 ```feng
 func main() {
    var c1 *Cat = new(Cat, {id=1001, name="Tom"});
-   // 下面是错误用法
+   // Incorrect usage below
    // var c2 *Cat = new(Cat);
    // var c3 *Cat = new(Cat, {name="Tom"});
 }
 ```
 
-显然如果类里面没有`const`的字段则不强制要求初始化。
+If a class has no `const` fields, initialization is not required.
 
 ```feng
 class Mouse {
@@ -729,10 +719,10 @@ func main() {
 }
 ```
 
-如果没有初始化，或者初始化中没有指定的字段，一律置为默认状态：对应内存全`0`，引用类型则是`nil`值。
+If not initialized, or if a field is not specified in initialization, it is set to the default state: all memory set to `0`, and reference types set to `nil`.
 
-副作用：一个导出类的，但它有未导出`const`字段，在其他模块就无法实例化该类。
-比如下面的`Dog`类就只能在当前模块实例化：
+Side effect: If an exported class has unexported `const` fields, it cannot be instantiated in other modules.
+For example, the `Dog` class below can only be instantiated in the current module:
 
 ```feng
 export
@@ -750,16 +740,16 @@ func dog(id int, name *rom) Dog {
 }
 ```
 
-#### 弱引用类型
+#### Weak Reference Type
 
-字段特有的一种的引用类型，表示方法为：`~` 类型名称。
-这种类型的引用不影响实例释放，且所引用的实例在释放后将自动置空（`nil`）。
-在使用引用计数管理内存时，循环引用是个逻辑问题，但可以通过弱引用手动解决这个问题：
+A special reference type for fields, denoted by `~` before the type name.
+This type of reference does not affect instance deallocation, and the referenced instance is automatically set to `nil` when deallocated.
+When using reference counting for memory management, circular references are a logical problem that can be manually solved with weak references:
 
-1. 弱引用不影响实例释放这个原则，那就是说不会导致计数+1，因此计数会归零。
-2. 归零后实例释放了，将弱引用字段置空，这是内存安全的保证。
+1. Weak references do not affect instance deallocation (no increment of reference count), allowing the count to reach zero.
+2. When the instance is deallocated, the weak reference field is set to `nil`, ensuring memory safety.
 
-例如，将双向链表`Node`向前引用的字段`prev`定义为弱引用，就不会发生计数无法归零的问题：
+For example, defining the forward reference field `prev` in a doubly linked list `Node` as a weak reference prevents the reference count from never reaching zero:
 
 ```feng
 class Node {
@@ -769,15 +759,15 @@ class Node {
 }
 ```
 
-### 方法
+### Methods
 
-方法与[函数](#函数)基本相同，区别是：
+Methods are largely the same as [functions](#functions), with differences:
 
-1. 必须通过类实例来调用。
-2. 在方法内部能使用当前实例的类成员。
-3. 方法名称作为唯一ID，在当前类的方法集中是唯一的，包括继承来的方法，但子类会覆盖同名的父类方法。
+1. They must be called via a class instance.
+2. Inside a method, the current instance's class members are accessible.
+3. Method names are unique IDs within the current class's method set, including inherited methods, but subclasses override parent methods with the same name.
 
-比如定义`Task`类用于管理任务（枚举`TaskState`是任务的状态）：
+For example, define a `Task` class for managing tasks (enum `TaskState` represents task status):
 
 ```feng
 enum TaskState {WAIT, RUN, DONE,}
@@ -787,23 +777,23 @@ class Task {
       return state == RUN;
    }
    func start() {
-      if (isRunning()) return;   // 调用另一个方法
-      state = RUN;     // 修改状态
+      if (isRunning()) return;   // Call another method
+      state = RUN;     // Modify state
    }
 }
 ```
 
-通过值类型的变量来调用方法：
+Call methods via value type variables:
 
 ```feng
 func sample1() {
    var task Task;
    task.start();
-   printf("task state '%s'\n", task.state.name);   // 打印：task state: 'RUN'
+   printf("task state '%s'\n", task.state.name);   // Prints: task state: 'RUN'
 }
 ```
 
-也可以通过引用来调用：
+Or via references:
 
 ```feng
 func sample2() {
@@ -812,35 +802,34 @@ func sample2() {
 }
 ```
 
-### this关键字
+### this Keyword
 
-`this`是一个类内部的特殊关键字，用于指代当前实例本身。
+`this` is a special keyword inside a class that refers to the current instance itself.
 
-在成员方法内使用当前类的成员，本地变量可能和字段同名，那么需要通过`this`来使用字段：
+Inside a member method, when a local variable has the same name as a field, `this` is used to access the field:
 
 ```feng
 class Cat {
    var name String;
    func setName(name String) {
-      log();   // 上文没有log函数，那就指向log成员方法
-      this.name = name; // 上文有name变量/参数，与成员字段name冲突，必须加this
+      log();   // No log function above, so this refers to the log member method
+      this.name = name; // The name variable/parameter above conflicts with field name; must use this
    }
    func log() {
-      printf("%s: miao~~\n", name); // 上文没有name变量，可以省略this
+      printf("%s: miao~~\n", name); // No name variable above; can omit this
    }
 }
 ```
 
-在方法调用时`this`即会引用当前实例，保证实例不会被释放：
+During method invocation, `this` references the current instance, ensuring it is not deallocated:
 
 ```feng
 func sample() {
-   new(Cat).log();  // log方法退出后创建的实例才能被释放
+   new(Cat).log();  // The created instance can only be deallocated after the log method exits
 }
 ```
 
-`this`能传递给[虚引用类型](#虚引用类型)的变量，但如果强引用调用方法时可传递给强引用，
-如果值类型调用时可赋值给值变量。例如：
+`this` can be passed to [phantom reference type](#phantom-reference-type) variables. If called via a strong reference, it can be passed to a strong reference; if called via a value type, it can be assigned to a value variable. Example:
 
 ```feng
 class Foo {
@@ -873,8 +862,8 @@ func use3(f &Foo) {
 }
 ```
 
-`this`可以放在返回值的地方，但也是不表示某种类型，而是当前实例本身。
-当然能立即调用方法和引用字段，也可以赋值给与调用者同类型的变量：
+`this` can be used as a return value, but it does not represent a specific type—it represents the current instance itself.
+It can be used for method chaining or assigned to variables of the same type as the caller:
 
 ```feng
 class Car {
@@ -884,7 +873,7 @@ class Car {
    func backward() this {}
 }
 func sample1(c Car) {
-   var speed = c.forward().stop().backward().speed;   // 链式调用
+   var speed = c.forward().stop().backward().speed;   // Chained calls
    var c2 Car = c.forward();
 }
 func sample2(c *Car) {
@@ -895,31 +884,31 @@ func sample2(c &Car) {
 }
 ```
 
-### 继承
+### Inheritance
 
-继承也叫扩展，即扩展已有的类以便增加新的字段和方法。
-子类继承了父类的字段和方法，自己新增字段和方法是可选的。
+Inheritance (also called extension) extends an existing class by adding new fields and methods.
+A subclass inherits the fields and methods of its parent class and may optionally add its own.
 
-在继承时，子类的字段不能和父类重名：
+When inheriting, subclass fields cannot have the same name as parent class fields:
 
 ```feng
 class Device {
     var id int;
 }
 class Disk : Device {
-    // var id int; // ✖：重名了
+    // var id int; // ✖: Name conflict
     var diskId int;
 }
 ```
 
-方法允许重名，但必须原型一致，也就是[多态](#多态)。
+Methods can have the same name but must have identical prototypes, enabling [polymorphism](#polymorphism).
 
-#### 多态
+#### Polymorphism
 
-多态（polymorphic）是指同一个行为具有多个不同表现形式或形态。
-所以严格来讲抽象（详见[接口](#接口)）也属于多态。
+Polymorphism means that the same behavior can have multiple different forms or manifestations.
+Strictly speaking, [abstraction](#abstraction) (see [Interfaces](#interfaces)) is also a form of polymorphism.
 
-下面举例说明类的多态：先定义一个父类`Animal`，并且有一个字段`name`和一个方法`eat`：
+Example of class polymorphism: first define a parent class `Animal` with a field `name` and a method `eat`:
 
 ```feng
 class Animal {
@@ -930,7 +919,7 @@ class Animal {
 }
 ```
 
-然后定义一个子类`Cat`，继承了父类字段`name`，下面实现一个与父类的方法`eat`同名同原型的方法：
+Then define a subclass `Cat` that inherits the `name` field and implements a method `eat` with the same name and prototype:
 
 ```feng
 class Cat : Animal {
@@ -940,19 +929,19 @@ class Cat : Animal {
 }
 ```
 
-允许`Animal`的引用指向一个子类实例，通过父类引用调用`eat`方法时，允许时实际会调用子类的`eat`方法：
+An `Animal` reference can point to a subclass instance. When calling the `eat` method via the parent class reference, the subclass's `eat` method is actually invoked:
 
 ```feng
 func main() {
    var animal *Animal = new(Cat, {name="Tom"});
-   animal.eat("fish-meat"); // 将打印的是：Cat Tom eating fish-meat.
+   animal.eat("fish-meat"); // Prints: Cat Tom eating fish-meat.
 }
 ```
 
-通过这个例子可以看到，方法`eat`在继承之后可以允许有多个实现，父类引用的不同子类均会指向子类实现的方法。
-**子类在重实现父类方法时要求原型必须一致**。
+This example shows that the `eat` method can have multiple implementations after inheritance, and parent class references pointing to different subclasses will call the subclass's implementation.
+**Subclasses must have identical prototypes when overriding parent class methods.**
 
-支持[断言表达式](#断言表达式)来判断子类型：
+[Assertion expressions](#assertion-expression) are supported for subtype checking:
 
 ```feng
 func test(animal *Animal) {
@@ -964,12 +953,12 @@ func main() {
 }
 ```
 
-父类与子类仅支持引用传递，值类型变量之间不能传递。且传递规则为：
+Parent and child classes only support reference passing; value type variables cannot be passed between them. Passing rules:
 
-1. 引用类型相同的情况，子类可以传递给父类。
-2. 子类的常量强引用可以传递给父类的虚引用。
+1. When reference types are the same, a subclass can be passed to a parent class.
+2. A constant strong reference of a subclass can be passed to a phantom reference of the parent class.
 
-比如父类`Animal`和子类`Cat`之间传递：
+Example with parent class `Animal` and subclass `Cat`:
 
 ```feng
 func sample1(lc *Animal) {
@@ -983,15 +972,15 @@ func sample2(lc *Animal) {
 }
 ```
 
-#### 抽象
+#### Abstraction
 
-多态的父类的方法也有自己的实现，但[接口](#接口)的方法没有具体实现，而是接口的“子类”给出实现，因此叫抽象。
-抽象出接口更好的作为约定和规范：
+Polymorphic parent classes have their own method implementations, but [interface](#interfaces) methods have no implementation; the "subclasses" of the interface provide implementations. This is called abstraction.
+Abstraction serves as a better contract and specification:
 
-1. 管理者只关注接口的实现，隐藏具体的类，并提供已实现接口的实例。
-2. 使用者不必关心是什么类，只要实现了接口就可以使用。
+1. Managers focus only on interface implementations, hiding concrete classes, and provide instances that implement the interface.
+2. Users need not care about the specific class as long as the interface is implemented.
 
-比如定义一个接口`Task`，仅包含一个简单方法`run`：
+For example, define an interface `Task` containing only a simple method `run`:
 
 ```feng
 interface Task {
@@ -999,7 +988,7 @@ interface Task {
 }
 ```
 
-定义两个实现类`MyTask`和`YourTask`：
+Define two implementation classes `MyTask` and `YourTask`:
 
 ```feng
 class MyTask (Task) {
@@ -1014,25 +1003,25 @@ class YourTask {
 }
 ```
 
-用法和多态类似了：
+Usage is similar to polymorphism:
 
 ```feng
 func asyncRun(t *Task) {
-    t.run(); // 假装这里在异步执行
+    t.run(); // Pretend this is asynchronous execution
 }
 func main() {
-    asyncRun(new(MyTask));      // 打印：Run my task!
-    asyncRun(new(YourTask));    // 打印：Run your task!
+    asyncRun(new(MyTask));      // Prints: Run my task!
+    asyncRun(new(YourTask));    // Prints: Run your task!
 }
 ```
 
-当然也支持[断言表达式](#断言表达式)判断类型。
+[Assertion expressions](#assertion-expression) are also supported for type checking.
 
-### 根类
+### Root Class
 
-由于类是单继承的，因此所有类都会按继承关系形成一棵树，而这棵树的根类就是`Object`类。
-这是内置的类，没有声明继承任何父类的类则默认直接继承`Object`类。
-`Object`类没有任何成员，可以创建一个`Object`的对象。
+Since classes support single inheritance, all classes form a tree based on inheritance relationships, with the root class being `Object`.
+`Object` is a built-in class. Any class without an explicit parent class inherits from `Object` by default.
+`Object` has no members; an `Object` instance can be created.
 
 ```feng
 func test() {
@@ -1041,10 +1030,10 @@ func test() {
 }
 ```
 
-### final类
+### final Class
 
-如果希望定义的类仅用于保存数据，或者有简单的逻辑，而不希望用于复杂的继承和接口设计，可以给类加上final。
-这个类就不能被继承，也不会有基类（不是Object的子类），不能抽象接口（应该可以，但是未实现）。
+If a class is intended only for storing data or simple logic, and not for complex inheritance or interface design, it can be marked as `final`.
+Such a class cannot be inherited, has no base class (is not a subclass of Object), and cannot abstract interfaces (should be possible, but not implemented).
 
 ```feng
 class User final {
@@ -1052,59 +1041,58 @@ class User final {
 }
 ```
 
-### 导出成员
+### Exporting Members
 
-类的成员可以单独设置导出，并且默认不导出。
+Class members can be individually exported and are not exported by default.
 
-在`util`里有代码：
+Code in module `util`:
 
 ```feng
 export List`T`{
-   var elements []T; // elements这个成员就是需要对外隐藏的
-   export func get(i int) { // 但是get这个成员就需要暴露出去
-      // TODO： 检查下标越界
+   var elements []T; // elements is hidden from external access
+   export func get(i int) { // get is exposed
+      // TODO: check index bounds
       return elements[i];
    }
 }
 ```
 
-### 资源类
+### Resource Classes
 
-当一个类添加了`resource free`宏方法，这个类就被标记为资源类，这个宏的代码会在这个类的实例释放时调用。
+When a class is annotated with the `resource free` macro method, it is marked as a resource class. The macro's code is called when an instance of this class is deallocated.
 
-这个特性可以用于自动释放其他资源。比如C语言lib中分配的缓冲区：
+This feature can be used to automatically release other resources, such as buffers allocated from C libraries:
 
 ```feng
 class CBuffer {
-   const buf uint64; // 假设这个字段保存的是buf指针值
+   const buf uint64; // Assume this field holds a buffer pointer value
    macro resource free() {
-      cFree(buf); // 假设可以这样调C语言的释放函数free
+      cFree(buf); // Assume this calls C's free function
    }
 }
 ```
 
-资源类只能通过`new`创建实例。这个限制可以避免重复调用。
-比如上面的`CBuffer`类，值类型在赋值中复制了`buf`的值，多个实例在释放时就会重复调用`cFree(buf);`。
+Resource classes can only be instantiated via `new`. This restriction prevents duplicate calls.
+For example, in the `CBuffer` class above, if a value type variable copies the `buf` value, multiple instances would call `cFree(buf);` repeatedly.
 
-有些外部资源的关闭往往是耗时操作，比如文件，如果放在这里处理可能对性能的影响难以预料，而且还需要处理IO错误或异常，
-所以应该采用[异常语句](#异常语句)来处理。
+Some external resource releases, like file closures, are often time-consuming and may involve I/O errors or exceptions. Such operations should be handled with [exception statements](#exception-statements) rather than in `free`.
 
-## 接口
+## Interfaces
 
-接口是从多态分离出来的特性，是去掉了具体实现的父类，而且没有字段。
-这样接口看上去是由一组方法的集合，在定义时省去了方法前面的`func`关键字。
+Interfaces are a feature separated from polymorphism—they are parent classes without concrete implementations and without fields.
+Thus, an interface appears as a collection of methods, omitting the `func` keyword before method definitions.
 
-接口仅仅是约定和规范，不支持实例化，因此接口类型变量只能是引用。
+Interfaces are only contracts and specifications; they cannot be instantiated, so interface type variables can only be references.
 
-### 接口组合
+### Interface Composition
 
-接口可以进行组合：
+Interfaces can be composed:
 
-1. 组合成的接口包含各个组件的所有方法原型。
-2. 组合接口可以传递给组件接口，因为实现了组合接口当然也实现了组件接口。
-3. 接口的方法名称会检查冲突，不同组件中同名的方法被视为同一个方法，如果原型不一致则不能编译。
+1. A composed interface includes all method prototypes from its components.
+2. A composed interface can be passed to a component interface because implementing the composed interface naturally implements the component interface.
+3. Method name conflicts are checked; methods with the same name from different components are considered the same method. Compilation fails if prototypes do not match.
 
-比如文件可以读和写，那可以这样设计接口：
+For example, a file can be read and written; interfaces can be designed as follows:
 
 ```feng
 interface Reader {
@@ -1113,30 +1101,30 @@ interface Reader {
 interface Writer {
    write(b [*#]byte, off, len int) (int, Error);
 }
-// 组合成的接口File包含read和write方法
+// Composed interface File includes both read and write methods
 interface File {
    Reader;
    Writer;
    query() *FileInfo;
 }
-// 实现File接口的实例自然也实现了Write接口
+// An instance implementing the File interface naturally implements the Writer interface
 func use(file *File) Write {
    return file;
 }
 ```
 
-### 接口类型变量
+### Interface Type Variables
 
-接口类型变量是引用类型变量，并且只能引用实现类的实例。
-接口的变量声明需要加上引用标识符来标识引用类型。
+Interface type variables are reference type variables and can only reference instances of implementing classes.
+Interface variable declarations require a reference identifier to indicate the reference type.
 
-允许的传递：
+Allowed passing:
 
-1. 引用类型相同的情况，实现类可以传递给接口。
-2. 类型允许的条件下，接口的常量强引用可以传递给接口的虚引用。
-3. 类型允许的条件下，实现类的常量强引用可以传递给接口的虚引用。
+1. When reference types are the same, an implementing class can be passed to the interface.
+2. Under allowed type conditions, a constant strong reference of an interface can be passed to a phantom reference of the interface.
+3. Under allowed type conditions, a constant strong reference of an implementing class can be passed to a phantom reference of the interface.
 
-比如接口`Cache`和实现类`LocalCache`之间传递：
+Example with interface `Cache` and implementation class `LocalCache`:
 
 ```feng
 func sample1(lc *LocalCache) {
@@ -1153,39 +1141,39 @@ func sample4(lc *LocalCache) {
 }
 ```
 
-## 枚举
+## Enumerations
 
-枚举类型的值的个数是有限的，且必须在定义时把全部值都列举出来：
+Enumeration types have a finite number of values, all of which must be listed at definition time:
 
 ```feng
-enum TaskState {WAIT, RUN, DONE,}   // 注意结尾必须有个逗号“,”
+enum TaskState {WAIT, RUN, DONE,}   // Note the required trailing comma ","
 ```
 
-[枚举变量](#枚举变量)的值必须是枚举值中的一个，不能为空（`nil`）。
+[Enumeration variables](#enumeration-variables) must be one of the enumeration values; they cannot be `nil`.
 
-枚举类型内置了特殊属性，这些属性在编译时就已经确定：
+Enumeration types have built-in special attributes determined at compile time:
 
-* `id`：自动按定义的顺序递增产生的整数值，就是说修改了顺序就会变化。
-* `name`：就是定义的字面名称。比如上面定义的`WAIT`，其名称就是`"WAIT"`。
-* `value`：允许自定义的属性，整数类型。在未定义情况下，第一个枚举值的`value`等于`0`，后面的等于上一个的`vaue`递增1。
+* `id`: An integer value automatically incremented in definition order. Changing the order changes the IDs.
+* `name`: The literal name as defined. For example, `WAIT` has name `"WAIT"`.
+* `value`: A custom integer attribute. If not defined, the first enumeration value's `value` is `0`, and subsequent values increment by 1.
 
-使用枚举的值通常需要枚举类型为前缀，当然如果变量的类型明确就可以省略前缀，例如：
+Enumeration values typically require the enum type as a prefix. If the variable type is clear, the prefix can be omitted. Example:
 
 ```feng
-enum TaskState {WAIT, RUN, DONE,}   // 未设置value，就等于id
-enum BillState {WAIT, PAID=4, SEND, DONE,} // 这里WAIT=0，SEND=5，DONE=6，……
+enum TaskState {WAIT, RUN, DONE,}   // value not set, so equals id
+enum BillState {WAIT, PAID=4, SEND, DONE,} // WAIT=0, SEND=5, DONE=6, ...
 func main() {
-   var s1 = TaskState.WAIT;             // s1初始化为枚举值：WAIT
-   s1 = RUN;                            // s1类型已知，因此省略前缀
-   var s2 TaskState = DONE;             // s2已知，也可以省略前缀
-   var i int = TaskState.RUN.id;        // i初始化为整数：1
-   i = s2.id;                           // i赋值为：3
-   var n [*#]byte = s2.name;                // n初始化为rom引用，内容为字符串"DONE"
-   var v int = BillState.SEND.value;    // v初始化为整数：5
+   var s1 = TaskState.WAIT;             // s1 initialized to enum value WAIT
+   s1 = RUN;                            // s1 type known, so prefix omitted
+   var s2 TaskState = DONE;             // s2 known, prefix can be omitted
+   var i int = TaskState.RUN.id;        // i initialized to integer 1
+   i = s2.id;                           // i assigned 3
+   var n [*#]byte = s2.name;            // n initialized to rom reference containing string "DONE"
+   var v int = BillState.SEND.value;    // v initialized to integer 5
 }
 ```
 
-类型明确的情况还有`switch`语句中，如果case未覆盖所有值，那必须加`default`分支；反之则不能加：
+When the type is clear (e.g., in a `switch` statement), if the `case` statements do not cover all values, a `default` branch is required; otherwise, `default` is not allowed:
 
 ```feng
 func sample(s BillState) {
@@ -1200,7 +1188,7 @@ func sample(s BillState) {
 }
 ```
 
-支持[迭代循环](#迭代循环)所有枚举值：
+Supports [iteration loops](#iteration-loop) over all enumeration values:
 
 ```feng
 func main() {
@@ -1209,7 +1197,7 @@ func main() {
 }
 ```
 
-支持直接通过索引取值：
+Supports direct indexing:
 
 ```feng
 func sample() {
@@ -1218,22 +1206,22 @@ func sample() {
 }
 ```
 
-枚举的变量或数组元素的默认值为第一个枚举值（`id`等于`0`）。
+The default value for enumeration variables or array elements is the first enumeration value (with `id` equal to `0`).
 
-## 结构类型
+## Struct Types
 
-### 结构类型定义
+### Struct Type Definition
 
-结构体和联合体统称为结构类型，定义和内存布局与C语言一致：
+Structs and unions are collectively called struct types. Their definition and memory layout are consistent with C:
 
-1. 结构体：所有字段的存储按顺序分配。
-2. 联合体：所有字段的存储是重叠的。
+1. Struct: All fields are allocated sequentially in order.
+2. Union: All fields share overlapping storage.
 
-字段类型只能是[整数](#整数类型)、[浮点数](#浮点数类型)和结构类型，及这两种的[定长数组](#定长数组)。
+Field types can only be [integers](#integer-types), [floating-point numbers](#floating-point-types), struct types, and [fixed-length arrays](#fixed-length-array) of these types.
 
-结构体和联合体的定义格式一样，只是开头的关键字不同：
+Struct and union definitions have the same format, differing only in the keyword:
 
-1. 结构体的定义格式为：`struct` 名称 `{` 字段列表 `}`。
+1. Struct definition format: `struct` name `{` field list `}`.
     ```feng
     struct Message {
         type int;
@@ -1242,7 +1230,7 @@ func sample() {
         ext [12]int;
     }
     ```
-2. 联合体的定义格式为：`union` 名称 `{` 字段列表 `}`。
+2. Union definition format: `union` name `{` field list `}`.
     ```feng
     union DataType {
         type int;
@@ -1251,7 +1239,7 @@ func sample() {
     }
     ```
 
-相邻且相同类型的字段可以合并，当然不相邻的不能合并。以结构体为例：
+Adjacent fields of the same type can be combined; non-adjacent fields cannot. Example with struct:
 
 ```feng
 struct Request {
@@ -1260,9 +1248,9 @@ struct Request {
 }
 ```
 
-位域（bit-field）是字段实际使用的位宽，只能用于基本类型的字段。
-位域取值为该字段类型的位宽范围，放在在字段名称后面。
-例如设置`code`的位域为`6`（`type`未设置）：
+Bit-fields specify the actual bit width used for a field, applicable only to basic types.
+The bit-field value is within the range of the field's type width, placed after the field name.
+Example setting `code` bit-field to `6` (with `type` unspecified):
 
 ```feng
 struct Request {
@@ -1271,7 +1259,7 @@ struct Request {
 }
 ```
 
-比较特殊的是，联合体在初始化时只能指定其中一个字段：
+A notable exception: unions can only specify one field during initialization:
 
 ```feng
 union Foo {
@@ -1279,83 +1267,83 @@ union Foo {
    fly uint8;
 }
 var foo Foo = {tag=1};
-// var foo Foo = {tag=1,fly=2}; // 错误×
+// var foo Foo = {tag=1,fly=2}; // Error
 ```
 
-### 结构类型实例
+### Struct Type Instances
 
-结构类型可以有两种实例化方式：
+Struct types can be instantiated in two ways:
 
-1. 定义为[值类型](#值类型变量)，支持变量、类或结构类型的字段。
-2. 通过`new`动态分配实例。
+1. Defined as [value types](#value-type-variables), supported as fields of variables, classes, or struct types.
+2. Dynamically allocated via `new`.
 
-## 数组
+## Arrays
 
-### 数组元素
+### Array Elements
 
-数组是用于存储一组连续重复元素的类型，元素可以为任意类型。
-每个元素相当于一个[变量](#变量)，也分[值类型](#值类型变量)和[引用类型](#引用类型变量)：
+Arrays are types that store a contiguous sequence of repeated elements. Elements can be of any type.
+Each element is equivalent to a [variable](#variables) and can be either a [value type](#value-type-variables) or a [reference type](#reference-type-variables):
 
 ```feng
-var a [4]int;       // 基本类型数组
-var b [4]Host;      // 类数组
-var c [16]*Bus;     // 类引用数组
-var d [12][4]int;   // 定长数组的数组：即多维数组
-var e [10][]int;    // 变长数组的数组，区别于多维数组，元素其实为引用
+var a [4]int;       // Basic type array
+var b [4]Host;      // Class array
+var c [16]*Bus;     // Class reference array
+var d [12][4]int;   // Array of fixed-length arrays: multi-dimensional array
+var e [10][]int;    // Array of variable-length arrays; elements are references (different from multi-dimensional)
 ```
 
-值类型数组的元素所需空间是和数组一起分配的，可以直接使用：
+Value type array elements' memory is allocated together with the array and can be used directly:
 
 ```feng
 func test() {
-    // 基本类型数组
+    // Basic type array
     var a [4]int = [1,2,3,4];
     a[0] += a[1];
-    // 类数组
+    // Class array
     var b [4]Host = [{id=1}];
     b[3].id = 111;
-    // 定长数组的数组：即多维数组
+    // Array of fixed-length arrays: multi-dimensional array
     var c [4][8]int = [[1],[2]];
     c[3][4] = 222;
 }
 ```
 
-引用数组的元素需要额外引用其他实例，默认值为`nil`（不引用任何实例）。
+Reference array elements require additional references to other instances; the default value is `nil`.
 
 ```feng
 func test() {
     var a [4]Device;
-    // a[2].name = "dev-2"; // 错误✖：这里会抛出空指针异常
+    // a[2].name = "dev-2"; // Error: throws null pointer exception
     a[0] = new(Device);
-    a[0].name = "dev-0";    // 只有a[0]可使用，其他元素依然是nil
+    a[0].name = "dev-0";    // Only a[0] usable; other elements remain nil
 }
 ```
 
-上面以[定长数组](#定长数组)为例，[变长数组](#变长数组)只在初始化时有差别，用法一样。
+The above uses [fixed-length arrays](#fixed-length-array) as an example; [variable-length arrays](#variable-length-array) differ only in initialization; usage is the same.
 
-### 数组类型
+### Array Types
 
-数组长度是指能容纳的元素总数，声明变量类型时指定和不指定分别表示两种类型的变量。
+Array length refers to the total number of elements the array can hold. Specifying or not specifying the size when declaring the variable type indicates two different types.
 
-#### 定长数组
+#### Fixed-Length Array
 
-声明时如果指定了大小是定长数组，也就是说数组方括号中的必须是整数字面量，或者整数常量表达式。
+If the size is specified at declaration, it is a fixed-length array—the value in square brackets must be an integer literal or integer constant expression.
 
 ```feng
 var a [4]int;
 ```
 
-这种类型的数组是[值类型变量](#值类型变量)。
+This type of array is a [value type variable](#value-type-variables).
 
-初始化为[数组字面量](#数组字面量)，初始化值数量不能超过数组长度；
-如果小于则从第一个位置开始顺序初始化，后面则归零：
+Initialized with [array literal](#array-literal); the number of initial values cannot exceed the array length.
+If fewer, elements are initialized sequentially from the first position; remaining elements are zeroed:
 
 ```feng
 // var a [4]int = [1,2,3,4,5];
-var b [4]int = [1,2];   // b初始化为：[1,2,0,0]
+var b [4]int = [1,2];   // b initialized to: [1,2,0,0]
 ```
 
-初始化为表达式时，表达式的结果必须是同类型长度相同的数组：
+When initialized with an expression, the expression's result must be an array of the same type and length:
 
 ```feng
 func foo() [4]int {
@@ -1363,17 +1351,17 @@ func foo() [4]int {
 }
 func foobar() {
     var a [4]int = foo();
-    // var b [2]int = foo(); // 错误✖
+    // var b [2]int = foo(); // Error
 }
 ```
 
-#### 变长数组
+#### Variable-Length Array
 
-不指定长度是[引用类型变量](#引用类型变量)，也就是数组引用，可指向任意长度的数组实例。
+Omitting the length creates a [reference type variable](#reference-type-variables), i.e., an array reference that can point to array instances of any length.
 
-数组实例是通过`new`分配的，并且在分配时必须指定分配的长度。格式为：new(\[长度\]类型)
+Array instances are allocated via `new`, and the length must be specified at allocation time. Format: `new([length]type)`
 
-例如创建int类型数组：
+Example creating an int array:
 
 ```feng
 func test(size uint) {
@@ -1382,9 +1370,9 @@ func test(size uint) {
 }
 ```
 
-### 数组类型字段
+### Array Type Fields
 
-[类](#类)的字段类型可以为数组或数组引用，这和变量用法一样：
+[Class](#classes) fields can be arrays or array references, same as variable usage:
 
 ```feng
 class Foobar {
@@ -1393,16 +1381,16 @@ class Foobar {
 }
 ```
 
-注意：[结构类型](#结构类型)的字段类型不能为[引用](#引用类型变量)，必须指定长度。
+Note: [Struct type](#struct-types) fields cannot be [references](#reference-type-variables); the length must be specified.
 
 ## mappable
 
-mappable定义为其引用可以互相转换，与类的转换协变逆变不同，不需要做类型检查，而只检查边界。
+`mappable` defines types whose references can be freely converted to each other. Unlike class covariance/contravariance, no type checking is required—only bounds checking.
 
-支持映射的类型：[结构类型](#结构类型)、[整数](#整数类型)、[浮点数](#浮点数类型)和这两个类型的[定长数组](#定长数组)。
-这些类型占据的是连续空间，并且不包含引用（即指针），因此允许他们的引用像C语言那样自由转换，唯一的约束是边界检查。
+Supported mappable types: [struct types](#struct-types), [integers](#integer-types), [floating-point numbers](#floating-point-types), and [fixed-length arrays](#fixed-length-array) of these types.
+These types occupy contiguous memory and contain no references (pointers), so their references can be freely converted like in C, with the only constraint being bounds checking.
 
-比如下例中将`int`的引用转换成`int16`的引用：
+Example: converting an `int` reference to an `int16` reference:
 
 ```feng
 func f1(a *int) *int16 {
@@ -1410,7 +1398,7 @@ func f1(a *int) *int16 {
 }
 ```
 
-因为size是编译器已知的，可以在编译时检查到。上面的引用不会越界，但下面会编译不通过：
+Since the size is known at compile time, it can be checked. The above conversion does not cause out-of-bounds, but the following fails to compile:
 
 ```feng
 func f1(a *int8) *int16 {
@@ -1418,7 +1406,7 @@ func f1(a *int8) *int16 {
 }
 ```
 
-结构体转换类似，显然f1能是允许的，f2则越界了：
+Struct conversion is similar; `f1` is allowed, while `f2` is out-of-bounds:
 
 ```feng
 struct Foo {
@@ -1432,41 +1420,41 @@ func f2(a *Foo) *int64 {
 }
 ```
 
-因为数组引用可以指向任意长度的数组，因此其长度是运行时计算的。如果其元素大小超出了目标则size为`0`：
+Array references can point to arrays of any length, so their length is computed at runtime. If the element size exceeds the target, the size is `0`:
 
 ```feng
 struct Foo {
    v int32;
 }
-func f1(a *Foo) [*]int16 { // length为2
+func f1(a *Foo) [*]int16 { // length = 2
    return a;
 }
-func f2(a *Foo) [*]int64 { // length为0
+func f2(a *Foo) [*]int64 { // length = 0
    return a;
 }
 ```
 
-允许mappable的类型都是明确内存布局的，并与C语言一致，只不过不会包含引用（即指针）。
-[结构类型](#结构类型)明确定义了字段不能为引用，同时数组的元素也不能包含引用，包括多维数组：
+Mappable types have well-defined memory layout consistent with C and contain no references (pointers).
+[Struct types](#struct-types) explicitly prohibit reference fields, and array elements cannot contain references, including multi-dimensional arrays:
 
 ```feng
 func test() {
-   var a1 [*]int; // 可映射
-   var a2 [*][2]int; // 可映射
-   var a3 [*][3][4]int; // 可映射
+   var a1 [*]int; // mappable
+   var a2 [*][2]int; // mappable
+   var a3 [*][3][4]int; // mappable
    
-   var a4 [*]*int; // 不可映射
-   var a4 [*][*]int; // 不可映射
-   var a4 [*][5]*int; // 不可映射
-   var a4 [*][6][*]int; // 不可映射
+   var a4 [*]*int; // not mappable
+   var a4 [*][*]int; // not mappable
+   var a4 [*][5]*int; // not mappable
+   var a4 [*][6][*]int; // not mappable
 }
 ```
 
-## 函数
+## Functions
 
-定义格式为：`func` 函数名 `(` 参数表 `)` 返回表 `{` 函数体 `}`
+Definition format: `func` function-name `(` parameter-list `)` return-list `{` function-body `}`
 
-其中函数名是必须的，参数表、返回表及函数体都可以为空。下面举3个例子：
+The function name is required; parameter list, return list, and function body can all be empty. Three examples:
 
 ```feng
 func run() {}
@@ -1476,9 +1464,9 @@ func exec(a []Sting) *Error {
 }
 ```
 
-### 函数名
+### Function Name
 
-函数名是函数的唯一ID，在模块内的函数集中是唯一的；并且需要通过函数名调用函数。
+The function name is the function's unique ID within the module's function set; functions are called by name.
 
 ```feng
 func add(a,b int) int { return a + b; }
@@ -1487,11 +1475,11 @@ func test() {
 }
 ```
 
-### 参数表
+### Parameter List
 
-参数是参数名和类型组成，且都是常量（省略了`const`），作用域在当前函数内。
+Parameters consist of a parameter name and type, are constants (implicit `const`), and their scope is within the function.
 
-下面的例子定义了类型为`Queue`的`l`和类型为`int`的`a`两个参数：
+Example defining parameters `l` of type `Queue` and `a` of type `int`:
 
 ```feng
 func send(l Queue, a int) {
@@ -1499,30 +1487,29 @@ func send(l Queue, a int) {
 }
 ```
 
-相邻且相同类型的参数可以合并定义，比如定义两个类型为`int`的参数`a`和`b`可以这样：
+Adjacent parameters of the same type can be combined. Example defining two `int` parameters `a` and `b`:
 
 ```feng
 func add(a, b int) int {
-    reutrn a + b;
+    return a + b;
 }
 ```
 
-### 返回值类型表
+### Return Type List
 
-在参数和代码段之间声明返回值类型表，用圆括号括起来。例如函数`foo`返回一个`int`和一个`float`：
+The return type list is declared between the parameter list and the function body, enclosed in parentheses. Example: function `foo` returns an `int` and a `float`:
 
 ```feng
 func foo() (int, float) {}
 ```
 
-只有单一返回值的时候可以省略括号：
+When there is only a single return value, parentheses can be omitted:
 
 ```feng
 func online() bool {};
 ```
 
-多返回值对程序设计的影响较大。比如，在不仅需要得到函数的执行结果，还需要知道函数执行的错误信息时，
-就不必加个引用传参来修改外部变量了，直接返回即可：
+Multiple return values have significant design implications. For example, when needing both a function's result and error information, returning both avoids modifying an external variable via reference parameter:
 
 ```feng
 func createDevice(host *Host) (*Device, *Error) {
@@ -1533,11 +1520,11 @@ func createDevice(host *Host) (*Device, *Error) {
 }
 ```
 
-错误信息还可以作为异常[抛出](#抛出异常)，这两种方案在这里都是可行的。
+Error information can also be [thrown](#throwing-exceptions); both approaches are viable.
 
-### 函数体
+### Function Body
 
-函数体由一组[语句](#语句)序列组成的：
+The function body consists of a sequence of [statements](#statements):
 
 ```feng
 func run(s int) {
@@ -1547,7 +1534,7 @@ func run(s int) {
 }
 ```
 
-函数体内部能访问的变量组成上下文，函数内的上下文包括[全局变量](#全局变量)、[参数表](#参数表)和[本地变量](#本地变量)。
+The context accessible inside the function body includes [global variables](#global-variables), [parameter list](#parameter-list), and [local variables](#local-variables).
 
 ```feng
 const PI = 3.14;
@@ -1557,11 +1544,10 @@ func circlyArea(diameter float) float {
 }
 ```
 
-### 函数原型
+### Function Prototype
 
-函数原型是变量类型的一种，函数的定义去掉函数体就是原型：`func` 函数名 `(` 参数表 `)` 返回表。
-这种类型的[变量](#函数原型变量)要么为空，要么指向与原型兼容的函数。
-例如：
+A function prototype is a type of variable. A function definition without its body is a prototype: `func` function-name `(` parameter-list `)` return-list.
+A [variable](#function-prototype-variable) of this type is either null or points to a function compatible with the prototype. Example:
 
 ```feng
 func add(a, b int) int { return a + b; }
@@ -1581,7 +1567,7 @@ func main() {
 }
 ```
 
-函数原型支持匿名定义：
+Function prototypes support anonymous definition:
 
 ```feng
 func test(c func(a, b int) int) {}
@@ -1596,28 +1582,28 @@ func supply(c int) func(a, b int) int {
 }
 func main() {
     var c1 func(a, b int) int = add;
-    var c2 = sub;   // 也可以省略类型，自动推导
+    var c2 = sub;   // Type can be omitted; auto-inferred
 }
 ```
 
-原型变量并非引用类型，但可以为空（即`nil`），也可以加非空前缀标记（`!`）来表示不能为空，这点与引用的非空规则一样：
+Prototype variables are not reference types but can be `nil`. They can also be marked with a non-null prefix (`!`) to indicate they cannot be null, following the same non-null rules as references:
 
 ```feng
 func use1(a !func()) {
    var c1 func() = a;
    var c2 !func() = a;
-   // var c3 !func() = c1; // 错误×：不能反向传递
+   // var c3 !func() = c1; // Error: cannot pass in reverse direction
    if (c1 != nil) {
-      var c3 !func() = c1; // 显示判断空之后才能反传
+      var c3 !func() = c1; // After explicit null check, can pass
    }
 }
 ```
 
-## 语句
+## Statements
 
-### 块语句
+### Block Statement
 
-块语句是由`{`与`}`括起来的语句序列组成的，块内上下文会嵌套，内声明的[本地变量](#本地变量)不能在外部使用：
+A block statement is a sequence of statements enclosed by `{` and `}`. The inner context is nested; [local variables](#local-variables) declared inside cannot be used outside:
 
 ```feng
 func test() {
@@ -1626,23 +1612,23 @@ func test() {
       println("block 2");
       {
          println("block 3");
-         // 嵌套没有限制
+         // Nesting has no limit
       }
    }
 }
 ```
 
-### 分支语句
+### Branch Statements
 
-根据控制条件选择执行其中一个分支，有两种类型。
+Select one branch to execute based on a control condition. Two types.
 
-#### if语句
+#### if Statement
 
-`if`紧跟带括号的条件表达式，然后是当匹配条件时执行的语句；之后的`else`开始的语句是未匹配时执行的，这个分支不是必须的。
+`if` is followed by a parenthesized conditional expression, then the statement executed when the condition matches; the `else` branch is executed when it does not match and is optional.
 
-表达式结果作为条件，必须是`bool`类型。
+The expression result, used as the condition, must be of type `bool`.
 
-简单的条件语句：
+Simple conditional statement:
 
 ```feng
 func abs(m int) int {
@@ -1653,7 +1639,7 @@ func abs(m int) int {
 }
 ```
 
-可以省略`else`语句：
+The `else` branch can be omitted:
 
 ```feng
 func printIfError(err uint) {
@@ -1662,18 +1648,18 @@ func printIfError(err uint) {
 }
 ```
 
-可以在条件表达式前面加一个初始化语句：
+An initialization statement can be added before the conditional expression:
 
 ```feng
 func test(m Map`int,*Node`, k int) {
-   if (var n,ok = m[k]; ok) { // 这里的n和ok变量只属于当前块
+   if (var n,ok = m[k]; ok) { // n and ok are only within this block
       printf("value of %d is: %s\n", k, n.value());
    }
-   // printf("value of %d is: %s\n", k, n.value()); // 错误✖：外层不能使用
+   // printf("value of %d is: %s\n", k, n.value()); // Error: cannot use outside
 }
 ```
 
-显然`else`可以嵌套`if`，就组成了多分支：
+Nesting `else` with `if` creates multi-branch structures:
 
 ```feng
 func compare(a, b int) int {
@@ -1687,7 +1673,7 @@ func compare(a, b int) int {
 }
 ```
 
-`if..else`可以作为[元组](#元组-_未完成_)使用，但是`else`分支不能省略了，且每个分支提供的元组长度必须一致：
+`if..else` can be used as [tuples](#tuples-_[Incomplete]_), but the `else` branch cannot be omitted, and each branch must produce a tuple of the same length:
 
 ```feng
 func compare(a, b int) int {
@@ -1698,10 +1684,10 @@ func minMax(x,y int) (int,int) {
 }
 ```
 
-#### switch语句
+#### switch Statement
 
-由`switch`开始的带有一个条件表达式，多个匹配规则，每个规则由`case`开始，其下有一组语句。  
-匹配到的`case`规则其下的语句组会被执行，当执行结束后会跳出`switch`语句，不会继续下降，除非语句组最后一个是`fallthrough`语句。
+A `switch` statement begins with a conditional expression and contains multiple match rules. Each rule starts with `case` and is followed by a group of statements.
+The statement group of the matched `case` is executed, and after execution, control exits the `switch` statement (no fall-through) unless the last statement in the group is `fallthrough`.
 
 ```feng
 func numberName(k int) {
@@ -1720,7 +1706,7 @@ func numberName(k int) {
 }
 ```
 
-和`if`类似可以在条件表达式前面加一个初始化语句：
+Like `if`, an initialization statement can be added before the conditional expression:
 
 ```feng
 func test(n Node) {
@@ -1731,20 +1717,19 @@ func test(n Node) {
 }
 ```
 
-也可以作为[元组](#元组-_未完成_)使用，规则与条件语句一样：
+`switch` can also be used as [tuples](#tuples-_[Incomplete]_) following the same rules as conditional statements.
 
-### 循环语句
+### Loop Statements
 
-#### 条件循环语句
+#### Conditional Loop Statement
 
-`for`后面的括号内是控制体，控制体可以且必须有一个控制条件表达式，也可以包括初始化和更新子语句；
-之后是需要执行的语句或语句序列，称循环体。
-当控制条件满足时重复执行循环体：
+The parentheses after `for` contain a control body, which must include a control condition expression and can also include initialization and update substatements. This is followed by the statement(s) to be executed, called the loop body.
+The loop body repeats as long as the control condition is satisfied:
 
-1. 控制条件是一个`bool`类型的条件表达式，当结果为`true`时才会执行循环体。
-2. 循环体是一个语句，如果需要多个语句操作则需使用[块语句](#块语句)包起来。
+1. The control condition is a `bool` expression; the loop body executes only when the result is `true`.
+2. The loop body is a single statement; if multiple statements are needed, they must be enclosed in a [block statement](#block-statement).
 
-简单的循环语句为括号内只有条件表达式：
+A simple loop with only a condition expression:
 
 ```feng
 func main() {
@@ -1756,15 +1741,15 @@ func main() {
 }
 ```
 
-完整的控制体格式为：【初始化】;【表达式】;【更新】
+The complete control body format: [Initialization]; [Expression]; [Update]
 
-1. 【初始化】在循环前执行一次，然后再进入循环过程。
-2. 循环过程的每一轮：先判断【表达式】，`false`则结束循环，`true`则执行循环体，最后执行【更新】。
-3. 循环体中可以有控制循环的操作：
-    1. 遇到`continue`语句则直接进入下一轮循环，也就是2中描述的。
-    2. 遇到`break`则直接跳出当前循环或指定循环。
+1. [Initialization] executes once before the loop begins.
+2. Each iteration: evaluate [Expression]; if `false`, exit the loop; if `true`, execute the loop body, then execute [Update].
+3. Loop control operations within the body:
+    1. `continue` jumps directly to the next iteration.
+    2. `break` exits the current loop or a specified loop.
 
-例如循环100次，并每次打印变量`i`的值：
+Example: loop 100 times, printing the value of `i` each time:
 
 ```feng
 func main() {
@@ -1774,36 +1759,36 @@ func main() {
 }
 ```
 
-#### 迭代循环
+#### Iteration Loop
 
-对于变量数组，可以用更简单的方式遍历所有元素：
+For arrays, a simpler way to iterate over all elements:
 
 ```feng
 func main() {
     var src []int = [0,1,2,3,4,5,6,7,8,9];
-    for ( v : src )  // 只获取值
+    for ( v : src )  // value only
       handle(j);
-    for ( i,v : src) //  同时获取索引和值
+    for ( i,v : src) // both index and value
       println(i, v);
 }
 ```
 
-当然`continue`和`break`语句对迭代循环依然有效。
+`continue` and `break` are also effective in iteration loops.
 
-循环语句遍历形式默认只对数组使用，对自定义类可以实现自定义迭代器，然后就可以用迭代循环来遍历了。
-实现迭代是通过名为`Iterator`的helper宏实现的，但考虑循环是很常用的语法，所以利用宏直接由编译器展开。
-宏的字段不限制，包含4个方法`initializer`、`condition`、`updater`、`get`
+By default, iteration loops work only for arrays. For custom classes, a custom iterator can be implemented to enable iteration loops.
+Iteration is implemented via a helper macro named `Iterator`. Since loops are very common syntax, the macro is directly expanded by the compiler.
+The macro's fields are unrestricted and include four methods: `initializer`, `condition`, `updater`, `get`
 
-| 方法          | 作用     | 参数  |
-|-------------|--------|-----|
-| initializer | 初始化迭代器 | 无   |
-| condition   | 循环条件   | 无   |
-| updater     | 更新迭代器  | 无   |
-| get         | 获取值    | 不限制 |
+| Method       | Purpose              | Parameters |
+|--------------|----------------------|------------|
+| initializer  | Initialize iterator  | None       |
+| condition    | Loop condition       | None       |
+| updater      | Update iterator      | None       |
+| get          | Get value(s)         | Unrestricted |
 
-其中`get`可以写多个，但参数个数不能相同。
+Multiple `get` methods can be defined, but they must have different numbers of parameters.
 
-示例：
+Example:
 
 ```feng
 class Node`T` {
@@ -1837,18 +1822,18 @@ class List`T` {
     }
 }
 func test(src List`*Team`) {
-   for ( t : src) { // 匹配第一个get
+   for ( t : src) { // matches the first get
       // TODO
    }
-   for (i, t : src) { // 匹配第二个get
+   for (i, t : src) { // matches the second get
       // TODO
    }
 }
 ```
 
-### 赋值运算语句
+### Assignment Operation Statement
 
-[赋值运算](#赋值运算)只能用于语句中，即：
+[Assignment operations](#assignment-operation) can only be used in statements:
 
 ```feng
 func test() {
@@ -1857,11 +1842,11 @@ func test() {
 }
 ```
 
-### 赋值语句
+### Assignment Statement
 
-#### 修改赋值
+#### Modification Assignment
 
-赋值语句的左边是操作数（指将要被修改值的对象），后边是由表达式列表组成的[元组](#元组-_未完成_)：
+The left side of an assignment statement is an operand (the object whose value will be modified), and the right side is a [tuple](#tuples-_[Incomplete]_) of expressions:
 
 ```feng
 func test(x,y int, u *User, a []int) {
@@ -1873,12 +1858,12 @@ func test(x,y int, u *User, a []int) {
 }
 ```
 
-1. 赋值语句并不是拆成多个语句独立执行的，而是先计算操作数的表达式，再计算表达式元组，再一一赋值。
-2. 显然，不同类型的赋值可以放在一起。
+1. Assignment is not executed as multiple independent statements. The left operands are evaluated first, then the right tuple, then the assignments are performed.
+2. Different types can be assigned together.
 
-#### 变量初始化
+#### Variable Initialization
 
-[变量声明语句](#变量声明语句)右边的初始化赋值是可选的，且也是先计算右边表达式元组，再赋值给左边变量：
+The initialization assignment on the right side of a [variable declaration statement](#variable-declaration-statement) is optional. The right tuple is evaluated first, then assigned to the left variables:
 
 ```feng
 func test() {
@@ -1886,14 +1871,14 @@ func test() {
 }
 ```
 
-复制的时候要求原类型必须相同，如果是数组则按最小长度复制。
+The original types must match. For arrays, copying follows the smaller length.
 
-### 变量声明语句
+### Variable Declaration Statement
 
-声明一个或一组[变量](#变量)使用关键词`var`或`const`开头，后面紧跟变量的名称，然后是变量类型。
+Declaring one or a group of [variables](#variables) starts with `var` or `const`, followed by the variable name(s), then the variable type.
 
-1. `var`声明一个普通变量。后面可以有初始化值。TODO：允许未初始化并置默认值？还是强制使用前必须赋值？
-2. `const`用于定义不变的量，不能重新赋值，且必须在声明时初始化值。
+1. `var` declares an ordinary variable, optionally with an initial value.
+2. `const` defines immutable values; they cannot be reassigned and must be initialized at declaration.
 
 ```feng
 func main() {
@@ -1901,34 +1886,34 @@ func main() {
     var g float64;
     var a float64 = 0;
     const pi float64 = 3.1415926;
-    const pi = 3.1415926; // 当设置了初始化值时，类型可以省略
+    const pi = 3.1415926; // When initialized, type can be omitted
     g = 2 * r * pi;
     a = r * r * pi;
 }
 ```
 
-由于声明的类型可以省略，因此会出现两种情况：
+Since the type can be omitted, two cases arise:
 
-1. 省略时，左边可以是不同类型的表达式，这样右边对应的变量类型会自动推导为不同的类型。
-2. 如果显式加上，显然左边的类型统一了，右边的类型自然必须兼容。
+1. When omitted, the right side can contain expressions of different types; the corresponding variable types are inferred independently.
+2. If types are explicitly specified, all left variables share the same type, and the right expressions must be compatible.
 
 ```feng
 func test() {
    var a,b int = 1,2;
-   // var a,b int = 1, "ggyy"; // 错误✖，必须拆成两个语句
+   // var a,b int = 1, "ggyy"; // Error: must be split into two statements
 }
 ```
 
-### 异常语句
+### Exception Statements
 
-分为抛出和处理[异常](#异常-_未完成_)两种语句。
+Two types: throwing and handling [exceptions](#exceptions-_[Incomplete]_).
 
-#### 抛出异常
+#### Throwing Exceptions
 
-抛出异常是为了处理返回值没有处理的错误。抛出异常后：
+Throwing an exception handles errors not addressed by return values. After throwing an exception:
 
-1. 会终止当前过程的执行，不执行返回语句，而是抛出一个包含错误信息的实例。
-2. 如果调用的过程抛出了一个异常A，会从调用处终止当前过程的执行，继续抛出异常A。
+1. Execution of the current procedure terminates; instead of executing the return statement, an instance containing error information is thrown.
+2. If a called procedure throws an exception A, execution of the current procedure terminates at the call site, and exception A continues to be thrown.
 
 ```feng
 func example1() {
@@ -1936,32 +1921,32 @@ func example1() {
 }
 func example2() {
     example1();
-    println("example1()必然抛出异常，所以这一行不会执行！");
+    println("example1() always throws an exception, so this line will not execute!");
 }
 func example3() {
     example2();
-    println("example2()也会抛出异常，所以这一行也不会执行！");
+    println("example2() also throws an exception, so this line will not execute!");
 }
 ```
 
-如果发生了抛出异常，那这个会一直按调用链往外抛，直到被`catch`匹配到为止。
+Once an exception is thrown, it propagates up the call chain until caught by a `catch` block.
 
-抛出的异常的类型需要自己定义，在[异常](#异常-_未完成_)中详细说明。
+The type of the thrown exception must be defined by the user, as detailed in [Exceptions](#exceptions-_[Incomplete]_).
 
-#### 处理异常
+#### Handling Exceptions
 
-异常处理语句分三个部分：
+Exception handling statements consist of three parts:
 
-1. `try`部分：必须的部分，将需要处理的代码块包裹起来。
-2. `catch`部分：可以有多个，分配匹配不同的异常类型。匹配到就执行对应的代码块，否则继续往后匹配。
-   如果没有都未匹配成功则继续往外抛出。
-3. `finally`部分：上面两部分无论什么情况，都必须执行这部分。
-   如果第1部分有`return`语句，先执行`return`后的表达式，再执行`finally`部分，最后再正式返回。
-   如果第2部分没有或者未捕获到异常，则先执行`finally`部分后继续抛出。
+1. `try` block: mandatory, wraps the code to be monitored.
+2. `catch` blocks: multiple allowed, each matching a different exception type. When matched, the corresponding code block executes; otherwise, matching continues.
+   If no block matches, the exception continues to propagate outward.
+3. `finally` block: executes regardless of whether an exception occurred or was caught.
+   If a `return` statement exists in the `try` block, the expression after `return` is evaluated first, then the `finally` block executes, then the return is completed.
+   If no `catch` block or no match, the `finally` block executes before re-throwing.
 
-第2和3部分至少必须有一个。
+At least one of parts 2 and 3 must be present.
 
-完整的例子：
+Complete example:
 
 ```feng
 func calc() {
@@ -1969,30 +1954,30 @@ func calc() {
       step1();
       step2();
    } catch(e *NilPointerError) {
-      println("捕获到了空指针");
+      println("Caught null pointer");
    } catch(e *IllegalStateError | *IllegalArgumentError) {
-      println("捕获到了状态错误或者参数错误");
+      println("Caught state error or argument error");
    } finally {
-      println("最终经过这里再往下执行");
+      println("Finally, execution continues after here");
    }
    return getResult();
 }
 ```
 
-没有`finally`部分，只有`catch`部分：
+With `catch` but no `finally`:
 
 ```feng
 func calc() {
    try {
       step1();
    } catch(e *IllegalStateError) {
-      println("捕获到了状态错误或者参数错误");
+      println("Caught state error or argument error");
    }
    return getResult();
 }
 ```
 
-没有`catch`部分，只有`finally`部分：
+With `finally` but no `catch`:
 
 ```feng
 func calc() {
@@ -2001,12 +1986,12 @@ func calc() {
       step2();
       return getResult();
    } finally {
-      println("最终经过这里再往下执行");
+      println("Finally, execution continues after here");
    }
 }
 ```
 
-`finally`可以用来释放外部资源，避免资源泄露。比如文件关闭：
+`finally` can be used to release external resources, avoiding resource leaks. Example: closing a file:
 
 ```feng
 func readTxt() String {
@@ -2024,65 +2009,65 @@ func readTxt() String {
 }
 ```
 
-注意：`catch`匹配括号里的参数`e`是常量参数。
+Note: The parameter `e` in `catch` matching parentheses is a constant parameter.
 
-## 变量
+## Variables
 
-声明方式参考[变量声明语句](#变量声明语句)。
+Refer to [Variable Declaration Statement](#variable-declaration-statement) for declaration syntax.
 
-变量的声明方式有两种：可变的`var`和不可变的`const`，区别是后者在首次赋值后就不能再修改了。
+Variables can be declared in two ways: mutable `var` and immutable `const`. The difference is that `const` cannot be modified after its first assignment.
 
-### 变量值的类型
+### Types of Variable Values
 
-变量的类型分三种情况：值类型、引用类型、枚举和函数原型。
+Variables have three categories: value types, reference types, enumerations, and function prototypes.
 
-#### 值类型变量
+#### Value Type Variables
 
-变量与实例一体，变量的值就是实例本身，赋值相当于复制实例的数据：
+The variable and the instance are one; the variable's value is the instance itself. Assignment copies the instance's data:
 
-1. 基本类型的变量本身只是一个寄存器值，修改通常只需一个机器指令：
+1. Basic type variables are just register values; modification usually requires a single machine instruction:
    ```feng
-   var a int = 1; // 变量a赋值为字面量数值1，那a的值就是1
-   var b int = a; // 变量b赋值为变量a，则将a的值复制给b
-   b = 2; // a和b是两个不同变量，修改其中任何一个不会影响另一个
+   var a int = 1; // Variable a assigned literal 1, so a's value is 1
+   var b int = a; // Variable b assigned variable a, copying a's value to b
+   b = 2; // a and b are different variables; modifying one does not affect the other
    ```
-2. 派生类型通常会占用超过寄存器位宽的空间，所以实现上往往需要一组指令，将类型的字段数据全部复制：
+2. Derived types typically occupy more space than a register, so implementation often requires a set of instructions to copy all field data:
    ```feng
    class Vector { var x,y,z float64; }
    var a Vector = { x=1.0, y=0, z=-1.0 };
-   var b Vector = a; // 和基本类型一样，复制a的所有字段数据给b
-   b.x += 2.0; // 同样修改b不影响a，a.x的值依然是'1.0'
+   var b Vector = a; // Like basic types, copy all field data from a to b
+   b.x += 2.0; // Modifying b does not affect a; a.x remains '1.0'
    ```
-3. [定长数组](#定长数组)赋值等效于遍历数组的所有元素进行赋值：
+3. [Fixed-length array](#fixed-length-array) assignment is equivalent to iterating over all elements and assigning each:
    ```feng
-   var a [4]int = [1,2]; // 遍历每个元素初始化，没写出来的为默认值，int默认值为0
+   var a [4]int = [1,2]; // Initialize each element; unspecified ones get default (0 for int)
    var b [4]int;
-   b = a; // 就是把a的数据复制给b
-   // 等效于循环赋值
+   b = a; // Copy data from a to b
+   // Equivalent to loop assignment
    for (var i = 0; i < a.size; i++) b[i] = a[i];
-   b[0] += 10; // 修改了b[0]不会影响a，a[0]值依然是'1'
+   b[0] += 10; // Modifying b[0] does not affect a; a[0] remains '1'
    ```
-   派生类型的数组，如果元素是值类型的，也是一起复制的：
+   For arrays of derived types, if the elements are value types, they are copied as well:
    ```feng
-   var a [4]Vector = [{x=1.0}, {x=2.0}]; // 遍历每个元素初始化，没写出来的为默认值，Vector默认值的每个字段都是0
+   var a [4]Vector = [{x=1.0}, {x=2.0}]; // Initialize each element; unspecified get defaults (all fields 0)
    var b [4]Vector;
-   b = a; // 就是把a的数据复制给b
-   // 也等效于循环赋值
+   b = a; // Copy data from a to b
+   // Also equivalent to loop assignment
    for (var i = 0; i < a.size; i++) 
-       b[i] = a[i]; // 这里的赋值参考第2点
-   b[0].x += 5.0; // 同样修改b[0].x不会影响a，a[0].x的值还是'1.0'
+       b[i] = a[i]; // Assignment refers to point 2 above
+   b[0].x += 5.0; // Modifying b[0].x does not affect a; a[0].x remains '1.0'
    ```
 
-#### 引用类型变量
+#### Reference Type Variables
 
-引用类型变量是与实例分离，即给赋值变量只是改变引用的指向。
+Reference type variables are separate from instances; assignment changes the reference's target.
 
-变量能引用的实例有类型安全的约束：
+The instances a variable can reference are subject to type safety constraints:
 
-1. [类](#类)和[接口](#接口)的引用有[多态](#多态)与[抽象](#抽象)的约束。
-2. [接口](#接口)引用类的实例有抽象兼容的约束。
+1. [Class](#classes) and [interface](#interfaces) references have [polymorphism](#polymorphism) and [abstraction](#abstraction) constraints.
+2. [Interface](#interfaces) references to class instances have abstraction compatibility constraints.
 
-比如下面的`Device`和`Bus`尽管结构一样，但却不能引用：
+For example, `Device` and `Bus` cannot be cross-referenced even if they have identical structure:
 
 ```feng
 class Device {}
@@ -2090,46 +2075,46 @@ class Bus {}
 func test() {
     var a *Device = new(Device);
     var b *Bus = new(Bus);
-    // a = b;   // 错误✖：Device的引用变量不能引用Bus的实例
+    // a = b;   // Error: Device reference cannot reference a Bus instance
 }
 ```
 
-##### 非空引用
+##### Non-Null Reference
 
-引用默认是可空的（即`nil`），可以标注为非空（加`!`号），两种只能单向传递：非空 → 可空。
-如需反向传递，必须显示对变量进行判断非空（只支持本地变量，不支持字段）：
+References are nullable by default (can be `nil`). They can be marked as non-null (with `!`). Passing is one-way: non-null → nullable.
+For reverse passing, the variable must be explicitly checked for non-null (supported only for local variables, not fields):
 
 ```feng
 func f(a *!int, b *int) {
    var x *int = a;
-   // var y *!int = b; // 错误✖：不能直接传递
+   // var y *!int = b; // Error: cannot pass directly
    if (b != nil) {
-      var y *!int = b; // 必须显式判断空，在非空的分支内传递
+      var y *!int = b; // Must explicitly check non-null; pass within the non-null branch
    }
 }
 ```
 
-##### 不可修改引用
+##### Immutable Reference
 
-引用可以标注为不可修改（加`#`号），不可修改引用不能修改实例，同样也是单向传递：可修改 → 不可修改。
+References can be marked as immutable (with `#`). Immutable references cannot modify the instance. Passing is one-way: mutable → immutable.
 
 ```feng
 class Foo { var id int; }
 func f(a *int, b *Foo) {
-   var x *#int = a;  // 转为不可修改引用
-   // *x = 1; // 错误✖：不可修改实例
+   var x *#int = a;  // Convert to immutable reference
+   // *x = 1; // Error: cannot modify immutable instance
    var y *#Foo = b;
-   // y.id = 1; // 错误✖：不可修改实例
+   // y.id = 1; // Error: cannot modify immutable instance
 }
 ```
 
-不可修改不能反向传递。
+Immutable references cannot be passed in reverse.
 
-##### 解引用操作
+##### Dereference Operation
 
-除了数组引用，其他引用均支持解引用操作`*`，改操作相当于直接对指向的实例进行操作，包括取值和赋值：
+Except for array references, other references support the dereference operator `*`, which operates directly on the referenced instance, both for reading and writing:
 
-1. 取值能获取实例的值，并赋给值类型变量：
+1. Reading retrieves the instance's value and assigns it to a value type variable:
    ```feng
    class Complex {
       var real, imag float;
@@ -2139,7 +2124,7 @@ func f(a *int, b *Foo) {
       var y Complex = *b;
    }
    ```
-2. 赋值可以直接修改实例，当然不可修改的引用是不能赋值的：
+2. Writing directly modifies the instance; immutable references cannot be written to:
    ```feng
    class Complex {
       var real, imag float;
@@ -2147,27 +2132,27 @@ func f(a *int, b *Foo) {
    func test(a &int, b *Complex, c &#Complex) {
       *a = 1;
       *b = {real=1.0, imag=-1.0};
-      // *c = {}; // ✖ 不可修改
+      // *c = {}; // ✖ Immutable
    }
    ```
 
-##### 引用类型
+##### Reference Types
 
-###### 强引用类型
+###### Strong Reference Type
 
-强引用表示为`*`带类型符号，比如：`var aDev *Device;`声明了强引用变量`aDev`。
-它可以指向一个类`Device`的实例，或者`Device`的[子类](#多态)的实例：
+Strong references are denoted by `*` followed by a type symbol, e.g., `var aDev *Device;` declares a strong reference variable `aDev`.
+It can point to an instance of class `Device` or an instance of a [subclass](#polymorphism) of `Device`:
 
 ```feng
 func test() {
-    var b *Device = new(Device);    // 初始化指向一个新分配的Bus实例
-    var a *Device = b;              // 将b引用的实例传递给a
-    a.speed = 10;                   // a和b的修改都会更新同一个实例
-    printf("speed=%d", b.speed);  // 打印：speed=10
+    var b *Device = new(Device);    // Initialized to point to a new Device instance
+    var a *Device = b;              // Pass the instance referenced by b to a
+    a.speed = 10;                   // Modifications through a and b affect the same instance
+    printf("speed=%d", b.speed);  // Prints: speed=10
 }
 ```
 
-`const`声明的常量引用，必须初始化指向一个实例（或`nil`），然后不能再改变指向了：
+Constant references declared with `const` must be initialized to point to an instance (or `nil`) and cannot change their target:
 
 ```feng
 const a *Bus = new(Bus);
@@ -2175,19 +2160,19 @@ const a *Bus = new(Bus);
 // a = nil; // ✖
 ```
 
-[变长数组](#变长数组)也是引用类型的变量，可以引用元素类型相同但长度任意的数组实例。
+[Variable-length arrays](#variable-length-array) are also reference type variables; they can reference array instances of the same element type but any length.
 
-强引用在自动内存管理中的作用是标识实例是否被使用：
+Strong references indicate to the automatic memory manager whether an instance is in use:
 
-* 被强引用变量引用的实例不能被内存管理器回收；
-* 当一个实例没有被强引用变量引用时就应该被回收。
+* Instances referenced by strong references cannot be reclaimed.
+* When an instance has no strong references, it should be reclaimed.
 
-###### 虚引用类型
+###### Phantom Reference Type
 
-虚引用（Phantom Reference）是指不影响内存释放的引用。
-可以引用动态创建的实例，也可以引用值类型变量的实例，但只在一定条件下才能使用。
+Phantom references do not affect memory deallocation.
+They can reference dynamically created instances or instances of value type variables, but only under certain conditions.
 
-虚引用变量是常量，即只能用`const`声明：
+Phantom reference variables are constants and can only be declared with `const`:
 
 ```feng
 func test() {
@@ -2196,17 +2181,17 @@ func test() {
 }
 ```
 
-虚引用只能是本地变量或参数。仅有下面几种情况能传递给虚引用：
+Phantom references can only be local variables or parameters. They can be passed in the following scenarios:
 
-1. 值类型变量在作用域内可以被虚引用指向。
-2. 常量引用变量在作用域内，可以传递实例给虚引用。
-3. 虚引用可以传递实例给新的虚引用。
-4. 本地变量是强引用类型，在传递给虚引用之后，在虚引用作用域之内不可被修改。
-5. 一个类实例在可以被虚引用的作用区间内：
-    1. 它的值类型字段可以被虚引用。
-    2. 它的常量字段引用的实例可以被虚引用。
+1. Value type variables within scope can be referenced by phantom references.
+2. Constant reference variables within scope can pass their instances to phantom references.
+3. Phantom references can pass instances to new phantom references.
+4. Local variables of strong reference type, after being passed to a phantom reference, cannot be modified within the phantom reference's scope.
+5. Within a class instance's phantom-reachable scope:
+    1. Its value type fields can be phantom-referenced.
+    2. Instances referenced by its constant fields can be phantom-referenced.
 
-显然全局变量能在所有代码中被引用：
+Global variables can be referenced from any code:
 
 ```feng
 var gDrv Driver;
@@ -2217,7 +2202,7 @@ func use() {
 }
 ```
 
-本地变量需要在作用域内使用虚引用：
+Local variables must be used within scope for phantom references:
 
 ```feng
 func sample1() {
@@ -2238,7 +2223,7 @@ func sample3() {
 }
 ```
 
-允许被虚引用指向的实例的字段：
+Fields of instances can be phantom-referenced:
 
 ```feng
 class Device {
@@ -2255,75 +2240,75 @@ func sample2(dev *Device) {
 }
 ```
 
-**虚引用仅限为上面的场景才能使用**，例如函数返回值不能是虚引用类型的。
+**Phantom references are restricted to the above scenarios.** For example, function return values cannot be of phantom reference type.
 
-#### 枚举变量
+#### Enumeration Variables
 
-枚举变量的使用详见[枚举](#枚举)。
+Refer to [Enumerations](#enumerations) for details.
 
-#### 函数原型变量
+#### Function Prototype Variables
 
-改变量要么为空，要么指向一个函数，详见[函数原型](#函数原型)。
+Such a variable is either null or points to a function. Refer to [Function Prototype](#function-prototype) for details.
 
-### 常量
+### Constants
 
-上面讲述了变量的值，而常量的不可变就是指变量值不可变：
+Constants' immutability means the variable's value cannot change:
 
-1. 值类型常量，其所有内容都不可变，对除了基本类型以外的类型：
-    1. 数组常量的每个元素都分别是常量。
-    2. 类和结构的字段值都不能修改了。
-2. 引用类型常量在一经声明初始化后就只能固定指向一个实例了，直到离开作用域。
+1. For value type constants, all content is immutable:
+    1. Each element of a constant array is constant.
+    2. Fields of constant classes and structs cannot be modified.
+2. Reference type constants, once declared and initialized, can only point to a single instance until they go out of scope.
 
 ```feng
 class Vector { var x,y,z int; }
 class Data { var ve Vector; }
 func test() {
    const vec Vector = {x=1.0,y=2.0,z=3.0};
-   // vec.x = 4.0; // 错误✖
+   // vec.x = 4.0; // Error
    const vecs [4]Vector = [{x=1.0,y=2.0,z=3.0}];
-   // vecs[1].x = 4.0; // 错误✖
+   // vecs[1].x = 4.0; // Error
    const data Data = {v={x=1.0,y=2.0,z=3.0}}; 
-   // data.ve.x = 4.0; // 错误✖
+   // data.ve.x = 4.0; // Error
 }
 ```
 
-### 变量作用域
+### Variable Scope
 
-作用域就是变量生效的范围：变量的生命周期从声明开始，直到离开作用域变量的生命周期结束。
-作用域一般分本地和全局两种情况。
+Scope is the region where a variable is valid: a variable's lifetime begins at its declaration and ends when it leaves its scope.
+Scope is generally either local or global.
 
-#### 本地变量
+#### Local Variables
 
-本地变量声明在函数或方法中：
+Local variables are declared within functions or methods:
 
-1. 作用域是声明的代码块及其中嵌套内层代码块。
-2. 但是同一层不能重复声明同名的变量。
-3. 当内层声明同名的变量时（不要求同类型），外层的同名变量则被遮住，不能使用。
+1. Their scope is the code block where they are declared and any nested inner blocks.
+2. Variables cannot be redeclared with the same name at the same level.
+3. When an inner block declares a variable with the same name (type may differ), the outer variable is shadowed and cannot be used.
 
 ```feng
 func test() {
-   var v = "Hello"; // 变量v的生命周期在当前函数内
+   var v = "Hello"; // v's lifetime is within the current function
    {
-      var s = "Fèng!"; // 变量s的生命周期在当前块内
-      printf("%s %s\n", v, s);   // 可使用外部声明的变量v
+      var s = "Fèng!"; // s's lifetime is within this block
+      printf("%s %s\n", v, s);   // Can access outer variable v
    }
-   // printf("%s %s\n", v, s);  // 错误✖：不能使用内层块内的变量s
+   // printf("%s %s\n", v, s);  // Error: cannot access s from inner block
    {
-      // printf("%s %s\n", v, s);  // 错误✖：不能使用另一个块内的变量s
+      // printf("%s %s\n", v, s);  // Error: cannot access s from another block
    }
    {
-      var v = "Dear Fèng"; // 内层重新声明同名的变量，外层的变量v就被遮住了
-      printf("%s\n", v); // 打印：Dear Fèng
+      var v = "Dear Fèng"; // Inner redeclaration shadows outer v
+      printf("%s\n", v); // Prints: Dear Fèng
    }
-   // var v = "Fèng"; // 错误✖：不能重新声明
+   // var v = "Fèng"; // Error: cannot redeclare
 }
 ```
 
-#### 全局变量
+#### Global Variables
 
-全局变量必须放在代码的最顶层，即在函数和类型定义的外面声明。
-不论是变量还是常量都必须初始化。
-作用域为全局，生命周期为运行时。
+Global variables must be placed at the topmost level of code, outside function and type definitions.
+Both variables and constants must be initialized.
+Their scope is global, and their lifetime is the entire runtime.
 
 ```feng
 var count int = 0;
@@ -2335,58 +2320,58 @@ func doCount() int {
 }
 ```
 
-可以使用`export`导出给其他module使用：
+`export` can be used to make them available to other modules:
 
 ```feng
 export const PI float64 = 3.1415926;
 export var delay int = 0;
 ```
 
-_这里定义声明周期为运行时。_
+*Here, the lifetime is defined as runtime.*
 
-## 字面量
+## Literals
 
-### 整数字面量
+### Integer Literals
 
-### 实数字面量
+### Real Number Literals
 
-### 布尔值字面量
+### Boolean Literals
 
-`bool`的字面量只能是`true`或`false`。
+`bool` literals are only `true` or `false`.
 
-### 空值字面量 _[未完成]_
+### Null Literal _[Incomplete]_
 
-空值就是`nil`，表示变量或字段初始值，即不指向任何实例。
-可适用于[引用类型变量](#引用类型变量)和[函数原型变量](#函数原型变量)。
+The null value is `nil`, representing the initial value of variables or fields—not pointing to any instance.
+Applicable to [reference type variables](#reference-type-variables) and [function prototype variables](#function-prototype-variables).
 
-### 字符串字面量
+### String Literals
 
-字符串并不是基本类型，编译器对字符串字面量进行编码。
-字符串字面量即字符串常量，本身不能修改，所以只能用immutable变量引用。
-字符串常量不是在函数栈上分配的，而是一律放在常量区：
+Strings are not basic types; the compiler encodes string literals.
+String literals are string constants and cannot be modified, so they can only be referenced by immutable variables.
+String constants are not allocated on the function stack but are placed in a constant region:
 
 ```feng
 func moduleName() [*#]byte {
     var r [*#]byte = "test-module";
-    return r; // 离开函数moduleName还是能使用
+    return r; // Still usable after leaving function moduleName
 }
 func test() {
     printf("module: %s\n", moduleName());
 }
 ```
 
-### 数组字面量
+### Array Literals
 
-将数组元素列出来放在方括号中：`[1,2,3]`、`["Hello", "Good"]`等等。
-数组元素类型为兼容所有元素的类型，如果没有可兼容的类型则不允许。
+List array elements within square brackets: `[1,2,3]`, `["Hello", "Good"]`, etc.
+The array element type must be compatible with all elements; if no compatible type exists, it is disallowed.
 
-## 元组 _[未完成]_
+## Tuples _[Incomplete]_
 
-元组是语言内部的特殊类型，由一组元素显示组成。不支持显示定义元组类型的变量。
+Tuples are special internal language types consisting of a group of elements. Variables of tuple type cannot be explicitly declared.
 
-### 用途
+### Usage
 
-声明了多返回值函数或方法，如果是返回数组，那无法自动解构成多个变量，因此采用元组来处理。
+For functions or methods with multiple return values, if they return an array, it cannot be automatically destructured into multiple variables; tuples handle this.
 
 ```feng
 func getValue(key int) (int, bool) {
@@ -2396,7 +2381,7 @@ func getValue(key int) (int, bool) {
 }
 ```
 
-运行同时赋值给多个操作对象：
+Simultaneously assign to multiple operands:
 
 ```feng
 func test() {
@@ -2404,7 +2389,7 @@ func test() {
 }
 ```
 
-在声明变量时也可以使用：
+Also usable in variable declarations:
 
 ```feng
 func test() {
@@ -2412,9 +2397,9 @@ func test() {
 }
 ```
 
-### 特殊元组
+### Special Tuples
 
-调用函数或方法返回的结构是一个元组，当然可以直接当做元组来使用。
+The result of calling a function or method is a tuple, which can be used directly as a tuple.
 
 ```feng
 func result(e int, r *Res) (int, *Res) {
@@ -2425,18 +2410,18 @@ func success(r *Res) (int, *Res) {
 }
 ```
 
-多返回值的函数或方法不能参与表达式计算，但是单返回值的函数可以（编译器应该自动拆开）：
+Functions or methods with multiple return values cannot participate in expression evaluation, but single-return functions can (the compiler should automatically unpack):
 
 ```feng
-func sin(x float64) float64 {    // 单返回值可以作为元组返回也可以参与表达式计算
-   // TODO：……
+func sin(x float64) float64 {    // Single return value can be returned as a tuple or used in expressions
+   // TODO:……
 }
 func cos(x float64) float64 {
-   return sqrt(1 - sin(x)^2); // 需要自动把元组拆开成单值
+   return sqrt(1 - sin(x)^2); // Needs to automatically unpack tuple to single value
 }
 ```
 
-if元组和if语句类似，不同的是直接返回的是元组而不是语句：
+`if` tuples are similar to `if` statements but return a tuple directly instead of a statement:
 
 ```feng
 func getValue(key int) (int, bool) {
@@ -2445,7 +2430,7 @@ func getValue(key int) (int, bool) {
 }
 ```
 
-以及与switch语句对应的switch元组：
+And `switch` tuples corresponding to `switch` statements:
 
 ```feng
 func createIf(c int) (bool, *Object) {
@@ -2456,7 +2441,7 @@ func createIf(c int) (bool, *Object) {
 }
 ```
 
-不同类型元组可以嵌套组合：
+Tuples of different types can be nested and combined:
 
 ```feng
 func createIf(c int) (bool, *Object) {
@@ -2466,24 +2451,24 @@ func createIf(c int) (bool, *Object) {
 }
 ```
 
-## 宏 _[未完成]_
+## Macros _[Incomplete]_
 
-宏是一种有特定格式的代码片段，这种特定格式不是随意的，而是由特定用途决定的。
-特定用途就是指某种语言特性，比如当宏用于实现[自定义运算](#自定义运算-_未完成_)时，由运算本身设定了代码格式。
-目前宏仅支持在类和接口里。
+Macros are code snippets with specific formats determined by their specific purpose.
+A specific purpose refers to some language feature; for example, when a macro is used to implement [custom operations](#custom-operations-_[Incomplete]_), the operation itself defines the code format.
+Currently, macros are only supported within classes and interfaces.
 
-宏统一由`macro`开头定义，主要格式有过程宏和类宏两种。
+Macros are uniformly defined with the `macro` keyword. The main types are procedural macros and class macros.
 
-### 过程宏
+### Procedural Macros
 
-过程宏类似一般过程（函数或方法），有名称、参数表和语句序列组成：
+Procedural macros resemble ordinary procedures (functions or methods), with a name, parameter list, and sequence of statements:
 
-- 名称和其他名称互不干扰，可以与其他元素重名。
-- 参数表和函数参数不同，而是相当于上下文的变量。
-- 语句序列就是普通的语句序列，末尾可以有过可选的表达式。
-- 宏不能被调用。
+- Names do not interfere with other names; they can share names with other elements.
+- Parameter lists differ from function parameters; they are context variables.
+- The statement sequence is an ordinary sequence, optionally ending with an expression.
+- Macros cannot be called.
 
-下面举自定义加法运算符的例子：
+Example of a custom addition operator:
 
 ```feng
 class Vector {
@@ -2496,26 +2481,26 @@ class Vector {
 }
 ```
 
-### 类宏
+### Class Macros
 
-包含名称、字段表和过程宏组成，能保存中间状态。
-比如派生类型的[迭代循环](#迭代循环)的实现。
+Consist of a name, field table, and procedural macros, capable of preserving intermediate state.
+Example: implementation of [iteration loops](#iteration-loop) for derived types.
 
-## 泛型
+## Generics
 
-泛型的概念是一般的通用的类型，类似C++的模板的概念，用于实现比较通用的类与函数。
-不同与C++，这里的泛型是在展开之前检查，因此展开之前不能做任何具体的操作，只能传值。
+Generics are general, common types, similar to C++ templates, used to implement generic classes and functions.
+Unlike C++, generics here are checked before expansion, so no specific operations can be performed before expansion—only values can be passed.
 
-泛型使用反引号（\`）标记。
+Generics are marked with backticks (\`).
 
-在定义时指定泛型形参：
+Generic parameters are specified during definition:
 
 ```feng
 class Box`T`{var t T;}
 func save`T`(t T) {}
 ```
 
-在使用时传入具体的实参。
+Concrete types are passed during use:
 
 ```feng
 func f() {
@@ -2524,7 +2509,7 @@ func f() {
 }
 ```
 
-可以指定多个参数：
+Multiple parameters can be specified:
 
 ```feng
 class Pair`K,V`{
@@ -2540,16 +2525,16 @@ func test(k int) {
 }
 ```
 
-支持定义泛型形参的有函数、接口、类及类的方法。
+Generic parameters can be defined for functions, interfaces, classes, and class methods.
 
-泛型除了解决样板代码外，还能解决自依赖问题，比如：
+Besides reducing boilerplate code, generics can solve self-dependency issues, e.g.:
 
 ```feng
 var bb Box`Box`int``;
 var bbb Box`Box`Box`int```;
 ```
 
-在没有泛型时，上面的`Box`类会陷入递归初始化导致无法编译：
+Without generics, the `Box` class above would fall into recursive initialization and fail to compile:
 
 ```feng
 class Box {
@@ -2557,9 +2542,9 @@ class Box {
 }
 ```
 
-### 泛型函数
+### Generic Functions
 
-函数定义的泛型形参在函数体内可以被当做类型使用：
+Generic parameters defined on functions can be used as types within the function body:
 
 ```feng
 func go`R`(r R) {
@@ -2567,7 +2552,7 @@ func go`R`(r R) {
 }
 ```
 
-传入具体参数使用，支持任意类型：
+Concrete types can be passed arbitrarily:
 
 ```feng
 func test(i int, b bool, a [16]byte, r *A) {
@@ -2578,7 +2563,7 @@ func test(i int, b bool, a [16]byte, r *A) {
 }
 ```
 
-在另一个泛型函数中可以传入另一个泛型参数：
+Within another generic function, a generic parameter can be passed:
 
 ```feng
 func run`P`(p P) {
@@ -2586,9 +2571,9 @@ func run`P`(p P) {
 }
 ```
 
-### 泛型类
+### Generic Classes
 
-在类上定义的泛型形参可用于字段和方法及方法内部使用：
+Generic parameters defined on classes can be used in fields, methods, and within method bodies:
 
 ```feng
 class Box`E` {
@@ -2602,7 +2587,7 @@ class Box`E` {
 }
 ```
 
-上面定义的盒子类看上去可以装任何实例：
+The box class defined above can hold any instance:
 
 ```feng
 func use() {
@@ -2612,7 +2597,7 @@ func use() {
 }
 ```
 
-类的方法也可以像函数那样有自己的泛型参数：
+Class methods can also have their own generic parameters, like functions:
 
 ```feng
 class Box`E` {
@@ -2637,9 +2622,9 @@ func use() {
 }
 ```
 
-带有泛型的方法不支持多态，不能覆盖或者被覆盖。
+Methods with generics do not support polymorphism; they cannot be overridden or override other methods.
 
-继承一个泛型类时，可以传入实际类型，也能传泛型参数：
+When inheriting a generic class, you can pass concrete types or generic parameters:
 
 ```feng
 class Pair`K,V` {
@@ -2647,23 +2632,23 @@ class Pair`K,V` {
    var v V;
 }
 class MyPair`V` : Pair`int,V` {
-   // 当前类实际只有1个泛型参数'V'
+   // This class actually has only one generic parameter 'V'
 }
 func use() {
    var p1 MyPair`*int` = {k=1,v=new(int)};
 }
 ```
 
-接口实现也是如此：
+Interface implementation follows the same pattern:
 
 ```feng
 class Node`T` (Inode`T`) {
 }
 ```
 
-### 泛型接口
+### Generic Interfaces
 
-接口的泛型只能定义在类型上，方法不支持：
+Generic parameters for interfaces can only be defined on the type itself; methods do not support them:
 
 ```feng
 interface Box`V` {
@@ -2672,7 +2657,7 @@ interface Box`V` {
 }
 ```
 
-实现类示例：
+Example implementing class:
 
 ```feng
 class MyBox`E` (Box`E`) {
@@ -2686,9 +2671,9 @@ class MyBox`E` (Box`E`) {
 }
 ```
 
-## 异常 _[未完成]_
+## Exceptions _[Incomplete]_
 
-一个能被抛出的异常类需要定义`#error`宏`tracestack`，在这个宏里追踪并收集栈信息：
+An exception class that can be thrown needs to define the `#error` macro `tracestack`, which tracks and collects stack information:
 
 ```feng
 class Stack {
@@ -2708,4 +2693,4 @@ class Error {
 }
 ```
 
-## 属性 _[未完成]_
+## Attributes _[Incomplete]_
