@@ -36,11 +36,7 @@ public class GlobalSymbolContext implements SymbolContext {
         return semantic("import '%s' fail: %s", path, path.pos());
     }
 
-    private ParseSymbolTable tableOf(Symbol symbol) {
-        return tableOf(symbol.module().get());
-    }
-
-    private boolean isLocal(Symbol s) {
+    public boolean isLocal(Symbol s) {
         return gst.module.none() ||
                 s.module().none() ||
                 gst.module.equals(s.module());

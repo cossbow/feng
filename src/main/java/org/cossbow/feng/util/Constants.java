@@ -31,4 +31,11 @@ public class Constants {
                 isSource(p.getFileName().toString());
     }
 
+    public static Path trimExt(Path name) {
+        var s = name.toString();
+        var i = s.lastIndexOf('.');
+        if (i < 0) return name;
+        return Path.of(s.substring(0, i));
+    }
+
 }

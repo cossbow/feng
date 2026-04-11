@@ -18,10 +18,7 @@ import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.RepeatList;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -59,10 +56,14 @@ public class CppGenerator {
     static final String baseHeader = "cpp11/Header.h";
     static final String mainFile = "cpp11/Main.cpp";
 
-    public static void copyBaseHeader(Path dir) {
+    private static InputStream getResource(String res) {
         var cl = Thread.currentThread().getContextClassLoader();
-        try (var is = cl.getResourceAsStream(baseHeader)) {
-            assert is != null;
+        return new BufferedInputStream(Objects.requireNonNull(
+                cl.getResourceAsStream(res)));
+    }
+
+    public static void copyBaseHeader(Path dir) {
+        try (var is = getResource(baseHeader)) {
             Files.copy(is, dir.resolve("Header.h"),
                     StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
@@ -81,6 +82,7 @@ public class CppGenerator {
         includeHeader("Header");
 
         table.module.use(fm -> {
+            includeHeader(fm.path().filename());
             if (fm.imports().isEmpty()) return;
             writeComment("import headers");
             for (var i : fm.imports()) {
@@ -122,12 +124,6 @@ public class CppGenerator {
 
     private CppGenerator write(Label label) {
         return write(label.name()).write('_').write(label.id());
-    }
-
-    private CppGenerator declareStatic(boolean export) {
-        if (header) return write("extern");
-        if (export) return this;
-        return write("static");
     }
 
     private static final String COMMA = ", ";
@@ -214,6 +210,9 @@ public class CppGenerator {
     }
 
     private void declareType() {
+        if (table.module.has()) {
+            if (!header) return;
+        }
         writeComment("type declarations");
 //        declarePrimitive();
         writeComment("declare primitive");
@@ -292,6 +291,7 @@ public class CppGenerator {
 
     // 写入全局的字符串常量池：非C-type字符串，没有尾部的'0'
     private void literalStringCache() {
+        if (header) return;
         writeComment("string cache");
         var list = table.stringCache
                 .keySet().stream()
@@ -369,7 +369,8 @@ public class CppGenerator {
     }
 
     void visitEnum(EnumDefinition ed) {
-        declareStatic(true).write(" Feng$Array<Feng$Enum").write(',');
+        if (header) write("extern");
+        write(" Feng$Array<Feng$Enum").write(',');
         write(ed.size()).write("> ").enumName(ed);
         if (header) {
             endStmt();
@@ -384,12 +385,18 @@ public class CppGenerator {
     }
 
     void structureDefinition() {
+        if (table.module.has()) {
+            if (!header) return;
+        }
         writeComment("struct definition");
         table.dagStructures.bfs(this::write);
         newLine();
     }
 
     void declareFunction() {
+        if (table.module.has()) {
+            if (!header) return;
+        }
         writeComment("prototype definition");
         table.dagPrototypes.bfs(this::writePrototype);
         newLine();
@@ -410,7 +417,6 @@ public class CppGenerator {
     }
 
     void functionDefinition() {
-        if (header) return;
         writeComment("function definition");
         for (var fd : table.functionList) {
             if (fd.builtin()) continue;
@@ -426,8 +432,9 @@ public class CppGenerator {
         writeComment("entry function");
         implFunc(main);
         newLine();
-        var ld = Thread.currentThread().getContextClassLoader();
-        try (var is = ld.getResourceAsStream(mainFile);
+        if (header) return;
+
+        try (var is = getResource(mainFile);
              var ir = new InputStreamReader(Objects.requireNonNull(is));
              var r = new BufferedReader(ir)) {
             r.lines().forEach(line -> write(line).newLine());
@@ -438,8 +445,13 @@ public class CppGenerator {
 
 
     private CppGenerator write(GlobalVariable v) {
-        declareStatic(v.export()).write(' ');
-        return declareVar(v);
+        if (v.export()) {
+            if (header) write("extern");
+        } else {
+            if (header) return this;
+            write("static");
+        }
+        return write(' ').declareVar(v);
     }
 
     private CppGenerator castRef(
@@ -710,8 +722,7 @@ public class CppGenerator {
 //        classRelation(table.dagClasses);
         table.dagInterfaces.bfs(this::declareInterface);
         table.dagClasses.bfs(this::declareClass);
-        if (!header)
-            table.dagClasses.bfs(this::implClass);
+        table.dagClasses.bfs(this::implClass);
         newLine();
     }
 
@@ -720,6 +731,7 @@ public class CppGenerator {
 
     private void writeExtends(List<DerivedType> exts) {
         if (exts.isEmpty()) return;
+        write(' ');
         write(':');
         var first = true;
         for (var p : exts) {
@@ -744,7 +756,10 @@ public class CppGenerator {
     }
 
     void declareInterface(InterfaceDefinition id) {
-        if (header) return;
+        if (id.builtin()) return;
+        if (table.module.has()) {
+            if (!header) return;
+        }
         if (id.builtin()) return;
         write(id.generic());
         write("class ");
@@ -769,15 +784,19 @@ public class CppGenerator {
 
     private void declareClass(ClassDefinition cd) {
         if (cd.builtin()) return;
+        if (table.module.has()) {
+            if (!header) return;
+        }
         assert enterClass == null;
         enterClass = cd;
         write(cd.generic());
         write("class ");
         write(cd.symbol());
-        write(' ');
-        var pubs = Stream.concat(cd.inherit().stream(),
-                cd.impl().stream()).toList();
-        writeExtends(pubs);
+        if (!cd.isFinal()) {
+            var pubs = Stream.concat(cd.inherit().stream(),
+                    cd.impl().stream()).toList();
+            writeExtends(pubs);
+        }
         write("{\n").indent();
         write("public:\n");
 
@@ -901,6 +920,10 @@ public class CppGenerator {
 
     private void implClass(ClassDefinition cd) {
         if (cd.builtin()) return;
+        if (table.module.has()) {
+            if (header == cd.generic().isEmpty())
+                return;
+        }
         assert enterClass == null;
         enterClass = cd;
         for (var cm : cd.methods()) {
@@ -1007,6 +1030,10 @@ public class CppGenerator {
     }
 
     private void implFunc(FunctionDefinition fd) {
+        if (fd.builtin()) return;
+        if (table.module.has()) {
+            if (header == fd.generic().isEmpty()) return;
+        }
         assert enterFunc == null;
         enterFunc = fd;
         write(fd.generic());

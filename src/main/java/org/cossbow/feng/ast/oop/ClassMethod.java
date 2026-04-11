@@ -1,5 +1,6 @@
 package org.cossbow.feng.ast.oop;
 
+import org.cossbow.feng.ast.Exportable;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Method;
 import org.cossbow.feng.ast.Position;
@@ -13,7 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-public class ClassMethod extends Method {
+public class ClassMethod extends Method
+        implements Exportable {
     private Modifier modifier;
     private Identifier name;
     private TypeParameters generic;

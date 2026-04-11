@@ -33,13 +33,14 @@ public class ModuleParser {
     }
 
     public FModule parseFile(Path file) {
+        var name = Constants.trimExt(file.getFileName());
+        var mp = new ModulePath(name);
         if (!file.isAbsolute()) {
             file = base.resolve(file);
         }
-        var mp = new ModulePath(base);
         var src = new SourceParser(mp, charset).parse(file);
         if (src.imports().isEmpty())
-            return new FModule(base, mp, List.of(), src.table());
+            return new FModule(name, mp, List.of(), src.table());
         return ErrorUtil.unsupported("import library");
     }
 
@@ -52,8 +53,9 @@ public class ModuleParser {
         return sources;
     }
 
-    private FModule mergeFiles(Path path, ModulePath mp, List<Source> list) {
-        var table = new ParseSymbolTable(Optional.of(mp));
+    private FModule mergeFiles(
+            Path path, ModulePath mp, List<Source> list) {
+        var table = new ParseSymbolTable(Optional.of(mp), new DedupCache<>());
         var paths = new DedupCache<ModulePath>();
         for (var src : list) {
             table.merge(src.table());

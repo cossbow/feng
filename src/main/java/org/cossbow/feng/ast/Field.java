@@ -3,7 +3,8 @@ package org.cossbow.feng.ast;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 abstract
-public class Field extends Entity {
+public class Field extends Entity
+        implements Exportable {
     private Identifier name;
     private TypeDeclarer type;
 
@@ -13,6 +14,10 @@ public class Field extends Entity {
         super(pos);
         this.name = name;
         this.type = type;
+    }
+
+    public boolean export() {
+        return true;
     }
 
     public Identifier name() {

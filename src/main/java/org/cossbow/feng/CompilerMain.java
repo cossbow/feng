@@ -8,8 +8,6 @@ import org.cossbow.feng.analysis.AnalyseSymbolTable;
 import org.cossbow.feng.coder.CppGenerator;
 import org.cossbow.feng.mod.ModuleAnalysis;
 import org.cossbow.feng.mod.ModuleParser;
-import org.cossbow.feng.parser.ParseSymbolTable;
-import org.cossbow.feng.parser.SourceParser;
 import org.cossbow.feng.util.Constants;
 import org.cossbow.feng.util.ErrorUtil;
 
@@ -34,15 +32,6 @@ public class CompilerMain {
     private Path output;
 
     //
-    private ParseSymbolTable parse(Path src) {
-        if (Files.isRegularFile(src)) {
-            return new SourceParser(UTF_8)
-                    .parse(src).table();
-        }
-        return new ModuleParser(src.getParent(), UTF_8)
-                .parseModule(src.getFileName())
-                .table();
-    }
 
     private void generateCpp(AnalyseSymbolTable ast, Path dir, String name)
             throws IOException {
@@ -50,8 +39,7 @@ public class CompilerMain {
         try (var w = Files.newBufferedWriter(cpp, UTF_8)) {
             new CppGenerator(ast, w, true).write();
         }
-        if (ast.main.has()) return;
-        var header = dir.resolve(replaceExt(cpp.getFileName(), "h"));
+        var header = dir.resolve(name + ".h");
         try (var w = Files.newBufferedWriter(header, UTF_8)) {
             new CppGenerator(ast, w, true, false).write();
         }

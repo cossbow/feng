@@ -60,6 +60,7 @@ static Int64 Feng$fastPow(Int64 a, Int64 b) {
 	}
 	return result;
 }
+
 // 快速幂：计算 a^b
 static Float64 Feng$fastPow(Float64 a, Int64 b) {
 	Float64 result = 1;
@@ -84,22 +85,22 @@ class $Object {
 public:
 	uint32_t feng$classId;
 
-    $Object() = default;
+	$Object() = default;
 
 	virtual ~$Object() = default;
 
-    $Object &operator=(const $Object &) = default;
+	$Object &operator=(const $Object &) = default;
 
-    auto operator<=>(const $Object &) const = default;
+	auto operator<=>(const $Object &) const = default;
 };
 
+const int MAGIC = 12345678;
 
 // reference counting
 struct Feng$Header {
 	std::atomic_int refcnt;
 #ifdef FENG_DEBUG_MEMORY
-	bool released;
-	bool isObject;
+	bool magic;
 #endif
 };
 
@@ -171,27 +172,29 @@ static T *Feng$impl0(void *p, uint32_t interfaceId) {
 
 #ifdef FENG_DEBUG_MEMORY
 static std::list<Feng$Header *> objects;
+
 #include <cstdio>
+
 static void feng$debug(bool all) {
 	printf("==== see memory stat ====\n");
 	for (const auto &o: objects) {
 		int c = o->refcnt.load();
-		bool r = o->released;
-		if (all || c) printf("ref=%d, del=%d\n", c, r);
+		bool r = o->magic;
+		if (all || c) printf("ref=%d, del=%#x\n", c, r);
 	}
 	printf("==== end memory stat ====\n");
 }
+
 #endif
 
-static void *Feng$alloc(int64_t size, bool isObject) {
+static void *Feng$alloc(int64_t size) {
 	void *p = malloc(sizeof(Feng$Header) + size);
 	if (p == nullptr) throw std::bad_alloc();
 
 	Feng$Header *fh = (Feng$Header *) p;
 	fh->refcnt.store(1);
 #ifdef FENG_DEBUG_MEMORY
-	fh->released = false;
-	fh->isObject = isObject;
+	fh->magic = MAGIC;
 	objects.push_back(fh);
 #endif
 	void *o = Feng$toInstance(fh);
@@ -203,7 +206,7 @@ static void *Feng$alloc(int64_t size, bool isObject) {
 static void Feng$del(void *p) {
 	Feng$Header *fh = Feng$headerOf(p);
 #ifdef FENG_DEBUG_MEMORY
-	fh->released = true;
+	fh->magic = 0;
 #else
 	free(fh);
 #endif
@@ -237,7 +240,7 @@ static bool Feng$dec0(T *p) {
 template<typename T>
 static T *&Feng$dec(T *&p) {
 	if (Feng$dec0(p)) {
-        if (std::is_destructible_v<T>) {
+		if (std::is_destructible_v<T>) {
 			p->~T();
 		}
 		Feng$del(p);
@@ -261,7 +264,7 @@ struct Feng$SRefer {
 	// [builtin] creator without init
 	Feng$SRefer() : t(nullptr) {}
 
-    explicit Feng$SRefer(std::nullptr_t) : t(nullptr) {}
+	explicit Feng$SRefer(std::nullptr_t) : t(nullptr) {}
 
 	// [builtin] creator with init
 	Feng$SRefer(T *t) : t(t) {}
@@ -286,13 +289,13 @@ struct Feng$SRefer {
 	// var t *T = s;
 	template<typename S>
 	Feng$SRefer(Feng$SRefer<S> &s) {
-		t = (T *) (void *) Feng$inc(s.t);
+		t = Feng$inc(static_cast<T *>(s.t));
 	}
 
 	// var t *T = new(S);
 	template<typename S>
 	Feng$SRefer(Feng$SRefer<S> &&s) {
-		t = (T *) (void *) Feng$inc(s.t);
+		t = Feng$inc(static_cast<T *>(s.t));
 	}
 
 	~Feng$SRefer() {
@@ -349,50 +352,50 @@ struct Feng$SRefer {
 		return *this;
 	}
 
-    auto operator<=>(const Feng$SRefer<T> &) const = default;
+	auto operator<=>(const Feng$SRefer<T> &) const = default;
 };
 
 template<class T>
 static Feng$SRefer<T> Feng$newObject() {
-	void *p = Feng$alloc(sizeof(T), true);
+	void *p = Feng$alloc(sizeof(T));
 	return Feng$SRefer<T>{new(p) T()};
 }
 
 template<class T, typename ...Args>
 static Feng$SRefer<T> Feng$newObjectInit(Args &&... args) {
-	void *p = Feng$alloc(sizeof(T), true);
+	void *p = Feng$alloc(sizeof(T));
 	return Feng$SRefer<T>{new(p) T(std::forward<Args>(args)...)};
 }
 
 template<class T>
 static Feng$SRefer<T> Feng$newObjectCopy(T &t) {
-	void *p = Feng$alloc(sizeof(T), true);
+	void *p = Feng$alloc(sizeof(T));
 	return Feng$SRefer<T>{new(p) T(t)};
 }
 
 template<class T>
 static Feng$SRefer<T> Feng$newObjectCopy(Feng$SRefer<T> &t) {
-	void *p = Feng$alloc(sizeof(T), true);
+	void *p = Feng$alloc(sizeof(T));
 	return Feng$SRefer<T>{new(p) T(*t)};
 }
 
 template<typename T>
 static Feng$SRefer<T> Feng$newMem() {
-	T *p = (T *) Feng$alloc(sizeof(T), false);
+	T *p = (T *) Feng$alloc(sizeof(T));
 	*p = {};
 	return Feng$SRefer<T>{p};
 }
 
 template<typename T>
 static Feng$SRefer<T> Feng$newMem(T &init) {
-	T *p = (T *) Feng$alloc(sizeof(T), false);
+	T *p = (T *) Feng$alloc(sizeof(T));
 	*p = init;
 	return Feng$SRefer<T>{p};
 }
 
 template<typename T>
 static Feng$SRefer<T> Feng$newMem(T &&init) {
-	T *p = (T *) Feng$alloc(sizeof(T), false);
+	T *p = (T *) Feng$alloc(sizeof(T));
 	*p = init;
 	return Feng$SRefer<T>{p};
 }
@@ -516,7 +519,7 @@ struct Feng$Array {
 		return values[index];
 	}
 
-    auto operator<=>(const Feng$Array<E, L> &) const = default;
+	auto operator<=>(const Feng$Array<E, L> &) const = default;
 };
 
 /**
@@ -566,7 +569,7 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 
 	Feng$ArraySRefer() {}
 
-    Feng$ArraySRefer(std::nullptr_t) : Feng$ArrayRefer<E>() {}
+	Feng$ArraySRefer(std::nullptr_t) : Feng$ArrayRefer<E>() {}
 
 	Feng$ArraySRefer(E *start, int64_t len) {
 		this->start = start;
@@ -627,7 +630,7 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 		return *this;
 	}
 
-    auto operator<=>(const Feng$ArraySRefer<E> &) const = default;
+	auto operator<=>(const Feng$ArraySRefer<E> &) const = default;
 
 private:
 	void dec() {
@@ -667,7 +670,7 @@ concept BaseArrayRefer = std::is_base_of_v<Feng$ArrayRefer<E>, T>;
 template<typename E>
 static Feng$ArraySRefer<E> Feng$newArray(int64_t len) {
 	if (len < 0) throw Feng$NegativeInteger();
-	void *p = Feng$alloc(sizeof(E) * len, false);
+	void *p = Feng$alloc(sizeof(E) * len);
 	memset(p, 0, sizeof(E) * len);
 	E *e = new(p)E[len];
 	return {e, len};
@@ -694,6 +697,7 @@ static Feng$ArraySRefer<E> Feng$newArrayCopy(int64_t len, Feng$Array<E, L0> &ini
 	}
 	return a;
 }
+
 template<typename E, typename A>
 requires BaseArrayRefer<E, A>
 static Feng$ArraySRefer<E> Feng$newArrayCopy(int64_t len, A &init) {
@@ -712,6 +716,7 @@ static Feng$ArrayRefer<T> Feng$mapA2A(A &s) {
 	int64_t len = (sizeof(S) * s.len) / sizeof(T);
 	return {(T *) s.start, len};
 }
+
 template<typename S, int64_t L, typename R>
 static Feng$ArrayPRefer<R> Feng$mapA2A(Feng$Array<S, L> &s) {
 	int64_t l = sizeof(S) * L / sizeof(R);
@@ -724,21 +729,25 @@ static Feng$ArrayRefer<T> Feng$mapU2A(S *s) {
 	int64_t len = sizeof(S) / sizeof(T);
 	return {(T *) s, len};
 }
+
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$SRefer<S> &s) {
 	int64_t len = sizeof(S) / sizeof(T);
 	return {(T *) s.t, len};
 }
+
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$SRefer<S> &&s) {
 	int64_t len = sizeof(S) / sizeof(T);
 	return {(T *) s.t, len};
 }
+
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$PRefer<S> &s) {
 	int64_t len = sizeof(S) / sizeof(T);
 	return {(T *) s.t, len};
 }
+
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$PRefer<S> &&s) {
 	int64_t len = sizeof(S) / sizeof(T);
@@ -798,7 +807,7 @@ public:
 
 	// 使用模板化的调用操作符，支持参数隐式转换
 	template<typename... CallArgs>
-	Ret operator()(CallArgs&&... args) const {
+	Ret operator()(CallArgs &&... args) const {
 		Feng$required(fp);
 		// 将参数转换为期望的类型
 		return fp(static_cast<Args>(std::forward<CallArgs>(args))...);

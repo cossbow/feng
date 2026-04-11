@@ -10,6 +10,7 @@ import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.parser.SourceParser;
 import org.cossbow.feng.util.BufferOutputStream;
+import org.cossbow.feng.util.ErrorUtil;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -47,8 +48,14 @@ public class ModuleAnalysis {
         modules.bfs(m -> {
             var imports = new HashMap<ModulePath, ParseSymbolTable>(
                     m.imports().size() + 1);
-            for (var i : m.imports())
-                imports.put(i, tabMap.get(i));
+            for (var i : m.imports()) {
+                var im = tabMap.get(i);
+                if (im.main.has()) {
+                    ErrorUtil.semantic("can't import main-module: %s", i, i.pos());
+                    return;
+                }
+                imports.put(i, im);
+            }
 
             var context = new GlobalSymbolContext(imports, m.table());
             var ast = new SemanticAnalysis(

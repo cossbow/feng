@@ -17,6 +17,12 @@ public class DedupCache<K> extends LinkedHashMap<K, K> {
         super(m);
     }
 
+    public void addAll(DedupCache<K> c) {
+        for (K k : c.keySet()) {
+            dedup(k);
+        }
+    }
+
     public K dedup(K key) {
         var old = putIfAbsent(key, key);
         return old != null ? old : key;

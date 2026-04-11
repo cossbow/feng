@@ -11,6 +11,8 @@ import java.util.stream.Stream;
 
 public interface SymbolContext {
 
+    boolean isLocal(Symbol s);
+
     Optional<TypeDefinition> findType(Symbol symbol);
 
     Optional<FunctionDefinition> findFunc(Symbol symbol);

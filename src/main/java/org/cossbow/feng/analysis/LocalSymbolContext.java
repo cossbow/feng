@@ -24,6 +24,11 @@ public class LocalSymbolContext implements SymbolContext {
     private final HashMap<Integer, Variable> checkedNonNil = new HashMap<>();
 
     @Override
+    public boolean isLocal(Symbol s) {
+        return s.module().none() || parent.isLocal(s);
+    }
+
+    @Override
     public Optional<TypeDefinition> findType(Symbol symbol) {
         return parent.findType(symbol);
     }
