@@ -6,7 +6,8 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
-import org.cossbow.feng.util.Lazy;
+
+import java.util.Objects;
 
 public class ClassField extends Field {
     private Modifier modifier;
@@ -22,16 +23,16 @@ public class ClassField extends Field {
         this.modifier = modifier;
     }
 
+    public boolean export() {
+        return modifier.export();
+    }
+
     public Declare declare() {
         return declare;
     }
 
     public Modifier modifier() {
         return modifier;
-    }
-
-    public boolean export() {
-        return modifier.export();
     }
 
     @Override
@@ -41,16 +42,18 @@ public class ClassField extends Field {
 
     //
 
-    private Lazy<ClassDefinition> master = Lazy.nil();
+    private ClassDefinition master;
 
-    public Lazy<ClassDefinition> master() {
+    public ClassDefinition master() {
         return master;
     }
 
+    public void master(ClassDefinition master) {
+        this.master = Objects.requireNonNull(master);
+    }
+
     public ClassField clone() {
-        var n = (ClassField) super.clone();
-        n.master = master.clone();
-        return n;
+        return (ClassField) super.clone();
     }
 
     //

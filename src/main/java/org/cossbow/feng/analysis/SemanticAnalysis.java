@@ -47,7 +47,6 @@ public class SemanticAnalysis {
     private final LiteralComputer computer = new LiteralComputer();
     private final ReturnAnalyzer analyzer = new ReturnAnalyzer();
     private final DedupCache<StringLiteral> stringCache;
-    private final Lazy<FunctionDefinition> main = Lazy.nil();
 
     public SemanticAnalysis(ParseSymbolTable table,
                             SymbolContext root,
@@ -261,11 +260,12 @@ public class SemanticAnalysis {
                 .stream().map(this::analyse)
                 .filter(f -> !f.entry())
                 .toList();
+        table.main.use(this::checkMain);
+        result.main.set(table.main);
 
         result.typeList = table.types.stream().toList();
 
         result.stringCache = stringCache;
-        result.main.set(main);
         return result;
     }
 
@@ -1006,7 +1006,8 @@ public class SemanticAnalysis {
     //
 
     private void checkMain(FunctionDefinition fd) {
-        if (!fd.entry())return;
+        assert fd.entry() : "only check main function";
+        analyse(fd);
 
         var prot = fd.prototype();
         if (prot.returnSet().has()) {
@@ -1026,7 +1027,6 @@ public class SemanticAnalysis {
                 et.refer().match(r -> r.required() && r.immutable()) &&
                 et.element() instanceof PrimitiveTypeDeclarer pt &&
                 pt.primitive() == Primitive.BYTE) {
-            main.set(fd);
             return;
         }
 
@@ -1040,7 +1040,6 @@ public class SemanticAnalysis {
         assert enterFunc == null;
         enterFunc = fd;
         analyse(fd.procedure());
-        checkMain(fd);
         enterFunc = null;
         return fd;
     }
@@ -2382,8 +2381,11 @@ public class SemanticAnalysis {
         if (of.none())
             return semantic("field %s not defined: %s", name, name.pos());
         var f = of.get();
-        if (f instanceof ClassField cf && cf.declare() == Declare.CONST)
-            return semantic("immutable field: %s", name.pos());
+        if (f instanceof ClassField cf) {
+            checkExport(cf, cf.master(), name);
+            if (cf.declare() == Declare.CONST)
+                return semantic("immutable field: %s", name.pos());
+        }
 
         var r = td.maybeRefer();
         if (r.has()) {
@@ -3038,6 +3040,16 @@ public class SemanticAnalysis {
                 name, name.pos());
     }
 
+    private <T extends Exportable, D extends Definition> T
+    checkExport(T cf, D cd, Identifier name) {
+        if (context.isLocal(cd.symbol()))
+            return cf;
+        if (cf.export()) return cf;
+
+        return semantic("Can‘t use unexported member '%s.%s' here: %s",
+                cd.symbol(), name, name.pos());
+    }
+
     private Groups.G2<Expression, TypeDeclarer>
     optimizeMember(PrimaryExpression s, ClassDefinition cd,
                    Identifier name, DerivedTypeDeclarer st,
@@ -3046,7 +3058,7 @@ public class SemanticAnalysis {
             invalid(generic);
             var o = cd.allFields().tryGet(name);
             if (o.has()) {
-                var f = o.get();
+                var f = checkExport(o.get(), cd, name);
                 var gm = st.gm();
                 var t = gm.mapIf(f.type());
                 var n = wrapRelayExpr(s, t, _s -> {
@@ -3062,7 +3074,7 @@ public class SemanticAnalysis {
 
         var om = cd.allMethods().tryGet(name);
         if (om.has()) {
-            var m = om.get();
+            var m = checkExport(om.get(), cd, name);
             var gm = genericMap(name, st.gm(), m.generic(), generic);
             var prot = gm.instantiate(m.prototype());
             var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
@@ -3075,7 +3087,7 @@ public class SemanticAnalysis {
         var of = cd.allFields().tryGet(name);
         if (of.has()) {
             invalid(generic);
-            var f = of.get();
+            var f = checkExport(of.get(), cd, name);
             if (f.type() instanceof FuncTypeDeclarer) {
                 var t = st.gm().mapIf(f.type());
                 var n = wrapRelayExpr(s, t, _s -> {
@@ -3463,7 +3475,7 @@ public class SemanticAnalysis {
                 return semantic("type '%s' had no field '%s': %s",
                         def, n.key(), n.key().pos());
             }
-            var f = o.get();
+            var f = checkExport(o.get(), def, n.key());
             var v = n.value();
             var ft = dtd.gm().mapIf(f.type());
             v.expectType.set(ft);

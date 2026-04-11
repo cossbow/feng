@@ -2,8 +2,10 @@ package org.cossbow.feng.parser;
 
 import org.antlr.v4.runtime.*;
 import org.cossbow.feng.ast.Source;
+import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.err.SyntaxException;
+import org.cossbow.feng.util.DedupCache;
 import org.cossbow.feng.util.Optional;
 
 import java.io.IOException;
@@ -39,6 +41,8 @@ public class SourceParser {
         this(Optional.empty(), charset, false);
     }
 
+    private final DedupCache<StringLiteral> stringCache = new DedupCache<>();
+
     public Source parse(String file, CharStream cs) {
         var lexer = new FengLexer(cs);
         var ts = new CommonTokenStream(lexer);
@@ -46,7 +50,8 @@ public class SourceParser {
         var ec = new ErrorCollector(file);
         parser.addErrorListener(ec);
         var visitor = new SourceParseVisitor(file, module,
-                charset, new ParseSymbolTable(module), metadata);
+                charset, new ParseSymbolTable(module, stringCache),
+                metadata);
         return (Source) visitor.visit(parser.source());
     }
 

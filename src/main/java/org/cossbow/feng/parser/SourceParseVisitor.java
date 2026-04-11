@@ -199,10 +199,14 @@ final class SourceParseVisitor
     @Override
     public Entity visitGlobalFunctionDefinition(
             FengParser.GlobalFunctionDefinitionContext ctx) {
-        var def = (FunctionDefinition) visit(ctx.def);
-        checkGlobalName(def.symbol().name(), def);
-        table.functions.add(def.symbol().name(), def);
-        return def;
+        var fd = (FunctionDefinition) visit(ctx.def);
+        checkGlobalName(fd.symbol().name(), fd);
+        if (fd.entry()) {
+            table.main.setIfNone(fd);
+        } else {
+            table.functions.add(fd.symbol().name(), fd);
+        }
+        return fd;
     }
 
     private void globalVarCheck(Variable v) {
@@ -825,7 +829,7 @@ final class SourceParseVisitor
 
         var def = new ClassDefinition(posOf(ctx), modifier, symbol,
                 generic, isFinal, inherit, impl, fields, methods, macros);
-        for (var f : fields) f.master().set(def);
+        for (var f : fields) f.master(def);
         for (var m : methods) m.master(def);
 
         genericStack.pop();

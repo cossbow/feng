@@ -13,26 +13,41 @@ import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.util.DedupCache;
+import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
 public class ParseSymbolTable {
     public final Optional<ModulePath> module;
+    public final DedupCache<StringLiteral> stringCache;
 
-    public ParseSymbolTable(Optional<ModulePath> module) {
+    public ParseSymbolTable(Optional<ModulePath> module,
+                            DedupCache<StringLiteral> stringCache) {
         this.module = module;
+        this.stringCache = stringCache;
     }
 
     public final IdentifierMap<TypeDefinition> types = new IdentifierMap<>();
     public final IdentifierMap<FunctionDefinition> functions = new IdentifierMap<>();
     public final IdentifierMap<GlobalVariable> variables = new IdentifierMap<>();
     public final MacroTable macros = new MacroTable();
-    public final DedupCache<StringLiteral> stringCache = new DedupCache<>();
+    public final Lazy<FunctionDefinition> main = Lazy.nil();
 
     public void merge(ParseSymbolTable ot) {
         types.addAll(ot.types);
         functions.addAll(ot.functions);
         variables.addAll(ot.variables);
         macros.addAll(ot.macros);
+        stringCache.addAll(ot.stringCache);
+        if (main.none()) {
+            main.set(ot.main);
+            return;
+        }
+        if (ot.main.has()) {
+            ErrorUtil.semantic(
+                    "duplicate func main defined: %s <--> %s",
+                    main.must().pos(), ot.main.must().pos());
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -62,7 +77,8 @@ public class ParseSymbolTable {
     //
 
 
-    public static final ParseSymbolTable BUILTIN = new ParseSymbolTable(Optional.empty());
+    public static final ParseSymbolTable BUILTIN = new ParseSymbolTable(
+            Optional.empty(), new DedupCache<>());
 
     static {
         PrimitiveDefinition.types.forEach((k, v) ->

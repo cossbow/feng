@@ -36,6 +36,11 @@ public class StackedContext implements SymbolContext {
     }
 
     @Override
+    public boolean isLocal(Symbol s) {
+        return getScope().isLocal(s);
+    }
+
+    @Override
     public Optional<TypeDefinition> findType(Symbol symbol) {
         return getScope().findType(symbol);
     }
