@@ -770,8 +770,12 @@ public class SemanticAnalysis {
                         cd.symbol(), im.name(), im.pos());
                 return;
             }
-            var prot = dt.gm().instantiate(im.prototype());
             var cm = o.must();
+            if (id.export() && !cm.export()) {
+                semantic("implement exported interface, must export the method: %s",
+                        cm.pos());
+            }
+            var prot = dt.gm().instantiate(im.prototype());
             compatible(prot, cm.prototype(), im).valid();
             im.override().add(cm);
         }

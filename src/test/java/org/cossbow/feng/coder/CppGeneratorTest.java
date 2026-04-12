@@ -55,24 +55,20 @@ public class CppGeneratorTest {
         try {
             var p = new ProcessBuilder().directory(dir.toFile())
                     .command(cmd).start();
-            Thread.startVirtualThread(() -> {
-                try (var es = p.getInputStream()) {
-                    var msg = new String(es.readAllBytes());
-                    if (msg.isEmpty()) return;
-                    System.out.println(msg);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
-            Thread.startVirtualThread(() -> {
-                try (var es = p.getErrorStream()) {
-                    var er = new String(es.readAllBytes());
-                    if (er.isEmpty()) return;
-                    System.err.println(er);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
+            try (var es = p.getInputStream()) {
+                var msg = new String(es.readAllBytes());
+                if (msg.isEmpty()) return;
+                System.out.println(msg);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            try (var es = p.getErrorStream()) {
+                var er = new String(es.readAllBytes());
+                if (er.isEmpty()) return;
+                System.err.println(er);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
             p.waitFor();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -101,8 +97,11 @@ public class CppGeneratorTest {
         ResourceUtil.write(dir.resolve(cpp), w -> {
             new CppGenerator(ast, w, true).write();
         });
+        ResourceUtil.write(dir.resolve("aaa.h"), w -> {
+            new CppGenerator(ast, w, true, true).write();
+        });
         CppGenerator.copyBaseHeader(dir);
-        compileCpp(false, dir, cpp, cpp);
+        compileCpp(false, dir, Path.of("aaa"), cpp);
     }
 
     @Test

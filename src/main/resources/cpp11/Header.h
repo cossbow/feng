@@ -41,6 +41,9 @@ class Feng$NegativeInteger : public std::exception {
 class Feng$NilPointer : public std::exception {
 };
 
+class Feng$UseAfterFree : public std::exception {
+};
+
 template<typename T>
 requires std::integral<T>
 static T Feng$checkIndex(T index, T bounds) {
@@ -83,7 +86,6 @@ static T *Feng$required(T *p) {
 // The root of polymorphism and abstraction classes
 class $Object {
 public:
-	uint32_t feng$classId;
 
 	$Object() = default;
 
@@ -94,17 +96,23 @@ public:
 	auto operator<=>(const $Object &) const = default;
 };
 
-const int MAGIC = 12345678;
+const uint16_t MAGIC = 0xA539;
 
 // reference counting
 struct Feng$Header {
 	std::atomic_int refcnt;
-#ifdef FENG_DEBUG_MEMORY
-	bool magic;
-#endif
 };
 
-static Feng$Header *Feng$headerOf(void *p) {
+template<typename T>
+static Feng$Header *Feng$headerOf(T *t) {
+	void *p;
+	if constexpr (std::is_polymorphic_v<T>) {
+		auto o = dynamic_cast<$Object *>(t);
+		if (o != nullptr) p = o;
+		else p = t;
+	} else {
+		p = t;
+	}
 	return (Feng$Header *) (((uint8_t *) p) - sizeof(Feng$Header));
 }
 
@@ -113,78 +121,17 @@ static void *Feng$toInstance(Feng$Header *fh) {
 }
 
 
-#ifndef FENG_MAX_CLASS_NUM
-#define FENG_MAX_CLASS_NUM 1
-#endif
-#ifndef FENG_MAX_INHERIT_SIZE
-#define FENG_MAX_INHERIT_SIZE 1
-#endif
-#ifndef FENG_MAX_IMPLS_SIZE
-#define FENG_MAX_IMPLS_SIZE 1
-#endif
-
-
-struct Feng$ClassRelation {
-	uint16_t inheritsSize;
-	uint16_t implsSize;
-	uint32_t inherits[FENG_MAX_INHERIT_SIZE];
-	uint32_t impls[FENG_MAX_IMPLS_SIZE];
-
-	bool findAncestor(uint32_t value) const {
-		for (int i = 0; i < inheritsSize; ++i)
-			if (inherits[i] == value)
-				return true;
-		return false;
-	}
-
-	bool findImpl(uint32_t value) const {
-		for (int i = 0; i < implsSize; ++i)
-			if (impls[i] == value)
-				return true;
-		return false;
-	}
-};
-
-extern const Feng$ClassRelation Feng$classRelations[FENG_MAX_CLASS_NUM];
-
-template<class T>
-static T *Feng$inherit0(void *p, uint32_t classId) {
-	if (p == nullptr) return nullptr;
-	$Object *o = ($Object *) p;
-	int id = o->feng$classId;
-	if (id == classId) return (T *) p;
-	if (Feng$classRelations[id].findAncestor(classId)) {
-		return (T *) p;
-	}
-	return nullptr;
-}
-
-template<class T>
-static T *Feng$impl0(void *p, uint32_t interfaceId) {
-	if (p == nullptr) return nullptr;
-	$Object *o = ($Object *) p;
-	if (Feng$classRelations[o->feng$classId].findImpl(interfaceId)) {
-		return (T *) p;
-	}
-	return nullptr;
-}
-
-
 #ifdef FENG_DEBUG_MEMORY
 static std::list<Feng$Header *> objects;
-
 #include <cstdio>
-
 static void feng$debug(bool all) {
 	printf("==== see memory stat ====\n");
 	for (const auto &o: objects) {
 		int c = o->refcnt.load();
-		bool r = o->magic;
-		if (all || c) printf("ref=%d, del=%#x\n", c, r);
+		if (all || c) printf("ref=%d\n", c);
 	}
 	printf("==== end memory stat ====\n");
 }
-
 #endif
 
 static void *Feng$alloc(int64_t size) {
@@ -194,7 +141,6 @@ static void *Feng$alloc(int64_t size) {
 	Feng$Header *fh = (Feng$Header *) p;
 	fh->refcnt.store(1);
 #ifdef FENG_DEBUG_MEMORY
-	fh->magic = MAGIC;
 	objects.push_back(fh);
 #endif
 	void *o = Feng$toInstance(fh);
@@ -202,12 +148,10 @@ static void *Feng$alloc(int64_t size) {
 	return o;
 }
 
-
-static void Feng$del(void *p) {
+template<typename T>
+static void Feng$del(T *p) {
+#ifndef FENG_DEBUG_MEMORY
 	Feng$Header *fh = Feng$headerOf(p);
-#ifdef FENG_DEBUG_MEMORY
-	fh->magic = 0;
-#else
 	free(fh);
 #endif
 }
@@ -216,7 +160,10 @@ template<typename T>
 static T *Feng$inc(T *p) {
 	if (p == nullptr) return p;
 	Feng$Header *fh = Feng$headerOf(p);
-	fh->refcnt.fetch_add(1, std::memory_order_relaxed);
+	int ref = fh->refcnt.fetch_add(1, std::memory_order_relaxed);
+	if (ref < 1) {
+		throw Feng$UseAfterFree();
+	}
 	return p;
 }
 
@@ -228,23 +175,24 @@ static bool Feng$dec0(T *p) {
 	if (ref == 0) {
 		return true;
 	} else if (ref < 0) {
-#ifndef FENG_DEBUG_MEMORY
 		throw Feng$DoubleFree();
-#else
-		return false;
-#endif
 	}
 	return false;
 }
 
 template<typename T>
 static T *&Feng$dec(T *&p) {
-	if (Feng$dec0(p)) {
+	if (!Feng$dec0(p)) return p;
+	if constexpr (std::is_polymorphic_v<T>) {
+		auto o = dynamic_cast<$Object *>(p);
+		if (o != nullptr) o->~$Object();
+		else p->~T();
+	} else {
 		if (std::is_destructible_v<T>) {
 			p->~T();
 		}
-		Feng$del(p);
 	}
+	Feng$del(p);
 	return p;
 }
 
@@ -289,13 +237,21 @@ struct Feng$SRefer {
 	// var t *T = s;
 	template<typename S>
 	Feng$SRefer(Feng$SRefer<S> &s) {
-		t = Feng$inc(static_cast<T *>(s.t));
+		if constexpr (std::is_class_v<S>) {
+			t = static_cast<T *>(Feng$inc(s.t));
+		} else {
+			t = (T *) (void *) Feng$inc(s.t);
+		}
 	}
 
 	// var t *T = new(S);
 	template<typename S>
 	Feng$SRefer(Feng$SRefer<S> &&s) {
-		t = Feng$inc(static_cast<T *>(s.t));
+		if constexpr (std::is_class_v<S>) {
+			t = static_cast<T *>(Feng$inc(s.t));
+		} else {
+			t = (T *) (void *) Feng$inc(s.t);
+		}
 	}
 
 	~Feng$SRefer() {

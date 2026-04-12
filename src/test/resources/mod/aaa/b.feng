@@ -1,0 +1,59 @@
+
+
+export
+interface Owner`E` {
+    get() E;
+    set(E);
+}
+export
+class Box`V` (Owner`V`){
+    export
+    var value V;
+    export
+    func get() V {
+        return value;
+    }
+
+    export
+    func set(v V) {
+        value = v;
+    }
+    func test() {
+        var v = get();
+
+    }
+}
+
+export
+struct Bu {
+    tag [2]int;
+}
+
+export
+func wrap`V`(v V) *Owner`V` {
+    return new(Box`V`,{value=v});
+}
+
+export
+interface I{
+    run();
+}
+export
+class A (I){
+    var id int;
+    export
+    func run(){}
+}
+
+export
+func make(i int) *I {
+    return new(A,{id=i});
+}
+
+export
+enum State{A,B,C,D,E}
+export
+func check(id int) {
+    var s = State[id];
+    var v = s.value;
+}

@@ -1,0 +1,14 @@
+
+export
+class Result`V` final {
+    export
+    var v V;
+    export
+    var ok bool;
+}
+
+export
+interface Map`K, V` {
+    set(key K, value V) Result`V`;
+    get(key K) Result`V`;
+}

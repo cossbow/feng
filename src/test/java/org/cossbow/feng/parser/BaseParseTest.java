@@ -157,7 +157,8 @@ public class BaseParseTest {
 
     public static Statement doParseLocal(String stmt) {
         var fun = "func main() { %s }".formatted(stmt);
-        var func = doParseProc(fun);
+        var src = doParseFile(fun);
+        var func = src.table().main.must();
         return func.procedure().body().list().getFirst();
     }
 

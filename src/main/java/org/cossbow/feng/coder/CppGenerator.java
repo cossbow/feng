@@ -24,6 +24,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
@@ -154,23 +156,6 @@ public class CppGenerator {
 
     // global
 
-    private String toCType(Primitive p) {
-        return switch (p) {
-            case INT8 -> "int8_t";
-            case INT16 -> "int16_t";
-            case INT32 -> "int32_t";
-            case INT64, INT -> "int64_t";
-            case UINT8, BYTE -> "uint8_t";
-            case UINT16 -> "uint16_t";
-            case UINT32 -> "uint32_t";
-            case UINT64, UINT -> "uint64_t";
-            case FLOAT32 -> "float";
-            case FLOAT64, FLOAT -> "double";
-            case BOOL -> "bool";
-            case null -> unreachable();
-        };
-    }
-
     private void definePre() {
         if (header) {
             var name = table.module.must()
@@ -277,16 +262,6 @@ public class CppGenerator {
             return pt.primitive().type();
         }
         return ((DerivedType) dt).def.must();
-    }
-
-    void declarePrimitive() {
-        if (header) return;
-        writeComment("declare primitives");
-        for (var p : Primitive.values()) {
-            write("typedef ").write(toCType(p)).write(' ')
-                    .write(p).endStmt();
-        }
-        newLine();
     }
 
     // 写入全局的字符串常量池：非C-type字符串，没有尾部的'0'
@@ -446,12 +421,26 @@ public class CppGenerator {
 
     private CppGenerator write(GlobalVariable v) {
         if (v.export()) {
-            if (header) write("extern");
+            if (header) write("extern ");
         } else {
             if (header) return this;
-            write("static");
+            write("static ");
         }
-        return write(' ').declareVar(v);
+
+        var t = v.type().must();
+        declare(v);
+        if (v.export() && header) return endStmt();
+
+        write(" = ");
+        v.value().use(e -> {
+            writeValue(e, t);
+        }, () -> {
+            if (t.maybeRefer().has())
+                write("nullptr");
+            else
+                write("{}");
+        });
+        return endStmt();
     }
 
     private CppGenerator castRef(
@@ -562,7 +551,6 @@ public class CppGenerator {
     private CppGenerator declareVar(Variable v) {
         var t = v.type().must();
         declare(v);
-        if (header) return endStmt();
         write(" = ");
         v.value().use(e -> {
             writeValue(e, t);
@@ -628,8 +616,13 @@ public class CppGenerator {
         return write(td.derivedType()).write('>');
     }
 
+    private static final Map<Primitive, String> PrimitiveName =
+            Arrays.stream(Primitive.values())
+                    .collect(Collectors.toMap(Function.identity(),
+                            p -> CommonUtil.upperFirst(p.code)));
+
     private CppGenerator write(Primitive p) {
-        return write(CommonUtil.upperFirst(p.code));
+        return write(PrimitiveName.get(p));
     }
 
     private CppGenerator write(PrimitiveTypeDeclarer td) {
@@ -792,7 +785,9 @@ public class CppGenerator {
         write(cd.generic());
         write("class ");
         write(cd.symbol());
-        if (!cd.isFinal()) {
+        if (cd.isFinal()) {
+            write(" final");
+        } else {
             var pubs = Stream.concat(cd.inherit().stream(),
                     cd.impl().stream()).toList();
             writeExtends(pubs);
@@ -880,37 +875,6 @@ public class CppGenerator {
         write("auto operator<=>(const ");
         definedToken(cd);
         write(" &) const = default").endStmt();
-    }
-
-    private <O extends ObjectDefinition> List<O>
-    sortedById(Collection<O> src) {
-        var dst = new ArrayList<>(src);
-        dst.sort(Comparator.comparingInt(O::id));
-        return dst;
-    }
-
-    private void classRelation(DAGGraph<ClassDefinition> dag) {
-        write("const Feng$ClassRelation Feng$classRelations[FENG_MAX_CLASS_NUM] = {")
-                .newLine();
-
-        for (var cd : sortedById(dag.all())) {
-            writeComment(cd.toString());
-            write('{');
-
-            write(".inheritsSize=").write(cd.ancestors().size());
-            write(", .implsSize=").write(cd.allImpls().size());
-
-            write(", .inherits={");
-            for (var a : sortedById(cd.ancestors()))
-                write(a.id()).write(',');
-
-            write("}, .impls={");
-            for (var i : sortedById(cd.allImpls()))
-                write(i.id()).write(',');
-
-            write("}},").newLine();
-        }
-        write("};").newLine();
     }
 
     private CppGenerator declareMethod(Method m) {
@@ -1032,7 +996,8 @@ public class CppGenerator {
     private void implFunc(FunctionDefinition fd) {
         if (fd.builtin()) return;
         if (table.module.has()) {
-            if (header == fd.generic().isEmpty()) return;
+            if (header == fd.generic().isEmpty())
+                return;
         }
         assert enterFunc == null;
         enterFunc = fd;

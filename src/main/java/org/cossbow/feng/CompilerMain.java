@@ -58,7 +58,7 @@ public class CompilerMain {
         if (Constants.isSource(name))
             name = name.substring(0, name.length() - Constants.SRC_EXT.length());
         generateCpp(ast, output, name);
-        CppGenerator.copyBaseHeader(output.getParent());
+        CppGenerator.copyBaseHeader(output);
     }
 
     private void compileModule() throws IOException {

@@ -110,8 +110,9 @@ public class ExportImportTest extends BaseParseTest {
 
     Statement parseLocal(String im, String stmt) {
         var fun = im + "func main() { %s }".formatted(stmt);
-        var func = doParseProc(fun);
-        return func.procedure().body().list().getFirst();
+        var src = doParseFile(fun);
+        return src.table().main.must()
+                .procedure().body().list().getFirst();
     }
 
     @Test

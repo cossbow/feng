@@ -33,8 +33,7 @@ public class StatementParseTest extends BaseParseTest {
     }
 
     Statement parseStmt(String code) {
-        var f = doParseFunc("func main() {" + code + " }", "main");
-        return f.procedure().body().list().getFirst();
+        return doParseLocal(code);
     }
 
     @Test
