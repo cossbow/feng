@@ -1,5 +1,4 @@
-【Fèng】编程语言
-===================
+**【Fèng】编程语言**
 
 # 语法
 
@@ -34,7 +33,7 @@ func sum(a, b int) int {
 
 ```feng
 import fmt *;
-func main() {
+func test() {
     printf("%d + %d = %d \n", 1, 3, sum(1, 3));
 }
 ```
@@ -55,7 +54,7 @@ import fmt *;
 func div(a, b int) int {
     return a / b;
 }
-func main() {
+func test() {
     var a, b = 1, 3;
     var s = div(a, b);
     printf("%d / %d = %d\n", a, b, s);
@@ -79,24 +78,36 @@ func sample() {
 }
 ```
 
-## module _[未完成]_
+## 模块
 
-作为代码组织单元，同一个目录下的文件都属于一个module，且module名与目录名相同，因此无需在文件里声明。
+作为代码组织单元，同一个目录下的文件都属于一个模块，且模块名与目录名相同，因此无需在文件里声明。
+不支持循环依赖，即依赖关系只能是与向无环图。
 
-1. module内定义的符号在内部都可使用，但是如果在外部则需要使用`export`导出。
-2. 如果想使用其他module里的符号，需先要`import`对应的module路径：
+## main函数
+
+main函数是可执行程序的入口函数，这个和其他语言一致。
+入口函数没有返回值，只有一个参数且参数类型必须是`[&!#][*!#]byte`；
+
+```feng
+func main(args [&!#][*!#]byte) {
+	hello();
+}
+```
+
+有main函数的模块会编译成一个可执行文件，并且不能作为库被其他模块导入；没有的则被作为库使用，即允许被导入使用。
 
 # 概念
 
 下面将详细描述各个语法元素的定义及用法。
 
-## module _[未完成]_
+## 模块
 
-module是代码的基本管理单元。
+模块是代码的基本管理单元。
 
-1. 在module内部所有的内容都可见，跨module只能访问导出的符号。
-2. module名称与路径一一对应，在文件中不声明module名称。要求目录名称的规则和变量名称一样。
-   例如在Linux下，module`com.jjj.base.util`对应的相对路径为`com/jjj/base/util`。
+1. 模块内部的全局符号不能重用，相当于单文件内部一样。
+2. 在模块内部所有的内容都可见，跨模块只能访问导出的符号。
+3. 模块名称与路径一一对应，在文件中不声明模块名称。要求目录名称的规则和变量名称一样。
+   例如在Linux下，模块`com$jjj$base$util`对应的相对路径为`com/jjj/base/util`。
 
 ### 导出符号
 
@@ -128,29 +139,20 @@ class Foo {
 
 ### 导入符号
 
-声明导入`com.cossbow.fmt`模块：
+声明导入`com$cossbow$fmt`模块：
 
 ```feng
-import com.cossbow.fmt;
-func main() {
+import com$cossbow$fmt;
+func test() {
    fmt$println(string("Hello Fèng!"));
-}
-```
-
-可以导入全部可见的符号，就不需要加module前缀了：
-
-```feng
-import com.cossbow.fmt *;
-func main() {
-   println(string("Hello Fèng!"));
 }
 ```
 
 可以设置module别名：
 
 ```feng
-import com.cossbow.fmt ccfmt;
-func main() {
+import com$cossbow$fmt ccfmt;
+func test() {
     var m Sring = ccfmt$sprintf("Hello Fèng!");
     ccfmt$println(m);
 }
@@ -178,7 +180,7 @@ func main() {
 不同整数类型之间必须显式转换：
 
 ```feng
-func main() {
+func test() {
    var a uint16 = 123;
    var b int32 = int32(a); // 将uint16转换为int32
 }
@@ -628,7 +630,7 @@ class Map {
       set(key, value);
    }
 }
-func main() {
+func test() {
    var m Map;
    m[100] = 159;
    // 带检查读：运行时如果key不存在则exists为false
@@ -695,7 +697,7 @@ class Cat {
 比如上面的`Cat`类，`id`必须指定初始化值，`name`则不强制：
 
 ```feng
-func main() {
+func test() {
    var c1 Cat = {id=1001};
    var c2 Cat = {id=1001, name="Tom"};
    // 下面是错误用法
@@ -708,7 +710,7 @@ func main() {
 同样通过`new`动态实例化也是一样：
 
 ```feng
-func main() {
+func test() {
    var c1 *Cat = new(Cat, {id=1001, name="Tom"});
    // 下面是错误用法
    // var c2 *Cat = new(Cat);
@@ -723,7 +725,7 @@ class Mouse {
    var id int;
    var name *rom;
 }
-func main() {
+func test() {
    var m1 Mouse;
    var m2 *Mouse = new(Cat);
 }
@@ -943,7 +945,7 @@ class Cat : Animal {
 允许`Animal`的引用指向一个子类实例，通过父类引用调用`eat`方法时，允许时实际会调用子类的`eat`方法：
 
 ```feng
-func main() {
+func test() {
    var animal *Animal = new(Cat, {name="Tom"});
    animal.eat("fish-meat"); // 将打印的是：Cat Tom eating fish-meat.
 }
@@ -959,7 +961,7 @@ func test(animal *Animal) {
     var cat, ok = animal?(*Cat);
     if (ok) cat.eat("mouse");
 }
-func main() {
+func test() {
     test(new(Cat));
 }
 ```
@@ -1020,7 +1022,7 @@ class YourTask {
 func asyncRun(t *Task) {
     t.run(); // 假装这里在异步执行
 }
-func main() {
+func test() {
     asyncRun(new(MyTask));      // 打印：Run my task!
     asyncRun(new(YourTask));    // 打印：Run your task!
 }
@@ -1174,7 +1176,7 @@ enum TaskState {WAIT, RUN, DONE,}   // 注意结尾必须有个逗号“,”
 ```feng
 enum TaskState {WAIT, RUN, DONE,}   // 未设置value，就等于id
 enum BillState {WAIT, PAID=4, SEND, DONE,} // 这里WAIT=0，SEND=5，DONE=6，……
-func main() {
+func test() {
    var s1 = TaskState.WAIT;             // s1初始化为枚举值：WAIT
    s1 = RUN;                            // s1类型已知，因此省略前缀
    var s2 TaskState = DONE;             // s2已知，也可以省略前缀
@@ -1203,7 +1205,7 @@ func sample(s BillState) {
 支持[迭代循环](#迭代循环)所有枚举值：
 
 ```feng
-func main() {
+func test() {
    for ( s : TaskState )
       printf("name: %s, id: %d \n", s.name, s.id);
 }
@@ -1573,7 +1575,7 @@ func Calc(a, b int) int;
 func test(c Calc) {
     printf("%d\n", c(rand(), rand()));
 }
-func main() {
+func test() {
     test(add);
     test(sub);
     test(mul);
@@ -1594,7 +1596,7 @@ func supply(c int) func(a, b int) int {
     default: return nil;
     }
 }
-func main() {
+func test() {
     var c1 func(a, b int) int = add;
     var c2 = sub;   // 也可以省略类型，自动推导
 }
@@ -1747,7 +1749,7 @@ func test(n Node) {
 简单的循环语句为括号内只有条件表达式：
 
 ```feng
-func main() {
+func test() {
     var i = 0;
     for ( i < 100 ) {
         println(i);
@@ -1767,7 +1769,7 @@ func main() {
 例如循环100次，并每次打印变量`i`的值：
 
 ```feng
-func main() {
+func test() {
     for (var i = 0; i < 100; i += 1) {
         println(i);
     }
@@ -1779,7 +1781,7 @@ func main() {
 对于变量数组，可以用更简单的方式遍历所有元素：
 
 ```feng
-func main() {
+func test() {
     var src []int = [0,1,2,3,4,5,6,7,8,9];
     for ( v : src )  // 只获取值
       handle(j);
@@ -1896,7 +1898,7 @@ func test() {
 2. `const`用于定义不变的量，不能重新赋值，且必须在声明时初始化值。
 
 ```feng
-func main() {
+func test() {
     var r int = 5;
     var g float64;
     var a float64 = 0;

@@ -1,5 +1,4 @@
 **【Fèng】Programming Language**
-===================
 
 # Syntax
 
@@ -33,7 +32,7 @@ Assume `printf` is a function provided by module `fmt` for printing to the termi
 
 ```feng
 import fmt *;
-func main() {
+func test() {
     printf("%d + %d = %d \n", 1, 3, sum(1, 3));
 }
 ```
@@ -54,7 +53,7 @@ import fmt *;
 func div(a, b int) int {
     return a / b;
 }
-func main() {
+func test() {
     var a, b = 1, 3;
     var s = div(a, b);
     printf("%d / %d = %d\n", a, b, s);
@@ -78,24 +77,36 @@ func sample() {
 }
 ```
 
-## Module _[Incomplete]_
+## Modules
 
 As a code organization unit, all files in the same directory belong to the same module, and the module name is the same as the directory name, so no declaration is needed in the file.
+Circular dependencies are not supported; the dependency graph must be a directed acyclic graph (DAG).
 
-1. Symbols defined within a module are usable internally, but must be `export`ed for external use.
-2. To use symbols from another module, you must first `import` the corresponding module path.
+## main Function
+
+The `main` function is the entry point of an executable program, consistent with other languages.
+The entry function has no return value and only one parameter, whose type must be `[&!#][*!#]byte`:
+
+```feng
+func main(args [&!#][*!#]byte) {
+    hello();
+}
+```
+
+A module containing a `main` function will be compiled into an executable file and cannot be imported as a library by other modules. Modules without a `main` function are used as libraries, meaning they can be imported for use.
 
 # Concepts
 
 The following sections describe the definitions and usage of each syntactic element in detail.
 
-## Module _[Incomplete]_
+## Modules
 
 A module is the basic unit of code management.
 
-1. Everything inside a module is visible internally. Cross-module access is limited to exported symbols.
-2. Module names correspond one-to-one with paths; module names are not declared in files. Directory names must follow the same rules as variable names.
-   For example, on Linux, module `com.jjj.base.util` corresponds to the relative path `com/jjj/base/util`.
+1. Global symbols within a module cannot be reused; it's the same as within a single file.
+2. Everything inside a module is visible internally. Cross-module access is limited to exported symbols.
+3. Module names correspond one-to-one with paths; module names are not declared in files. Directory names must follow the same rules as variable names.
+   For example, on Linux, module `com$jjj$base$util` corresponds to the relative path `com/jjj/base/util`.
 
 ### Exporting Symbols
 
@@ -127,29 +138,20 @@ class Foo {
 
 ### Importing Symbols
 
-Declare importing the `com.cossbow.fmt` module:
+Declare importing the `com$cossbow$fmt` module:
 
 ```feng
-import com.cossbow.fmt;
-func main() {
+import com$cossbow$fmt;
+func test() {
    fmt$println(string("Hello Fèng!"));
-}
-```
-
-You can import all visible symbols, eliminating the need for the module prefix:
-
-```feng
-import com.cossbow.fmt *;
-func main() {
-   println(string("Hello Fèng!"));
 }
 ```
 
 You can set a module alias:
 
 ```feng
-import com.cossbow.fmt ccfmt;
-func main() {
+import com$cossbow$fmt ccfmt;
+func test() {
     var m Sring = ccfmt$sprintf("Hello Fèng!");
     ccfmt$println(m);
 }
@@ -177,7 +179,7 @@ Supports [arithmetic operations](#arithmetic-operations), [bitwise operations](#
 Explicit conversion is required between different integer types:
 
 ```feng
-func main() {
+func test() {
    var a uint16 = 123;
    var b int32 = int32(a); // Convert uint16 to int32
 }
@@ -619,7 +621,7 @@ class Map {
       set(key, value);
    }
 }
-func main() {
+func test() {
    var m Map;
    m[100] = 159;
    // Checked read: if key does not exist at runtime, exists is false
@@ -685,7 +687,7 @@ When instantiating, `const` fields must be initialized; `var` fields are optiona
 In the `Cat` class above, `id` must be initialized, while `name` is optional:
 
 ```feng
-func main() {
+func test() {
    var c1 Cat = {id=1001};
    var c2 Cat = {id=1001, name="Tom"};
    // Incorrect usage below
@@ -698,7 +700,7 @@ func main() {
 The same applies to dynamic instantiation via `new`:
 
 ```feng
-func main() {
+func test() {
    var c1 *Cat = new(Cat, {id=1001, name="Tom"});
    // Incorrect usage below
    // var c2 *Cat = new(Cat);
@@ -713,7 +715,7 @@ class Mouse {
    var id int;
    var name *rom;
 }
-func main() {
+func test() {
    var m1 Mouse;
    var m2 *Mouse = new(Cat);
 }
@@ -932,7 +934,7 @@ class Cat : Animal {
 An `Animal` reference can point to a subclass instance. When calling the `eat` method via the parent class reference, the subclass's `eat` method is actually invoked:
 
 ```feng
-func main() {
+func test() {
    var animal *Animal = new(Cat, {name="Tom"});
    animal.eat("fish-meat"); // Prints: Cat Tom eating fish-meat.
 }
@@ -948,7 +950,7 @@ func test(animal *Animal) {
     var cat, ok = animal?(*Cat);
     if (ok) cat.eat("mouse");
 }
-func main() {
+func test() {
     test(new(Cat));
 }
 ```
@@ -1009,7 +1011,7 @@ Usage is similar to polymorphism:
 func asyncRun(t *Task) {
     t.run(); // Pretend this is asynchronous execution
 }
-func main() {
+func test() {
     asyncRun(new(MyTask));      // Prints: Run my task!
     asyncRun(new(YourTask));    // Prints: Run your task!
 }
@@ -1162,7 +1164,7 @@ Enumeration values typically require the enum type as a prefix. If the variable 
 ```feng
 enum TaskState {WAIT, RUN, DONE,}   // value not set, so equals id
 enum BillState {WAIT, PAID=4, SEND, DONE,} // WAIT=0, SEND=5, DONE=6, ...
-func main() {
+func test() {
    var s1 = TaskState.WAIT;             // s1 initialized to enum value WAIT
    s1 = RUN;                            // s1 type known, so prefix omitted
    var s2 TaskState = DONE;             // s2 known, prefix can be omitted
@@ -1191,7 +1193,7 @@ func sample(s BillState) {
 Supports [iteration loops](#iteration-loop) over all enumeration values:
 
 ```feng
-func main() {
+func test() {
    for ( s : TaskState )
       printf("name: %s, id: %d \n", s.name, s.id);
 }
@@ -1559,7 +1561,7 @@ func Calc(a, b int) int;
 func test(c Calc) {
     printf("%d\n", c(rand(), rand()));
 }
-func main() {
+func test() {
     test(add);
     test(sub);
     test(mul);
@@ -1580,7 +1582,7 @@ func supply(c int) func(a, b int) int {
     default: return nil;
     }
 }
-func main() {
+func test() {
     var c1 func(a, b int) int = add;
     var c2 = sub;   // Type can be omitted; auto-inferred
 }
@@ -1732,7 +1734,7 @@ The loop body repeats as long as the control condition is satisfied:
 A simple loop with only a condition expression:
 
 ```feng
-func main() {
+func test() {
     var i = 0;
     for ( i < 100 ) {
         println(i);
@@ -1752,7 +1754,7 @@ The complete control body format: [Initialization]; [Expression]; [Update]
 Example: loop 100 times, printing the value of `i` each time:
 
 ```feng
-func main() {
+func test() {
     for (var i = 0; i < 100; i += 1) {
         println(i);
     }
@@ -1764,7 +1766,7 @@ func main() {
 For arrays, a simpler way to iterate over all elements:
 
 ```feng
-func main() {
+func test() {
     var src []int = [0,1,2,3,4,5,6,7,8,9];
     for ( v : src )  // value only
       handle(j);
@@ -1881,7 +1883,7 @@ Declaring one or a group of [variables](#variables) starts with `var` or `const`
 2. `const` defines immutable values; they cannot be reassigned and must be initialized at declaration.
 
 ```feng
-func main() {
+func test() {
     var r int = 5;
     var g float64;
     var a float64 = 0;
@@ -2694,3 +2696,7 @@ class Error {
 ```
 
 ## Attributes _[Incomplete]_
+
+---
+
+This completes the translation of the modified Fèng programming language syntax documentation.

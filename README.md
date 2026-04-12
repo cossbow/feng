@@ -1,5 +1,4 @@
 **【Fèng】Programming Language**
-===================
 
 C++ initially extended C by adding object-oriented features, but it lacks memory safety semantics.
 Memory safety (safety) and system security are different concepts. Memory safety specifically refers to hard-to-predict issues caused by developer mistakes in memory usage.
@@ -12,9 +11,6 @@ The goal is to replace most of C's use cases, improve system development efficie
 
 # Feature Overview
 
-Simply introducing memory safety design while staying as consistent as possible with C would still require major changes. For example, removing C pointers and replacing them with references.
-Adding classes for object-oriented programming, while keeping structs unchanged but restricting their fields to non-reference types.
-
 Main designed features:
 
 1. Memory safety mechanisms:
@@ -22,28 +18,32 @@ Main designed features:
     2. Safe pointer usage: Pointers cannot be generated through arithmetic operations, nor can arbitrary integers be converted to pointer values. This also includes pointer increment and decrement.
     3. Mandatory bounds checking: For arrays and buffer space operations.
     4. Mandatory type checking: Type conversions must be checked for permissibility. Even when compile-time analysis is impossible, runtime checks must be performed.
-    5. Virtual references: Replace C's address-of operator (&) with virtual references, restricting usage to within the instance's lifetime.
+    5. Phantom references: Replace C's address-of operator (&) with phantom references, restricting usage to within the instance's lifetime.
 2. Basic object-oriented elements, including inheritance, polymorphism, and interface abstraction.
 3. Resource classes: Designed with reference to C++ destructors, used to reclaim resources allocated by underlying libraries and handle circular references.
 4. Allow free conversion for certain types, mainly struct and union.
 5. Value type variables: Variables are the instances themselves, requiring no additional memory allocation.
-6. Modular code management: Symbols require export and import between modules. _[*Incomplete*]_
+6. Modular code management: Symbols require export and import between modules.
 
 Plus several minor features:
 
 7. Exception handling mechanism. _[*Incomplete*]_
-8. Generics or templates: Generic parameters can have constraints, and class member methods can also take parameters.
-9. Allow custom operators for classes, simplified from C++ operator overloading. _[*Incomplete*]_
+8. Generics: Only basic generic mechanisms are implemented.
+9. Operator overloading: _[*Incomplete*]_
 
-Designed syntax details are listed in the [reference manual](reference.md).
+Designed syntax details are listed in the [reference manual](reference_zh.md).
 
 # Development Progress
 
+Currently under development. Although simple projects can be compiled, the lack of system call libraries and utility libraries still prevents normal usage.
+Contributions from interested friends are welcome!
+
 ## Syntax Parsing
 
-The parser is generated using ANTLR4, designed with reference to [grammar](src/main/antlr4/org/cossbow/feng/parser/Feng.g4).
-During build, parser classes are automatically generated via Maven plugins, then IDEA can be used for normal debugging.
-File parsing reuses [SourceParser](src/main/java/org/cossbow/feng/parser/SourceParser.java), which traverses the parse results and builds the AST using [SourceParseVisitor.java](src/main/java/org/cossbow/feng/parser/SourceParseVisitor.java).
+The parser is generated using ANTLR4. The language specification can be found in [grammar](src/main/antlr4/org/cossbow/feng/parser/Feng.g4).
+The parse results are traversed and the AST is built using [SourceParseVisitor](src/main/java/org/cossbow/feng/parser/SourceParseVisitor.java).
+
+During build, parser classes are automatically generated via Maven plugins, so simply building with `mvn` allows debugging in IDEA.
 
 ## Semantic Analysis
 
@@ -62,6 +62,7 @@ Completed semantic analyses include:
 9. Immutable checks for references.
 10. Statement context checking.
 11. Generic type parameter checking.
+12. Checking of symbols exported from other modules.
 
 ## Target Code Generation
 
@@ -80,33 +81,45 @@ Completed code features:
 9. Literals and initialization: Completed
 10. Generics: Completed
 11. String formatting: _[*Incomplete*]_
+12. Modules: One cpp file generated per module.
 
 # Tool Building
 
-The current build tool supports compiling a single source file or a single module. Module export/import _[*Incomplete*]_
+The current build tool supports compiling a single source file, a single module, or multi-module joint builds.
 
-The project is built with Maven, depending only on the `antlr4-runtime` package and 3 Maven plugins, which will be downloaded automatically. Recommended packaging command:
+The tool is developed in Java, requiring JDK and Maven to be installed first. For details, consult [deepseek](https://chat.deepseek.com/).
+The project dependencies include only antlr4-runtime, jcommander, and 3 Maven plugins, which are automatically downloaded during build. Recommended build command:
 
 ```shell
 mvn clean package -Dmaven.test.skip=true
 ```
 
-The packaged JAR will be in the target directory: `feng-${tag}.jar`
-For example, with the current tag "0.0.1-dev", the built package is `feng-0.0.1-dev.jar`. Execution requires a Java runtime environment.
+The packaged JAR will be in the target directory: `feng-${version}.jar`
+For example, with the current version "0.0.1-dev", the built package is `feng-0.0.1-dev.jar`.
+
+Tool usage:
+```shell
+java -jar feng-0.0.1-dev.jar -t [type] -i [source] -o [output directory]
+```
+
+Parameter descriptions:
+1. -t: Source type: f/file - single file, m/module - single module, p/project - simple project with multiple modules
+2. -i: Source path: for a single file, point to the full file path; for a module or project, point to the directory.
+3. -o: Output directory: for a single file, outputs one C++ file; for a module or project, each module corresponds to one C++ file. If not specified, defaults to the source directory.
 
 Compile a single source file:
 
 ```shell
-java -jar feng-0.0.1-dev.jar jjj.feng jjj.cpp
-```
-
-Compile a single module:
-
-```shell
-java -jar feng-0.0.1-dev.jar jjj jjj.cpp
+java -jar feng-0.0.1-dev.jar -t f -i jjj.feng -o jjj.cpp
 ```
 
 The generated C++ requires a C/C++ compilation environment, and the C++20 standard must be specified during compilation:
+
+```shell
+c++ --std=c++20 -c jjj.cpp -o jjj.o
+```
+
+If the Fèng code contains a `main` function, a `main` function will be created in the corresponding C++ file, allowing it to be compiled into an executable:
 
 ```shell
 c++ --std=c++20 jjj.cpp -o jjj.o
