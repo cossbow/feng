@@ -18,11 +18,17 @@ public class CommonUtil {
     public static Identifier rand(String prefix) {
         var h = rand();
         return new Identifier(Position.ZERO,
-                "Feng$" + prefix + "_" + h, true);
+                "$" + prefix + "_" + h, true);
     }
 
     public static String upperFirst(String s) {
         return s.substring(0, 1).toUpperCase() + s.substring(1);
+    }
+
+    public static String trimExt(String fn) {
+        var i = fn.lastIndexOf(".");
+        if (i < 0) return fn;
+        return fn.substring(0, i);
     }
 
     public static byte[] concat(byte[] first, byte[]... more) {

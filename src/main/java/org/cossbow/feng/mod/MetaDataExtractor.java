@@ -109,7 +109,7 @@ public class MetaDataExtractor {
     }
 
     private MetaDataExtractor write(ModulePath mp) {
-        for (var id : mp) write(id).write('$');
+        write(mp.name()).write('$');
         return this;
     }
 
@@ -286,15 +286,17 @@ public class MetaDataExtractor {
     }
 
     private void write(PrototypeDefinition sd) {
-        colon().write(sd.prototype()).endStmt();
+        write('=').write(sd.prototype()).endStmt();
     }
 
     private MetaDataExtractor write(TypeParameters tps) {
+        if (tps.isEmpty()) return this;
+        write('`');
         joinByComma(tps, tp -> {
             write(tp.name());
             tp.constraint().use(this::write);
         });
-        return this;
+        return write('`');
     }
 
     private MetaDataExtractor write(TypeConstraint c) {
@@ -437,7 +439,7 @@ public class MetaDataExtractor {
     private MetaDataExtractor write(ObjectExpression e) {
         write('{');
         for (var n : e.entries().nodes()) {
-            write(n.key()).write('=').write(n.value());
+            write(n.key()).write('=').write(n.value()).write(',');
         }
         write('}');
         return this;

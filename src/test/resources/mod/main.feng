@@ -1,7 +1,7 @@
-import mod$aaa a;
-import mod$aab v;
-import mod$aac r;
-import mod$map m;
+import test$aaa a;
+import test$aab v;
+import test$aac r;
+import test$map m;
 
 func intHashing(k int) int {
     return (k);

@@ -1,5 +1,6 @@
 package org.cossbow.feng.mod;
 
+import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.ast.mod.ModulePath;
@@ -7,7 +8,10 @@ import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.dag.DAGUtil;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.parser.SourceParser;
-import org.cossbow.feng.util.*;
+import org.cossbow.feng.util.Constants;
+import org.cossbow.feng.util.DedupCache;
+import org.cossbow.feng.util.Groups;
+import org.cossbow.feng.util.Optional;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -19,11 +23,16 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 
+import static org.cossbow.feng.util.ErrorUtil.modFail;
+import static org.cossbow.feng.util.ErrorUtil.unsupported;
+
 public class ModuleParser {
+    private final Identifier pkg;
     private final Path base;
     private final Charset charset;
 
-    public ModuleParser(Path base, Charset charset) {
+    public ModuleParser(String pkg, Path base, Charset charset) {
+        this.pkg = new Identifier(pkg);
         this.base = base;
         this.charset = charset;
     }
@@ -33,15 +42,12 @@ public class ModuleParser {
     }
 
     public FModule parseFile(Path file) {
-        var name = Constants.trimExt(file.getFileName());
-        var mp = new ModulePath(name);
-        if (!file.isAbsolute()) {
-            file = base.resolve(file);
-        }
-        var src = new SourceParser(mp, charset).parse(file);
+        var mp = new ModulePath(pkg, Path.of(""));
+        var src = new SourceParser(mp, charset)
+                .parse(absPath(file));
         if (src.imports().isEmpty())
-            return new FModule(name, mp, List.of(), src.table());
-        return ErrorUtil.unsupported("import library");
+            return new FModule(mp, List.of(), src.table());
+        return unsupported("import library");
     }
 
     private List<Source> parseFiles(ModulePath mp, List<Path> files) {
@@ -64,31 +70,23 @@ public class ModuleParser {
                 if (!mp.equals(imp))
                     continue;
 
-                return ErrorUtil.modFail(
+                return modFail(
                         "cyclic import detected '%s': %s", i, i.pos());
             }
         }
-        return new FModule(base.resolve(path), mp, paths.toList(), table);
+        return new FModule(mp, paths.toList(), table);
     }
 
-    private FModule parseModule(Path path, List<Path> files) {
-        var mp = new ModulePath(path);
-        var sources = parseFiles(mp, files);
-        return mergeFiles(path, mp, sources);
-    }
-
+    /**
+     * 解析指定模块
+     * @param module 模块名称
+     */
     public FModule parseModule(Path module) {
-        Path path, dir;
-        if (module.isAbsolute()) {
-            dir = module;
-            path = base.relativize(dir);
-        } else {
-            path = module;
-            dir = absPath(path);
-        }
-        try (var ls = Files.list(dir)) {
-            var a = ls.filter(Constants.srcTest()).toList();
-            return parseModule(path, a);
+        try (var ls = Files.list(absPath(module))) {
+            var files = ls.filter(Constants.srcTest()).toList();
+            var mp = new ModulePath(pkg, module);
+            var sources = parseFiles(mp, files);
+            return mergeFiles(module, mp, sources);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -98,8 +96,10 @@ public class ModuleParser {
         var list = scanModule();
         var map = new LinkedHashMap<ModulePath, FModule>();
         var modules = new ArrayList<FModule>(list.size());
-        for (var ms : list) {
-            var fm = parseModule(ms);
+        for (var g2 : list) {
+            var mp = new ModulePath(pkg, g2.a());
+            var sources = parseFiles(mp, g2.b());
+            var fm = mergeFiles(g2.a(), mp, sources);
             modules.add(fm);
             map.put(fm.path(), fm);
         }
@@ -107,22 +107,18 @@ public class ModuleParser {
         for (var fm : modules) {
             for (var i : fm.imports()) {
                 var im = map.get(i);
+                if (im == null) {
+                    modFail("module '%s' not found: %s",
+                            i, i.pos());
+                }
                 edges.add(Groups.g2(im, fm));
             }
         }
         return DAGUtil.make(map.values(), edges);
     }
 
-    private FModule parseModule(ModuleSource ms) {
-        var mp = new ModulePath(ms.path);
-        var sources = parseFiles(mp, ms.files);
-        return mergeFiles(ms.path, mp, sources);
-    }
-
-    private List<ModuleSource> scanModule() {
-        var projBase = this.base.getParent();
-        var projName = this.base.getFileName();
-        var result = new ArrayList<ModuleSource>();
+    private List<Groups.G2<Path, List<Path>>> scanModule() {
+        var result = new ArrayList<Groups.G2<Path, List<Path>>>();
         var q = new ArrayDeque<Path>();
         q.add(base);
         while (!q.isEmpty()) {
@@ -140,7 +136,7 @@ public class ModuleParser {
                 }
                 if (files.isEmpty()) continue;
 
-                result.add(new ModuleSource(projBase.relativize(dir), files));
+                result.add(Groups.g2(base.relativize(dir), files));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -148,6 +144,4 @@ public class ModuleParser {
         return result;
     }
 
-    record ModuleSource(Path path, List<Path> files) {
-    }
 }

@@ -123,7 +123,9 @@ static void *Feng$toInstance(Feng$Header *fh) {
 
 #ifdef FENG_DEBUG_MEMORY
 static std::list<Feng$Header *> objects;
+
 #include <cstdio>
+
 static void feng$debug(bool all) {
 	printf("==== see memory stat ====\n");
 	for (const auto &o: objects) {
@@ -132,6 +134,7 @@ static void feng$debug(bool all) {
 	}
 	printf("==== end memory stat ====\n");
 }
+
 #endif
 
 static void *Feng$alloc(int64_t size) {
@@ -205,6 +208,15 @@ struct Feng$Refer {
 	}
 };
 
+template<typename S, typename T>
+static inline T *Feng$cast(S *s) {
+	if constexpr (std::is_base_of_v<T, S>) {
+		return static_cast<T *>(s);
+	} else {
+		return (T *) (void *) s;
+	}
+}
+
 template<typename T>
 struct Feng$SRefer {
 	T *t;
@@ -237,21 +249,13 @@ struct Feng$SRefer {
 	// var t *T = s;
 	template<typename S>
 	Feng$SRefer(Feng$SRefer<S> &s) {
-		if constexpr (std::is_class_v<S>) {
-			t = static_cast<T *>(Feng$inc(s.t));
-		} else {
-			t = (T *) (void *) Feng$inc(s.t);
-		}
+		t = Feng$cast<S, T>(Feng$inc(s.t));
 	}
 
 	// var t *T = new(S);
 	template<typename S>
 	Feng$SRefer(Feng$SRefer<S> &&s) {
-		if constexpr (std::is_class_v<S>) {
-			t = static_cast<T *>(Feng$inc(s.t));
-		} else {
-			t = (T *) (void *) Feng$inc(s.t);
-		}
+		t = Feng$cast<S, T>(Feng$inc(s.t));
 	}
 
 	~Feng$SRefer() {
@@ -365,22 +369,22 @@ struct Feng$PRefer {
 	Feng$PRefer(T *t) : t(t) {}
 
 	template<typename S>
-	Feng$PRefer(S *s) : t((T *) s) {}
+	Feng$PRefer(S *s) : t(Feng$cast<S, T>(s)) {}
 
 	Feng$PRefer(T &t) : t(&t) {}
 
 	template<typename S>
-	Feng$PRefer(S &s) : t((T *) &s) {}
+	Feng$PRefer(S &s) : t(Feng$cast<S, T>(&s)) {}
 
 	Feng$PRefer(Feng$SRefer<T> &r) : t(r.t) {}
 
 	template<typename S>
-	Feng$PRefer(Feng$SRefer<S> &r) : t((T *) r.t) {}
+	Feng$PRefer(Feng$SRefer<S> &r) : t(Feng$cast<S, T>(r.t)) {}
 
 	Feng$PRefer(Feng$PRefer<T> &r) : t(r.t) {}
 
 	template<typename S>
-	Feng$PRefer(Feng$PRefer<S> &r) : t((T *) r.t) {}
+	Feng$PRefer(Feng$PRefer<S> &r) : t(Feng$cast<S, T>(r.t)) {}
 
 	Feng$PRefer(Feng$Refer<T> &&r) : t(r.t) {}
 

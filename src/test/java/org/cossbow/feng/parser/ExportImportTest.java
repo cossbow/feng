@@ -20,11 +20,7 @@ import org.cossbow.feng.util.Optional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.cossbow.feng.ast.Position.ZERO;
@@ -32,7 +28,9 @@ import static org.cossbow.feng.ast.Position.ZERO;
 public class ExportImportTest extends BaseParseTest {
 
     static ModulePath mod(String first, String... more) {
-        return new ModulePath(Path.of(first, more));
+        var path = Arrays.stream(more)
+                .map(Identifier::new).toArray(Identifier[]::new);
+        return new ModulePath(ZERO, new Identifier(first), path);
     }
 
     // import

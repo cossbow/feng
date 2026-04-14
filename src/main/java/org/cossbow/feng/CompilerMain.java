@@ -8,7 +8,7 @@ import org.cossbow.feng.analysis.AnalyseSymbolTable;
 import org.cossbow.feng.coder.CppGenerator;
 import org.cossbow.feng.mod.ModuleAnalysis;
 import org.cossbow.feng.mod.ModuleParser;
-import org.cossbow.feng.util.Constants;
+import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.ErrorUtil;
 
 import java.io.IOException;
@@ -18,6 +18,9 @@ import java.nio.file.Path;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class CompilerMain {
+    @Parameter(names = {"-p", "-pkg"},
+            description = "package name")
+    private String pkg;
     @Parameter(names = {"-t", "--source-type"},
             description = "the source type",
             converter = SourceTypeConverter.class)
@@ -51,13 +54,14 @@ public class CompilerMain {
             return;
         }
 
-        var fm = new ModuleParser(input.getParent(), UTF_8)
-                .parseFile(input);
+        var fn = input.getFileName();
+        if (pkg == null) {
+            pkg = CommonUtil.trimExt(fn.toString());
+        }
+        var fm = new ModuleParser(pkg, input.getParent(), UTF_8)
+                .parseFile(fn);
         var ast = new ModuleAnalysis().analyse(fm);
-        var name = input.getFileName().toString();
-        if (Constants.isSource(name))
-            name = name.substring(0, name.length() - Constants.SRC_EXT.length());
-        generateCpp(ast, output, name);
+        generateCpp(ast, output, pkg);
         CppGenerator.copyBaseHeader(output);
     }
 
@@ -69,7 +73,8 @@ public class CompilerMain {
 
         var dir = input.getParent();
         var fn = input.getFileName();
-        var fm = new ModuleParser(dir, UTF_8)
+        if (pkg == null) pkg = fn.toString();
+        var fm = new ModuleParser(pkg, dir, UTF_8)
                 .parseModule(fn);
         var ast = new ModuleAnalysis().analyse(fm);
         generateCpp(ast, output, fn.toString());
@@ -81,10 +86,9 @@ public class CompilerMain {
             ErrorUtil.argument("%s is not a dir", input);
             return;
         }
-        var proj = input.getFileName().toString();
+        if (pkg == null) pkg = input.getFileName().toString();
 
-        // TODO：多文件联合编译，需要头文件或直接添加声明
-        var dag = new ModuleParser(input, UTF_8).scanAndParse();
+        var dag = new ModuleParser(pkg, input, UTF_8).scanAndParse();
         new ModuleAnalysis().analyse(dag);
         for (var fm : dag) {
             var mp = fm.path();
@@ -147,13 +151,6 @@ public class CompilerMain {
             if (t != null) return t;
             return ErrorUtil.argument("Unknown input type: %s", s);
         }
-    }
-
-    static Path replaceExt(Path file, String ext) {
-        var name = file.getFileName().toString();
-        var i = name.lastIndexOf('.');
-        if (i < 0) return Path.of(name + '.' + ext);
-        return Path.of(name.substring(0, i + 1) + ext);
     }
 
 }

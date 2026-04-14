@@ -76,6 +76,11 @@ public class ParseSymbolTable {
 
     //
 
+    public static boolean isBuiltin(Identifier name) {
+        return BUILTIN.types.exists(name) ||
+                BUILTIN.functions.exists(name) ||
+                BUILTIN.variables.exists(name);
+    }
 
     public static final ParseSymbolTable BUILTIN = new ParseSymbolTable(
             Optional.empty(), new DedupCache<>());

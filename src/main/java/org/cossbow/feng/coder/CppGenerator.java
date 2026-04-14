@@ -84,7 +84,10 @@ public class CppGenerator {
         includeHeader("Header");
 
         table.module.use(fm -> {
-            includeHeader(fm.path().filename());
+            if (!header) {
+                includeHeader(fm.path().filename());
+                return;
+            }
             if (fm.imports().isEmpty()) return;
             writeComment("import headers");
             for (var i : fm.imports()) {
@@ -921,10 +924,7 @@ public class CppGenerator {
 
     private CppGenerator write(Symbol s) {
         s.module().use(mp -> {
-            for (int i = 0; i < mp.size(); i++) {
-                if (i > 0) write('$');
-                write(mp.get(i).value());
-            }
+            write(mp.toString());
         });
         write(s.name());
         return this;
@@ -1430,7 +1430,7 @@ public class CppGenerator {
     }
 
     private CppGenerator write(BoolLiteral e) {
-        write(e.value() ? "true" : "false");
+        write(Boolean.toString(e.value()));
         return this;
     }
 

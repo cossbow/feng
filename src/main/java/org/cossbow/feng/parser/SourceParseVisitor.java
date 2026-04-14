@@ -139,6 +139,9 @@ final class SourceParseVisitor
     }
 
     Symbol defineSymbol(Identifier id) {
+        if (ParseSymbolTable.isBuiltin(id)) {
+            return new Symbol(id.pos(), id);
+        }
         return new Symbol(id.pos(), module, id);
     }
 
@@ -183,7 +186,8 @@ final class SourceParseVisitor
     public Entity visitImport_(FengParser.Import_Context ctx) {
         var pos = posOf(ctx);
         var mod = identifiers(ctx.module().Identifier());
-        var path = new ModulePath(pos, mod);
+        var path = new ModulePath(pos, mod.getFirst(),
+                mod.stream().skip(1).toArray(Identifier[]::new));
         var alias = identifierOptional(ctx.alias);
         return new Import(pos, path, alias);
     }
@@ -530,8 +534,8 @@ final class SourceParseVisitor
     }
 
     private Symbol parseSymbol(FengParser.SymbolContext ctx) {
-        var mod = identifierOptional(ctx.mod)
-                .map(importMap::get);
+        var id = identifierOptional(ctx.mod);
+        var mod = id.map(importMap::get);
         var name = identifier(ctx.name);
         return new Symbol(posOf(ctx), mod, name);
     }

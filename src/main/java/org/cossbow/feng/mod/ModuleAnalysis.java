@@ -75,6 +75,7 @@ public class ModuleAnalysis {
                 module.table(), context, false)
                 .analyse();
         ast.module.set(module);
+        module.result.set(ast);
         return ast;
     }
 }
