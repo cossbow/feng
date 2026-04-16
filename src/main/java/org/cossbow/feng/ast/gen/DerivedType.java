@@ -4,9 +4,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
-import org.cossbow.feng.util.Lazy;
-
-import java.util.Objects;
+import org.cossbow.feng.util.CommonUtil;
 
 public class DerivedType extends DefinedType {
     private final Symbol symbol;
@@ -38,19 +36,31 @@ public class DerivedType extends DefinedType {
 
     //
 
-    public final Lazy<TypeDefinition> def = Lazy.nil();
+    private TypeDefinition def;
     private GenericMap gm = GenericMap.EMPTY;
 
+    public TypeDefinition def() {
+        return CommonUtil.required(def);
+    }
+
+    public void def(TypeDefinition def) {
+        this.def = CommonUtil.required(def);
+    }
+
     public GenericMap gm() {
-        return gm;
+        return CommonUtil.required(gm);
     }
 
     public void gm(GenericMap gm) {
-        this.gm = Objects.requireNonNull(gm);
+        this.gm = CommonUtil.required(gm);
     }
 
     public boolean hasTemplate() {
         return generic.hasTemplate();
+    }
+
+    public DerivedType clone() {
+        return (DerivedType) super.clone();
     }
 
     //

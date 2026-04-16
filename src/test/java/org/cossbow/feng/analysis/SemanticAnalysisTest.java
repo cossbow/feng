@@ -2931,14 +2931,6 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testGenericImplType4() {
-        var d = "class A`T`{var t T; } class B`E`:A`E`{} class C`V`:B`V`{}";
-        checkSucc(d + "func f(i int){var a A`*A`int`` = {t=new(A`int`,{t=i})};}");
-        checkSucc(d + "func f(i int){var a A`*A`int`` = {t=new(B`int`,{t=i})};}");
-        checkSucc(d + "func f(i int){var a A`*A`int`` = {t=new(C`int`,{t=i})};}");
-    }
-
-    @Test
-    public void testGenericImplType5() {
         var d = "class A`T`{var v T; func m`E`()A`E`{return {};}}";
         checkSucc(d + "func f(a A`int`){var b=a.m`bool`(); b.v=true;}");
         d = "class A`T`{var v T; func m`E`(e E){}}";
@@ -2946,7 +2938,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testGenericImplType6() {
+    public void testGenericImplType5() {
         var d = "class A`T`{var t T; var c func();} ";
         checkSucc(d + "func f(a *A`int`){var v = a.t;}");
         checkFail(d + "func f(a *A`int`){var v = a.t`bool`;}");
@@ -2966,13 +2958,61 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testGenericImplType7() {
+    public void testGenericImplType6() {
         var d = "class A`T1,T2,T3`{var t1 T1; var t2 T2; var t3 T3;}";
         checkSucc(d + "func f(){var a A`int,int,int`;}");
         checkFail(d + "func f(){var a A`int,int`;}");
         checkFail(d + "func f(){var a A`int`;}");
         checkFail(d + "func f(){var a A`int,int,int,int`;}");
         checkFail(d + "func f(){var a A`int,int,int,int,int`;}");
+    }
+
+    @Test
+    public void testGenericImplType7() {
+        var d = "class A`T`{var t T; } class B`E`:A`E`{} class C`V`:B`V`{}";
+        checkSucc(d + "func f(i int){var a A`*A`int`` = {t=new(A`int`,{t=i})};}");
+        checkSucc(d + "func f(i int){var a A`*A`int`` = {t=new(B`int`,{t=i})};}");
+        checkSucc(d + "func f(i int){var a A`*A`int`` = {t=new(C`int`,{t=i})};}");
+    }
+
+    @Test
+    public void testGenericImplType8() {
+        var d = "struct S1{} struct S2{} struct S3{} ";
+        d += "class A {} ";
+        d += "class B`I1`:A {} ";
+        d += "class C`J1,J2`:B`J2` {} ";
+        d += "class D`K1,K2,K3`:C`K1,K3` {} ";
+        checkSucc(d + "func f(a*D`S1,S2,S3`)*C`S1,S3`{return a;}");
+        checkFail(d + "func f(a*D`S1,S2,S3`)*C`S1,S2`{return a;}");
+        checkFail(d + "func f(a*D`S1,S2,S3`)*C`S2,S3`{return a;}");
+        checkFail(d + "func f(a*D`S1,S2,S3`)*C`S3,S1`{return a;}");
+        checkFail(d + "func f(a*D`S1,S2,S3`)*C`S1,int`{return a;}");
+        checkSucc(d + "func f(a*D`S1,S2,S3`)*B`S3`{return a;}");
+        checkFail(d + "func f(a*D`S1,S2,S3`)*B`S2`{return a;}");
+        checkFail(d + "func f(a*D`S1,S2,S3`)*B`int`{return a;}");
+        checkSucc(d + "func f(a*D`S1,S2,S3`)*A{return a;}");
+        checkSucc(d + "func f(a*D`S1,S2,S3`)*Object{return a;}");
+    }
+
+    @Test
+    public void testGenericImplType9() {
+        var d = "struct S1{} struct S2{} struct S3{} struct S4{} ";
+        d += "interface I`T` {} ";
+        d += "interface J1`T1,T2` { I`T1`; } ";
+        d += "interface J2`T3,T4,T5` { I`T4`; } ";
+        checkFail(d + "interface K1`R1,R2,R3,R4` { J1`R1,R3`; J2`R2,R4,R3`; }");
+        d += "interface K1`R1,R2,R3,R4` { J1`R1,R3`; J2`R2,R1,R3`; } ";
+        d += "class A`R1,R2,R3,R4` (J1`R2,R3`, J2`R4,R2,R3`) {} ";
+        checkFail(d + "class A`R1,R2,R3,R4` (J1`R2,R3`, J2`R4,R1,R3`) {} ");
+
+        checkSucc(d + "func f(a *K1`S1,S2,S3,S4`)*I`S1`{return a;}");
+        checkFail(d + "func f(a *K1`S1,S2,S3,S4`)*I`S2`{return a;}");
+        checkFail(d + "func f(a *K1`S1,S2,S3,S4`)*I`S3`{return a;}");
+        checkFail(d + "func f(a *K1`S1,S2,S3,S4`)*I`S4`{return a;}");
+        checkFail(d + "func f(a *A`S1,S2,S3,S4`)*I`S1`{return a;}");
+        checkSucc(d + "func f(a *A`S1,S2,S3,S4`)*I`S2`{return a;}");
+        checkFail(d + "func f(a *A`S1,S2,S3,S4`)*I`S3`{return a;}");
+        checkFail(d + "func f(a *A`S1,S2,S3,S4`)*I`S4`{return a;}");
     }
 
     //
@@ -2987,7 +3027,7 @@ public class SemanticAnalysisTest {
     @Test
     public void testSample() {
         var cl = Thread.currentThread().getContextClassLoader();
-        var res=cl.getResource("analysis");
+        var res = cl.getResource("analysis");
         var dir = new File(required(res).getFile());
         for (var file : required(dir.listFiles(Constants.srcFilter()))) {
             parseSample(file);

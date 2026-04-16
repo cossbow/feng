@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 public class InterfaceDefinition extends ObjectDefinition {
     private IdentifierMap<InterfaceMethod> methods;
@@ -52,6 +53,10 @@ public class InterfaceDefinition extends ObjectDefinition {
 
     public int id() {
         return id;
+    }
+
+    public Stream<? extends DerivedType> supers() {
+        return parts.stream();
     }
 
     public void visitParts(Consumer<InterfaceDefinition> user) {

@@ -264,7 +264,7 @@ public class CppGenerator {
         if (dt instanceof PrimitiveType pt) {
             return pt.primitive().type();
         }
-        return ((DerivedType) dt).def.must();
+        return ((DerivedType) dt).def();
     }
 
     // 写入全局的字符串常量池：非C-type字符串，没有尾部的'0'

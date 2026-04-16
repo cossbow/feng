@@ -33,7 +33,7 @@ public class DerivedTypeDeclarer extends TypeDeclarer
     }
 
     public TypeDefinition def() {
-        return derivedType.def.must();
+        return derivedType.def();
     }
 
     public GenericMap gm() {

@@ -4,6 +4,7 @@ import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.proc.ParameterSet;
 import org.cossbow.feng.ast.proc.Prototype;
+import org.cossbow.feng.util.ErrorUtil;
 
 import java.util.Map;
 import java.util.function.Function;
@@ -38,6 +39,15 @@ public class GenericMap {
         return parent.find(p);
     }
 
+    public TypeDeclarer mapIf(TypeParameter tp) {
+        var t = find(tp);
+        if (t == null)
+            return ErrorUtil.unreachable();
+        if (next == null) return t;
+        if (!t.hasTemplate()) return t;
+        return next.mapIf(t);
+    }
+
     public TypeDeclarer mapIf(GenericTypeDeclarer gtd) {
         var t = find(gtd.param());
         if (t == null) return gtd;
@@ -47,7 +57,7 @@ public class GenericMap {
     }
 
     public DerivedTypeDeclarer mapIf(DerivedTypeDeclarer dtd) {
-        var dt = (DerivedType) dtd.derivedType().clone();
+        var dt = dtd.derivedType().clone();
         var nArgs = dt.generic().map(mapper());
         dt.generic(nArgs);
         dt.gm(dt.gm().overlay(this));
@@ -76,6 +86,18 @@ public class GenericMap {
             case FuncTypeDeclarer otd -> mapIf(otd);
             default -> td;
         };
+    }
+
+    public TypeArguments mapAll(TypeArguments tas) {
+        if (isEmpty() || tas.isEmpty()) return tas;
+        var list = tas.stream().map(mapper()).toList();
+        return new TypeArguments(tas.pos(), list);
+    }
+
+    public TypeArguments mapAll(TypeParameters tps) {
+        if (isEmpty() || tps.isEmpty()) return TypeArguments.EMPTY;
+        var list = tps.stream().map(this::mapIf).toList();
+        return new TypeArguments(tps.pos(), list);
     }
 
     public Prototype instantiate(Prototype p0) {

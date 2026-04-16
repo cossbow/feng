@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -36,20 +35,6 @@ public class TypeArguments extends Entity
 
     public boolean isEmpty() {
         return arguments.isEmpty();
-    }
-
-    public boolean allMatch(Predicate<TypeDeclarer> p) {
-        for (var a : arguments) {
-            if (!p.test(a)) return false;
-        }
-        return true;
-    }
-
-    public boolean anyMatch(Predicate<TypeDeclarer> p) {
-        for (var a : arguments) {
-            if (p.test(a)) return true;
-        }
-        return false;
     }
 
     public Stream<TypeDeclarer> stream() {

@@ -263,7 +263,7 @@ public class LowCppGenerator {
     }
 
     private TypeDefinition findType(DerivedType dt) {
-        return dt.def.must();
+        return dt.def();
     }
 
     private TypeDefinition findType(DefinedType dt) {
@@ -1507,7 +1507,7 @@ public class LowCppGenerator {
     }
 
     private LowCppGenerator write(BoolLiteral e) {
-        write(e.value() ? "true" : "false");
+        write(Boolean.toString(e.value()));
         return this;
     }
 

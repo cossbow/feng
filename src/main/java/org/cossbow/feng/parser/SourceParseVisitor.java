@@ -140,7 +140,7 @@ final class SourceParseVisitor
 
     Symbol defineSymbol(Identifier id) {
         if (ParseSymbolTable.isBuiltin(id)) {
-            return new Symbol(id.pos(), id);
+            return semantic("name '%s' has used by builtin-type: %s", id, id.pos());
         }
         return new Symbol(id.pos(), module, id);
     }
@@ -425,7 +425,8 @@ final class SourceParseVisitor
                 return new PrimitiveType(posOf(ctx), name, pd.get());
             }
 
-            symbol = defineSymbol(name);
+            if (!ParseSymbolTable.isBuiltin(name))
+                symbol = new Symbol(name.pos(), module, name);
         }
         var args = typeArguments(ctx.typeArguments());
         return new DerivedType(posOf(ctx), symbol, args);

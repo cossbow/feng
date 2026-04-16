@@ -6,6 +6,7 @@ import org.cossbow.feng.ast.Position;
 
 import java.util.Iterator;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class TypeParameters extends Entity
         implements Iterable<TypeParameter> {
@@ -35,6 +36,10 @@ public class TypeParameters extends Entity
 
     public Iterator<TypeParameter> iterator() {
         return params.iterator();
+    }
+
+    public Stream<TypeParameter> stream() {
+        return params.stream();
     }
 
     //

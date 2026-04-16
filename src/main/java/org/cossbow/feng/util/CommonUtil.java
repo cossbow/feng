@@ -60,6 +60,23 @@ public class CommonUtil {
         return l;
     }
 
+    public static <T> Optional<Groups.G2<T, T>>
+    diff(List<T> la, List<T> lb) {
+        var sa = la.size();
+        if (sa != lb.size())
+            throw new IllegalArgumentException(
+                    "required same size of tow lists");
+        if (sa == 0) return Optional.empty();
+        for (int i = 0; i < sa; i++) {
+            var va = la.get(i);
+            var vb = lb.get(i);
+            if (la.get(i).equals(lb.get(i)))
+                continue;
+            return Optional.of(Groups.g2(va, vb));
+        }
+        return Optional.empty();
+    }
+
     public static <Key> Set<Key>
     subtract(Collection<Key> minuend, Collection<Key> subtraction) {
         var difference = new HashSet<Key>(

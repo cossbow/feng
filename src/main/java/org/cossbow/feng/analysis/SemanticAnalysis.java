@@ -330,7 +330,7 @@ public class SemanticAnalysis {
         var s = dt.symbol();
         var o = context.findType(s);
         if (o.has()) {
-            dt.def.set(o);
+            dt.def(o.get());
             analyse(dt.generic());
             var gm = genericMap(dt, o.get().generic(), dt.generic());
             dt.gm(gm);
@@ -798,6 +798,7 @@ public class SemanticAnalysis {
         for (var id : cd.allImpls()) {
             id.impls.add(cd);
         }
+        checkInheritGeneric(cd);
     }
 
     private Optional<ClassDefinition>
@@ -928,6 +929,35 @@ public class SemanticAnalysis {
                 m, e.generic());
     }
 
+
+    // check: support multiple inheritance
+    private void checkInheritGeneric(ObjectDefinition od) {
+        var args = new HashMap<Symbol, TypeArguments>(16);
+        checkInheritGeneric(od, GenericMap.EMPTY, args, od);
+    }
+
+    private void checkInheritGeneric(ObjectDefinition od, GenericMap next,
+                                     Map<Symbol, TypeArguments> typeArgs,
+                                     Entity e) {
+        var supers = od.supers().toList();
+        for (var st : supers) {
+            var gm = st.gm().overlay(next);
+            var sd = (ObjectDefinition) st.def();
+            var other = gm.mapAll(sd.generic());
+            var exist = typeArgs.putIfAbsent(sd.symbol(), other);
+
+            if (exist != null) {
+                var o = CommonUtil.diff(exist.arguments(), other.arguments());
+                o.use(g -> {
+                    semantic("'%s' can't be inherited with different " +
+                                    "type arguments: '%s' and '%s'", sd.symbol(),
+                            g.a(), g.b(), e.pos());
+                });
+            }
+            checkInheritGeneric(sd, gm, typeArgs, e);
+        }
+    }
+
     private List<InterfaceDefinition>
     findParts(InterfaceDefinition def) {
         return def.parts().stream().map(p -> {
@@ -990,6 +1020,7 @@ public class SemanticAnalysis {
         }
         all.forEach(id.allMethods::add);
 
+        checkInheritGeneric(id);
         return id;
     }
 
@@ -1193,80 +1224,62 @@ public class SemanticAnalysis {
         return bs;
     }
 
-    private boolean assignable(ClassDefinition l, ClassDefinition r) {
-        if (r.equals(l)) return true;
-        return r.parent().match(p -> assignable(l, p));
-    }
-
-    private boolean assignable(InterfaceDefinition l, ClassDefinition r) {
-        if (r.impl().exists(l.symbol())) return true;
-
-        var ok = r.parent().match(p -> assignable(l, p));
-        if (ok) return true;
-
-        for (var dt : r.impl()) {
-            var id = (InterfaceDefinition) dt.def.must();
-            if (assignable(l, id)) return true;
+    private boolean assignable(
+            DerivedType lt, ObjectDefinition ld,
+            ObjectDefinition rd, GenericMap next) {
+        var supers = rd.supers().toList();
+        for (var st : supers) {
+            var sd = (ObjectDefinition) st.def();
+            var gm = st.gm().overlay(next);
+            var tas = gm.mapAll(sd.generic());
+            if (ld.equals(sd))
+                return lt.generic().equals(tas);
+            if (assignable(lt, ld, sd, gm))
+                return true;
         }
-
         return false;
     }
 
-    private boolean assignable(InterfaceDefinition l, InterfaceDefinition r) {
-        if (l.equals(r)) return true;
-
-        for (var dt : r.parts()) {
-            var def = dt.def.must();
-            if (def instanceof InterfaceDefinition id)
-                if (assignable(l, id)) return true;
-        }
-
-        return false;
+    private boolean assignable(
+            DerivedType lt, ObjectDefinition ld,
+            DerivedType rt, ObjectDefinition rd) {
+        return assignable(lt, ld, rd, rt.gm());
     }
 
     // 协变分析
     private boolean assignable(
-            ObjectDefinition l, ObjectDefinition r) {
-        if (typeNest > 0) return l.equals(r);
+            DerivedTypeDeclarer lt, ObjectDefinition ld,
+            DerivedTypeDeclarer rt, ObjectDefinition rd) {
 
-        if (l instanceof ClassDefinition lc) {
-            if (r instanceof ClassDefinition rc) {
-                return assignable(lc, rc);
-            }
-            return l == ClassDefinition.ObjectClass;
+        if (ld.equals(rd))
+            return lt.generic().equals(rt.generic());
+        if (typeNest > 0) return false;
+
+        if (ClassDefinition.ObjectClass.equals(ld)) {
+            if (rd instanceof InterfaceDefinition)
+                return true;
+            if (rd instanceof ClassDefinition rc)
+                return !rc.isFinal();
         }
 
-        if (l instanceof InterfaceDefinition li) {
-            if (r instanceof ClassDefinition rc) {
-                return assignable(li, rc);
-            }
-            if (r instanceof InterfaceDefinition ri) {
-                return assignable(li, ri);
+        if (ld instanceof ClassDefinition) {
+            if (rd instanceof InterfaceDefinition) {
+                return false;
             }
         }
 
-        return unreachable();
+        return assignable(lt.derivedType(),
+                ld, rt.derivedType(), rd);
     }
 
-    private boolean
-    assignable(DerivedTypeDeclarer l, EnumTypeDeclarer r) {
-        var ld = l.def();
-        return ld instanceof EnumDefinition ed && r.def().equals(ed);
-    }
-
-    private TypeValid
-    assignable(DerivedTypeDeclarer l,
-               DerivedTypeDeclarer r,
-               Entity e) {
-        if (!l.generic().equals(r.generic()))
-            return TypeValid.err("type arguments not match '%s'%s <--> '%s'%s: %s",
-                    l, l.pos(), r, r.pos(), e.pos());
-
+    private TypeValid assignable(DerivedTypeDeclarer l,
+                                 DerivedTypeDeclarer r,
+                                 Entity e) {
         var lt = l.def();
         var rt = r.def();
         if (lt instanceof ObjectDefinition lo &&
                 rt instanceof ObjectDefinition ro)
-            if (assignable(lo, ro)) return TypeValid.ok();
+            if (assignable(l, lo, r, ro)) return TypeValid.ok();
 
         if (lt instanceof EnumDefinition le &&
                 rt instanceof EnumDefinition re) {
@@ -1609,7 +1622,6 @@ public class SemanticAnalysis {
 
         if (r instanceof FuncTypeDeclarer rf) {
             if (l instanceof FuncTypeDeclarer lf)
-                // TODO: 检查空
                 return compatible(lf.prototype(),
                         rf.prototype(), e);
         }
@@ -1977,7 +1989,7 @@ public class SemanticAnalysis {
 
         var a = e.arguments().getFirst();
         var dt = new DerivedType(a.pos(), ed.symbol(), TypeArguments.EMPTY);
-        dt.def.set(ed);
+        dt.def(ed);
         var t = new EnumTypeDeclarer(a.pos(), ed);
 
         var size = new IntegerLiteral(ZERO, ed.values().size()).expr();
@@ -2634,8 +2646,8 @@ public class SemanticAnalysis {
             DerivedTypeDeclarer l, DerivedTypeDeclarer r) {
         if (l.def() instanceof ObjectDefinition lo &&
                 r.def() instanceof ObjectDefinition ro)
-            return assignable(lo, ro) ||
-                    assignable(ro, lo);
+            return assignable(l, lo, r, ro) ||
+                    assignable(r, ro, l, lo);
         return false;
     }
 
@@ -2802,7 +2814,7 @@ public class SemanticAnalysis {
         assertFinalClass(srcDef, e);
         assertFinalClass(tgtDef, e);
 
-        if (assignable(tgtDef, srcDef)) {
+        if (assignable(dstType, tgtDef, srcType, srcDef)) {
             return Groups.g2(n, dstType);
         }
         if (tgtDef instanceof InterfaceDefinition ||
@@ -2812,7 +2824,7 @@ public class SemanticAnalysis {
         }
         if (tgtDef instanceof ClassDefinition td &&
                 srcDef instanceof ClassDefinition sd) {
-            if (assignable(srcDef, tgtDef)) {
+            if (assignable(srcType, srcDef, dstType, tgtDef)) {
                 n.needCheck(true);
                 return Groups.g2(n, dstType);
             }
@@ -2936,7 +2948,7 @@ public class SemanticAnalysis {
     private Groups.G2<Expression, TypeDeclarer> optimize(CurrentExpression e) {
         // 必定是在类的方法里
         var dt = new DerivedType(e.pos(), e.type(), TypeArguments.EMPTY);
-        dt.def.set(enterClass);
+        dt.def(enterClass);
         var ref = new Refer(e.pos(), PHANTOM, true, false);
         var td = new DerivedTypeDeclarer(e.pos(), dt, Optional.of(ref));
         return Groups.g2(e, td);
