@@ -53,6 +53,10 @@ public class ModulePath extends Entity {
         return path;
     }
 
+    public Identifier pkg() {
+        return pkg;
+    }
+
     public Identifier name() {
         return values.length > 0 ?
                 values[values.length - 1] : pkg;

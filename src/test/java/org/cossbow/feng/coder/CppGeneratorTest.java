@@ -1,6 +1,7 @@
 package org.cossbow.feng.coder;
 
 import org.cossbow.feng.ast.mod.FModule;
+import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.mod.ModuleAnalyseTest;
 import org.cossbow.feng.mod.ModuleAnalysis;
 import org.cossbow.feng.mod.ModuleParser;
@@ -9,9 +10,9 @@ import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.ResourceUtil;
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 
@@ -23,22 +24,6 @@ public class CppGeneratorTest {
         var i = name.lastIndexOf('.');
         if (i < 0) return Path.of(name + '.' + ext);
         return Path.of(name.substring(0, i + 1) + ext);
-    }
-
-    static Path compileFile(Path file) {
-        var dir = file.getParent();
-        var fn = file.getFileName();
-        var name = CommonUtil.trimExt(fn.toString());
-        var fm = new ModuleParser(name, dir, UTF_8).parseFile(fn);
-        var ast = new ModuleAnalysis().analyse(fm);
-        var cpp = replaceExt(name, "cpp");
-        System.out.printf("[compile]%s%s{%s -> %s}\n",
-                dir, File.separator, name, cpp);
-        ResourceUtil.write(dir.resolve(cpp), w -> {
-            new CppGenerator(ast, w, true).write();
-        });
-
-        return cpp;
     }
 
     static void compileCpp(boolean ld, Path dir, String name, Path... cpps) {
@@ -84,9 +69,10 @@ public class CppGeneratorTest {
             var fn = file.getFileName();
             var name = CommonUtil.trimExt(fn.toString())
                     .replace("-", "_");
-            var fm = new ModuleParser(name, dir, UTF_8).parseFile(fn);
-            new ModuleAnalysis().analyse(fm);
-            genCpp(fm, dir);
+            var dag = new ModuleParser(name, dir, UTF_8,
+                    ModuleParserTest.libs()).parseFile(fn);
+            new ModuleAnalysis().analyse(dag);
+            generate(dag, dir, true);
         }
     }
 
@@ -102,6 +88,7 @@ public class CppGeneratorTest {
         ResourceUtil.write(dir.resolve(name + ".h"), w -> {
             new CppGenerator(ast, w, true, true).write();
         });
+        Files.exists(dir.resolve(name + ".h"));
         System.out.printf("c++: %s.o\n", name);
         compileCpp(false, dir, name, cpp);
         return cpp;
@@ -111,20 +98,25 @@ public class CppGeneratorTest {
     public void testSampleModule() {
         var dir = ModuleParserTest.getDir();
         var fm = ModuleAnalyseTest.analyseModule();
-        CppGenerator.copyBaseHeader(dir);
-        genCpp(fm, dir);
+        generate(fm, dir, true);
     }
 
     @Test
     public void testMultiModule() {
         var dir = ModuleParserTest.getDir();
+        var dag = ModuleAnalyseTest.analysePackage();
+        generate(dag, dir, false);
+    }
+
+    private void generate(DAGGraph<FModule> dag,
+                          Path dir, boolean libs) {
         CppGenerator.copyBaseHeader(dir);
-        var dag = ModuleAnalyseTest.analyseProject();
         var cpps = new ArrayList<Path>();
         for (var fm : dag) {
             var cpp = genCpp(fm, dir);
             cpps.add(cpp);
         }
+        if (libs) return;
         System.out.println("c++ main");
         compileCpp(true, dir, ModuleParserTest.pkgName,
                 cpps.toArray(Path[]::new));

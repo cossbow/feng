@@ -10,8 +10,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.BufferedWriter;
 import java.io.OutputStreamWriter;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -23,40 +21,47 @@ public class ModuleAnalyseTest {
              var w = new BufferedWriter(osw)) {
             new MetaDataExtractor(m, w).write();
         }
-        var save = ModuleParserTest.getDir()
-                .resolve(m.path().toPath()).resolve("feng.meta");
-        Files.copy(buf.read(), save, StandardCopyOption.REPLACE_EXISTING);
-        System.out.println(save);
+//        var save = ModuleParserTest.getDir()
+//                .resolve(m.path().toPath()).resolve("feng.meta");
+//        Files.copy(buf.read(), save, StandardCopyOption.REPLACE_EXISTING);
+//        System.out.println(save);
 
         var src = new SourceParser(m.path(), UTF_8, true)
                 .parse("buffer", CharStreams.fromStream(buf.read()));
         return src.table();
     }
 
-    public static FModule analyseModule() {
+    public static DAGGraph<FModule> analyseModule() {
         var m = ModuleParserTest.parseModule();
         new ModuleAnalysis().analyse(m);
         return m;
     }
 
     @Test
-    public void testSingle() throws Exception {
-        var fm = analyseModule();
-        export(fm);
-    }
-
-    public static DAGGraph<FModule> analyseProject() {
-        var dag = ModuleParserTest.parseProject();
-        new ModuleAnalysis().analyse(dag);
-        return dag;
-    }
-
-    @Test
-    public void testAnalysis() throws Exception {
-        var dag = analyseProject();
+    public void testModule() throws Exception {
+        var dag = analyseModule();
         for (var fm : dag) {
             export(fm);
         }
     }
 
+    public static DAGGraph<FModule> analysePackage() {
+        var dag = ModuleParserTest.parsePackage();
+        new ModuleAnalysis().analyse(dag);
+        return dag;
+    }
+
+    @Test
+    public void testPackage() throws Exception {
+        var dag = analysePackage();
+        for (var fm : dag) {
+            export(fm);
+        }
+    }
+
+    @Test
+    public void testLibrary() {
+        var dag = ModuleParserTest.withLibrary();
+        new ModuleAnalysis().analyse(dag);
+    }
 }

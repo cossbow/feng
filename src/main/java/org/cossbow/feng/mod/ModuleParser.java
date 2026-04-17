@@ -8,9 +8,7 @@ import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.dag.DAGUtil;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.parser.SourceParser;
-import org.cossbow.feng.util.Constants;
-import org.cossbow.feng.util.DedupCache;
-import org.cossbow.feng.util.Groups;
+import org.cossbow.feng.util.*;
 import org.cossbow.feng.util.Optional;
 
 import java.io.IOException;
@@ -18,36 +16,61 @@ import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.*;
 
 import static org.cossbow.feng.util.ErrorUtil.modFail;
-import static org.cossbow.feng.util.ErrorUtil.unsupported;
 
 public class ModuleParser {
     private final Identifier pkg;
     private final Path base;
     private final Charset charset;
+    // dependencies of libs has been solved outside
+    private final Map<Identifier, ModuleParser> libs;
 
-    public ModuleParser(String pkg, Path base, Charset charset) {
+    public ModuleParser(String pkg, Path base, Charset charset,
+                        Map<Identifier, ModuleParser> libs) {
         this.pkg = new Identifier(pkg);
         this.base = base;
         this.charset = charset;
+        this.libs = libs;
+    }
+
+    public ModuleParser(String pkg, Path base, Charset charset) {
+        this(pkg, base, charset, Map.of());
+    }
+
+    public Identifier pkg() {
+        return pkg;
     }
 
     private Path absPath(Path relPath) {
         return base.resolve(relPath);
     }
 
-    public FModule parseFile(Path file) {
+    private final Map<ModulePath, FModule> libCache = new HashMap<>();
+
+    private FModule loadLib(ModulePath mp) {
+        var fm = libCache.get(mp);
+        if (fm != null) return fm;
+        fm = parseOneModule(mp.toPath());
+        libCache.put(mp, fm);
+        return fm;
+    }
+
+    private FModule searchLib(ModulePath mp) {
+        var parser = libs.get(mp.pkg());
+        if (parser != null) {
+            return parser.loadLib(mp);
+        }
+        return ErrorUtil.modFail("can't find module '%s'", mp);
+    }
+
+    public DAGGraph<FModule> parseFile(Path file) {
         var mp = new ModulePath(pkg, Path.of(""));
         var src = new SourceParser(mp, charset)
                 .parse(absPath(file));
-        if (src.imports().isEmpty())
-            return new FModule(mp, List.of(), src.table());
-        return unsupported("import library");
+        var fm = new FModule(mp, src.imports(), src.table());
+        return makeGraph(List.of(fm));
     }
 
     private List<Source> parseFiles(ModulePath mp, List<Path> files) {
@@ -59,8 +82,7 @@ public class ModuleParser {
         return sources;
     }
 
-    private FModule mergeFiles(
-            Path path, ModulePath mp, List<Source> list) {
+    private FModule mergeFiles(ModulePath mp, List<Source> list) {
         var table = new ParseSymbolTable(Optional.of(mp), new DedupCache<>());
         var paths = new DedupCache<ModulePath>();
         for (var src : list) {
@@ -71,50 +93,71 @@ public class ModuleParser {
                     continue;
 
                 return modFail(
-                        "cyclic import detected '%s': %s", i, i.pos());
+                        "can't import self '%s': %s", i, i.pos());
             }
         }
         return new FModule(mp, paths.toList(), table);
     }
 
-    /**
-     * 解析指定模块
-     * @param module 模块名称
-     */
-    public FModule parseModule(Path module) {
+    private FModule parseModuleFiles(Path module, List<Path> files) {
+        var mp = new ModulePath(pkg, module);
+        var sources = parseFiles(mp, files);
+        return mergeFiles(mp, sources);
+    }
+
+    private FModule parseOneModule(Path module) {
         try (var ls = Files.list(absPath(module))) {
             var files = ls.filter(Constants.srcTest()).toList();
-            var mp = new ModulePath(pkg, module);
-            var sources = parseFiles(mp, files);
-            return mergeFiles(module, mp, sources);
+            return parseModuleFiles(module, files);
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            throw new UncheckedIOException(
+                    "parse module fail: " + module, e);
         }
     }
 
-    public DAGGraph<FModule> scanAndParse() {
+    /**
+     * parse one module
+     */
+    public DAGGraph<FModule> parseModule(Path module) {
+        var fm = parseOneModule(module);
+        return makeGraph(List.of(fm));
+    }
+
+    /**
+     * parse all modules of whole package
+     */
+    public DAGGraph<FModule> parsePackage() {
         var list = scanModule();
-        var map = new LinkedHashMap<ModulePath, FModule>();
         var modules = new ArrayList<FModule>(list.size());
-        for (var g2 : list) {
-            var mp = new ModulePath(pkg, g2.a());
-            var sources = parseFiles(mp, g2.b());
-            var fm = mergeFiles(g2.a(), mp, sources);
+        for (var g : list) {
+            var fm = parseModuleFiles(g.a(), g.b());
             modules.add(fm);
-            map.put(fm.path(), fm);
+        }
+        return makeGraph(modules);
+    }
+
+    private DAGGraph<FModule> makeGraph(List<FModule> list) {
+        var modules = CommonUtil.toMap(list, FModule::path);
+        for (var fm : list) {
+            collectLibs(modules, fm.imports());
         }
         var edges = new ArrayList<Groups.G2<FModule, FModule>>();
-        for (var fm : modules) {
-            for (var i : fm.imports()) {
-                var im = map.get(i);
-                if (im == null) {
-                    modFail("module '%s' not found: %s",
-                            i, i.pos());
-                }
-                edges.add(Groups.g2(im, fm));
+        for (var fm : modules.values()) {
+            for (ModulePath i : fm.imports()) {
+                edges.add(Groups.g2(modules.get(i), fm));
             }
         }
-        return DAGUtil.make(map.values(), edges);
+        return DAGUtil.make(modules.values(), edges);
+    }
+
+    private void collectLibs(Map<ModulePath, FModule> modules,
+                             List<ModulePath> imports) {
+        for (var i : imports) {
+            if (modules.containsKey(i)) continue;
+            var im = searchLib(i);
+            modules.put(im.path(), im);
+            collectLibs(modules, im.imports());
+        }
     }
 
     private List<Groups.G2<Path, List<Path>>> scanModule() {

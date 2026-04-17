@@ -1,0 +1,5 @@
+import test$aac;
+
+func test() {
+    aac$test1();
+}

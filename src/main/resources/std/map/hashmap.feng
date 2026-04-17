@@ -1,18 +1,21 @@
-
+export
 class Node`K, V` final {
-    var key K;
+    export
+    const key K;
+    export
     var value V;
     var next *Node`K, V`;
 }
 
-class HashMap`K, V` ( Map`K, V`) {
-    const hashing func(k K) int;
+
+class HashMap`K, V` (Map`K, V`) {
+    const hashing func(&Node`K, V`) int;
     var buckets [*]*Node`K, V`;
     var size int;
     var threshold int;
 
-    func indexed(k K) int {
-        var h = hashing(k);
+    func indexed(n &Node`K,V`) int {
+        var h = hashing(n);
         return h & (buckets.length-1);
     }
 
@@ -28,10 +31,10 @@ class HashMap`K, V` ( Map`K, V`) {
                 var cur = buckets[i];
                 for (cur != nil) {
                     var next = cur.next;
-                    var idx = hashing(cur.key) % cap;
+                    var idx = hashing(cur) % cap;
                     cur.next = newBuck[idx];
                     newBuck[idx] = cur;
-                    cur = next;
+//                    cur = next;
                 }
             }
             buckets = newBuck;
@@ -43,10 +46,11 @@ class HashMap`K, V` ( Map`K, V`) {
     export
     func set(key K, value V) Result`V` {
         var bucks = rehash();
-        var idx = indexed(key);
+        var nn Node`K,V` = {key=key,value=value};
+        var idx = indexed(nn);
         var cur = bucks[idx];
         if (cur == nil) {
-            bucks[idx] = new(Node`K, V`, {key=key,value=value});
+            bucks[idx] = new(Node`K, V`, nn);
             size += 1;
             return {ok=true};
         }
@@ -61,7 +65,7 @@ class HashMap`K, V` ( Map`K, V`) {
             prev = cur;
             cur = cur.next;
         }
-        prev.next = new(Node`K, V`, {key=key,value=value});
+        prev.next = new(Node`K, V`, nn);
 
         size += 1;
 
@@ -70,8 +74,8 @@ class HashMap`K, V` ( Map`K, V`) {
 
     export
     func get(key K) Result`V` {
-
-        var idx = indexed(key);
+        var kn Node`K,V` = {key=key};
+        var idx = indexed(kn);
         var cur = buckets[idx];
         if (cur == nil) {
             return {};
@@ -86,7 +90,7 @@ class HashMap`K, V` ( Map`K, V`) {
 }
 
 export
-func newHashmap`K,V`(hashing func(k K)int) *Map`K,V` {
+func newHashmap`K,V`(hashing func(&Node`K,V`)int) *Map`K,V` {
     return new(HashMap`K,V`, {hashing=hashing});
 }
 

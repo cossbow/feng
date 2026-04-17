@@ -1,9 +1,6 @@
 package org.cossbow.feng.util;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.io.Writer;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -11,7 +8,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.file.StandardOpenOption.*;
 
 public class ResourceUtil {
 
@@ -31,9 +28,17 @@ public class ResourceUtil {
     }
 
     public static void write(Path file, Output o) {
-        try (var w = Files.newBufferedWriter(file, UTF_8)) {
+        var buf = new BufferOutputStream(4096);
+        try (var w = new OutputStreamWriter(buf)) {
             o.write(w);
             w.flush();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        try (var w = Files.newOutputStream(
+                file, CREATE, WRITE, TRUNCATE_EXISTING);
+             var i = buf.read()) {
+            i.transferTo(w);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

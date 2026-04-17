@@ -40,6 +40,14 @@ public class DAGGraph<Key>
         this.heads = Set.copyOf(subtract(all, this.reverse.keySet()));
     }
 
+    public DAGGraph(Key one) {
+        this.all = Set.of(one);
+        this.heads = Set.of(one);
+        this.tails = Set.of(one);
+        this.forward = Map.of();
+        this.reverse = Map.of();
+    }
+
     private DAGGraph() {
         this.all = Set.of();
         this.heads = Set.of();
@@ -170,6 +178,10 @@ public class DAGGraph<Key>
         for (Key key : linear()) {
             user.accept(key);
         }
+    }
+
+    public String toString() {
+        return all.toString();
     }
 
     //

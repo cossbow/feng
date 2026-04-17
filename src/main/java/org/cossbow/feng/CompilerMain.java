@@ -1,19 +1,23 @@
 package org.cossbow.feng;
 
-import com.beust.jcommander.JCommander;
-import com.beust.jcommander.Parameter;
-import com.beust.jcommander.converters.BaseConverter;
+import com.beust.jcommander.*;
 import com.beust.jcommander.converters.PathConverter;
 import org.cossbow.feng.analysis.AnalyseSymbolTable;
+import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.coder.CppGenerator;
+import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.mod.ModuleAnalysis;
 import org.cossbow.feng.mod.ModuleParser;
 import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.ErrorUtil;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -33,8 +37,36 @@ public class CompilerMain {
             description = "path of output dir, default to input dir",
             converter = PathConverter.class)
     private Path output;
+    @DynamicParameter(names = "-L",
+            description = "search libraries: [name=path] ...")
+    private Map<String, String> lib = new HashMap<>();
 
     //
+    private static Path getDir(String name) {
+        var cl = Thread.currentThread().getContextClassLoader();
+        var dir = cl.getResource(name);
+        assert dir != null;
+        return new File(dir.getFile()).toPath();
+    }
+
+    private static final ModuleParser stdInner =
+            new ModuleParser("std", getDir("std"), UTF_8);
+
+    private Map<Identifier, ModuleParser> getLibParsers() {
+        if (lib == null || lib.isEmpty())
+            return Map.of(stdInner.pkg(), stdInner);
+        var parsers = new HashMap<Identifier, ModuleParser>(1 + lib.size());
+        parsers.put(stdInner.pkg(), stdInner);
+        for (var le : lib.entrySet()) {
+            var p = new ModuleParser(le.getKey(), Path.of(le.getValue()), UTF_8);
+            parsers.put(p.pkg(), p);
+        }
+        return parsers;
+    }
+
+    private ModuleParser parser(Path dir) {
+        return new ModuleParser(pkg, dir, UTF_8, getLibParsers());
+    }
 
     private void generateCpp(AnalyseSymbolTable ast, Path dir, String name)
             throws IOException {
@@ -48,6 +80,15 @@ public class CompilerMain {
         }
     }
 
+    private void analyzeAndGenCpp(DAGGraph<FModule> dag) throws IOException {
+        new ModuleAnalysis().analyse(dag);
+        CppGenerator.copyBaseHeader(output);
+        for (var fm : dag) {
+            var mp = fm.path();
+            generateCpp(fm.result.must(), output, mp.filename());
+        }
+    }
+
     private void compileFile() throws IOException {
         if (!Files.isRegularFile(input)) {
             ErrorUtil.argument("%s is not a regular file", input);
@@ -58,11 +99,9 @@ public class CompilerMain {
         if (pkg == null) {
             pkg = CommonUtil.trimExt(fn.toString());
         }
-        var fm = new ModuleParser(pkg, input.getParent(), UTF_8)
+        var fm = parser(input.getParent())
                 .parseFile(fn);
-        var ast = new ModuleAnalysis().analyse(fm);
-        generateCpp(ast, output, pkg);
-        CppGenerator.copyBaseHeader(output);
+        analyzeAndGenCpp(fm);
     }
 
     private void compileModule() throws IOException {
@@ -74,27 +113,19 @@ public class CompilerMain {
         var dir = input.getParent();
         var fn = input.getFileName();
         if (pkg == null) pkg = fn.toString();
-        var fm = new ModuleParser(pkg, dir, UTF_8)
-                .parseModule(fn);
-        var ast = new ModuleAnalysis().analyse(fm);
-        generateCpp(ast, output, fn.toString());
-        CppGenerator.copyBaseHeader(output.getParent());
+        var dag = parser(dir).parseModule(fn);
+        analyzeAndGenCpp(dag);
     }
 
-    private void compileProject() throws IOException {
+    private void compilePackage() throws IOException {
         if (!Files.isDirectory(input)) {
             ErrorUtil.argument("%s is not a dir", input);
             return;
         }
         if (pkg == null) pkg = input.getFileName().toString();
 
-        var dag = new ModuleParser(pkg, input, UTF_8).scanAndParse();
-        new ModuleAnalysis().analyse(dag);
-        for (var fm : dag) {
-            var mp = fm.path();
-            generateCpp(fm.result.must(), output, mp.filename());
-        }
-        CppGenerator.copyBaseHeader(output);
+        var dag = parser(input).parsePackage();
+        analyzeAndGenCpp(dag);
     }
 
     void run() throws IOException {
@@ -110,41 +141,42 @@ public class CompilerMain {
         switch (sourceType) {
             case FILE -> compileFile();
             case MODULE -> compileModule();
-            case PROJECT -> compileProject();
+            case PACKAGE -> compilePackage();
         }
     }
 
     public static void main(String[] args) throws IOException {
-        var main = new CompilerMain();
-        JCommander.newBuilder().addObject(main).build().parse(args);
-        main.run();
+        try {
+            var main = new CompilerMain();
+            JCommander.newBuilder().addObject(main).build().parse(args);
+            main.run();
+        } catch (ParameterException e) {
+            e.getJCommander().usage();
+            System.exit(1);
+        }
     }
 
     enum SourceType {
         FILE,
         MODULE,
-        PROJECT,
+        PACKAGE,
     }
 
-    static class SourceTypeConverter extends BaseConverter<SourceType> {
-        public SourceTypeConverter(String optionName) {
-            super(optionName);
-        }
-
+    static class SourceTypeConverter implements IStringConverter<SourceType> {
         public SourceType convert(String s) {
             SourceType t;
             if (s.length() == 1) {
                 t = switch (s.charAt(0)) {
                     case 'f' -> SourceType.FILE;
                     case 'm' -> SourceType.MODULE;
-                    case 'p' -> SourceType.PROJECT;
+                    case 'p' -> SourceType.PACKAGE;
                     default -> null;
                 };
             } else {
                 t = switch (s) {
                     case "file" -> SourceType.FILE;
                     case "module" -> SourceType.MODULE;
-                    case "project" -> SourceType.PROJECT;
+                    case "package" -> SourceType.PACKAGE;
                     default -> null;
                 };
             }

@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.Position;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
 
 public class CommonUtil {
 
@@ -77,6 +78,27 @@ public class CommonUtil {
         return Optional.empty();
     }
 
+    public static <K, V> Map<K, V> map(K k, V v) {
+        var m = new HashMap<K, V>(1);
+        m.put(k, v);
+        return m;
+    }
+
+    public static <K, V> Map<K, V> map(K k1, V v1, K k2, V v2) {
+        var m = new HashMap<K, V>(1);
+        m.put(k1, v1);
+        m.put(k2, v2);
+        return m;
+    }
+
+    public static <T, K> Map<K, T> toMap(List<T> l, Function<T, K> kf) {
+        var r = new LinkedHashMap<K, T>(l.size());
+        for (T t : l) {
+            r.put(kf.apply(t), t);
+        }
+        return r;
+    }
+
     public static <Key> Set<Key>
     subtract(Collection<Key> minuend, Collection<Key> subtraction) {
         var difference = new HashSet<Key>(
@@ -94,6 +116,13 @@ public class CommonUtil {
         var result = new HashMap<K, V>(keys.size());
         for (K k : keys) result.put(k, src.get(k));
         return result;
+    }
+
+    public static <K, V> Map<K, V> merge(Map<K, V> a, Map<K, V> b) {
+        var r = new HashMap<K, V>(a.size(), b.size());
+        r.putAll(a);
+        r.putAll(b);
+        return r;
     }
 
     //
