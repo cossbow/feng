@@ -27,6 +27,10 @@ public class StackedContext implements SymbolContext {
         return stack.peek();
     }
 
+    public void exitScope() {
+        stack.pop();
+    }
+
     public void exitScope(Scope scope) {
         var ctx = stack.pop();
         if (!(ctx instanceof LocalSymbolContext lsc))

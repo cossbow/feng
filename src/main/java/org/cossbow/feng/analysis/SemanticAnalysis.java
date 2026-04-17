@@ -2861,6 +2861,7 @@ public class SemanticAnalysis {
             return semantic("redundant arguments: %s", e.pos());
         }
 
+        context.enterScope(); // enter a new scope for check arguments
         var nArgs = new ArrayList<Expression>(args.size());
         for (int i = 0; i < left.size(); i++) {
             var l = left.get(i);
@@ -2870,6 +2871,7 @@ public class SemanticAnalysis {
             assignable(l, ag.b(), Optional.of(ag.a()), a).valid();
             nArgs.add(ag.a());
         }
+        context.exitScope();
 
         call = (PrimaryExpression) g.a();
         if (!(call instanceof BlockExpression be
