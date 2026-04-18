@@ -15,7 +15,9 @@ import org.cossbow.feng.util.ErrorUtil;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -42,6 +44,16 @@ public class CompilerMain {
     private Map<String, String> lib = new HashMap<>();
 
     //
+
+    private static Path toPath(String value) {
+        try {
+            return Paths.get(value);
+        } catch (InvalidPathException e) {
+            throw new ParameterException(
+                    "invalid path: %s".formatted(value));
+        }
+    }
+
     private static Path getDir(String name) {
         var cl = Thread.currentThread().getContextClassLoader();
         var dir = cl.getResource(name);
@@ -58,7 +70,8 @@ public class CompilerMain {
         var parsers = new HashMap<Identifier, ModuleParser>(1 + lib.size());
         parsers.put(stdInner.pkg(), stdInner);
         for (var le : lib.entrySet()) {
-            var p = new ModuleParser(le.getKey(), Path.of(le.getValue()), UTF_8);
+            var base = toPath(le.getValue());
+            var p = new ModuleParser(le.getKey(), base, UTF_8);
             parsers.put(p.pkg(), p);
         }
         return parsers;

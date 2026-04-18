@@ -103,9 +103,11 @@ java -jar feng-0.0.1-dev.jar -t [type] -i [source] -o [output directory]
 ```
 
 Parameter descriptions:
-1. -t: Source type: f/file - single file, m/module - single module, p/project - simple project with multiple modules
-2. -i: Source path: for a single file, point to the full file path; for a module or project, point to the directory.
-3. -o: Output directory: for a single file, outputs one C++ file; for a module or project, each module corresponds to one C++ file. If not specified, defaults to the source directory.
+1. -t Source type: f/file - single file, m/module - single module, p/project - simple project with multi-module organization
+2. -i Source path: For a single file, points to the full file path; for a module or project, points to the corresponding directory.
+3. -o Output directory: For a single file, outputs one C++ file; for a module or project, each module corresponds to one C++ file. If not specified, defaults to the source directory.
+4. -p Current package name: Defaults to the filename or directory name.
+5. -L Add dependency packages: Multiple packages can be specified as key-value pairs (package name = path), for example: `-Lfoo=D:\dev\libs\foo`
 
 Compile a single source file:
 
