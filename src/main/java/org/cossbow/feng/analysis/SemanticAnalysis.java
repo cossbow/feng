@@ -28,6 +28,7 @@ import org.cossbow.feng.util.Stack;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -681,24 +682,27 @@ public class SemanticAnalysis {
 
     // class define
 
-    private void checkInherit(
-            ClassDefinition parent, ClassDefinition child,
-            IdentifierMap<ClassField> inheritFields,
-            IdentifierMap<ClassMethod> inheritMethods) {
-        var inherit = child.inherit().must();
-        parent.children().add(child);
-        if (parent.isFinal()) {
+    private void checkInherit(ClassDefinition cd) {
+        cd.allFields().addAll(cd.fields());
+        cd.allMethods().addAll(cd.methods());
+
+        if (!cd.parent().match(p ->
+                p != ClassDefinition.ObjectClass)) return;
+        var pt = cd.inherit().must();
+        var pd = cd.parent().must();
+        if (pd.isFinal()) {
             semantic("can't inherit final %s: %s",
-                    parent, inherit.pos());
+                    pd, pt.pos());
             return;
         }
         // 检查同名属性
-        for (var pf : parent.allFields()) {
-            var cf = child.fields().tryGet(pf.name());
+        for (var pf : pd.allFields()) {
+            var cf = cd.fields().tryGet(pf.name());
             if (cf.none()) {
                 var nf = pf.clone();
-                nf.type(inherit.gm().mapIf(nf.type()));
-                inheritFields.add(nf.name(), nf);
+                nf.type(pt.gm().mapIf(nf.type()));
+                cd.inheritFields().add(nf.name(), nf);
+                cd.allFields().add(nf.name(), nf);
                 continue;
             }
             semantic("can't hide parent field: %s%s",
@@ -707,19 +711,20 @@ public class SemanticAnalysis {
         }
 
         // 检查方法覆盖是否兼容
-        for (var pm : parent.allMethods()) {
-            var o = child.methods().tryGet(pm.name());
+        for (var pm : pd.allMethods()) {
+            var o = cd.methods().tryGet(pm.name());
             if (o.none()) {
                 var cm = pm.declaration();
-                var pp = inherit.gm().instantiate(cm.prototype());
+                var pp = pt.gm().instantiate(cm.prototype());
                 cm.prototype(pp);
-                cm.master(child);
-                inheritMethods.add(cm.name(), cm);
+                cm.master(cd);
+                cd.inheritMethods().add(cm.name(), cm);
+                cd.allMethods().add(cm.name(), cm);
                 continue;
             }
             var cm = o.must();
             if (!pm.generic().isEmpty() || !cm.generic().isEmpty()) {
-                semantic("override method not support generic: '%s' -> '%s' %s ",
+                semantic("override method not support generic: '%s' -> '%s' %s",
                         pm, cm, cm.pos());
                 return;
             }
@@ -728,42 +733,57 @@ public class SemanticAnalysis {
                         cm.pos());
                 return;
             }
-            var pp = inherit.gm().instantiate(pm.prototype());
+            var pp = pt.gm().instantiate(pm.prototype());
+            if (!compatible(pp, cm.prototype(), pm).ok) {
+                semantic("'%s' clashes with '%s'; incompatible return type: %s",
+                         cm,  pm, cm.pos());
+            }
             compatible(pp, cm.prototype(), pm).valid();
             pm.override().add(cm);
         }
 
     }
 
-    private ClassDefinition findClass(DerivedType t) {
-        var dt = findDef(t);
-        if (dt instanceof ClassDefinition pcd)
-            return pcd;
-        return semantic("require class: %s", dt.symbol());
+    private ClassDefinition findParentClass(DerivedType t) {
+        var def = findDef(t);
+        if (def instanceof ClassDefinition pcd) {
+            if (!pcd.isFinal())
+                return pcd;
+            return semantic("can't inherit final %s: %s",
+                    pcd, t.pos());
+        }
+        return semantic("require class but actual '%s': %s",
+                def, t.pos());
     }
 
-    private void checkAllInherits(ClassDefinition cd) {
+    private void checkImplements(ClassDefinition cd) {
         if (cd.builtin()) return;
-        var inheritFields = new IdentifierMap<ClassField>();
-        var inheritMethods = new IdentifierMap<ClassMethod>();
-        if (cd.parent().has()) {
-            checkInherit(cd.parent().must(), cd, inheritFields, inheritMethods);
+        if (cd.impl().isEmpty()) return;
+
+        for (var t : cd.impl()) {
+            var def = findDef(t);
+            if (def instanceof InterfaceDefinition)
+                continue;
+            semantic("require interface but actual '%s':  %s",
+                    def, t.pos());
         }
-        for (var c = cd.parent(); c.has(); c = c.must().parent()) {
-            cd.ancestors().add(c.must());
-        }
-        cd.inheritFields().addAll(inheritFields);
-        cd.allFields().addAll(inheritFields);
-        cd.allFields().addAll(cd.fields());
-        cd.inheritMethods().addAll(inheritMethods);
-        cd.allMethods().addAll(inheritMethods);
-        cd.allMethods().addAll(cd.methods());
+        checkGeneric(cd, (sd, gm) -> {
+            if (sd instanceof InterfaceDefinition id) {
+                cd.allImpls().add(id);
+                for (var im : id.methods()) {
+                    if (cd.allMethods().exists(im.name()))
+                        continue;
+                    semantic("%s unimplement method: %s%s",
+                            cd.symbol(), im.name(), cd.pos());
+                }
+            }
+        });
     }
 
     private void checkImplList(
             ClassDefinition cd, InterfaceDefinition id,
             DerivedType dt) {
-        for (var im : id.allMethods) {
+        for (var im : id.allMethods()) {
             var o = cd.allMethods().tryGet(im.name());
             if (o.none()) {
                 semantic("%s unimplement method: %s%s",
@@ -798,7 +818,7 @@ public class SemanticAnalysis {
         for (var id : cd.allImpls()) {
             id.impls.add(cd);
         }
-        checkInheritGeneric(cd);
+
     }
 
     private Optional<ClassDefinition>
@@ -823,7 +843,7 @@ public class SemanticAnalysis {
     }
 
     private List<ClassDefinition> findInitDeps(ClassDefinition cd) {
-        var inherit = cd.inherit().stream().map(this::findClass)
+        var inherit = cd.inherit().stream().map(this::findParentClass)
                 .peek(p -> cd.parent().setIfNone(p));
         var fields = cd.fields().stream().map(ClassField::type)
                 .map(this::getClassTypeField).flatMap(Optional::stream);
@@ -847,9 +867,9 @@ public class SemanticAnalysis {
         // 先分析类的结构
         dag.bfs(this::visitClass);
         // 再分析继承关系
-        dag.bfs(this::checkAllInherits);
+        dag.bfs(this::checkInherit);
         // 最后分析实现接口
-        dag.bfs(this::checkImplList);
+        dag.bfs(this::checkImplements);
         // 分析方法是否修改字段：暂时没用，期望用于检查到不可变示例是否调用到了updater
         dag.bfs(cd -> new UpdaterAnalyzer().analyse(cd));
         return (dag);
@@ -931,16 +951,22 @@ public class SemanticAnalysis {
 
 
     // check: support multiple inheritance
-    private void checkInheritGeneric(ObjectDefinition od) {
+    // DFS visit, so check impls after inherits
+    private <OD extends ObjectDefinition> void checkGeneric(
+            OD od, BiConsumer<ObjectDefinition, GenericMap> walk) {
         var args = new HashMap<Symbol, TypeArguments>(16);
-        checkInheritGeneric(od, GenericMap.EMPTY, args, od);
+        var methods = new HashMap<Identifier, Prototype>(16);
+        for (var m : od.methods()) methods.put(m.name(), m.prototype());
+        checkGeneric(od, GenericMap.EMPTY, args, methods, walk, od);
     }
 
-    private void checkInheritGeneric(ObjectDefinition od, GenericMap next,
-                                     Map<Symbol, TypeArguments> typeArgs,
-                                     Entity e) {
-        var supers = od.supers().toList();
-        for (var st : supers) {
+    private <OD extends ObjectDefinition>
+    void checkGeneric(OD od, GenericMap next,
+                      Map<Symbol, TypeArguments> typeArgs,
+                      Map<Identifier, Prototype> methodMap,
+                      BiConsumer<ObjectDefinition, GenericMap> walk,
+                      Entity e) {
+        for (var st : od.supers()) {
             var gm = st.gm().overlay(next);
             var sd = (ObjectDefinition) st.def();
             var other = gm.mapAll(sd.generic());
@@ -950,11 +976,21 @@ public class SemanticAnalysis {
                 var o = CommonUtil.diff(exist.arguments(), other.arguments());
                 o.use(g -> {
                     semantic("'%s' can't be inherited with different " +
-                                    "type arguments: '%s' and '%s'", sd.symbol(),
-                            g.a(), g.b(), e.pos());
+                                    "type arguments: '%s' and '%s': %s",
+                            sd.symbol(), g.a(), g.b(), e.pos());
                 });
             }
-            checkInheritGeneric(sd, gm, typeArgs, e);
+
+            if (sd instanceof InterfaceDefinition) {
+                for (var sm : sd.methods()) {
+                    var gp = gm.instantiate(sm.prototype());
+                    var op = methodMap.putIfAbsent(sm.name(), gp);
+                    if (op == null) continue;
+                    compatible(gp, op, od).valid();
+                }
+            }
+            checkGeneric(sd, gm, typeArgs, methodMap, walk, e);
+            walk.accept(sd, gm);
         }
     }
 
@@ -1009,18 +1045,18 @@ public class SemanticAnalysis {
 
         for (var m : id.methods()) analyse(m);
 
-        var all = new HashMap<Identifier, InterfaceMethod>();
-        for (var m : id.methods()) all.put(m.name(), m);
-        for (var dep : id.partDefs) {
-            var c = compatible(dep, all);
-            c.use(g -> {
-                semantic("duplicate method %s <--> %s",
-                        g.a().pos(), g.b().pos());
-            });
-        }
-        all.forEach(id.allMethods::add);
+        id.allMethods().addAll(id.methods());
+        checkGeneric(id, (sd, gm) -> {
+            var pd = (InterfaceDefinition) sd;
+            for (var m : pd.methods()) {
+                if (id.allMethods().exists(m.name())) continue;
+                var pt = gm.instantiate(m.prototype());
+                var nm = new InterfaceMethod(m.pos(), m.modifier(),
+                        m.name(), m.generic(), pt, m.returnThis());
+                id.allMethods().add(m.name(), nm);
+            }
+        });
 
-        checkInheritGeneric(id);
         return id;
     }
 
@@ -1225,10 +1261,27 @@ public class SemanticAnalysis {
     }
 
     private boolean assignable(
-            DerivedType lt, ObjectDefinition ld,
+            DerivedType lt, ClassDefinition ld,
+            DerivedType rt, ClassDefinition rd) {
+        var gm = rt.gm();
+        var lg = lt.generic();
+        var rg = rt.generic();
+        while (true) {
+            if (ld.equals(rd))
+                return lg.equals(rg);
+            if (rd.inherit().none())
+                return false;
+            rt = rd.inherit().get();
+            rd = (ClassDefinition) rt.def();
+            gm = rt.gm().overlay(gm);
+            rg = gm.mapAll(rd.generic());
+        }
+    }
+
+    private boolean assignable(
+            DerivedType lt, InterfaceDefinition ld,
             ObjectDefinition rd, GenericMap next) {
-        var supers = rd.supers().toList();
-        for (var st : supers) {
+        for (var st : rd.supers()) {
             var sd = (ObjectDefinition) st.def();
             var gm = st.gm().overlay(next);
             var tas = gm.mapAll(sd.generic());
@@ -1241,7 +1294,7 @@ public class SemanticAnalysis {
     }
 
     private boolean assignable(
-            DerivedType lt, ObjectDefinition ld,
+            DerivedType lt, InterfaceDefinition ld,
             DerivedType rt, ObjectDefinition rd) {
         return assignable(lt, ld, rd, rt.gm());
     }
@@ -1262,14 +1315,20 @@ public class SemanticAnalysis {
                 return !rc.isFinal();
         }
 
-        if (ld instanceof ClassDefinition) {
+        if (ld instanceof ClassDefinition lc) {
             if (rd instanceof InterfaceDefinition) {
                 return false;
             }
+            if (rd instanceof ClassDefinition rc) {
+                return assignable(lt.derivedType(),
+                        lc, rt.derivedType(), rc);
+            }
+            return false;
         }
 
+        var li = (InterfaceDefinition) ld;
         return assignable(lt.derivedType(),
-                ld, rt.derivedType(), rd);
+                li, rt.derivedType(), rd);
     }
 
     private TypeValid assignable(DerivedTypeDeclarer l,
@@ -3141,7 +3200,7 @@ public class SemanticAnalysis {
             if (!s.expectCallable())
                 return semantic("interface has no field '%s': %s",
                         name, s.pos());
-            var m = id.allMethods.tryGet(name);
+            var m = id.allMethods().tryGet(name);
             if (m.has()) {
                 var gm = genericMap(name, st.gm(), m.get().generic(), generic);
                 var prot = gm.instantiate(m.get().prototype());
@@ -3767,24 +3826,10 @@ public class SemanticAnalysis {
             semantic("required const value '%s': %s", v, v.pos());
             return;
         }
-        var t = (LiteralTypeDeclarer) g.b();
-        switch (f.type()) {
-            case INT -> {
-                if (t.isInteger()) return;
-            }
-            case FLOAT -> {
-                if (t.isFloat()) return;
-            }
-            case BOOL -> {
-                if (t.isBool()) return;
-            }
-            case STRING -> {
-                if (t.isString()) return;
-            }
-            case null -> unreachable();
-        }
+        if (f.type().literal.isInstance(le.literal()))
+            return;
         semantic("can't use '%s' as type '%s': %s",
-                v, t.literal().type(), v.pos());
+                v, le.literal().type(), v.pos());
     }
 
     private void analyse(SymbolMap<Attribute> attributes) {

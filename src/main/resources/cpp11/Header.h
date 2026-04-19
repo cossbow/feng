@@ -760,7 +760,7 @@ public:
 
 	Feng$Prototype(Feng$CppFun fp) : fp(fp) {}
 
-	Ret operator()(Args... args) const {
+	Ret operator()(Args &&... args) const {
 		Feng$required(fp);
 		return fp(std::forward<Args>(args)...);
 	}

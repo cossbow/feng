@@ -2,6 +2,7 @@ package org.cossbow.feng.mod;
 
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.mod.FModule;
+import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.util.ResourceUtil;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,10 @@ public class ModuleParserTest {
 
     static ModuleParser testMod() {
         return new ModuleParser(pkgName, getDir(), UTF_8, libs());
+    }
+
+    public static boolean isTestPkg(ModulePath mp) {
+        return pkgName.equals(mp.pkg().value());
     }
 
     public static DAGGraph<FModule> parseModule() {

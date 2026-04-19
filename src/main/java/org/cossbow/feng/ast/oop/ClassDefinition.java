@@ -9,7 +9,6 @@ import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -103,9 +102,8 @@ public class ClassDefinition extends ObjectDefinition {
 
     private final int id = IdGenerator.getAndIncrement();
     private final Lazy<ClassDefinition> parent = Lazy.nil();
-    private final List<ClassDefinition> ancestors = new ArrayList<>();
-    private final Set<ClassDefinition> children = new HashSet<>();
-    private final List<InterfaceDefinition> allImpls = new ArrayList<>();
+    private final Set<ClassDefinition> ancestors = new HashSet<>();
+    private final Set<InterfaceDefinition> allImpls = new HashSet<>();
     private IdentifierMap<ClassField> allFields = new IdentifierMap<>();
     private IdentifierMap<ClassField> inheritFields = new IdentifierMap<>();
     private IdentifierMap<ClassMethod> allMethods = new IdentifierMap<>();
@@ -116,23 +114,21 @@ public class ClassDefinition extends ObjectDefinition {
         return id;
     }
 
-    public Stream<? extends DerivedType> supers() {
-        return Stream.concat(inherit.stream(), impl.stream());
+    public List<DerivedType> supers() {
+        if (parent.match(p -> p == ClassDefinition.ObjectClass))
+            return impl.values();
+        return Stream.concat(inherit.stream(), impl.stream()).toList();
     }
 
     public Lazy<ClassDefinition> parent() {
         return parent;
     }
 
-    public List<ClassDefinition> ancestors() {
+    public Set<ClassDefinition> ancestors() {
         return ancestors;
     }
 
-    public Set<ClassDefinition> children() {
-        return children;
-    }
-
-    public List<InterfaceDefinition> allImpls() {
+    public Set<InterfaceDefinition> allImpls() {
         return allImpls;
     }
 

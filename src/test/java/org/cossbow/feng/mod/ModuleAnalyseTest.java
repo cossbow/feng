@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 
 import java.io.BufferedWriter;
 import java.io.OutputStreamWriter;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -21,10 +23,10 @@ public class ModuleAnalyseTest {
              var w = new BufferedWriter(osw)) {
             new MetaDataExtractor(m, w).write();
         }
-//        var save = ModuleParserTest.getDir()
-//                .resolve(m.path().toPath()).resolve("feng.meta");
-//        Files.copy(buf.read(), save, StandardCopyOption.REPLACE_EXISTING);
-//        System.out.println(save);
+        var save = ModuleParserTest.getDir()
+                .resolve(m.path().toPath()).resolve("feng.meta");
+        Files.copy(buf.read(), save, StandardCopyOption.REPLACE_EXISTING);
+        System.out.println(save);
 
         var src = new SourceParser(m.path(), UTF_8, true)
                 .parse("buffer", CharStreams.fromStream(buf.read()));
@@ -41,7 +43,8 @@ public class ModuleAnalyseTest {
     public void testModule() throws Exception {
         var dag = analyseModule();
         for (var fm : dag) {
-            export(fm);
+            if (ModuleParserTest.isTestPkg(fm.path()))
+                export(fm);
         }
     }
 
@@ -55,7 +58,8 @@ public class ModuleAnalyseTest {
     public void testPackage() throws Exception {
         var dag = analysePackage();
         for (var fm : dag) {
-            export(fm);
+            if (ModuleParserTest.isTestPkg(fm.path()))
+                export(fm);
         }
     }
 

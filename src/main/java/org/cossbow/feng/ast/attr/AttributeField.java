@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.attr;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
@@ -44,15 +45,17 @@ public class AttributeField extends Entity {
 
     //
     public enum Type {
-        INT("int"),
-        FLOAT("float"),
-        BOOL("bool"),
-        STRING("string"),
+        INT("int", IntegerLiteral.class),
+        FLOAT("float", FloatLiteral.class),
+        BOOL("bool", BoolLiteral.class),
+        STRING("string", StringLiteral.class),
         ;
         public final String symbol;
+        public final Class<? extends Literal> literal;
 
-        Type(String symbol) {
+        Type(String symbol, Class<? extends Literal> literal) {
             this.symbol = symbol;
+            this.literal = literal;
         }
 
         public String toString() {

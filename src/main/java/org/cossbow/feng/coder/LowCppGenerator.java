@@ -853,7 +853,7 @@ public class LowCppGenerator {
         write('{').newLine();
         var args = m.prototype().parameterSet();
         write("switch (((Object *)this)->feng$classId) {").newLine();
-        for (var cd : m.master.must().impls) {
+        for (var cd : m.master().impls) {
             write("case ").write(cd.id()).write(':').newLine();
             m.prototype().returnSet().use(rt -> {
                 write("return (").write(rt).write(')');

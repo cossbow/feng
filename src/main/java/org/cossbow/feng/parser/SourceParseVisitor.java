@@ -696,7 +696,7 @@ final class SourceParseVisitor
         }
         var def = new InterfaceDefinition(posOf(ctx),
                 modifier, symbol, generic, methods, parts, macros);
-        for (var m : methods) m.master.set(def);
+        for (var m : methods) m.master(def);
         genericStack.pop();
         return def;
     }

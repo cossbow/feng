@@ -34,7 +34,7 @@ class HashMap`K, V` (Map`K, V`) {
                     var idx = hashing(cur) % cap;
                     cur.next = newBuck[idx];
                     newBuck[idx] = cur;
-//                    cur = next;
+                    cur = next;
                 }
             }
             buckets = newBuck;

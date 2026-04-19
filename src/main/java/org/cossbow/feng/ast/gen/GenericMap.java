@@ -16,7 +16,7 @@ public class GenericMap {
     public GenericMap(GenericMap parent,
                       Map<TypeParameter, TypeDeclarer> map) {
         this.parent = parent;
-        this.map = map;
+        this.map = Map.copyOf(map);
     }
 
     public GenericMap(Map<TypeParameter, TypeDeclarer> map) {

@@ -3015,6 +3015,18 @@ public class SemanticAnalysisTest {
         checkFail(d + "func f(a *A`S1,S2,S3,S4`)*I`S4`{return a;}");
     }
 
+    @Test
+    public void testGenericImplType10() {
+        var d = "struct S1{} struct S2{} struct S3{} struct S4{} ";
+        d += "interface I1`T` { set(T); } ";
+        d += "interface I2`T` { set(T); } ";
+        d += "class B`E` (I1`E`) { func set(e E) {} }";
+        checkSucc(d + "class BB`V1,V2` : B`V1` (I1`V1`) {}");
+        checkFail(d + "class BB`V1,V2` : B`V1` (I1`V2`) {}");
+        checkSucc(d + "class BB`V1,V2` : B`V1` (I2`V1`) {}");
+        checkFail(d + "class BB`V1,V2` : B`V1` (I2`V2`) {}");
+    }
+
     //
 
     static void parseSample(File file) {

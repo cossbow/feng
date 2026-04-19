@@ -6,7 +6,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.proc.Prototype;
-import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.CommonUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,14 +52,27 @@ public class InterfaceMethod extends Method {
         return returnThis;
     }
 
-    public final Lazy<InterfaceDefinition> master = Lazy.nil();
-    private final List<ClassMethod> impls = new ArrayList<>();
+    private InterfaceDefinition master;
+    private final List<ClassMethod> override = new ArrayList<>();
 
     public InterfaceDefinition master() {
-        return master.must();
+        return CommonUtil.required(master);
+    }
+
+    public void master(InterfaceDefinition master) {
+        this.master = CommonUtil.required(master);
     }
 
     public List<ClassMethod> override() {
-        return impls;
+        return override;
+    }
+
+    //
+    @Override
+    public String toString() {
+        if (master == null)
+            return name.value() + generic + prototype;
+        return master.symbol() + "." +
+                name + generic + prototype;
     }
 }

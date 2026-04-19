@@ -93,7 +93,7 @@ attributes
 
 
 modifier
-    : exportable attributes
+    : attributes exportable
     ;
 
 

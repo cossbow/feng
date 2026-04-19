@@ -97,6 +97,10 @@ public class ClassMethod extends Method
                 name, generic, prototype, returnThis);
     }
 
+    public Position pos() {
+        return name.pos();
+    }
+
     //
 
     private ClassDefinition master;
@@ -136,8 +140,8 @@ public class ClassMethod extends Method
     @Override
     public String toString() {
         if (master == null)
-            return name.value() + prototype;
+            return name.value() + generic + prototype;
         return master.symbol() + "." +
-                name + prototype;
+                name + generic + prototype;
     }
 }

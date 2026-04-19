@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 public class InterfaceDefinition extends ObjectDefinition {
     private IdentifierMap<InterfaceMethod> methods;
@@ -48,15 +47,15 @@ public class InterfaceDefinition extends ObjectDefinition {
 
     private final int id = IdGenerator.getAndIncrement();
     public final List<InterfaceDefinition> partDefs = new ArrayList<>();
-    public final IdentifierMap<InterfaceMethod> allMethods = new IdentifierMap<>();
+    private final IdentifierMap<InterfaceMethod> allMethods = new IdentifierMap<>();
     public final Set<ClassDefinition> impls = new HashSet<>();
 
     public int id() {
         return id;
     }
 
-    public Stream<? extends DerivedType> supers() {
-        return parts.stream();
+    public List<DerivedType> supers() {
+        return parts.values();
     }
 
     public void visitParts(Consumer<InterfaceDefinition> user) {
@@ -64,6 +63,10 @@ public class InterfaceDefinition extends ObjectDefinition {
             user.accept(d);
             d.visitParts(user);
         }
+    }
+
+    public IdentifierMap<InterfaceMethod> allMethods() {
+        return allMethods;
     }
 
     //

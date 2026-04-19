@@ -276,7 +276,7 @@ public class MetaDataExtractor {
         for (var p : sd.parts()) {
             write(p).endStmt();
         }
-        for (var m : sd.allMethods) {
+        for (var m : sd.allMethods()) {
             if (!sd.methods().exists(m.name())) {
                 write(InheritAttr);
             }
