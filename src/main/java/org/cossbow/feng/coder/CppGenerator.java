@@ -133,23 +133,23 @@ public class CppGenerator {
 
     private static final String COMMA = ", ";
 
-    private int indentValue;
+    private int dent;
 
     CppGenerator indent() {
-        indentValue++;
-        return this;
+        dent++;
+        return newLine();
     }
 
     CppGenerator dedent() {
-        indentValue--;
-        return this;
+        dent--;
+        return newLine();
     }
 
     CppGenerator newLine() {
         write('\n');
-//        for (int i = 0; i < indentValue; i++) {
-//            write('\t');
-//        }
+        for (int i = 0; i < dent; i++) {
+            write('\t');
+        }
         return this;
     }
 
@@ -168,28 +168,6 @@ public class CppGenerator {
             return;
         }
         if (debug) write("#define FENG_DEBUG_MEMORY").newLine();
-
-/*
-        write("#define FENG_MAX_CLASS_NUM ").write(ClassDefinition.maxId()).newLine();
-        var ma = table.dagClasses.all().stream()
-                .mapToInt(d -> d.ancestors().size()).max();
-        ma.ifPresent(s -> {
-            write("#define FENG_MAX_INHERIT_SIZE ").write(s).newLine();
-        });
-        var mi = table.dagClasses.all().stream()
-                .mapToInt(d -> d.allImpls().size()).max();
-        mi.ifPresent(s -> {
-            write("#define FENG_MAX_IMPLS_SIZE ").write(s).newLine();
-        });
-*/
-
-/*
-        for (var d : TypeDomain.values()) {
-            write("#define ").domain(d).write(' ')
-                    .write(d.ordinal()).newLine();
-        }
-        newLine();
-*/
     }
 
     private void endFile() {
@@ -202,7 +180,6 @@ public class CppGenerator {
             if (!header) return;
         }
         writeComment("type declarations");
-//        declarePrimitive();
         writeComment("declare primitive");
         for (var t : table.enumList) declareType(t);
         writeComment("declare structure");
@@ -354,12 +331,12 @@ public class CppGenerator {
             endStmt();
             return;
         }
-        write(" = {").newLine();
+        write(" = {").indent();
         for (var v : ed.values()) {
             write("Feng$Enum{").write(v.val()).write(',');
             write(v.nameLit()).write(".sr()},").newLine();
         }
-        write('}').endStmt().newLine();
+        dedent().write('}').endStmt().newLine();
     }
 
     void structureDefinition() {
@@ -689,11 +666,11 @@ public class CppGenerator {
     private CppGenerator write(StructureDefinition sd) {
         write(sd.domain().name).write(' ');
         write(sd.symbol());
-        write('{').newLine();
+        write('{').indent();
         for (var sf : sd.fields()) {
             write(sf);
         }
-        write('}').endStmt();
+        dedent().write('}').endStmt();
         write("static_assert(sizeof(");
         write(sd.domain().name).write(' ');
         write(sd.symbol()).write(") == ");
@@ -727,14 +704,10 @@ public class CppGenerator {
 
     private void writeExtends(List<DerivedType> exts) {
         if (exts.isEmpty()) return;
-        write(' ');
-        write(':');
-        var first = true;
-        for (var p : exts) {
-            if (first) first = false;
-            else write(',');
+        write(" : ");
+        joinByComma(exts, p -> {
             write("public ").write(p);
-        }
+        });
     }
 
     void defaultDeconstruct(ObjectDefinition def) {
@@ -761,8 +734,8 @@ public class CppGenerator {
         write("class ");
         write(id.symbol());
         writeExtends(id.parts().values());
-        write(" {\n").indent();
-        write("public:\n");
+        write(" {").newLine();
+        write("public:").indent();
         for (var im : id.methods()) {
             write("virtual ");
             declareMethod(im);
@@ -770,7 +743,7 @@ public class CppGenerator {
         }
         defaultDeconstruct(id);
         operatorEquals(id);
-        write("}").endStmt();
+        dedent().write("}").endStmt().newLine();
     }
 
     // class definition
@@ -789,17 +762,19 @@ public class CppGenerator {
         write("class ");
         write(cd.symbol());
         if (cd.isFinal()) {
-            write(" final");
+            write(" final ");
         } else {
             var pubs = Stream.concat(cd.inherit().stream(),
                     cd.impl().stream()).toList();
             writeExtends(pubs);
         }
-        write("{\n").indent();
-        write("public:\n");
+        write(" {").newLine();
+        write("public:").indent();
 
         for (var f : cd.fields().values())
             write(f);
+
+        newLine();
         if (!cd.isFinal()) {
             emptyConstruct(cd);
             fullConstruct(cd);
@@ -816,7 +791,7 @@ public class CppGenerator {
             declareMethod(m).endStmt();
         }
 
-        dedent().write("};\n\n");
+        dedent().write("};").newLine().newLine();
         enterClass = null;
     }
 
@@ -824,7 +799,7 @@ public class CppGenerator {
         var first = true;
         for (var t : s) {
             if (first) first = false;
-            else write(',');
+            else write(", ");
             w.accept(t);
         }
     }
@@ -1010,11 +985,11 @@ public class CppGenerator {
     }
 
     private void write(Procedure proc) {
-        write('{').newLine();
+        write('{').indent();
         write((Statement) proc.body());
         if (noTerminal(proc.body().list()))
             exitScope(proc);
-        write('}').newLine();
+        dedent().write('}').newLine();
     }
 
     //
@@ -1065,7 +1040,7 @@ public class CppGenerator {
     }
 
     private CppGenerator write(BlockStatement bs) {
-        if (bs.newScope()) write('{').newLine();
+        if (bs.newScope()) write('{').indent();
 
         write(bs.list());
 
@@ -1171,19 +1146,20 @@ public class CppGenerator {
                 new Label(new Identifier("loopNext")),
                 new Label(new Identifier("loopExit")));
         loopLabels.put(fs, lg);
-        write('{');
+        write('{').indent();
         fs.initializer().use(this::write);
-        write("for(;;) {");
-        write("if(").write(fs.condition()).write("){").newLine();
+        write("for(;;) {").newLine();
+        indent().write("if(").write(fs.condition())
+                .write("){").indent();
         write(fs.body());
-        write("}else{").newLine();
+        dedent().write("}else{").indent();
         write("break").endStmt();
-        write('}');
+        dedent().write('}').newLine();
         write(lg.a()).write(":").endStmt();
         fs.updater().use(this::write);
-        write('}');
+        dedent().write('}').newLine();
         write(lg.b()).write(":").endStmt();
-        write('}');
+        dedent().write('}').newLine();
         return this;
     }
 
@@ -1211,7 +1187,7 @@ public class CppGenerator {
 
     private CppGenerator write(IfStatement is) {
         is.init().use(s -> {
-            write('{');
+            write('{').indent();
             write(s);
         });
         write("if(");
@@ -1223,7 +1199,7 @@ public class CppGenerator {
         });
         if (is.init().has()) {
             exitScope(is);
-            write('}');
+            dedent().write('}').newLine();
         }
         return this;
     }
@@ -1720,12 +1696,12 @@ public class CppGenerator {
     }
 
     private CppGenerator write(BlockExpression e) {
-        write("({").newLine();
+        write("({").indent();
         write(e.block());
         var re = e.result();
         var rt = re.resultType.must();
         writeValue(re, rt).endStmt();
-        return write("})");
+        return dedent().write("})");
     }
 
 
