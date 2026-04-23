@@ -733,7 +733,7 @@ public class SemanticAnalysis {
             var pp = pt.gm().instantiate(pm.prototype());
             if (!compatible(pp, cm.prototype(), pm).ok) {
                 semantic("'%s' clashes with '%s'; incompatible return type: %s",
-                         cm,  pm, cm.pos());
+                        cm, pm, cm.pos());
             }
             compatible(pp, cm.prototype(), pm).valid();
             pm.override().add(cm);
@@ -1577,19 +1577,20 @@ public class SemanticAnalysis {
     }
 
     private TypeValid assignValue(
-            TypeDeclarer l, LiteralExpression re) {
+            TypeDeclarer l, LiteralTypeDeclarer r,
+            Optional<Expression> re) {
         assert l.maybeRefer().none();
-        re.lt.set(l);
+        re.use(e -> ((LiteralExpression) e).lt.set(l));
 
         if (l instanceof PrimitiveTypeDeclarer ptd) {
-            var c = re.literal().compatible();
+            var c = r.literal().compatible();
             if (c.has() && c.get().kind == ptd.primitive().kind)
                 return TypeValid.ok();
             return TypeValid.err("can't assign '%s' to '%s': %s",
-                    ptd, re, re.pos());
+                    ptd, re, r.pos());
         }
 
-        if (re.literal() instanceof NilLiteral) {
+        if (r.literal() instanceof NilLiteral) {
             if (l instanceof FuncTypeDeclarer ftd) {
                 if (!ftd.required()) return TypeValid.ok();
                 return TypeValid.err("required '%s' can't set nil: %s",
@@ -1597,19 +1598,19 @@ public class SemanticAnalysis {
             }
         }
 
-        if (re.literal() instanceof StringLiteral sl) {
+        if (r.literal() instanceof StringLiteral sl) {
             // 字符串字面量只能传递给[N]byte类型
             if (l instanceof ArrayTypeDeclarer la && isByteArray(la)) {
                 if (la.len() >= sl.length())
                     return TypeValid.ok();
-                return TypeValid.err("string overflow: %s", re.pos());
+                return TypeValid.err("string overflow: %s", r.pos());
             }
             return TypeValid.err(
-                    "string literal only can assign to byte-array: %s", re.pos());
+                    "string literal only can assign to byte-array: %s", r.pos());
         }
 
         return TypeValid.err("can't assign '%s' to value '%s': %s",
-                l, re, re.pos());
+                l, re, r.pos());
     }
 
     private TypeValid assignValue(
@@ -1659,8 +1660,8 @@ public class SemanticAnalysis {
             Optional<Expression> re, Entity e) {
         assert l.maybeRefer().none();
 
-        if (r instanceof LiteralTypeDeclarer)
-            return assignValue(l, (LiteralExpression) re.must());
+        if (r instanceof LiteralTypeDeclarer rl)
+            return assignValue(l, rl, re);
 
         if (r instanceof ArrayTypeDeclarer ra) {
             // 数组比较复杂，虚比较每一层的元素

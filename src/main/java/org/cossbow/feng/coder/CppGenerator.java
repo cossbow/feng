@@ -1688,9 +1688,9 @@ public class CppGenerator {
 
     private CppGenerator write(ConditionalExpression e) {
         var rt = e.resultType.must();
-        write(e.condition()).write('?');
+        write(e.condition()).write('?').write(' ');
         write('(').write(rt).write(')').write(e.yes());
-        write(':');
+        write(' ').write(':').write(' ');
         write('(').write(rt).write(')').write(e.not());
         return this;
     }
