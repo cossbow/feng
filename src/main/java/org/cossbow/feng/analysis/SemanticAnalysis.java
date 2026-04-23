@@ -477,6 +477,9 @@ public class SemanticAnalysis {
     }
 
     private Stream<StructureDefinition> structureInitDeps(TypeDeclarer td) {
+        if (td.maybeRefer().has())
+            return semantic("can't be reference: %s", td.pos());
+
         if (td instanceof PrimitiveTypeDeclarer ptd) {
             if (!ptd.primitive().isBool())
                 return Stream.empty();
@@ -484,9 +487,6 @@ public class SemanticAnalysis {
         }
 
         if (td instanceof DerivedTypeDeclarer dtd) {
-            if (dtd.refer().has())
-                return semantic("can't be reference");
-
             if (!dtd.derivedType().generic().isEmpty())
                 return unsupported("generic");
 
@@ -499,9 +499,6 @@ public class SemanticAnalysis {
         }
 
         if (td instanceof ArrayTypeDeclarer atd) {
-            if (atd.refer().has())
-                return semantic("can't be reference");
-
             var l = atd.length().must();
             var sizeof = structureDepSizeof(l);
             var element = Stream.of(atd.element());
