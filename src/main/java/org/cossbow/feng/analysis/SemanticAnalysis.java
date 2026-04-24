@@ -3379,7 +3379,8 @@ public class SemanticAnalysis {
             var om = enterClass.allMethods().tryGet(s.name());
             if (om.has()) {
                 // 叠加上继承的泛型替换
-                var gm = enterClass.inherit().must().gm();
+                var gm = enterClass.inherit().map(DerivedType::gm)
+                        .orElse(GenericMap.EMPTY);
                 gm = genericMap(re, gm, om.get().generic(), re.generic());
                 var prot = gm.instantiate(om.get().prototype());
                 // 函数调用加上`this.`前缀，方便后续处理

@@ -398,6 +398,7 @@ public class SemanticAnalysisTest {
     @Test
     public void testClassMethod1() {
         checkSucc("class A { func at() {} func test() { at(); } }");
+        checkSucc("class A final { func at() {} func test() { at(); } }");
     }
 
     @Test
@@ -407,12 +408,13 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testClassMethod3() {
-        checkSucc("func at() {} \n class A { func at() {} \n func test() { at(); } }");
+        checkSucc("func at() {} \n class A { func at(int) {} \n func test() { at(); } }");
+        checkSucc("func at() {} \n class A final { func at(int) {} \n func test() { at(); } }");
     }
 
     @Test
     public void testClassMethod4() {
-        checkSucc("func at() {} \n class A { func at() {} \n func test() { this.at(); } }");
+        checkSucc("func at(int) {} \n class A { func at() {} \n func test() { this.at(); } }");
     }
 
     // prototype
