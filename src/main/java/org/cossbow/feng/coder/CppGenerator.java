@@ -790,6 +790,16 @@ public class CppGenerator {
                 write("virtual ");
             declareMethod(m).endStmt();
         }
+        for (var ent : cd.binaryOperators().entrySet()) {
+            write(() -> {
+                write("operator").write(cppBinOp(ent.getKey()));
+            }, ent.getValue().prototype()).endStmt();
+        }
+        for (var ent : cd.unaryOperators().entrySet()) {
+            write(() -> {
+                write("operator").write(ent.getKey().code);
+            }, ent.getValue().prototype()).endStmt();
+        }
 
         dedent().write("};").newLine().newLine();
         enterClass = null;
@@ -869,7 +879,17 @@ public class CppGenerator {
         assert enterClass == null;
         enterClass = cd;
         for (var cm : cd.methods()) {
-            implMethod(cm);
+            implMethod(cm, () -> write(cm.name()));
+        }
+        for (var ent : cd.binaryOperators().entrySet()) {
+            implMethod(ent.getValue(), () -> {
+                write("operator").write(cppBinOp(ent.getKey()));
+            });
+        }
+        for (var ent : cd.unaryOperators().entrySet()) {
+            implMethod(ent.getValue(), () -> {
+                write("operator").write(ent.getKey().code);
+            });
         }
         enterClass = null;
     }
@@ -883,16 +903,17 @@ public class CppGenerator {
         return this;
     }
 
-    private void implMethod(ClassMethod cm) {
+    private void implMethod(ClassMethod cm, Runnable naming) {
         assert enterClass != null;
         assert enterMethod == null;
         enterMethod = cm;
         write(enterClass.generic());
         write(cm.generic());
         write(() -> {
-            definedToken(enterClass).write("::").write(cm.name());
+            definedToken(enterClass).write("::");
+            naming.run();
         }, cm.prototype());
-        newLine();
+        write(' ');
         write(cm.procedure().must());
         enterMethod = null;
     }
@@ -1291,22 +1312,8 @@ public class CppGenerator {
         return this;
     }
 
-    private CppGenerator write(BinaryExpression e) {
-        var op = e.operator();
-        if (op == BinaryOperator.POW) {
-            if (e.right().resultType.must().isInteger()) {
-                write("Feng$fastPow(");
-                if (e.left().resultType.must().isInteger()) {
-                    write("(Int64)");
-                }
-            } else {
-                write("std::powl(");
-            }
-            write(e.left()).write(',').write(e.right());
-            return write(')');
-        }
-
-        String o = switch (op) {
+    private String cppBinOp(BinaryOperator op) {
+        return switch (op) {
             case MUL -> "*";
             case DIV -> "/";
             case MOD -> "%";
@@ -1327,8 +1334,26 @@ public class CppGenerator {
             case OR -> "||";
             default -> unreachable();
         };
+    }
+
+    private CppGenerator write(BinaryExpression e) {
+        var op = e.operator();
+        if (op == BinaryOperator.POW) {
+            if (e.right().resultType.must().isInteger()) {
+                write("Feng$fastPow(");
+                if (e.left().resultType.must().isInteger()) {
+                    write("(Int64)");
+                }
+            } else {
+                write("std::powl(");
+            }
+            write(e.left()).write(',').write(e.right());
+            return write(')');
+        }
+
         return write('(').write(e.left()).write(')')
-                .write(o).write('(').write(e.right()).write(')');
+                .write(cppBinOp(op)).write('(')
+                .write(e.right()).write(')');
     }
 
     private CppGenerator write(ReferEqualExpression e) {
@@ -1647,19 +1672,25 @@ public class CppGenerator {
     private CppGenerator write(UnaryExpression e) {
         var op = e.operator();
         var td = e.resultType.must();
-        if (!(td instanceof PrimitiveTypeDeclarer ptd))
-            return unreachable();
-        var p = ptd.primitive();
-        if (p == Primitive.BOOL) {
-            if (op != UnaryOperator.INVERT)
-                return unreachable();
-            write('!');
+        if (td instanceof PrimitiveTypeDeclarer ptd) {
+            var p = ptd.primitive();
+            if (p == Primitive.BOOL) {
+                if (op != UnaryOperator.INVERT)
+                    return unreachable();
+                write('!');
+            } else {
+                if (op == UnaryOperator.NEGATIVE)
+                    write('-');
+                else if (op == UnaryOperator.INVERT)
+                    write('~');
+                // ignore +
+            }
         } else {
-            if (op == UnaryOperator.NEGATIVE)
-                write('-');
-            else if (op == UnaryOperator.INVERT)
-                write('~');
-            // ignore +
+            switch (op) {
+                case POSITIVE -> write('+');
+                case NEGATIVE -> write('-');
+                case INVERT -> write('!');
+            }
         }
         write('(').write(e.operand()).write(')');
         return this;

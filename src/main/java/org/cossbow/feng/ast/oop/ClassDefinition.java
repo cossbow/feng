@@ -9,9 +9,7 @@ import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
@@ -109,6 +107,8 @@ public class ClassDefinition extends ObjectDefinition {
     private IdentifierMap<ClassMethod> allMethods = new IdentifierMap<>();
     private IdentifierMap<ClassMethod> inheritMethods = new IdentifierMap<>();
     private final Lazy<ClassMethod> resourceFree = Lazy.nil();
+    private Map<BinaryOperator, ClassMethod> binaryOperators = new HashMap<>();
+    private Map<UnaryOperator, ClassMethod> unaryOperators = new HashMap<>();
 
     public int id() {
         return id;
@@ -156,6 +156,13 @@ public class ClassDefinition extends ObjectDefinition {
         return resourceFree;
     }
 
+    public Map<BinaryOperator, ClassMethod> binaryOperators() {
+        return binaryOperators;
+    }
+
+    public Map<UnaryOperator, ClassMethod> unaryOperators() {
+        return unaryOperators;
+    }
     //
 
 

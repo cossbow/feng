@@ -1,12 +1,16 @@
 package org.cossbow.feng.ast.micro;
 
+import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.IdentifierMap;
+import org.cossbow.feng.ast.UnaryOperator;
 import org.cossbow.feng.util.Optional;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class MacroTable {
     private Map<Identifier, IdentifierMap<Macro>> tables
@@ -56,9 +60,25 @@ public class MacroTable {
         return tryGet(TYPE_RESOURCE, RESOURCE_FREE);
     }
 
+    public IdentifierMap<Macro> operators() {
+        return tables.getOrDefault(TYPE_OPERATOR, new IdentifierMap<>());
+    }
+
+    public Optional<Macro> operator(Identifier name) {
+        return tryGet(TYPE_OPERATOR, name);
+    }
+
     //
 
     public static final Identifier TYPE_RESOURCE = new Identifier("resource");
     public static final Identifier RESOURCE_FREE = new Identifier("free");
+
+    public static final Identifier TYPE_OPERATOR = new Identifier("operator");
+    public static final Map<Identifier, BinaryOperator> BINARY_OPERATOR = BinaryOperator
+            .Overridable.stream().collect(Collectors.toMap(o ->
+                    new Identifier(o.name().toLowerCase()), Function.identity()));
+    public static final Map<Identifier, UnaryOperator> UNARY_OPERATOR = UnaryOperator
+            .Overridable.stream().collect(Collectors.toMap(o ->
+                    new Identifier(o.name().toLowerCase()), Function.identity()));
 
 }

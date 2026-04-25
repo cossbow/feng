@@ -263,7 +263,7 @@ struct Feng$SRefer {
 	}
 
 	// var t1 &S = t0;
-	T *borrow() {
+	T *borrow() const {
 		return t;
 	}
 
@@ -274,18 +274,18 @@ struct Feng$SRefer {
 	}
 
 	// t == nil;
-	bool absent() {
+	bool absent() const {
 		return t == nullptr;
 	}
 
 	// t.start();
-	T *operator->() {
+	T *operator->() const {
 		Feng$required(t);
 		return t;
 	}
 
 	// *t
-	T &operator*() {
+	T &operator*() const {
 		Feng$required(t);
 		return *t;
 	}
@@ -347,7 +347,7 @@ static Feng$SRefer<T> Feng$newMem() {
 }
 
 template<typename T>
-static Feng$SRefer<T> Feng$newMem(T &init) {
+static Feng$SRefer<T> Feng$newMem(const T &init) {
 	T *p = (T *) Feng$alloc(sizeof(T));
 	*p = init;
 	return Feng$SRefer<T>{p};
@@ -373,6 +373,8 @@ struct Feng$PRefer {
 
 	Feng$PRefer(T &t) : t(&t) {}
 
+	Feng$PRefer(T &&t) : t(&t) {}
+
 	template<typename S>
 	Feng$PRefer(S &s) : t(Feng$cast<S, T>(&s)) {}
 
@@ -389,25 +391,25 @@ struct Feng$PRefer {
 	Feng$PRefer(Feng$Refer<T> &&r) : t(r.t) {}
 
 	// t == nil;
-	bool absent() {
+	bool absent() const {
 		return t == nullptr;
 	}
 
 	// t.start();
-	T *operator->() {
+	T *operator->() const {
 		Feng$required(t);
 		return t;
 	}
 
 	// *t
-	T &operator*() {
+	T &operator*() const {
 		Feng$required(t);
 		return *t;
 	}
 };
 
 template<class S, class T>
-static Feng$Refer<T> Feng$assert(Feng$SRefer<S> &p) {
+static Feng$Refer<T> Feng$assert(const Feng$SRefer<S> &p) {
 	return Feng$Refer<T>{dynamic_cast<T *>(p.t)};
 }
 
@@ -417,7 +419,7 @@ static Feng$Refer<T> Feng$assert(Feng$SRefer<S> &&p) {
 }
 
 template<class S, class T>
-static Feng$PRefer<T> Feng$assert(Feng$PRefer<S> &p) {
+static Feng$PRefer<T> Feng$assert(const Feng$PRefer<S> &p) {
 	return Feng$PRefer<T>{dynamic_cast<T *>(p.t)};
 }
 
@@ -496,11 +498,11 @@ struct Feng$ArrayRefer {
 	Feng$ArrayRefer(E *start, int64_t len) : start(start), len(len) {}
 
 	// t == nil;
-	bool absent() {
+	bool absent() const {
 		return start == nullptr;
 	}
 
-	E &operator[](int64_t index) {
+	E &operator[](int64_t index) const {
 		Feng$required(start);
 		if (index < 0 || index >= this->len)
 			throw Feng$OutOfBounds();
@@ -536,7 +538,7 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 		this->len = len;
 	}
 
-	Feng$ArraySRefer(Feng$ArrayRefer<E> &r) {
+	Feng$ArraySRefer(const Feng$ArrayRefer<E> &r) {
 		this->start = Feng$inc(r.start);
 		this->len = r.len;
 	}
@@ -548,7 +550,7 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 		r.len = 0;
 	}
 
-	Feng$ArraySRefer(Feng$ArraySRefer<E> &r) {
+	Feng$ArraySRefer(const Feng$ArraySRefer<E> &r) {
 		this->start = Feng$inc(r.start);
 		this->len = r.len;
 	}
@@ -572,7 +574,7 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 		return *this;
 	}
 
-	Feng$ArraySRefer<E> &operator=(Feng$ArraySRefer<E> const &r) {
+	Feng$ArraySRefer<E> &operator=(const Feng$ArraySRefer<E> &r) {
 		if (this == &r) return *this;
 		dec();
 		this->start = Feng$inc(r.start);

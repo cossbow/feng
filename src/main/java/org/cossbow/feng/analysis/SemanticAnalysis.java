@@ -11,6 +11,7 @@ import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.micro.MacroFunc;
+import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
@@ -911,6 +912,10 @@ public class SemanticAnalysis {
         enterClass = cd;
 
         for (var m : cd.methods()) analyse(m);
+        for (var m : cd.binaryOperators().values())
+            analyse(m);
+        for (var m : cd.unaryOperators().values())
+            analyse(m);
 
         enterClass = null;
     }
@@ -928,7 +933,7 @@ public class SemanticAnalysis {
 
     private CurrentExpression newThis(Position pos) {
         var ce = new CurrentExpression(pos, enterClass.symbol(),
-                enterMethod.name(), true);
+                true);
         var g = optimize(ce);
         ce.resultType.set(g.b());
         return ce;
@@ -1686,8 +1691,7 @@ public class SemanticAnalysis {
         if (r instanceof DerivedTypeDeclarer rd) {
             if (l instanceof DerivedTypeDeclarer ld) {
                 var eq = ld.derivedType().equals(rd.derivedType()) &&
-                        (rd.refer().none() || re.match(v ->
-                                v instanceof CurrentExpression));
+                        (rd.refer().none());
                 if (eq) return TypeValid.ok();
                 return compatible(ld, rd, e);
             }
@@ -2709,7 +2713,29 @@ public class SemanticAnalysis {
     }
 
     private Optional<TypeDeclarer> derivedTypeBinOp(
+            DerivedTypeDeclarer l, DerivedTypeDeclarer r,
+            BinaryExpression e) {
+        var ld = l.def();
+        var rd = r.def();
+        if (!ld.equals(rd)) return Optional.empty();
+
+        if (ld instanceof ClassDefinition lc) {
+            var op = e.operator();
+            if (lc.binaryOperators().containsKey(op))
+                return Optional.of(l);
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<TypeDeclarer> derivedTypeBinOp(
             TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
+        if (l instanceof DerivedTypeDeclarer ltd &&
+                r instanceof DerivedTypeDeclarer rtd) {
+            var ot = derivedTypeBinOp(ltd, rtd, e);
+            if (ot.has()) return ot;
+        }
+
         if (e.operator() != BinaryOperator.EQ &&
                 e.operator() != BinaryOperator.NE)
             return Optional.empty();
@@ -2810,6 +2836,12 @@ public class SemanticAnalysis {
             if (p.isInteger()) return true;
             if (p.isFloat()) return op != UnaryOperator.INVERT;
             if (p.isBool()) return op == UnaryOperator.INVERT;
+        }
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            var def = dtd.def();
+            if (def instanceof ClassDefinition cd) {
+                return cd.unaryOperators().containsKey(op);
+            }
         }
         return false;
     }
@@ -3005,6 +3037,7 @@ public class SemanticAnalysis {
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(CurrentExpression e) {
+        assert enterClass != null;
         // 必定是在类的方法里
         var dt = new DerivedType(e.pos(), e.type(), TypeArguments.EMPTY);
         dt.def(enterClass);
@@ -3293,7 +3326,7 @@ public class SemanticAnalysis {
             return Groups.g2(e, dtd);
         }
         var arg = e.arg().get();
-        var atd = new DerivedTypeDeclarer(e.pos(), dt, Optional.empty());
+        var atd = new DerivedTypeDeclarer(e.pos(), dt);
         arg.expectType.set(atd); // for ObjectExpression
         var g = optimize(arg);
         assignable(atd, g.b(), Optional.of(g.a()), e).valid();
@@ -3785,17 +3818,18 @@ public class SemanticAnalysis {
     // macro
 
     private void macro(ClassDefinition cd) {
-        var o = cd.macros().resourceFree();
-        o.use(m -> {
-            if (m instanceof MacroFunc mf) {
-                macroResFree(cd, mf);
-            } else {
-                semantic("'%s' must be fun-macro: %s", m, m.pos());
-            }
-        });
+        macroResFree(cd);
+        macroOperators(cd);
     }
 
-    private void macroResFree(ClassDefinition cd, MacroFunc mf) {
+    private void macroResFree(ClassDefinition cd) {
+        var o = cd.macros().resourceFree();
+        if (o.none()) return;
+        var m = o.get();
+        if (!(m instanceof MacroFunc mf)) {
+            semantic("'%s' must be fun-macro: %s", m, m.pos());
+            return;
+        }
         if (!mf.procedure().params().isEmpty())
             semantic("'%s' has no parameters: %s", mf, mf.pos());
 
@@ -3806,6 +3840,85 @@ public class SemanticAnalysis {
                 mf.makeId(), TypeParameters.empty(), proc, false);
         cd.methods().add(cm.name(), cm);
         cd.resourceFree().set(cm);
+    }
+
+    private void macroOperators(ClassDefinition cd) {
+        var map = cd.macros().operators();
+        for (var op : map) {
+            if (!(op instanceof MacroFunc mf)) {
+                semantic("operator require a procedure: %s", op.pos());
+                return;
+            }
+            var bo = MacroTable.BINARY_OPERATOR.get(mf.name());
+            if (bo != null) {
+                macroOperator(cd, mf, bo);
+                continue;
+            }
+            var uo = MacroTable.UNARY_OPERATOR.get(mf.name());
+            if (uo != null) {
+                macroOperator(cd, mf, uo);
+                continue;
+            }
+            semantic("undefined overrideable operator '%s': %s", mf.name(), mf.pos());
+        }
+    }
+
+    private void macroOperator(
+            ClassDefinition cd, MacroFunc mf, BinaryOperator op) {
+        var mp = mf.procedure();
+        if (mp.params().size() != 1)
+            semantic("binary-operator required one parameters: %s", mp.pos());
+
+        cd.binaryOperators().put(op, operatorMethod(cd, mf,
+                BinaryOperator.SetRel.contains(op)));
+    }
+
+    private void macroOperator(
+            ClassDefinition cd, MacroFunc mf, UnaryOperator op) {
+        var mp = mf.procedure();
+        if (!mp.params().isEmpty())
+            semantic("unary-operator has no parameters: %s", mp.pos());
+
+        cd.unaryOperators().put(op, operatorMethod(cd, mf, false));
+    }
+
+    private ClassMethod operatorMethod(
+            ClassDefinition cd, MacroFunc mf, boolean returnBool) {
+        var tds = new ArrayList<TypeDeclarer>(cd.generic().size());
+        for (var p : cd.generic()) {
+            tds.add(new GenericTypeDeclarer(ZERO, new GenericType(ZERO, p)));
+        }
+        var tas = new TypeArguments(ZERO, tds);
+        var dt = new DerivedType(ZERO, cd.symbol(), tas);
+
+        var mp = mf.procedure();
+        var params = new ArrayList<Variable>(mp.params().size());
+        for (var mv : mp.params()) {
+            mv.type().use(t -> semantic(
+                    "can't set type of operator parameter: %s", t.pos()));
+            var td = new DerivedTypeDeclarer(ZERO, dt, Optional.of(
+                    new Refer(ZERO, PHANTOM, true, true)));
+            var v = new Variable(mv.pos(), Modifier.empty(),
+                    Declare.CONST, mv.name(), Lazy.of(td), Lazy.nil());
+            params.add(v);
+        }
+        var retType = returnBool ?
+                Primitive.BOOL.declarer(ZERO) :
+                new DerivedTypeDeclarer(ZERO, dt);
+        var ps = new ParameterSet(params);
+        var pt = new Prototype(mf.pos(), ps, Optional.of(retType));
+
+        if (mp.result().none())
+            semantic("operator missing result: %s", mp.pos());
+
+        var list = new ArrayList<Statement>(mp.body().size() + 1);
+        list.addAll(mp.body());
+        list.add(new ReturnStatement(ZERO, mp.result()));
+        var block = new BlockStatement(mp.pos(), list, false);
+
+        var proc = new Procedure(mp.pos(), pt, block, Map.of());
+        return new ClassMethod(mf.pos(), Modifier.empty(), mf.makeId(),
+                TypeParameters.empty(), proc, false);
     }
 
     // attribute

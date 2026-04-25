@@ -629,7 +629,7 @@ final class SourceParseVisitor
             FengParser.UnnamedStructureFieldTypeContext ctx) {
         var def = (StructureDefinition) visit(ctx.unnamedStructureDefinition());
         var dt = new DerivedType(def.pos(), def.symbol(), TypeArguments.EMPTY);
-        return new DerivedTypeDeclarer(posOf(ctx), dt, Optional.empty());
+        return new DerivedTypeDeclarer(posOf(ctx), dt);
     }
 
 
@@ -707,7 +707,6 @@ final class SourceParseVisitor
         var pos = posOf(ctx);
         var modifier = parseModifier(ctx.modifier());
         var name = identifier(ctx.name);
-        enterMethodName = name;
         methodReturnThis = false;
         var generic = typeParameters(ctx.typeParameters());
         genericStack.push(generic);
@@ -716,7 +715,6 @@ final class SourceParseVisitor
                 prototype, methodReturnThis);
         genericStack.pop();
         methodReturnThis = false;
-        enterMethodName = null;
         return method;
     }
 
@@ -758,13 +756,7 @@ final class SourceParseVisitor
     }
 
     private volatile Symbol enterClassSymbol;
-    private volatile Identifier enterMethodName;
     private volatile boolean methodReturnThis;
-
-    private void mustInMethod(Position pos) {
-        if (enterMethodName == null)
-            syntax("must use in method: %s", pos);
-    }
 
     @Override
     public Entity visitClassDefinition(FengParser.ClassDefinitionContext ctx) {
@@ -791,15 +783,12 @@ final class SourceParseVisitor
             if (mi.method != null) {
                 var def = mi.method.def;
                 var mName = identifier(def.name);
-                enterMethodName = mName;
                 methodReturnThis = false;
                 var mGeneric = typeParameters(def.typeParameters());
                 genericStack.push(mGeneric);
                 var proc = this.<Procedure>visitOptional(def.procedure());
                 var pt = this.<Prototype>visitOptional(def.prototype());
-                methodReturnThis = false;
                 genericStack.pop();
-                enterMethodName = null;
                 ClassMethod method;
                 if (proc.has()) {
                     if (metadata) {
@@ -817,6 +806,7 @@ final class SourceParseVisitor
                             mGeneric, pt.must(), methodReturnThis);
                 }
                 methods.add(mName, method);
+                methodReturnThis = false;
             } else if (mi.fields != null) {
                 var dcl = parseDeclare(mi.fields.declare);
                 var td = (TypeDeclarer) visit(mi.fields.typeDeclarer());
@@ -935,7 +925,7 @@ final class SourceParseVisitor
         var o = this.<DefinedType>visitOptional(ctx.definedType());
         var type = o.map(dt -> {
             if (dt instanceof DerivedType t)
-                return new DerivedTypeDeclarer(dt.pos(), t, Optional.empty());
+                return new DerivedTypeDeclarer(dt.pos(), t);
             return semantic("can't init %s with object-init: %s",
                     dt, dt.pos());
         });
@@ -981,11 +971,9 @@ final class SourceParseVisitor
             FengParser.CurrentExpressionContext ctx) {
         var pos = posOf(ctx.current);
         var cn = enterClassSymbol;
-        var mn = enterMethodName;
-        mustInMethod(pos);
         var type = ctx.current.getType();
         var isSelf = type == FengParser.THIS;
-        return new CurrentExpression(pos, cn, mn, isSelf);
+        return new CurrentExpression(pos, cn, isSelf);
     }
 
     @Override
@@ -1489,7 +1477,6 @@ final class SourceParseVisitor
     private Optional<TypeDeclarer> parseReturnSet(FengParser.ReturnSetContext ctx) {
         if (ctx == null) return Optional.empty();
         if (ctx.current != null) {
-            mustInMethod(posOf(ctx.current));
             methodReturnThis = true;
             return Optional.empty();
         }

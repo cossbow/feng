@@ -20,6 +20,11 @@ public class DerivedTypeDeclarer extends TypeDeclarer
         this.refer = refer;
     }
 
+    public DerivedTypeDeclarer(Position pos,
+                               DerivedType derivedType) {
+        this(pos, derivedType, Optional.empty());
+    }
+
     public DerivedType derivedType() {
         return derivedType;
     }
@@ -48,8 +53,7 @@ public class DerivedTypeDeclarer extends TypeDeclarer
 
     public Optional<TypeDeclarer> derefer() {
         if (refer.none()) return Optional.of(this);
-        var n = new DerivedTypeDeclarer(pos(), derivedType,
-                Optional.empty());
+        var n = new DerivedTypeDeclarer(pos(), derivedType);
         return Optional.of(n);
     }
 

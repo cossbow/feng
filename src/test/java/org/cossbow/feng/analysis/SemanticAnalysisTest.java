@@ -192,7 +192,7 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testThis2() {
-        checkSucc("class A{ func m(){ var a A; a = this; } }");
+        checkSucc("class A{ func m(){ var a A; a = *this; } }");
         checkSucc("class A{ func m(){ const a &A = this; } }");
         checkFail("class A{ func m(){ const a *A = this; } }");
         checkFail("class A{ func m(){ var b B = this; } } class B{}");
@@ -3027,6 +3027,28 @@ public class SemanticAnalysisTest {
         checkFail(d + "class BB`V1,V2` : B`V1` (I1`V2`) {}");
         checkSucc(d + "class BB`V1,V2` : B`V1` (I2`V1`) {}");
         checkFail(d + "class BB`V1,V2` : B`V1` (I2`V2`) {}");
+    }
+
+    //
+
+    @Test
+    public void testOperateOverride1() {
+        var d = "class A{} ";
+        checkFail(d + "func f(a,b A) A { return a+b; }");
+        checkFail(d + "func f(a,b A) A { return a-b; }");
+        checkFail(d + "func f(a,b A) A { return a*b; }");
+        checkFail(d + "func f(a,b A) A { return a/b; }");
+        checkFail(d + "func f(a,b A) A { return -b; }");
+        d = "class A{macro operator add(r){A{}}} ";
+        checkSucc(d + "func f(a,b A) A { return a+b; }");
+        d = "class A{macro operator sub(r){A{}}} ";
+        checkSucc(d + "func f(a,b A) A { return a-b; }");
+        d = "class A{macro operator mul(r){A{}}} ";
+        checkSucc(d + "func f(a,b A) A { return a*b; }");
+        d = "class A{macro operator div(r){A{}}} ";
+        checkSucc(d + "func f(a,b A) A { return a/b; }");
+        d = "class A{macro operator negative(){A{}}} ";
+        checkSucc(d + "func f(a,b A) A { return -b; }");
     }
 
     //

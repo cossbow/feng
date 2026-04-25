@@ -1,0 +1,58 @@
+
+class Complex final {
+    export
+    var real,imag float;
+
+    macro operator positive() {
+        *this
+    }
+
+    macro operator negative() {
+        {real=-real, imag=-imag}
+    }
+
+    macro operator invert() {
+        {real=real, imag=-imag}
+    }
+
+    macro operator add(rhs) {
+        {real=real+rhs.real, imag=imag+rhs.imag}
+    }
+
+    macro operator sub(rhs) {
+        {real=real-rhs.real, imag=imag-rhs.imag}
+    }
+
+    macro operator mul(rhs) {
+        {
+            real=real*rhs.real-imag*rhs.imag,
+            imag=real*rhs.imag+imag*rhs.real
+        }
+    }
+
+    macro operator div(rhs) {
+        var d = rhs.real*rhs.real+rhs.imag*rhs.imag;
+        {
+            real=(real*rhs.real+imag*rhs.imag)/d,
+            imag=(imag*rhs.real-real*rhs.imag)/d
+        }
+    }
+
+}
+
+
+func test(n int) {
+    var a,b Complex = {real=1.1,imag=0.8},{real=0.37,imag=2.5};
+    var c Complex;
+    c = a + b;
+    c = a - b;
+    c = a * b;
+    c = a / b;
+    c = a + -b;
+    c = -b;
+    c = !b;
+}
+
+func main(args [&!#][*!#]byte) {
+    test(5);
+}
