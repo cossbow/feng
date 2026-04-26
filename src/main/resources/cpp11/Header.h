@@ -378,15 +378,15 @@ struct Feng$PRefer {
 	template<typename S>
 	Feng$PRefer(S &s) : t(Feng$cast<S, T>(&s)) {}
 
-	Feng$PRefer(Feng$SRefer<T> &r) : t(r.t) {}
+	Feng$PRefer(const Feng$SRefer<T> &r) : t(r.t) {}
 
 	template<typename S>
-	Feng$PRefer(Feng$SRefer<S> &r) : t(Feng$cast<S, T>(r.t)) {}
+	Feng$PRefer(const Feng$SRefer<S> &r) : t(Feng$cast<S, T>(r.t)) {}
 
-	Feng$PRefer(Feng$PRefer<T> &r) : t(r.t) {}
+	Feng$PRefer(const Feng$PRefer<T> &r) : t(r.t) {}
 
 	template<typename S>
-	Feng$PRefer(Feng$PRefer<S> &r) : t(Feng$cast<S, T>(r.t)) {}
+	Feng$PRefer(const Feng$PRefer<S> &r) : t(Feng$cast<S, T>(r.t)) {}
 
 	Feng$PRefer(Feng$Refer<T> &&r) : t(r.t) {}
 

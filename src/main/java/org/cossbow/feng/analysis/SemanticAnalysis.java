@@ -1172,6 +1172,10 @@ public class SemanticAnalysis {
             case VariableExpression ee -> enablePhantom(lr, ee.variable());
             case SymbolExpression ee -> enablePhantom(lr, ee);
             case CurrentExpression ee -> true;
+            case LiteralExpression ee -> passingParameters;
+            case ObjectExpression ee -> passingParameters;
+            case ArrayExpression ee -> passingParameters;
+            case NewExpression ee -> passingParameters;
             case EnumExpression ee -> false;
             default -> false;
         };
@@ -1302,35 +1306,52 @@ public class SemanticAnalysis {
     }
 
     // 协变分析
-    private boolean assignable(
+    private TypeValid assignable(
             DerivedTypeDeclarer lt, ObjectDefinition ld,
             DerivedTypeDeclarer rt, ObjectDefinition rd) {
 
-        if (ld.equals(rd))
-            return lt.generic().equals(rt.generic());
-        if (typeNest > 0) return false;
+        if (ld.equals(rd)) {
+            return lt.generic().equals(rt.generic()) ?
+                    TypeValid.ok() :
+                    TypeValid.err("type-arguments not match: '%s' <--> '%s' %s",
+                            lt.generic(), rt.generic(), rt.pos());
+        }
+        if (typeNest > 0)
+            return TypeValid.err("can't use '%s' as '%s': %s",
+                    rt, lt, rt.pos());
 
         if (ClassDefinition.ObjectClass.equals(ld)) {
             if (rd instanceof InterfaceDefinition)
-                return true;
-            if (rd instanceof ClassDefinition rc)
-                return !rc.isFinal();
+                return TypeValid.ok();
+            if (rd instanceof ClassDefinition rc) {
+                return !rc.isFinal() ? TypeValid.ok() : TypeValid.err(
+                        "final-class never inherit any: %s", rc.pos());
+            }
         }
 
         if (ld instanceof ClassDefinition lc) {
+            if (lc.isFinal()) return TypeValid.err(
+                    "final-class never be inherited: %s", lc.pos());
             if (rd instanceof InterfaceDefinition) {
-                return false;
+                return TypeValid.err("interface never inherited class: %s",
+                        rd.pos());
             }
             if (rd instanceof ClassDefinition rc) {
-                return assignable(lt.derivedType(),
+                var ok = assignable(lt.derivedType(),
                         lc, rt.derivedType(), rc);
+                if (ok) return TypeValid.ok();
+                return TypeValid.err("'%s' doesn't inherit '%s': %s",
+                        rc, lc, rc.pos());
             }
-            return false;
+            return unreachable();
         }
 
         var li = (InterfaceDefinition) ld;
-        return assignable(lt.derivedType(),
+        var ok = assignable(lt.derivedType(),
                 li, rt.derivedType(), rd);
+        if (ok) return TypeValid.ok();
+        return TypeValid.err("'%s' doesn't implement '%s': %s",
+                rd, ld, rd.pos());
     }
 
     private TypeValid assignable(DerivedTypeDeclarer l,
@@ -1340,7 +1361,7 @@ public class SemanticAnalysis {
         var rt = r.def();
         if (lt instanceof ObjectDefinition lo &&
                 rt instanceof ObjectDefinition ro)
-            if (assignable(l, lo, r, ro)) return TypeValid.ok();
+            return assignable(l, lo, r, ro);
 
         if (lt instanceof EnumDefinition le &&
                 rt instanceof EnumDefinition re) {
@@ -2707,8 +2728,8 @@ public class SemanticAnalysis {
             DerivedTypeDeclarer l, DerivedTypeDeclarer r) {
         if (l.def() instanceof ObjectDefinition lo &&
                 r.def() instanceof ObjectDefinition ro)
-            return assignable(l, lo, r, ro) ||
-                    assignable(r, ro, l, lo);
+            return assignable(l, lo, r, ro).ok ||
+                    assignable(r, ro, l, lo).ok;
         return false;
     }
 
@@ -2903,7 +2924,7 @@ public class SemanticAnalysis {
         assertFinalClass(srcDef, e);
         assertFinalClass(tgtDef, e);
 
-        if (assignable(dstType, tgtDef, srcType, srcDef)) {
+        if (assignable(dstType, tgtDef, srcType, srcDef).ok) {
             return Groups.g2(n, dstType);
         }
         if (tgtDef instanceof InterfaceDefinition ||
@@ -2913,7 +2934,7 @@ public class SemanticAnalysis {
         }
         if (tgtDef instanceof ClassDefinition td &&
                 srcDef instanceof ClassDefinition sd) {
-            if (assignable(srcType, srcDef, dstType, tgtDef)) {
+            if (assignable(srcType, srcDef, dstType, tgtDef).ok) {
                 n.needCheck(true);
                 return Groups.g2(n, dstType);
             }
@@ -2932,6 +2953,8 @@ public class SemanticAnalysis {
         var n = new LiteralExpression(se.pos(), new IntegerLiteral(se.pos(), size));
         return Groups.g2(n, Primitive.INT.declarer(se.pos()));
     }
+
+    private boolean passingParameters = false;
 
     private Groups.G2<Expression, TypeDeclarer> optimize(CallExpression e) {
         var call = e.callee();
@@ -2957,7 +2980,9 @@ public class SemanticAnalysis {
             var a = args.get(i);
             a.expectType.set(l);
             var ag = optimize(a);
+            passingParameters = true;
             assignable(l, ag.b(), Optional.of(ag.a()), a).valid();
+            passingParameters = false;
             nArgs.add(ag.a());
         }
         context.exitScope();

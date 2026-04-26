@@ -1000,7 +1000,7 @@ public class CppGenerator {
         write(fd.generic());
         var proc = fd.procedure();
         write(fd.symbol(), proc.prototype());
-        newLine();
+        write(' ');
         write(proc);
         enterFunc = null;
     }
@@ -1431,17 +1431,20 @@ public class CppGenerator {
     }
 
     private CppGenerator write(BoolLiteral e) {
-        write(Boolean.toString(e.value()));
+        write(Primitive.BOOL).write('(');
+        write(Boolean.toString(e.value())).write(')');
         return this;
     }
 
     private CppGenerator write(FloatLiteral e) {
-        write(e.value().toString());
+        write(Primitive.FLOAT).write('(');
+        write(e.value().toString()).write(')');
         return this;
     }
 
     private CppGenerator write(IntegerLiteral e) {
-        write(e.value().toString(e.radix()));
+        write(Primitive.INT).write('(');
+        write(e.value().toString(e.radix())).write(')');
         return this;
     }
 
@@ -1697,8 +1700,8 @@ public class CppGenerator {
     }
 
     private CppGenerator write(ConvertExpression e) {
-        return write('(').write(e.primitive()).write(')')
-                .write(e.operand());
+        return write(e.primitive()).write('(')
+                .write(e.operand()).write(')');
     }
 
     private CppGenerator write(EnumValueExpression e) {

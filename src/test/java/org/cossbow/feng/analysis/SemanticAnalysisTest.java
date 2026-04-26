@@ -1595,6 +1595,31 @@ public class SemanticAnalysisTest {
     }
 
     @Test
+    public void testPhantom5() {
+        checkSucc("func f(c func(&int)){ var v int; c(v); }");
+        checkFail("func f(c func(&int)){ c(0); }");
+        checkSucc("func f(c func(&int)){ c(int(0)); }");
+
+        checkSucc("func f(c func([&]int)){ var v [2]int; c(v); }");
+        checkSucc("func f(c func([&]int)){ c([]int[2]); }");
+
+        checkSucc("func f(c func(&int)){ var v = new(int); c(v); }");
+        checkSucc("func f(c func(&int)){ c(new(int)); }");
+
+        var d = "class A{} ";
+        checkSucc(d + "func f(c func(&A)){ var v A; c(v); }");
+        checkSucc(d + "func f(c func(&A)){ c(A{}); }");
+        checkSucc(d + "func f(c func(&Object)){ c(A{}); }");
+
+        checkSucc(d + "func f(c func([&]A)){ var v [2]A; c(v); }");
+        checkSucc(d + "func f(c func([&]A)){ c([]A[{}]); }");
+
+        checkSucc(d + "func f(c func(&A)){ var v = new(A); c(v); }");
+        checkSucc(d + "func f(c func(&A)){ c(new(A)); }");
+        checkSucc(d + "func f(c func(&Object)){ c(new(A)); }");
+    }
+
+    @Test
     public void testPhantomInherit1() {
         var d = "class A{} class B:A{} var a A; var b B; ";
         checkFail(d + "const r &A = a;");

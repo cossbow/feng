@@ -1,0 +1,29 @@
+
+class A {}
+
+func use0(a &int) {}
+func use1(a &A) {}
+func use2(a [&]int) {}
+func use3(o &Object) {}
+
+func test1() {
+    use0(int(0));
+
+    use1(A{});
+    use1(new(A));
+
+    use2([]int[1,2,3]);
+    use2(new([4]int));
+
+    use3(A{});
+    use3(new(A));
+}
+
+
+func test(n int) {
+    test1();
+}
+
+func main(args [&!#][*!#]byte) {
+    test(5);
+}
