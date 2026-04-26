@@ -1475,7 +1475,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testImmutable1() {
+    public void testUnmodifiable1() {
         checkSucc("func f(a *int){var v *#int = a;}");
         checkSucc("func f(a *#int){var v *#int = a;}");
         checkFail("func f(a *#int){var v *int = a;}");
@@ -1495,7 +1495,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testImmutable2() {
+    public void testUnmodifiable2() {
         checkSucc("func f(){ var a int; const v &int = a;}");
         checkSucc("func f(){ var a int; const v &#int = a;}");
         checkFail("func f(a int){ const v &int = a;}");
@@ -1509,7 +1509,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testImmutable3() {
+    public void testUnmodifiable3() {
         checkSucc("func f(a [*]int){var v [*#]int = a;}");
         checkSucc("func f(a [*#]int){var v [*#]int = a;}");
         checkFail("func f(a [*#]int){var v [*]int = a;}");

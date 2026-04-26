@@ -126,7 +126,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
             return master;
         }
 
-        public boolean immutable() {
+        public boolean unmodifiable() {
             return true;
         }
 

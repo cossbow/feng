@@ -46,7 +46,7 @@ Completed semantic analyses include:
 6. Variable lifetime checking.
 7. Check for anonymous objects in expressions.
 8. Required checks for reference and function type variables.
-9. Immutable checks for references.
+9. Unmodifiable checks for references.
 10. Statement context checking.
 11. Generic type parameter checking.
 12. Checking of symbols exported from other modules.

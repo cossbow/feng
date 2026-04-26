@@ -328,9 +328,9 @@ final class SourceParseVisitor
             default -> unreachable();
         };
         var required = ctx.required != null;
-        var immutable = ctx.immutable != null;
+        var unmodifiable = ctx.unmodifiable != null;
         return Optional.of(new Refer(posOf(ctx),
-                type, required, immutable));
+                type, required, unmodifiable));
     }
 
     @Override

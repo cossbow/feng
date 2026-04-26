@@ -64,7 +64,7 @@ func test() {
 ## 派生类型
 
 开发者可以自定义以下类型：
-[类](#类)与[接口](#接口)、[结构](#结构类型)、[枚举](#枚举)和[属性](#属性-_未完成_)。
+[类](#类)与[接口](#接口)、[结构](#结构类型)、[枚举](#枚举)。
 
 例如自定义派生类`Complex`以及使用它定义变量`c1`和`c2`：
 
@@ -1178,12 +1178,11 @@ func test() {
 ```feng
 func sample(s BillState) {
     switch(s) {
-    case WAIT:
-        // TODO
-    case PAID, SEND:
-        // TODO
-    default:
-        // TODO
+        case WAIT {
+        }
+        case PAID, SEND {
+        }
+        default {}
     }
 }
 ```
@@ -1575,11 +1574,11 @@ func test() {
 func test(c func(a, b int) int) {}
 func supply(c int) func(a, b int) int {
     switch(c) {
-    case 0: return add;
-    case 1: return sub;
-    case 2: return mul;
-    case 3: return div;
-    default: return nil;
+        case 0 { return add; }
+        case 1 { return sub; }
+        case 2 { return mul; }
+        case 3 { return div; }
+        default { return nil; }
     }
 }
 func test() {
@@ -1675,51 +1674,28 @@ func compare(a, b int) int {
 }
 ```
 
-`if..else`可以作为[元组](#元组-_未完成_)使用，但是`else`分支不能省略了，且每个分支提供的元组长度必须一致：
-
-```feng
-func compare(a, b int) int {
-    return if (a < b) -1 else 0;
-}
-func minMax(x,y int) (int,int) {
-   return if (x < y) x,y else y,x;
-}
-```
-
 #### switch语句
 
-由`switch`开始的带有一个条件表达式，多个匹配规则，每个规则由`case`开始，其下有一组语句。  
-匹配到的`case`规则其下的语句组会被执行，当执行结束后会跳出`switch`语句，不会继续下降，除非语句组最后一个是`fallthrough`语句。
+`switch`语句有一个条件表达式作为需要匹配的值，支持多个匹配规则（`case`），每个规则支持多个常量，匹配到规则后将后面的块语句。
 
 ```feng
 func numberName(k int) {
     switch(k) {
-    case 0: 
-        println("zero");
-    case 1: 
-        println("one");
-    case 2: 
-        println("two");
-    case 3:
-        fallthrough;
-    default:
-        println("Error");
+        case 0 {
+            println("zero");
+        }
+        case 1 {
+            println("one");
+        }
+        case 2,3,4 {
+            println("more");
+        }
+        default {
+            println("Error");
+        }
     }
 }
 ```
-
-和`if`类似可以在条件表达式前面加一个初始化语句：
-
-```feng
-func test(n Node) {
-   switch(var v=n.value; v) {
-   case 1:
-      println("one");
-   }
-}
-```
-
-也可以作为[元组](#元组-_未完成_)使用，规则与条件语句一样：
 
 ### 循环语句
 
@@ -1849,7 +1825,7 @@ func test() {
 
 #### 修改赋值
 
-赋值语句的左边是操作数（指将要被修改值的对象），后边是由表达式列表组成的[元组](#元组-_未完成_)：
+赋值语句的左边是操作数（指将要被修改值的对象），后边是由表达式列表：
 
 ```feng
 func test(x,y int, u *User, a []int) {
@@ -1861,20 +1837,15 @@ func test(x,y int, u *User, a []int) {
 }
 ```
 
-1. 赋值语句并不是拆成多个语句独立执行的，而是先计算操作数的表达式，再计算表达式元组，再一一赋值。
-2. 显然，不同类型的赋值可以放在一起。
-
 #### 变量初始化
 
-[变量声明语句](#变量声明语句)右边的初始化赋值是可选的，且也是先计算右边表达式元组，再赋值给左边变量：
+[变量声明语句](#变量声明语句)右边的初始化赋值是可选的，支持定义多个变量并初始化：
 
 ```feng
 func test() {
    var a,b,c = 1, "ggyy", 1.6;
 }
 ```
-
-复制的时候要求原类型必须相同，如果是数组则按最小长度复制。
 
 ### 变量声明语句
 
@@ -2099,7 +2070,7 @@ func f(a *!int, b *int) {
 
 ##### 不可修改引用
 
-引用可以标注为不可修改（加`#`号），不可修改引用不能修改实例，同样也是单向传递：可修改 → 不可修改。
+引用可以标注为不可修改（加`#`号），表示不能通过该引用修改实例，同样也是单向传递：可修改 → 不可修改。
 
 ```feng
 class Foo { var id int; }
@@ -2350,7 +2321,7 @@ _这里定义声明周期为运行时。_
 ### 字符串字面量
 
 字符串并不是基本类型，编译器对字符串字面量进行编码。
-字符串字面量即字符串常量，本身不能修改，所以只能用immutable变量引用。
+字符串字面量即字符串常量，本身不能修改，所以只能用unmodifiable变量引用。
 字符串常量不是在函数栈上分配的，而是一律放在常量区：
 
 ```feng
@@ -2367,92 +2338,6 @@ func test() {
 
 将数组元素列出来放在方括号中：`[1,2,3]`、`["Hello", "Good"]`等等。
 数组元素类型为兼容所有元素的类型，如果没有可兼容的类型则不允许。
-
-## 元组 _[未完成]_
-
-元组是语言内部的特殊类型，由一组元素显示组成。不支持显示定义元组类型的变量。
-
-### 用途
-
-声明了多返回值函数或方法，如果是返回数组，那无法自动解构成多个变量，因此采用元组来处理。
-
-```feng
-func getValue(key int) (int, bool) {
-   var node = get(key);
-   if (node == nil) return 0, false;
-   return node.value, true;
-}
-```
-
-运行同时赋值给多个操作对象：
-
-```feng
-func test() {
-   u.id, ok = 1, true;
-}
-```
-
-在声明变量时也可以使用：
-
-```feng
-func test() {
-   var id, ok = 1, true;
-}
-```
-
-### 特殊元组
-
-调用函数或方法返回的结构是一个元组，当然可以直接当做元组来使用。
-
-```feng
-func result(e int, r *Res) (int, *Res) {
-   return e, r;
-}
-func success(r *Res) (int, *Res) {
-   return result(0, r);
-}
-```
-
-多返回值的函数或方法不能参与表达式计算，但是单返回值的函数可以（编译器应该自动拆开）：
-
-```feng
-func sin(x float64) float64 {    // 单返回值可以作为元组返回也可以参与表达式计算
-   // TODO：……
-}
-func cos(x float64) float64 {
-   return sqrt(1 - sin(x)^2); // 需要自动把元组拆开成单值
-}
-```
-
-if元组和if语句类似，不同的是直接返回的是元组而不是语句：
-
-```feng
-func getValue(key int) (int, bool) {
-   var node = get(key);
-   return if (node == nil) 0, false else node.value, true;
-}
-```
-
-以及与switch语句对应的switch元组：
-
-```feng
-func createIf(c int) (bool, *Object) {
-   return switch(c) {
-   case 0: true, new(Res);
-   default: false, nil;
-   };
-}
-```
-
-不同类型元组可以嵌套组合：
-
-```feng
-func createIf(c int) (bool, *Object) {
-   return if (c > 0) false, nil 
-      else if (c < 0) true, new(Res)
-      else true, new(Res, {code=1000});
-}
-```
 
 ## 宏 
 
@@ -2684,5 +2569,3 @@ class Error {
    }
 }
 ```
-
-## 属性 _[未完成]_

@@ -32,7 +32,7 @@ public class Field extends Entity
         this.type = type;
     }
 
-    public boolean immutable() {
+    public boolean unmodifiable() {
         return false;
     }
 

@@ -330,7 +330,7 @@ definedTypeDeclarer
     : refer? definedType
     ;
 refer
-    : kind=(MUL|BITAND) required=NOT? immutable=HASH?
+    : kind=(MUL|BITAND) required=NOT? unmodifiable=HASH?
     ;
 funcTypeDeclarer
     : required=NOT? FUNC prototype

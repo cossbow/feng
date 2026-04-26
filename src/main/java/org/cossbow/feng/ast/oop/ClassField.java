@@ -36,7 +36,7 @@ public class ClassField extends Field {
     }
 
     @Override
-    public boolean immutable() {
+    public boolean unmodifiable() {
         return declare == Declare.CONST;
     }
 

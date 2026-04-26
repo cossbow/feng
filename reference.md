@@ -68,8 +68,7 @@ func test() {
 ## Derived Types
 
 Developers can define the following custom types:
-[Classes](#classes) and [interfaces](#interfaces), [structs](#struct-types), [enumerations](#enumerations),
-and [attributes](#attributes-_[Incomplete]_).
+[Classes](#classes) and [interfaces](#interfaces), [structs](#struct-types), [enumerations](#enumerations).
 
 For example, define a custom derived class `Complex` and use it to define variables `c1` and `c2`:
 
@@ -1251,12 +1250,11 @@ branch is required; otherwise, `default` is not allowed:
 ```feng
 func sample(s BillState) {
     switch(s) {
-    case WAIT:
-        // TODO
-    case PAID, SEND:
-        // TODO
-    default:
-        // TODO
+        case WAIT {
+        }
+        case PAID, SEND {
+        }
+        default {}
     }
 }
 ```
@@ -1668,11 +1666,11 @@ Function prototypes support anonymous definition:
 func test(c func(a, b int) int) {}
 func supply(c int) func(a, b int) int {
     switch(c) {
-    case 0: return add;
-    case 1: return sub;
-    case 2: return mul;
-    case 3: return div;
-    default: return nil;
+        case 0 { return add; }
+        case 1 { return sub; }
+        case 2 { return mul; }
+        case 3 { return div; }
+        default { return nil; }
     }
 }
 func test() {
@@ -1771,54 +1769,30 @@ func compare(a, b int) int {
 }
 ```
 
-`if..else` can be used as [tuples](#tuples-_[Incomplete]_), but the `else` branch cannot be omitted, and each branch
-must produce a tuple of the same length:
-
-```feng
-func compare(a, b int) int {
-    return if (a < b) -1 else 0;
-}
-func minMax(x,y int) (int,int) {
-   return if (x < y) x,y else y,x;
-}
-```
-
 #### switch Statement
 
-A `switch` statement begins with a conditional expression and contains multiple match rules. Each rule starts with
-`case` and is followed by a group of statements.
-The statement group of the matched `case` is executed, and after execution, control exits the `switch` statement (no
-fall-through) unless the last statement in the group is `fallthrough`.
+The `switch` statement has a conditional expression as the value to be matched, and supports multiple matching rules
+(`case`). Each rule supports multiple constants, and when a rule is matched, the following block statement will be
+executed.
 
 ```feng
 func numberName(k int) {
     switch(k) {
-    case 0: 
-        println("zero");
-    case 1: 
-        println("one");
-    case 2: 
-        println("two");
-    case 3:
-        fallthrough;
-    default:
-        println("Error");
+        case 0 {
+            println("zero");
+        }
+        case 1 {
+            println("one");
+        }
+        case 2,3,4 {
+            println("more");
+        }
+        default {
+            println("Error");
+        }
     }
 }
 ```
-
-Like `if`, an initialization statement can be added before the conditional expression:
-
-```feng
-func test(n Node) {
-   switch(var v=n.value; v) {
-   case 1:
-      println("one");
-   }
-}
-```
-
-`switch` can also be used as [tuples](#tuples-_[Incomplete]_) following the same rules as conditional statements.
 
 ### Loop Statements
 
@@ -1954,7 +1928,7 @@ func test() {
 #### Modification Assignment
 
 The left side of an assignment statement is an operand (the object whose value will be modified), and the right side is
-a [tuple](#tuples-_[Incomplete]_) of expressions:
+expressions:
 
 ```feng
 func test(x,y int, u *User, a []int) {
@@ -1966,22 +1940,16 @@ func test(x,y int, u *User, a []int) {
 }
 ```
 
-1. Assignment is not executed as multiple independent statements. The left operands are evaluated first, then the right
-   tuple, then the assignments are performed.
-2. Different types can be assigned together.
-
 #### Variable Initialization
 
-The initialization assignment on the right side of a [variable declaration statement](#variable-declaration-statement)
-is optional. The right tuple is evaluated first, then assigned to the left variables:
+The initialization assignment on the right side of the [variable declaration statement](#variable-declaration-statement)
+is optional, and it supports defining multiple variables and initializing them:
 
 ```feng
 func test() {
    var a,b,c = 1, "ggyy", 1.6;
 }
 ```
-
-The original types must match. For arrays, copying follows the smaller length.
 
 ### Variable Declaration Statement
 
@@ -2217,22 +2185,22 @@ func f(a *!int, b *int) {
 }
 ```
 
-##### Immutable Reference
+##### Unmodifiable Reference
 
-References can be marked as immutable (with `#`). Immutable references cannot modify the instance. Passing is one-way:
-mutable → immutable.
+References can be marked as unmodifiable (with a `#` symbol), indicating that instances cannot be modified 
+through that reference. This is also a one-way transfer: modifiable → unmodifiable.
 
 ```feng
 class Foo { var id int; }
 func f(a *int, b *Foo) {
-   var x *#int = a;  // Convert to immutable reference
-   // *x = 1; // Error: cannot modify immutable instance
+   var x *#int = a;  // Convert to unmodifiable reference
+   // *x = 1; // Error: cannot modify unmodifiable instance
    var y *#Foo = b;
-   // y.id = 1; // Error: cannot modify immutable instance
+   // y.id = 1; // Error: cannot modify unmodifiable instance
 }
 ```
 
-Immutable references cannot be passed in reverse.
+Unmodifiable references cannot be passed in reverse.
 
 ##### Dereference Operation
 
@@ -2249,7 +2217,7 @@ referenced instance, both for reading and writing:
       var y Complex = *b;
    }
    ```
-2. Writing directly modifies the instance; immutable references cannot be written to:
+2. Writing directly modifies the instance; unmodifiable references cannot be written to:
    ```feng
    class Complex {
       var real, imag float;
@@ -2257,7 +2225,7 @@ referenced instance, both for reading and writing:
    func test(a &int, b *Complex, c &#Complex) {
       *a = 1;
       *b = {real=1.0, imag=-1.0};
-      // *c = {}; // ✖ Immutable
+      // *c = {}; // ✖ Unmodifiable
    }
    ```
 
@@ -2482,7 +2450,7 @@ and [function prototype variables](#function-prototype-variables).
 ### String Literals
 
 Strings are not basic types; the compiler encodes string literals.
-String literals are string constants and cannot be modified, so they can only be referenced by immutable variables.
+String literals are string constants and cannot be modified, so they can only be referenced by unmodifiable variables.
 String constants are not allocated on the function stack but are placed in a constant region:
 
 ```feng
@@ -2499,95 +2467,6 @@ func test() {
 
 List array elements within square brackets: `[1,2,3]`, `["Hello", "Good"]`, etc.
 The array element type must be compatible with all elements; if no compatible type exists, it is disallowed.
-
-## Tuples _[Incomplete]_
-
-Tuples are special internal language types consisting of a group of elements. Variables of tuple type cannot be
-explicitly declared.
-
-### Usage
-
-For functions or methods with multiple return values, if they return an array, it cannot be automatically destructured
-into multiple variables; tuples handle this.
-
-```feng
-func getValue(key int) (int, bool) {
-   var node = get(key);
-   if (node == nil) return 0, false;
-   return node.value, true;
-}
-```
-
-Simultaneously assign to multiple operands:
-
-```feng
-func test() {
-   u.id, ok = 1, true;
-}
-```
-
-Also usable in variable declarations:
-
-```feng
-func test() {
-   var id, ok = 1, true;
-}
-```
-
-### Special Tuples
-
-The result of calling a function or method is a tuple, which can be used directly as a tuple.
-
-```feng
-func result(e int, r *Res) (int, *Res) {
-   return e, r;
-}
-func success(r *Res) (int, *Res) {
-   return result(0, r);
-}
-```
-
-Functions or methods with multiple return values cannot participate in expression evaluation, but single-return
-functions can (the compiler should automatically unpack):
-
-```feng
-func sin(x float64) float64 {    // Single return value can be returned as a tuple or used in expressions
-   // TODO:……
-}
-func cos(x float64) float64 {
-   return sqrt(1 - sin(x)^2); // Needs to automatically unpack tuple to single value
-}
-```
-
-`if` tuples are similar to `if` statements but return a tuple directly instead of a statement:
-
-```feng
-func getValue(key int) (int, bool) {
-   var node = get(key);
-   return if (node == nil) 0, false else node.value, true;
-}
-```
-
-And `switch` tuples corresponding to `switch` statements:
-
-```feng
-func createIf(c int) (bool, *Object) {
-   return switch(c) {
-   case 0: true, new(Res);
-   default: false, nil;
-   };
-}
-```
-
-Tuples of different types can be nested and combined:
-
-```feng
-func createIf(c int) (bool, *Object) {
-   return if (c > 0) false, nil 
-      else if (c < 0) true, new(Res)
-      else true, new(Res, {code=1000});
-}
-```
 
 ## Macros
 
@@ -2823,9 +2702,3 @@ class Error {
    }
 }
 ```
-
-## Attributes _[Incomplete]_
-
----
-
-This completes the translation of the modified Fèng programming language syntax documentation.

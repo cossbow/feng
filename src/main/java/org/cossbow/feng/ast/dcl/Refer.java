@@ -8,16 +8,16 @@ public class Refer extends Entity {
     // 不能为空（nil）
     private boolean required;
     // 实例不可修改
-    private boolean immutable;
+    private boolean unmodifiable;
 
     public Refer(Position pos,
                  ReferKind kind,
                  boolean required,
-                 boolean immutable) {
+                 boolean unmodifiable) {
         super(pos);
         this.kind = kind;
         this.required = required;
-        this.immutable = immutable;
+        this.unmodifiable = unmodifiable;
     }
 
     public ReferKind kind() {
@@ -32,8 +32,8 @@ public class Refer extends Entity {
         return required;
     }
 
-    public boolean immutable() {
-        return immutable;
+    public boolean unmodifiable() {
+        return unmodifiable;
     }
 
     @Override
@@ -41,7 +41,7 @@ public class Refer extends Entity {
         if (!(o instanceof Refer r)) return false;
 
         return required == r.required &&
-                immutable == r.immutable
+                unmodifiable == r.unmodifiable
                 && kind == r.kind;
     }
 
@@ -49,7 +49,7 @@ public class Refer extends Entity {
     public int hashCode() {
         int result = kind.hashCode();
         result = 31 * result + Boolean.hashCode(required);
-        result = 31 * result + Boolean.hashCode(immutable);
+        result = 31 * result + Boolean.hashCode(unmodifiable);
         return result;
     }
 
@@ -61,7 +61,7 @@ public class Refer extends Entity {
         var s = new StringBuilder(4);
         s.append(kind.symbol);
         if (required) s.append('!');
-        if (immutable) s.append('#');
+        if (unmodifiable) s.append('#');
         return s.toString();
     }
 }

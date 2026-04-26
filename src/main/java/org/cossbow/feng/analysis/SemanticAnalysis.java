@@ -1095,9 +1095,9 @@ public class SemanticAnalysis {
         }
         var t = prot.parameterSet().getType(0);
         if (t instanceof ArrayTypeDeclarer at &&
-                at.refer().match(r -> r.isKind(PHANTOM) && r.required() && r.immutable())
+                at.refer().match(r -> r.isKind(PHANTOM) && r.required() && r.unmodifiable())
                 && at.element() instanceof ArrayTypeDeclarer et &&
-                et.refer().match(r -> r.required() && r.immutable()) &&
+                et.refer().match(r -> r.required() && r.unmodifiable()) &&
                 et.element() instanceof PrimitiveTypeDeclarer pt &&
                 pt.primitive() == Primitive.BYTE) {
             return;
@@ -1212,7 +1212,7 @@ public class SemanticAnalysis {
         var fr = f.type().maybeRefer();
         if (fr.none()) return enablePhantom(lr, e.subject());
 
-        if (f.immutable())
+        if (f.unmodifiable())
             return enablePhantom(lr, e.subject());
         return semantic("can't convert var-refer-field to phantom-refer: %s", e.pos());
     }
@@ -1360,10 +1360,10 @@ public class SemanticAnalysis {
     }
 
     // 不可修改引用必须单向传递
-    private TypeValid checkImmutable(Refer lr, Refer rr) {
-        if (!rr.immutable() || lr.immutable())
+    private TypeValid checkUnmodifiable(Refer lr, Refer rr) {
+        if (!rr.unmodifiable() || lr.unmodifiable())
             return TypeValid.ok();
-        return TypeValid.err("can't deliver: immutable -> mutable: %s", lr.pos());
+        return TypeValid.err("can't deliver: unmodifiable -> mutable: %s", lr.pos());
     }
 
     // 检查非空的传递
@@ -1390,9 +1390,9 @@ public class SemanticAnalysis {
             var v = re.get();
             if (enablePhantom(lr, v)) {
                 // 不可修改引用必须单向传递
-                if (!immutable(v, false) || lr.immutable())
+                if (!unmodifiable(v, false) || lr.unmodifiable())
                     return TypeValid.ok();
-                return TypeValid.err("can't convert: immutable -> mutable: %s", lr.pos());
+                return TypeValid.err("can't convert: unmodifiable -> mutable: %s", lr.pos());
             }
             return TypeValid.err("can't convert '%s' to phantom refer: %s",
                     v, v.pos());
@@ -1406,7 +1406,7 @@ public class SemanticAnalysis {
         if (rr.isKind(PHANTOM))
             return TypeValid.err("can't convert: phantom -> strong: %s", lr.pos());
 
-        return checkImmutable(lr, rr);
+        return checkUnmodifiable(lr, rr);
     }
 
     private TypeValid assignRefer(TypeDeclarer l, LiteralExpression re) {
@@ -2312,67 +2312,67 @@ public class SemanticAnalysis {
 
     //
 
-    private boolean immutable(IndexOfExpression e, boolean left) {
+    private boolean unmodifiable(IndexOfExpression e, boolean left) {
         var t = e.resultType.must();
         var r = t.maybeRefer();
-        if (r.has()) return r.get().immutable();
-        return immutable(e.subject(), left);
+        if (r.has()) return r.get().unmodifiable();
+        return unmodifiable(e.subject(), left);
     }
 
-    private boolean immutable(MemberOfExpression e, boolean left) {
+    private boolean unmodifiable(MemberOfExpression e, boolean left) {
         var r = e.resultType.must().maybeRefer();
-        if (r.has()) return r.get().immutable();
+        if (r.has()) return r.get().unmodifiable();
         if (e.field().must() instanceof ClassField cf) {
             if (cf.declare() == Declare.CONST) return true;
         }
-        return immutable(e.subject(), left);
+        return unmodifiable(e.subject(), left);
     }
 
-    private boolean immutable(BlockExpression e, boolean left) {
+    private boolean unmodifiable(BlockExpression e, boolean left) {
         if (e.origin().has()) {
             var o = e.origin().must();
-            return immutable(o, left);
+            return unmodifiable(o, left);
         }
         var t = e.resultType.must();
         var ref = t.maybeRefer();
-        return ref.none() || ref.get().immutable();
+        return ref.none() || ref.get().unmodifiable();
     }
 
-    private boolean immutable(CallExpression e) {
+    private boolean unmodifiable(CallExpression e) {
         var t = e.resultType.must();
         var ref = t.maybeRefer();
-        return ref.none() || ref.get().immutable();
+        return ref.none() || ref.get().unmodifiable();
     }
 
-    private boolean immutable(Variable v) {
+    private boolean unmodifiable(Variable v) {
         var ref = v.type().must().maybeRefer();
         if (ref.none())
             return v.declare() == Declare.CONST;
-        return ref.get().immutable();
+        return ref.get().unmodifiable();
     }
 
-    private boolean immutable(SymbolExpression e) {
+    private boolean unmodifiable(SymbolExpression e) {
         var o = context.findVar(e.symbol());
         if (o.none()) return semantic("var '%s' not declared", e.symbol());
-        return immutable(o.get());
+        return unmodifiable(o.get());
     }
 
-    private boolean immutable(AssertExpression e, boolean left) {
-        var im = e.type().maybeRefer().match(Refer::immutable);
-        return im || immutable(e.subject(), left);
+    private boolean unmodifiable(AssertExpression e, boolean left) {
+        var im = e.type().maybeRefer().match(Refer::unmodifiable);
+        return im || unmodifiable(e.subject(), left);
     }
 
     // 检查不可修改值的入口
-    private boolean immutable(Expression e, boolean left) {
+    private boolean unmodifiable(Expression e, boolean left) {
         return switch (e) {
-            case CallExpression ee -> immutable(ee);
-            case IndexOfExpression ee -> immutable(ee, left);
-            case MemberOfExpression ee -> immutable(ee, left);
-            case ParenExpression ee -> immutable(ee.child(), left);
-            case SymbolExpression ee -> immutable(ee);
-            case VariableExpression ee -> immutable(ee.variable());
-            case AssertExpression ee -> immutable(ee, left);
-            case BlockExpression ee -> immutable(ee, left);
+            case CallExpression ee -> unmodifiable(ee);
+            case IndexOfExpression ee -> unmodifiable(ee, left);
+            case MemberOfExpression ee -> unmodifiable(ee, left);
+            case ParenExpression ee -> unmodifiable(ee.child(), left);
+            case SymbolExpression ee -> unmodifiable(ee);
+            case VariableExpression ee -> unmodifiable(ee.variable());
+            case AssertExpression ee -> unmodifiable(ee, left);
+            case BlockExpression ee -> unmodifiable(ee, left);
             case MethodExpression ee -> true;
             case NewExpression ee -> false;
             case CurrentExpression ee -> false;
@@ -2423,11 +2423,11 @@ public class SemanticAnalysis {
 
         var r = td.refer();
         if (r.has()) {
-            if (r.get().immutable())
-                return semantic("immutable array '%s': %s", op, op.pos());
+            if (r.get().unmodifiable())
+                return semantic("unmodifiable array '%s': %s", op, op.pos());
         } else {
-            if (immutable(sg.a(), true))
-                return semantic("immutable array '%s': %s", op, op.pos());
+            if (unmodifiable(sg.a(), true))
+                return semantic("unmodifiable array '%s': %s", op, op.pos());
         }
 
         var s = (PrimaryExpression) sg.a();
@@ -2461,16 +2461,16 @@ public class SemanticAnalysis {
         if (f instanceof ClassField cf) {
             checkExport(cf, cf.master(), name);
             if (cf.declare() == Declare.CONST)
-                return semantic("immutable field: %s", name.pos());
+                return semantic("unmodifiable field: %s", name.pos());
         }
 
         var r = td.maybeRefer();
         if (r.has()) {
-            if (r.get().immutable())
-                return semantic("immutable operand '%s': %s", op, op.pos());
+            if (r.get().unmodifiable())
+                return semantic("unmodifiable operand '%s': %s", op, op.pos());
         } else {
-            if (immutable(sg.a(), true))
-                return semantic("immutable operand '%s': %s", op, op.pos());
+            if (unmodifiable(sg.a(), true))
+                return semantic("unmodifiable operand '%s': %s", op, op.pos());
         }
 
         var s = (PrimaryExpression) sg.a();
@@ -2487,7 +2487,7 @@ public class SemanticAnalysis {
         if (o.has()) {
             var v = o.get();
             if (v.declare() == Declare.CONST)
-                return semantic("immutable operand %s: %s", s, s.pos());
+                return semantic("unmodifiable operand %s: %s", s, s.pos());
             if (context.isVarLocked(v))
                 return semantic("readonly operand %s: %s", s, s.pos());
 
@@ -2499,7 +2499,7 @@ public class SemanticAnalysis {
             var f = enterClass.allFields().tryGet(s.name());
             if (f.has()) {
                 if (f.get().declare() == Declare.CONST)
-                    return semantic("immutable operand %s: %s", s, s.pos());
+                    return semantic("unmodifiable operand %s: %s", s, s.pos());
                 // 操作数加上`this.`前缀，方便后续处理
                 var n = new FieldOperand(op.pos(), newThis(s.pos()), s.name());
                 return Groups.g2(n, f.get().type());
@@ -2512,8 +2512,8 @@ public class SemanticAnalysis {
         var g = optimize(op.subject());
         dereferable(g.b());
         var ref = g.b().maybeRefer().must();
-        if (ref.immutable())
-            return semantic("immutable refer '%s': %s", op, op.pos());
+        if (ref.unmodifiable())
+            return semantic("unmodifiable refer '%s': %s", op, op.pos());
 
         var s = (PrimaryExpression) g.a();
         var n = wrapRelayOperand(s, _s -> {
@@ -3574,7 +3574,7 @@ public class SemanticAnalysis {
         }
         for (var f : fields) {
             if (oe.entries().exists(f.name())) continue;
-            if (!f.immutable()) continue;
+            if (!f.unmodifiable()) continue;
             return semantic("const field '%s' must init: %s", f.name(), oe.pos());
         }
         var entries = new IdentifierMap<Expression>(oe.entries().size());
@@ -3733,7 +3733,7 @@ public class SemanticAnalysis {
     }
 
     private Variable makeTmpVar(String name, Expression e) {
-        var im = immutable(e, false);
+        var im = unmodifiable(e, false);
         var vn = new Identifier(e.pos(), name, true);
         return new Variable(e.pos(), Modifier.empty(),
                 im ? Declare.CONST : Declare.VAR,

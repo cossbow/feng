@@ -161,7 +161,7 @@ public class DeclarationParseTest extends BaseParseTest {
             Assertions.assertEquals(symbol("Host"), typeName(td.element()));
             Assertions.assertTrue(td.length().none());
             Assertions.assertTrue(td.refer().must().isKind(STRONG));
-            Assertions.assertFalse(td.refer().must().immutable());
+            Assertions.assertFalse(td.refer().must().unmodifiable());
             Assertions.assertFalse(td.refer().must().required());
         }
         {
@@ -175,7 +175,7 @@ public class DeclarationParseTest extends BaseParseTest {
             Assertions.assertEquals(symbol("Host"), typeName(td2.element()));
             Assertions.assertTrue(td2.length().none());
             Assertions.assertTrue(td2.refer().must().isKind(PHANTOM));
-            Assertions.assertFalse(td2.refer().must().immutable());
+            Assertions.assertFalse(td2.refer().must().unmodifiable());
             Assertions.assertTrue(td2.refer().must().required());
         }
     }

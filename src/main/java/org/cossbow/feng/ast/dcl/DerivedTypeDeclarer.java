@@ -87,7 +87,7 @@ public class DerivedTypeDeclarer extends TypeDeclarer
         var sb = new StringBuilder(16);
         sb.append(refer.get().kind().symbol);
         if (refer.get().required()) sb.append('!');
-        if (refer.get().immutable()) sb.append('#');
+        if (refer.get().unmodifiable()) sb.append('#');
         sb.append(derivedType.toString());
         return sb.toString();
     }

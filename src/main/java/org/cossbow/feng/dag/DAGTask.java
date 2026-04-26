@@ -38,8 +38,6 @@ public class DAGTask<Key, Result>
     // 执行结果集
     private final Map<Key, Result> results =
             new ConcurrentHashMap<>();
-    private final Map<Key, Result> immutableResults =
-            Collections.unmodifiableMap(results);
     // 是否已经启动
     private volatile boolean started = false;
 
