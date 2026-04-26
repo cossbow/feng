@@ -10,8 +10,7 @@ import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
-import org.cossbow.feng.ast.micro.MacroFunc;
-import org.cossbow.feng.ast.micro.MacroTable;
+import org.cossbow.feng.ast.micro.*;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
@@ -886,9 +885,8 @@ public class SemanticAnalysis {
 
         for (var f : cd.fields()) analyse(f);
 
-        declareMethod(cd);
-
         macro(cd);
+        declareMethod(cd);
 
         enterClass = null;
     }
@@ -905,6 +903,16 @@ public class SemanticAnalysis {
             analyse(m.modifier());
             analyse(m.prototype(), false);
         }
+        for (var m : cd.binaryOperators().values()) {
+            analyse(m.prototype(), false);
+        }
+        for (var m : cd.unaryOperators().values()) {
+            analyse(m.prototype(), false);
+        }
+        cd.indexOperator().use(io -> {
+            io.get().use(m -> analyse(m.prototype(), false));
+            io.set().use(m -> analyse(m.prototype(), false));
+        });
     }
 
     private void implMethod(ClassDefinition cd) {
@@ -916,6 +924,10 @@ public class SemanticAnalysis {
             analyse(m);
         for (var m : cd.unaryOperators().values())
             analyse(m);
+        cd.indexOperator().use(io -> {
+            io.get().use(this::analyse);
+            io.set().use(this::analyse);
+        });
 
         enterClass = null;
     }
@@ -1793,18 +1805,39 @@ public class SemanticAnalysis {
         ifUnmarkNonNil(v);
     }
 
+    private void index2Call(Assignment a) {
+        if (!(a.operand() instanceof IndexOperand io)) {
+            unreachable();
+            return;
+        }
+        var s = io.subject();
+        var td = (DerivedTypeDeclarer) s.resultType.must();
+        var cd = (ClassDefinition) td.def();
+        var set = cd.indexOperator().must().set().must();
+        var m = new MethodExpression(io.pos(), s, set, TypeArguments.EMPTY);
+        var n = new CallExpression(a.pos(), m, List.of(io.index(), a.value()),
+                Optional.of(set.prototype()));
+        n.resultType.set(set.prototype().returnType());
+        var stmt = new CallStatement(a.pos(), n);
+        a.replacer().set(stmt);
+    }
+
     private void analyse(Assignment a) {
         var og = optimize(a.operand());
+        a.operand(og.a());
         a.value().expectType.set(og.b());
         var vg = optimize(a.value());
+        a.value(vg.a());
         if (vg.b() instanceof VoidTypeDeclarer) {
             semantic("%s used as a value, but it returns nothing: %s",
                     a.value(), a.value().pos());
             return;
         }
+        if (og.b() instanceof VoidTypeDeclarer) {
+            index2Call(a);
+            return;
+        }
         assignable(og.b(), vg.b(), Optional.of(vg.a()), a).valid();
-        a.operand(og.a());
-        a.value(vg.a());
         unmarkNonNilVar(a);
     }
 
@@ -2438,11 +2471,8 @@ public class SemanticAnalysis {
         }
 
         var sg = optimize(op.subject());
-        if (!(sg.b() instanceof ArrayTypeDeclarer td)) {
-            return semantic("require array: %s", op.pos());
-        }
 
-        var r = td.refer();
+        var r = sg.b().maybeRefer();
         if (r.has()) {
             if (r.get().unmodifiable())
                 return semantic("unmodifiable array '%s': %s", op, op.pos());
@@ -2451,11 +2481,29 @@ public class SemanticAnalysis {
                 return semantic("unmodifiable array '%s': %s", op, op.pos());
         }
 
+        if (sg.b() instanceof DerivedTypeDeclarer dtd) {
+            if (dtd.def() instanceof ClassDefinition cd) {
+                if (cd.indexOperator().has()) {
+                    var io = cd.indexOperator().must();
+                    if (io.set().has()) {
+                        var set = io.set().get();
+                        var s = (PrimaryExpression) sg.a();
+                        var n = new IndexOperand(op.pos(), s, ig.a());
+                        return Groups.g2(n, set.prototype().returnType());
+                    }
+                }
+            }
+            return semantic("'%s' not implement index-set: %s", dtd, op.pos());
+        }
+
+        if (!(sg.b() instanceof ArrayTypeDeclarer atd))
+            return semantic("require array: %s", op.pos());
+
         var s = (PrimaryExpression) sg.a();
         var n = wrapRelayOperand(s, _s -> {
             return new IndexOperand(op.pos(), _s, ig.a());
         });
-        return Groups.g2(n, td.element());
+        return Groups.g2(n, atd.element());
     }
 
     private Groups.G2<Operand, TypeDeclarer> optimize(FieldOperand op) {
@@ -3071,63 +3119,110 @@ public class SemanticAnalysis {
         return Groups.g2(e, td);
     }
 
-    private Groups.G2<Expression, TypeDeclarer> optimize(IndexOfExpression e) {
-        var sg = optimize(e.subject());
-        var ig = optimize(e.index());
-
+    private Optional<IntegerLiteral> optimizeIndex(
+            Groups.G2<Expression, TypeDeclarer> ig) {
+        var pos = ig.a().pos();
         if (!isInteger(ig.b()))
-            return semantic("index require integer: %s", e.pos());
+            return semantic("index require integer: %s", pos);
 
-        IntegerLiteral idx = null;
         if (ig.a() instanceof LiteralExpression lit) {
-            idx = (IntegerLiteral) lit.literal();
-            if (idx.compareTo(0) < 0) {
-                return semantic("negative index: %s", e.index().pos());
-            }
+            var idx = (IntegerLiteral) lit.literal();
+            if (idx.compareTo(0) >= 0)
+                return Optional.of(idx);
+
+            return semantic("negative index: %s", pos);
         }
 
-        if (sg.b() instanceof DefinitionDeclarer dtd) {
-            // for enum
-            if (dtd.def() instanceof EnumDefinition ed) {
-                Expression n;
-                if (idx != null) {
-                    if (idx.compareTo(ed.values().size()) >= 0) {
-                        return semantic("index out of bounds: %s", e.pos());
-                    }
-                    var ev = ed.ofId(idx.value().intValue());
-                    n = new EnumValueExpression(e.pos(), ed, ev);
-                } else {
-                    n = new EnumIdExpression(e.pos(), ed, ig.a());
+        return Optional.empty();
+    }
+
+    private Groups.G2<Expression, TypeDeclarer> indexOfEnum(
+            IndexOfExpression e, DefinitionDeclarer dtd) {
+        var pos = e.index().pos();
+        var ig = optimize(e.index());
+        var idx = optimizeIndex(ig);
+        // for enum
+        if (dtd.def() instanceof EnumDefinition ed) {
+            Expression n;
+            if (idx.has()) {
+                if (idx.get().compareTo(ed.values().size()) >= 0) {
+                    return semantic("index out of bounds: %s", pos);
                 }
-                var td = new EnumTypeDeclarer(e.pos(), ed);
+                var ev = ed.ofId(idx.get().value().intValue());
+                n = new EnumValueExpression(e.pos(), ed, ev);
+            } else {
+                n = new EnumIdExpression(e.pos(), ed, ig.a());
+            }
+            var td = new EnumTypeDeclarer(e.pos(), ed);
+            return Groups.g2(n, td);
+        }
+        return semantic("only enum type can use index: %s", pos);
+    }
+
+    private Groups.G2<Expression, TypeDeclarer> indexOfArray(
+            IndexOfExpression e, ArrayTypeDeclarer atd,
+            Groups.G2<Expression, TypeDeclarer> sg) {
+        var ig = optimize(e.index());
+        var idx = optimizeIndex(ig);
+        var a = (PrimaryExpression) sg.a();
+        if (atd.length().has() && idx.has()) {
+            if (idx.get().compareTo(atd.len()) >= 0) {
+                return semantic("index out of bounds: %s", e.pos());
+            }
+        }
+        var ie = ig.a();
+        if (idx.has()) {
+            ie = new LiteralExpression(e.index().pos(), idx.get());
+            ie.resultType.set(new LiteralTypeDeclarer(ie.pos(), idx.get()));
+        }
+        var t = atd.element();
+        var p = e.pos();
+        var i = ie;
+        var n = wrapRelayExpr(a, t, _a -> {
+            return new IndexOfExpression(p, (PrimaryExpression) _a, i);
+        });
+        return Groups.g2(n, t);
+    }
+
+    private Groups.G2<Expression, TypeDeclarer> indexOfCustom(
+            IndexOfExpression e, DerivedTypeDeclarer dtd,
+            Groups.G2<Expression, TypeDeclarer> sg) {
+        var def = dtd.def();
+        if (def instanceof ClassDefinition cd &&
+                cd.indexOperator().has()) {
+            var op = cd.indexOperator().must();
+            if (op.get().has()) {
+                var cm = op.get().get();
+                var a = (PrimaryExpression) sg.a();
+                var s = new MethodExpression(a.pos(), a, cm, TypeArguments.EMPTY);
+                var ig = optimize(e.index());
+                var n = new CallExpression(e.pos(), s, List.of(ig.a()),
+                        Optional.of(cm.prototype()));
+                var td = cm.prototype().returnSet().must();
                 return Groups.g2(n, td);
             }
-            return semantic("only enum type can use index: %s", e.pos());
+        }
+        return semantic("'%s' not implement index: %s",
+                def, e.index().pos());
+    }
+
+    private Groups.G2<Expression, TypeDeclarer> optimize(IndexOfExpression e) {
+        var sg = optimize(e.subject());
+
+        if (sg.b() instanceof DefinitionDeclarer dtd) {
+            return indexOfEnum(e, dtd);
         }
 
         if (sg.b() instanceof ArrayTypeDeclarer atd) {
-            var a = (PrimaryExpression) sg.a();
-            if (atd.length().has() && idx != null) {
-                if (idx.compareTo(atd.len()) >= 0) {
-                    return semantic("index out of bounds: %s", e.pos());
-                }
-            }
-            var ie = ig.a();
-            if (idx != null) {
-                ie = new LiteralExpression(e.index().pos(), idx);
-                ie.resultType.set(new LiteralTypeDeclarer(ie.pos(), idx));
-            }
-            var t = atd.element();
-            var p = e.pos();
-            var i = ie;
-            var n = wrapRelayExpr(a, t, _a -> {
-                return new IndexOfExpression(p, (PrimaryExpression) _a, i);
-            });
-            return Groups.g2(n, t);
+            return indexOfArray(e, atd, sg);
         }
 
-        return semantic("%s not implement index: %s",
-                sg.b(), e.subject().pos());
+        if (sg.b() instanceof DerivedTypeDeclarer dtd) {
+            return indexOfCustom(e, dtd, sg);
+        }
+
+        return semantic("'%s' not implement index: %s",
+                sg.b(), e.index().pos());
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(LambdaExpression e) {
@@ -3438,7 +3533,7 @@ public class SemanticAnalysis {
             if (om.has()) {
                 // 叠加上继承的泛型替换
                 var gm = enterClass.inherit().map(DerivedType::gm)
-                        .orElse(GenericMap.EMPTY);
+                        .getOrElse(GenericMap.EMPTY);
                 gm = genericMap(re, gm, om.get().generic(), re.generic());
                 var prot = gm.instantiate(om.get().prototype());
                 // 函数调用加上`this.`前缀，方便后续处理
@@ -3845,6 +3940,7 @@ public class SemanticAnalysis {
     private void macro(ClassDefinition cd) {
         macroResFree(cd);
         macroOperators(cd);
+        macroIndexOperator(cd);
     }
 
     private void macroResFree(ClassDefinition cd) {
@@ -3927,23 +4023,96 @@ public class SemanticAnalysis {
                     Declare.CONST, mv.name(), Lazy.of(td), Lazy.nil());
             params.add(v);
         }
+        if (mp.result().has())
+            semantic("operator can't set return-type: %s", mp.pos());
         var retType = returnBool ?
                 Primitive.BOOL.declarer(ZERO) :
                 new DerivedTypeDeclarer(ZERO, dt);
-        var ps = new ParameterSet(params);
-        var pt = new Prototype(mf.pos(), ps, Optional.of(retType));
 
-        if (mp.result().none())
+        if (mp.value().none())
             semantic("operator missing result: %s", mp.pos());
+
+        return macro2Method(cd, mf, params, Optional.of(retType));
+    }
+
+    private void macroIndexOperator(ClassDefinition cd) {
+        var og = cd.macros().indexGet();
+        var os = cd.macros().indexSet();
+        if (og.none() && os.none()) return;
+        var mg = og.map(m -> macroIndexGet(cd, m));
+        var ms = os.map(m -> macroIndexSet(cd, m));
+        var io = new IndexOperator(mg, ms);
+        cd.indexOperator().set(io);
+    }
+
+    private ClassMethod macroIndexGet(ClassDefinition cd, Macro m) {
+        if (!(m instanceof MacroFunc mf)) {
+            return semantic("index-get require a procedure: %s", m.pos());
+        }
+        var mp = mf.procedure();
+        if (mp.result().none()) {
+            return semantic("index-get require result type: %s", m.pos());
+        }
+        if (mp.params().size() != 1) {
+            return semantic("index-get require single parameter: %s", m.pos());
+        }
+        var mv = mp.params().getValue(0);
+        if (mv.type().none()) {
+            return semantic("index-get require typed parameter: %s", m.pos());
+        }
+        if (mp.value().none()) {
+            return semantic("index-get require return value: %s", m.pos());
+        }
+
+        var param = new Variable(mv.pos(), Modifier.empty(), Declare.CONST,
+                mv.name(), Lazy.of(mv.type()), Lazy.nil());
+
+        return macro2Method(cd, mf, List.of(param), Optional.empty());
+    }
+
+    private ClassMethod macroIndexSet(ClassDefinition cd, Macro m) {
+        if (!(m instanceof MacroFunc mf)) {
+            return semantic("index-set require a procedure: %s", m.pos());
+        }
+        var mp = mf.procedure();
+        if (mp.result().has()) {
+            return semantic("index-set has no result type: %s", m.pos());
+        }
+        if (mp.params().size() != 2) {
+            return semantic("index-set require 2 parameter: %s", m.pos());
+        }
+        if (mp.value().has()) {
+            return semantic("index-set has no return value: %s", m.pos());
+        }
+
+        var params = new ArrayList<Variable>(2);
+        for (var mv : mp.params()) {
+            var v = new Variable(mv.pos(), Modifier.empty(), Declare.CONST,
+                    mv.name(), Lazy.of(mv.type()), Lazy.nil());
+            params.add(v);
+        }
+        return macro2Method(cd, mf, params, Optional.empty());
+    }
+
+    private ClassMethod macro2Method(
+            ClassDefinition cd, MacroFunc mf,
+            List<Variable> params, Optional<TypeDeclarer> ret) {
+        var mp = mf.procedure();
+        var ps = new ParameterSet(params);
+        var pt = new Prototype(mf.pos(), ps, mp.result().orElse(ret));
 
         var list = new ArrayList<Statement>(mp.body().size() + 1);
         list.addAll(mp.body());
-        list.add(new ReturnStatement(ZERO, mp.result()));
+        var rs = new ReturnStatement(ZERO, mp.value());
+        list.add(rs);
         var block = new BlockStatement(mp.pos(), list, false);
-
         var proc = new Procedure(mp.pos(), pt, block, Map.of());
-        return new ClassMethod(mf.pos(), Modifier.empty(), mf.makeId(),
+        rs.procedure().set(proc);
+
+        var cm = new ClassMethod(mf.pos(), Modifier.empty(), mf.makeId(),
                 TypeParameters.empty(), proc, false);
+        cm.master(cd);
+        return cm;
     }
 
     // attribute

@@ -3076,6 +3076,23 @@ public class SemanticAnalysisTest {
         checkSucc(d + "func f(a,b A) A { return -b; }");
     }
 
+    @Test
+    public void testIndexOverride1() {
+        var d = "class A{} ";
+        checkFail(d + "func f() { var a A; var v = a[0]; }");
+        checkFail(d + "func f() { var a *A; var v = a[0]; }");
+        checkFail(d + "func f() { var a A; a[0] = 0; }");
+        checkFail(d + "func f() { var a *A; a[0] = 0; }");
+
+        d = "class A{ macro index get(index int) bool { true } } ";
+        checkSucc(d + "func f() { var a A; var v = a[0]; }");
+        checkSucc(d + "func f() { var a *A; var v = a[0]; }");
+
+        d = "class A{ macro index set(index int, value bool) {} } ";
+        checkSucc(d + "func f() { var a A; a[0] = true; }");
+        checkSucc(d + "func f() { var a *A; a[0] = true; }");
+    }
+
     //
 
     static void parseSample(File file) {

@@ -20,13 +20,10 @@ public class Optional<T> {
         return has() ? value : defVal;
     }
 
-    public T orElse(T defVal) {
-        return has() ? value : defVal;
+    public Optional<T> orElse(Optional<T> defVal) {
+        return has() ? this : defVal;
     }
 
-    public T orElse(Supplier<T> defOpt) {
-        return has() ? value : defOpt.get();
-    }
 
     public boolean has() {
         return value != null;

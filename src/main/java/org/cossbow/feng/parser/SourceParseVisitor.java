@@ -1534,9 +1534,10 @@ final class SourceParseVisitor
     public Entity visitMacroProcedure(FengParser.MacroProcedureContext ctx) {
         var name = identifier(ctx.name);
         var params = parseMacroVariables(ctx.params);
+        var result = this.<TypeDeclarer>visitOptional(ctx.typeDeclarer());
         var body = parseStatements(ctx.statementList());
-        var result = this.<Expression>visitOptional(ctx.expression());
-        return new MacroProcedure(posOf(ctx), name, params, body, result);
+        var value = this.<Expression>visitOptional(ctx.expression());
+        return new MacroProcedure(posOf(ctx), name, params, result, body, value);
     }
 
     @Override
@@ -1560,7 +1561,7 @@ final class SourceParseVisitor
     public Entity visitMacroVariable(FengParser.MacroVariableContext ctx) {
         var name = identifier(ctx.name);
         var type = this.<TypeDeclarer>visitOptional(ctx.type);
-        return new MacroVariable(posOf(ctx), name, Lazy.of(type));
+        return new MacroVariable(posOf(ctx), name, type);
     }
 
 

@@ -137,7 +137,7 @@ static void feng$debug(bool all) {
 
 #endif
 
-static void *Feng$alloc(int64_t size) {
+static void *Feng$alloc(Int64 size) {
 	void *p = malloc(sizeof(Feng$Header) + size);
 	if (p == nullptr) throw std::bad_alloc();
 
@@ -429,7 +429,7 @@ static Feng$PRefer<T> Feng$assert(const Feng$PRefer<S> &p) {
  * @tparam E 元素类型
  * @tparam L 长度常量
  */
-template<typename E, int64_t L>
+template<typename E, Int64 L>
 struct Feng$Array {
 	E values[L] = {};
 
@@ -475,11 +475,13 @@ struct Feng$Array {
 		return *this;
 	}
 
-	E &operator[](int64_t index) {
+	E &operator[](Int64 index) {
 		if (index < 0 || index >= L)
 			throw Feng$OutOfBounds();
 		return values[index];
 	}
+
+	bool operator()(Int64 index) const {}
 
 	auto operator<=>(const Feng$Array<E, L> &) const = default;
 };
@@ -491,18 +493,18 @@ struct Feng$Array {
 template<typename E>
 struct Feng$ArrayRefer {
 	E *start;
-	int64_t len;
+	Int64 len;
 
 	Feng$ArrayRefer() : start(nullptr), len(0) {}
 
-	Feng$ArrayRefer(E *start, int64_t len) : start(start), len(len) {}
+	Feng$ArrayRefer(E *start, Int64 len) : start(start), len(len) {}
 
 	// t == nil;
 	bool absent() const {
 		return start == nullptr;
 	}
 
-	E &operator[](int64_t index) const {
+	E &operator[](Int64 index) const {
 		Feng$required(start);
 		if (index < 0 || index >= this->len)
 			throw Feng$OutOfBounds();
@@ -533,7 +535,7 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 
 	Feng$ArraySRefer(std::nullptr_t) : Feng$ArrayRefer<E>() {}
 
-	Feng$ArraySRefer(E *start, int64_t len) {
+	Feng$ArraySRefer(E *start, Int64 len) {
 		this->start = start;
 		this->len = len;
 	}
@@ -614,7 +616,7 @@ struct Feng$ArrayPRefer : public Feng$ArrayRefer<E> {
 
 	Feng$ArrayPRefer(std::nullptr_t) : Feng$ArrayRefer<E>() {}
 
-	Feng$ArrayPRefer(E *start, int64_t len) : Feng$ArrayRefer<E>(start, len) {}
+	Feng$ArrayPRefer(E *start, Int64 len) : Feng$ArrayRefer<E>(start, len) {}
 
 	Feng$ArrayPRefer(Feng$ArrayRefer<E> &&r) : Feng$ArrayRefer<E>(r) {}
 
@@ -630,7 +632,7 @@ concept BaseArrayRefer = std::is_base_of_v<Feng$ArrayRefer<E>, T>;
 
 // 创建数组实例
 template<typename E>
-static Feng$ArraySRefer<E> Feng$newArray(int64_t len) {
+static Feng$ArraySRefer<E> Feng$newArray(Int64 len) {
 	if (len < 0) throw Feng$NegativeInteger();
 	void *p = Feng$alloc(sizeof(E) * len);
 	memset(p, 0, sizeof(E) * len);
@@ -640,8 +642,8 @@ static Feng$ArraySRefer<E> Feng$newArray(int64_t len) {
 
 // 创建数组实例
 template<typename E, typename ...Args>
-static Feng$ArraySRefer<E> Feng$newArrayInit(int64_t len, Args &&... args) {
-	int64_t num = sizeof...(Args);
+static Feng$ArraySRefer<E> Feng$newArrayInit(Int64 len, Args &&... args) {
+	Int64 num = sizeof...(Args);
 	if (len < num) throw Feng$OutOfBounds();
 	auto a = Feng$newArray<E>(len);
 	int i = 0;
@@ -650,8 +652,8 @@ static Feng$ArraySRefer<E> Feng$newArrayInit(int64_t len, Args &&... args) {
 }
 
 // 创建数组实例
-template<typename E, int64_t L0>
-static Feng$ArraySRefer<E> Feng$newArrayCopy(int64_t len, Feng$Array<E, L0> &init) {
+template<typename E, Int64 L0>
+static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 len, Feng$Array<E, L0> &init) {
 	if (len < L0) throw Feng$OutOfBounds();
 	auto a = Feng$newArray<E>(len);
 	for (int i = 0; i < L0; ++i) {
@@ -662,7 +664,7 @@ static Feng$ArraySRefer<E> Feng$newArrayCopy(int64_t len, Feng$Array<E, L0> &ini
 
 template<typename E, typename A>
 requires BaseArrayRefer<E, A>
-static Feng$ArraySRefer<E> Feng$newArrayCopy(int64_t len, A &init) {
+static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 len, A &init) {
 	if (len < init.len) throw Feng$OutOfBounds();
 	auto a = Feng$newArray<E>(len);
 	for (int i = 0; i < init.len; ++i) {
@@ -675,44 +677,44 @@ static Feng$ArraySRefer<E> Feng$newArrayCopy(int64_t len, A &init) {
 template<typename S, typename A, typename T>
 requires BaseArrayRefer<S, A>
 static Feng$ArrayRefer<T> Feng$mapA2A(A &s) {
-	int64_t len = (sizeof(S) * s.len) / sizeof(T);
+	Int64 len = (sizeof(S) * s.len) / sizeof(T);
 	return {(T *) s.start, len};
 }
 
-template<typename S, int64_t L, typename R>
+template<typename S, Int64 L, typename R>
 static Feng$ArrayPRefer<R> Feng$mapA2A(Feng$Array<S, L> &s) {
-	int64_t l = sizeof(S) * L / sizeof(R);
+	Int64 l = sizeof(S) * L / sizeof(R);
 	return {(R *) s.values, l};
 }
 
 // mappable数组转换，例如： *int32 -> [*]int8
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(S *s) {
-	int64_t len = sizeof(S) / sizeof(T);
+	Int64 len = sizeof(S) / sizeof(T);
 	return {(T *) s, len};
 }
 
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$SRefer<S> &s) {
-	int64_t len = sizeof(S) / sizeof(T);
+	Int64 len = sizeof(S) / sizeof(T);
 	return {(T *) s.t, len};
 }
 
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$SRefer<S> &&s) {
-	int64_t len = sizeof(S) / sizeof(T);
+	Int64 len = sizeof(S) / sizeof(T);
 	return {(T *) s.t, len};
 }
 
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$PRefer<S> &s) {
-	int64_t len = sizeof(S) / sizeof(T);
+	Int64 len = sizeof(S) / sizeof(T);
 	return {(T *) s.t, len};
 }
 
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$PRefer<S> &&s) {
-	int64_t len = sizeof(S) / sizeof(T);
+	Int64 len = sizeof(S) / sizeof(T);
 	return {(T *) s.t, len};
 }
 
@@ -726,7 +728,7 @@ static Feng$Refer<U> Feng$mapA2U(A &s) {
 }
 
 
-template<typename T, int64_t L>
+template<typename T, Int64 L>
 struct Feng$GlobalArray {
 	Feng$Header $header;
 	Feng$Array<T, L> array;

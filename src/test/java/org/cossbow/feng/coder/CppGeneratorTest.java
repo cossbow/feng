@@ -61,20 +61,24 @@ public class CppGeneratorTest {
         }
     }
 
+    public void testOne(Path dir, Path file) throws IOException {
+        CppGenerator.copyBaseHeader(dir);
+        var fn = file.getFileName();
+        var name = CommonUtil.trimExt(fn.toString())
+                .replace("-", "_");
+        var subDir = dir.resolve(name);
+        var dag = new ModuleParser(name, dir, UTF_8,
+                ModuleParserTest.libs()).parseFile(fn);
+        new ModuleAnalysis().analyse(dag);
+        Files.createDirectories(subDir);
+        generate(dag, subDir, true);
+    }
+
     @Test
     public void testSampleSource() throws IOException {
         var dir = ResourceUtil.getDir("coder");
-        CppGenerator.copyBaseHeader(dir);
         for (var file : ResourceUtil.list(dir)) {
-            var fn = file.getFileName();
-            var name = CommonUtil.trimExt(fn.toString())
-                    .replace("-", "_");
-            var subDir = dir.resolve(name);
-            var dag = new ModuleParser(name, dir, UTF_8,
-                    ModuleParserTest.libs()).parseFile(fn);
-            new ModuleAnalysis().analyse(dag);
-            Files.createDirectories(subDir);
-            generate(dag, subDir, true);
+            testOne(dir, file);
         }
     }
 

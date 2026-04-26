@@ -5,14 +5,15 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.util.Optional;
 
 public class MacroVariable extends Entity {
     private Identifier name;
-    private Lazy<TypeDeclarer> type;
+    private Optional<TypeDeclarer> type;
 
     public MacroVariable(Position pos,
                          Identifier name,
-                         Lazy<TypeDeclarer> type) {
+                         Optional<TypeDeclarer> type) {
         super(pos);
         this.name = name;
         this.type = type;
@@ -22,7 +23,7 @@ public class MacroVariable extends Entity {
         return name;
     }
 
-    public Lazy<TypeDeclarer> type() {
+    public Optional<TypeDeclarer> type() {
         return type;
     }
 }

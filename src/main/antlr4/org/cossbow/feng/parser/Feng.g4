@@ -257,7 +257,7 @@ macroType
     : name=Identifier '{' fields=macroVariables SEMI macroProcedure+ '}'
     ;
 macroProcedure
-    : name=Identifier '(' params=macroVariables? ')' '{' statementList expression? '}'
+    : name=Identifier '(' params=macroVariables? ')' typeDeclarer? '{' statementList expression? '}'
     ;
 macroVariables
     : macroVariable (COMMA macroVariable)*

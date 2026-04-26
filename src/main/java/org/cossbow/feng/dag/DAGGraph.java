@@ -105,14 +105,6 @@ public class DAGGraph<Key>
         return all.size();
     }
 
-    public Iterator<Key> iterator() {
-        return all.iterator();
-    }
-
-    public Stream<Key> stream() {
-        return all.stream();
-    }
-
     public Set<Key> all() {
         return all;
     }
@@ -166,6 +158,14 @@ public class DAGGraph<Key>
             });
         }
         return list;
+    }
+
+    public Iterator<Key> iterator() {
+        return linear().iterator();
+    }
+
+    public Stream<Key> stream() {
+        return linear().stream();
     }
 
     public void visit(BiConsumer<Key, Set<Key>> user) {

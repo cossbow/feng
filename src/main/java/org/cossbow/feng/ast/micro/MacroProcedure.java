@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.micro;
 
 import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.stmt.Statement;
 import org.cossbow.feng.util.Optional;
@@ -10,19 +11,22 @@ import java.util.List;
 public class MacroProcedure extends Entity {
     private Identifier name;
     private IdentifierMap<MacroVariable> params;
+    private Optional<TypeDeclarer> result;
     private List<Statement> body;
-    private Optional<Expression> result;
+    private Optional<Expression> value;
 
     public MacroProcedure(Position pos,
                           Identifier name,
                           IdentifierMap<MacroVariable> params,
+                          Optional<TypeDeclarer> result,
                           List<Statement> body,
-                          Optional<Expression> result) {
+                          Optional<Expression> value) {
         super(pos);
         this.name = name;
         this.params = params;
-        this.body = body;
         this.result = result;
+        this.body = body;
+        this.value = value;
     }
 
     public Identifier name() {
@@ -33,12 +37,16 @@ public class MacroProcedure extends Entity {
         return params;
     }
 
+    public Optional<TypeDeclarer> result() {
+        return result;
+    }
+
     public List<Statement> body() {
         return body;
     }
 
-    public Optional<Expression> result() {
-        return result;
+    public Optional<Expression> value() {
+        return value;
     }
 
 }

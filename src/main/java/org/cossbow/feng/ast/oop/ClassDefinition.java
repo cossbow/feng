@@ -109,6 +109,7 @@ public class ClassDefinition extends ObjectDefinition {
     private final Lazy<ClassMethod> resourceFree = Lazy.nil();
     private Map<BinaryOperator, ClassMethod> binaryOperators = new HashMap<>();
     private Map<UnaryOperator, ClassMethod> unaryOperators = new HashMap<>();
+    private final Lazy<IndexOperator> indexOperator = Lazy.nil();
 
     public int id() {
         return id;
@@ -163,6 +164,11 @@ public class ClassDefinition extends ObjectDefinition {
     public Map<UnaryOperator, ClassMethod> unaryOperators() {
         return unaryOperators;
     }
+
+    public Lazy<IndexOperator> indexOperator() {
+        return indexOperator;
+    }
+
     //
 
 

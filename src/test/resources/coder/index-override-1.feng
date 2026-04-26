@@ -1,0 +1,25 @@
+
+class A {}
+
+class List {
+    var values [*]A;
+    macro index get(index int) A {
+        values[index]
+    }
+    macro index set(index int, value &A) {
+        values[index] = *value;
+    }
+}
+
+func use1(a *List) {
+    var v = a[0];
+    a[1] = v;
+}
+func test(n int){
+    var a = new(List, {values=new([n]A)});
+    use1(a);
+}
+
+func main(args [&!#][*!#]byte) {
+    test(5);
+}

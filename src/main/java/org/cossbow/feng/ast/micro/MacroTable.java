@@ -64,8 +64,12 @@ public class MacroTable {
         return tables.getOrDefault(TYPE_OPERATOR, new IdentifierMap<>());
     }
 
-    public Optional<Macro> operator(Identifier name) {
-        return tryGet(TYPE_OPERATOR, name);
+    public Optional<Macro> indexGet() {
+        return tryGet(TYPE_INDEX, INDEX_GET);
+    }
+
+    public Optional<Macro> indexSet() {
+        return tryGet(TYPE_INDEX, INDEX_SET);
     }
 
     //
@@ -80,5 +84,9 @@ public class MacroTable {
     public static final Map<Identifier, UnaryOperator> UNARY_OPERATOR = UnaryOperator
             .Overridable.stream().collect(Collectors.toMap(o ->
                     new Identifier(o.name().toLowerCase()), Function.identity()));
+
+    public static final Identifier TYPE_INDEX = new Identifier("index");
+    public static final Identifier INDEX_GET = new Identifier("get");
+    public static final Identifier INDEX_SET = new Identifier("set");
 
 }

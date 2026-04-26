@@ -800,6 +800,13 @@ public class CppGenerator {
                 write("operator").write(ent.getKey().code);
             }, ent.getValue().prototype()).endStmt();
         }
+        cd.indexOperator().use(io -> {
+            io.get().use(this::declareMethod);
+            endStmt();
+            io.set().use(this::declareMethod);
+            endStmt();
+        });
+
 
         dedent().write("};").newLine().newLine();
         enterClass = null;
@@ -870,6 +877,10 @@ public class CppGenerator {
         return write(() -> write(m.name()), m.prototype());
     }
 
+    private void implMethod(ClassMethod cm) {
+        implMethod(cm, () -> write(cm.name()));
+    }
+
     private void implClass(ClassDefinition cd) {
         if (cd.builtin()) return;
         if (table.module.has()) {
@@ -879,7 +890,7 @@ public class CppGenerator {
         assert enterClass == null;
         enterClass = cd;
         for (var cm : cd.methods()) {
-            implMethod(cm, () -> write(cm.name()));
+            implMethod(cm);
         }
         for (var ent : cd.binaryOperators().entrySet()) {
             implMethod(ent.getValue(), () -> {
@@ -891,6 +902,10 @@ public class CppGenerator {
                 write("operator").write(ent.getKey().code);
             });
         }
+        cd.indexOperator().use(io -> {
+            io.get().use(this::implMethod);
+            io.set().use(this::implMethod);
+        });
         enterClass = null;
     }
 
@@ -1123,6 +1138,10 @@ public class CppGenerator {
 
     private CppGenerator write(AssignmentsStatement as) {
         for (var a : as.list()) {
+            if (a.replacer().has()) {
+                write(a.replacer().must());
+                continue;
+            }
             var e = a.operand();
             writeAssign(a.operand(), a.value()).endStmt();
         }

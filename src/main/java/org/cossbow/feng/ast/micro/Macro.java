@@ -5,8 +5,6 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 
-import java.util.Objects;
-
 abstract
 public class Macro extends Entity {
     private Modifier modifier;
@@ -32,11 +30,14 @@ public class Macro extends Entity {
     public Identifier name();
 
     public Identifier makeId() {
-        return new Identifier("feng$macro$" + type() + "$" + name());
+        return makeId(type(), name());
+    }
+
+    public static Identifier makeId(Identifier type, Identifier name) {
+        return new Identifier("feng$macro$" + type + "$" + name);
     }
 
     //
-
 
     @Override
     public boolean equals(Object o) {
