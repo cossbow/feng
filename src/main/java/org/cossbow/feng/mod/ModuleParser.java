@@ -12,7 +12,6 @@ import org.cossbow.feng.util.*;
 import org.cossbow.feng.util.Optional;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,7 +48,7 @@ public class ModuleParser {
 
     private final Map<ModulePath, FModule> libCache = new HashMap<>();
 
-    private FModule loadLib(ModulePath mp) {
+    private FModule loadLib(ModulePath mp) throws IOException {
         var fm = libCache.get(mp);
         if (fm != null) return fm;
         fm = parseOneModule(mp.toPath());
@@ -57,7 +56,7 @@ public class ModuleParser {
         return fm;
     }
 
-    private FModule searchLib(ModulePath mp) {
+    private FModule searchLib(ModulePath mp) throws IOException {
         var parser = libs.get(mp.pkg());
         if (parser != null) {
             return parser.loadLib(mp);
@@ -65,7 +64,7 @@ public class ModuleParser {
         return ErrorUtil.modFail("can't find module '%s'", mp);
     }
 
-    public DAGGraph<FModule> parseFile(Path file) {
+    public DAGGraph<FModule> parseFile(Path file) throws IOException {
         var mp = new ModulePath(pkg, Path.of(""));
         var src = new SourceParser(mp, charset)
                 .parse(absPath(file));
@@ -105,20 +104,18 @@ public class ModuleParser {
         return mergeFiles(mp, sources);
     }
 
-    private FModule parseOneModule(Path module) {
+    private FModule parseOneModule(Path module) throws IOException {
         try (var ls = Files.list(absPath(module))) {
             var files = ls.filter(Constants.srcTest()).toList();
             return parseModuleFiles(module, files);
-        } catch (IOException e) {
-            throw new UncheckedIOException(
-                    "parse module fail: " + module, e);
         }
     }
 
     /**
      * parse one module
      */
-    public DAGGraph<FModule> parseModule(Path module) {
+    public DAGGraph<FModule> parseModule(Path module)
+            throws IOException {
         var fm = parseOneModule(module);
         return makeGraph(List.of(fm));
     }
@@ -126,7 +123,7 @@ public class ModuleParser {
     /**
      * parse all modules of whole package
      */
-    public DAGGraph<FModule> parsePackage() {
+    public DAGGraph<FModule> parsePackage() throws IOException {
         var list = scanModule();
         var modules = new ArrayList<FModule>(list.size());
         for (var g : list) {
@@ -136,7 +133,8 @@ public class ModuleParser {
         return makeGraph(modules);
     }
 
-    private DAGGraph<FModule> makeGraph(List<FModule> list) {
+    private DAGGraph<FModule> makeGraph(List<FModule> list)
+            throws IOException {
         var modules = CommonUtil.toMap(list, FModule::path);
         for (var fm : list) {
             collectLibs(modules, fm.imports());
@@ -151,7 +149,8 @@ public class ModuleParser {
     }
 
     private void collectLibs(Map<ModulePath, FModule> modules,
-                             List<ModulePath> imports) {
+                             List<ModulePath> imports)
+            throws IOException {
         for (var i : imports) {
             if (modules.containsKey(i)) continue;
             var im = searchLib(i);
@@ -160,7 +159,8 @@ public class ModuleParser {
         }
     }
 
-    private List<Groups.G2<Path, List<Path>>> scanModule() {
+    private List<Groups.G2<Path, List<Path>>> scanModule()
+            throws IOException {
         var result = new ArrayList<Groups.G2<Path, List<Path>>>();
         var q = new ArrayDeque<Path>();
         q.add(base);
@@ -180,8 +180,6 @@ public class ModuleParser {
                 if (files.isEmpty()) continue;
 
                 result.add(Groups.g2(base.relativize(dir), files));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
             }
         }
         return result;

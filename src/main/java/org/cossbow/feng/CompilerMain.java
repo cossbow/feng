@@ -12,7 +12,6 @@ import org.cossbow.feng.mod.ModuleParser;
 import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.ErrorUtil;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -54,21 +53,9 @@ public class CompilerMain {
         }
     }
 
-    private static Path getDir(String name) {
-        var cl = Thread.currentThread().getContextClassLoader();
-        var dir = cl.getResource(name);
-        assert dir != null;
-        return new File(dir.getFile()).toPath();
-    }
-
-    private static final ModuleParser stdInner =
-            new ModuleParser("std", getDir("std"), UTF_8);
-
     private Map<Identifier, ModuleParser> getLibParsers() {
-        if (lib == null || lib.isEmpty())
-            return Map.of(stdInner.pkg(), stdInner);
-        var parsers = new HashMap<Identifier, ModuleParser>(1 + lib.size());
-        parsers.put(stdInner.pkg(), stdInner);
+        if (lib == null || lib.isEmpty()) return Map.of();
+        var parsers = new HashMap<Identifier, ModuleParser>();
         for (var le : lib.entrySet()) {
             var base = toPath(le.getValue());
             var p = new ModuleParser(le.getKey(), base, UTF_8);

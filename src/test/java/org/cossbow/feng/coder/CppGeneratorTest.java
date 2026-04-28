@@ -108,7 +108,7 @@ public class CppGeneratorTest {
     }
 
     @Test
-    public void testMultiModule() {
+    public void testMultiModule() throws IOException {
         var dir = ModuleParserTest.getDir();
         var dag = ModuleAnalyseTest.analysePackage();
         generate(dag, dir, false);

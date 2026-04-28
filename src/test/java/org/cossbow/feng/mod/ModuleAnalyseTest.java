@@ -9,6 +9,7 @@ import org.cossbow.feng.util.BufferOutputStream;
 import org.junit.jupiter.api.Test;
 
 import java.io.BufferedWriter;
+import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
@@ -17,7 +18,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class ModuleAnalyseTest {
 
-    private ParseSymbolTable export(FModule m) throws Exception {
+    private ParseSymbolTable export(FModule m) throws IOException {
         var buf = new BufferOutputStream();
         try (var osw = new OutputStreamWriter(buf);
              var w = new BufferedWriter(osw)) {
@@ -40,7 +41,7 @@ public class ModuleAnalyseTest {
     }
 
     @Test
-    public void testModule() throws Exception {
+    public void testModule() throws IOException {
         var dag = analyseModule();
         for (var fm : dag) {
             if (ModuleParserTest.isTestPkg(fm.path()))
@@ -48,14 +49,14 @@ public class ModuleAnalyseTest {
         }
     }
 
-    public static DAGGraph<FModule> analysePackage() {
+    public static DAGGraph<FModule> analysePackage() throws IOException {
         var dag = ModuleParserTest.parsePackage();
         new ModuleAnalysis().analyse(dag);
         return dag;
     }
 
     @Test
-    public void testPackage() throws Exception {
+    public void testPackage() throws IOException {
         var dag = analysePackage();
         for (var fm : dag) {
             if (ModuleParserTest.isTestPkg(fm.path()))
@@ -64,7 +65,7 @@ public class ModuleAnalyseTest {
     }
 
     @Test
-    public void testLibrary() {
+    public void testLibrary() throws IOException {
         var dag = ModuleParserTest.withLibrary();
         new ModuleAnalysis().analyse(dag);
     }

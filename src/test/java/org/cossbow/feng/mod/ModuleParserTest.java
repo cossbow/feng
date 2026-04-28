@@ -4,9 +4,11 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.dag.DAGGraph;
+import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.ResourceUtil;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
 
@@ -39,7 +41,11 @@ public class ModuleParserTest {
     }
 
     public static DAGGraph<FModule> parseModule() {
-        return testMod().parseModule(Path.of("aaa"));
+        try {
+            return testMod().parseModule(Path.of("aaa"));
+        } catch (IOException e) {
+            return ErrorUtil.io(e);
+        }
     }
 
     @Test
@@ -48,18 +54,18 @@ public class ModuleParserTest {
         System.out.println(fm);
     }
 
-    public static DAGGraph<FModule> parsePackage() {
+    public static DAGGraph<FModule> parsePackage() throws IOException {
         return testMod().parsePackage();
     }
 
     @Test
-    public void testParsePackage() {
+    public void testParsePackage() throws IOException {
         for (var fm : parsePackage()) {
             System.out.println(fm.path());
         }
     }
 
-    public static DAGGraph<FModule> withLibrary() {
+    public static DAGGraph<FModule> withLibrary() throws IOException {
         var test = testMod();
         var lib = new ModuleParser("lib",
                 ResourceUtil.getDir("lib"),
@@ -68,7 +74,7 @@ public class ModuleParserTest {
     }
 
     @Test
-    public void testLibrary() {
+    public void testLibrary() throws IOException {
         var dag = withLibrary();
         for (var fm : dag) {
             System.out.println(fm);

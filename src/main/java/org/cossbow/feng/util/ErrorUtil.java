@@ -6,14 +6,13 @@ import org.cossbow.feng.err.SemanticException;
 import org.cossbow.feng.err.SyntaxException;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 
 final
 public class ErrorUtil {
     private ErrorUtil() {
     }
 
-    public static <T>T argument(String fmt, Object... args) {
+    public static <T> T argument(String fmt, Object... args) {
         throw new IllegalArgumentException(String.format(fmt, args));
     }
 
@@ -26,8 +25,8 @@ public class ErrorUtil {
         throw new UnreachableException();
     }
 
-    public static <T> T io(IOException e) throws UncheckedIOException {
-        throw new UncheckedIOException(e);
+    public static <T> T io(IOException e) throws RuntimeIOException {
+        throw new RuntimeIOException(e);
     }
 
     public static <T> T syntax(String fmt, Object... args) throws SyntaxException {
@@ -62,6 +61,12 @@ public class ErrorUtil {
     public static class ModuleException extends RuntimeException {
         public ModuleException(String message) {
             super(message);
+        }
+    }
+
+    public static class RuntimeIOException extends RuntimeException {
+        public RuntimeIOException(Throwable e) {
+            super("IO error", e, true, false);
         }
     }
 }
