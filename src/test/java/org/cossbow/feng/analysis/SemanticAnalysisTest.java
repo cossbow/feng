@@ -101,8 +101,8 @@ public class SemanticAnalysisTest {
     public void testClassInherit3() {
         checkSucc("class A{ var id int; } class B:A{} func f(b *B) { b.id = 0; }");
         checkSucc("class A{ func go() {} } class B:A{} func f(b *B) { b.go(); }");
-        checkSucc("class A{ var id int; } class B:A{} func f(b B) { var v = b.id; }");
-        checkSucc("class A{ func go() {} } class B:A{} func f(b B) { b.go(); }");
+        checkSucc("class A{ var id int; } class B:A{} func f() {var b B; var v = b.id; }");
+        checkSucc("class A{ func go() {} } class B:A{} func f() {var b B; b.go(); }");
     }
 
     @Test
@@ -1060,7 +1060,7 @@ public class SemanticAnalysisTest {
         checkSucc(d + "func t() { var i=float(pi); }");
         checkFail(d + "func t(i int) { i(); }");
         checkFail(d + "func t() { pi(); }");
-        checkSucc(d + "func t(a A) { a.run(); }");
+        checkSucc(d + "func t() {var a A; a.run(); }");
         checkFail(d + "func t(a A) { a(); }");
         checkFail(d + "func t(a A) { a.id(); }");
         checkFail(d + "func t(r *int) { r(); }");
@@ -1522,6 +1522,62 @@ public class SemanticAnalysisTest {
         checkSucc("func f(){ var a [2]int; const v [&#]int = a;}");
         checkFail("func f(a [2]int){ const v [&]int = a;}");
         checkSucc("func f(a [2]int){ const v [&#]int = a;}");
+    }
+
+    @Test
+    public void testUnmodifiable4() {
+        checkSucc("class A{var id int; func run(){id=1;}}");
+        checkFail("class A{var id int; func run#(){id=1;}}");
+        checkSucc("class A{var id int; func run(){this.id=1;}}");
+        checkFail("class A{var id int; func run#(){this.id=1;}}");
+        checkSucc("class A{var id int; func run(){*this={id=1};}}");
+        checkFail("class A{var id int; func run#(){*this={id=1};}}");
+
+        checkSucc("class A{var id *int; func run(){*id=1;}}");
+        checkSucc("class A{var id *int; func run#(){*id=1;}}");
+        checkSucc("class A{var id *int; func run(){*this.id=1;}}");
+        checkSucc("class A{var id *int; func run#(){*this.id=1;}}");
+
+        checkSucc("class A{func a() {} func b(){a();}}");
+        checkSucc("class A{func a#() {} func b(){a();}}");
+        checkFail("class A{func a() {} func b#(){a();}}");
+        checkSucc("class A{func a#() {} func b#(){a();}}");
+        checkSucc("class A{func a() {} func b(){this.a();}}");
+        checkSucc("class A{func a#() {} func b(){this.a();}}");
+        checkFail("class A{func a() {} func b#(){this.a();}}");
+        checkSucc("class A{func a#() {} func b#(){this.a();}}");
+
+    }
+
+    @Test
+    public void testUnmodifiable5() {
+        checkFail("class A{func run(){}} func f(a A){a.run();}");
+        checkSucc("class A{func run#(){}} func f(a A){a.run();}");
+
+        checkSucc("class A{func run(){}} func f(a *A){a.run();}");
+        checkSucc("class A{func run#(){}} func f(a *A){a.run();}");
+
+        checkSucc("class A{func run#(){}} func f(a *#A){a.run();}");
+        checkFail("class A{func run(){}} func f(a *#A){a.run();}");
+    }
+
+    @Test
+    public void testUnmodifiable6(){
+        checkSucc("class A{func a(){}} class B:A{func a(){}}");
+        checkFail("class A{func a#(){}} class B:A{func a(){}}");
+        checkFail("class A{func a(){}} class B:A{func a#(){}}");
+        checkSucc("class A{func a#(){}} class B:A{func a#(){}}");
+
+        checkSucc("interface A{a();} class B(A){func a(){}}");
+        checkFail("interface A{a#();} class B(A){func a(){}}");
+        checkFail("interface A{a();} class B(A){func a#(){}}");
+        checkSucc("interface A{a#();} class B(A){func a#(){}}");
+
+        checkSucc("interface A{a();} interface B{A;a();}");
+        checkFail("interface A{a#();} interface B{A;a();}");
+        checkFail("interface A{a();} interface B{A;a#();}");
+        checkSucc("interface A{a#();} interface B{A;a#();}");
+
     }
 
     @Test
@@ -2959,9 +3015,9 @@ public class SemanticAnalysisTest {
     @Test
     public void testGenericImplType4() {
         var d = "class A`T`{var v T; func m`E`()A`E`{return {};}}";
-        checkSucc(d + "func f(a A`int`){var b=a.m`bool`(); b.v=true;}");
+        checkSucc(d + "func f(a *A`int`){var b=a.m`bool`(); b.v=true;}");
         d = "class A`T`{var v T; func m`E`(e E){}}";
-        checkSucc(d + "func f(a A`int`){a.m`bool`(true);}");
+        checkSucc(d + "func f(a *A`int`){a.m`bool`(true);}");
     }
 
     @Test

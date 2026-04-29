@@ -152,7 +152,7 @@ interfaceMember
     | macro
     ;
 interfaceMemberMethod
-    : modifier name=Identifier typeParameters? prototype SEMI
+    : modifier name=Identifier typeParameters? unmodifiable=HASH? prototype SEMI
     ;
 interfaceMemberPart
     : definedType  SEMI
@@ -209,7 +209,7 @@ enumValue
 // function
 //
 funcDef
-    : FUNC name=Identifier typeParameters? (procedure|prototype SEMI)
+    : FUNC name=Identifier typeParameters? unmodifiable=HASH? (procedure|prototype SEMI)
     ;
 functionDefinition
     : modifier def=funcDef

@@ -725,6 +725,7 @@ public class SemanticAnalysis {
                         pm, cm, cm.pos());
                 return;
             }
+            checkUnmodifiable(pm, cm);
             if (pm.export() != cm.export()) {
                 semantic("override require same export: ",
                         cm.pos());
@@ -768,13 +769,22 @@ public class SemanticAnalysis {
             if (sd instanceof InterfaceDefinition id) {
                 cd.allImpls().add(id);
                 for (var im : id.methods()) {
-                    if (cd.allMethods().exists(im.name()))
-                        continue;
-                    semantic("%s unimplement method: %s%s",
-                            cd.symbol(), im.name(), cd.pos());
+                    var om = cd.allMethods().tryGet(im.name());
+                    if (om.none()) {
+                        semantic("%s unimplement method: %s%s",
+                                cd.symbol(), im.name(), cd.pos());
+                    }
+                    checkUnmodifiable(im, om.get());
                 }
             }
         });
+    }
+
+    void checkUnmodifiable(Method pm, Method sm) {
+        if (pm.unmodifiable() == sm.unmodifiable())
+            return;
+        semantic("method's unmodifiable-flag must same: %s <--> %s",
+                pm.pos(), sm.pos());
     }
 
     private void checkImplList(
@@ -867,8 +877,6 @@ public class SemanticAnalysis {
         dag.bfs(this::checkInherit);
         // 最后分析实现接口
         dag.bfs(this::checkImplements);
-        // 分析方法是否修改字段：暂时没用，期望用于检查到不可变示例是否调用到了updater
-        dag.bfs(cd -> new UpdaterAnalyzer().analyse(cd));
         return (dag);
     }
 
@@ -1063,10 +1071,15 @@ public class SemanticAnalysis {
         checkGeneric(id, (sd, gm) -> {
             var pd = (InterfaceDefinition) sd;
             for (var m : pd.methods()) {
-                if (id.allMethods().exists(m.name())) continue;
+                var om = id.allMethods().tryGet(m.name());
+                if (om.has()) {
+                    checkUnmodifiable(m, om.get());
+                    continue;
+                }
                 var pt = gm.instantiate(m.prototype());
                 var nm = new InterfaceMethod(m.pos(), m.modifier(),
-                        m.name(), m.generic(), pt, m.returnThis());
+                        m.name(), m.generic(), m.unmodifiable(),
+                        pt, m.returnThis());
                 id.allMethods().add(m.name(), nm);
             }
         });
@@ -2429,7 +2442,7 @@ public class SemanticAnalysis {
             case BlockExpression ee -> unmodifiable(ee, left);
             case MethodExpression ee -> true;
             case NewExpression ee -> false;
-            case CurrentExpression ee -> false;
+            case CurrentExpression ee -> enterMethod.unmodifiable();
             case DereferExpression ee -> left;
             case ObjectExpression ee -> left;
             case ArrayExpression ee -> left;
@@ -2471,15 +2484,9 @@ public class SemanticAnalysis {
         }
 
         var sg = optimize(op.subject());
-
-        var r = sg.b().maybeRefer();
-        if (r.has()) {
-            if (r.get().unmodifiable())
-                return semantic("unmodifiable array '%s': %s", op, op.pos());
-        } else {
-            if (unmodifiable(sg.a(), true))
-                return semantic("unmodifiable array '%s': %s", op, op.pos());
-        }
+        checkOptional(sg.a());
+        if (unmodifiable(sg.a(), true))
+            return semantic("unmodifiable array '%s': %s", op, op.pos());
 
         if (sg.b() instanceof DerivedTypeDeclarer dtd) {
             if (dtd.def() instanceof ClassDefinition cd) {
@@ -2532,15 +2539,9 @@ public class SemanticAnalysis {
             if (cf.declare() == Declare.CONST)
                 return semantic("unmodifiable field: %s", name.pos());
         }
-
-        var r = td.maybeRefer();
-        if (r.has()) {
-            if (r.get().unmodifiable())
-                return semantic("unmodifiable operand '%s': %s", op, op.pos());
-        } else {
-            if (unmodifiable(sg.a(), true))
-                return semantic("unmodifiable operand '%s': %s", op, op.pos());
-        }
+        checkOptional(sg.a());
+        if (unmodifiable(sg.a(), true))
+            return semantic("unmodifiable operand '%s': %s", op, op.pos());
 
         var s = (PrimaryExpression) sg.a();
         var n = wrapRelayOperand(s, _s -> {
@@ -2552,26 +2553,30 @@ public class SemanticAnalysis {
 
     private Groups.G2<Operand, TypeDeclarer> optimize(VariableOperand op) {
         var s = op.symbol();
-        var o = context.findVar(s);
-        if (o.has()) {
-            var v = o.get();
+        var ov = context.findVar(s);
+        if (ov.has()) {
+            var v = ov.get();
             if (v.declare() == Declare.CONST)
                 return semantic("unmodifiable operand %s: %s", s, s.pos());
             if (context.isVarLocked(v))
                 return semantic("readonly operand %s: %s", s, s.pos());
 
-            op.variable().set(o);
+            op.variable().set(ov);
             return Groups.g2(op, v.type().must());
         }
 
         if (enterClass != null && s.module().none()) {
-            var f = enterClass.allFields().tryGet(s.name());
-            if (f.has()) {
-                if (f.get().declare() == Declare.CONST)
-                    return semantic("unmodifiable operand %s: %s", s, s.pos());
+            var of = enterClass.allFields().tryGet(s.name());
+            if (of.has()) {
+                var f = of.get();
+                if (f.declare() == Declare.CONST)
+                    return semantic("unmodifiable field '%s': %s", f, s.pos());
+                if (enterMethod.unmodifiable())
+                    return semantic("in unmodifiable method '%s': %s",
+                            enterMethod, s.pos());
                 // 操作数加上`this.`前缀，方便后续处理
                 var n = new FieldOperand(op.pos(), newThis(s.pos()), s.name());
-                return Groups.g2(n, f.get().type());
+                return Groups.g2(n, f.type());
             }
         }
         return semantic("undefined operand %s: %s", s, s.pos());
@@ -2580,9 +2585,9 @@ public class SemanticAnalysis {
     private Groups.G2<Operand, TypeDeclarer> optimize(DereferOperand op) {
         var g = optimize(op.subject());
         dereferable(g.b());
-        var ref = g.b().maybeRefer().must();
-        if (ref.unmodifiable())
-            return semantic("unmodifiable refer '%s': %s", op, op.pos());
+        checkOptional(g.a());
+        if (unmodifiable(g.a(), true))
+            return semantic("unmodifiable operand '%s': %s", op, op.pos());
 
         var s = (PrimaryExpression) g.a();
         var n = wrapRelayOperand(s, _s -> {
@@ -3208,6 +3213,7 @@ public class SemanticAnalysis {
 
     private Groups.G2<Expression, TypeDeclarer> optimize(IndexOfExpression e) {
         var sg = optimize(e.subject());
+        checkOptional(sg.a());
 
         if (sg.b() instanceof DefinitionDeclarer dtd) {
             return indexOfEnum(e, dtd);
@@ -3278,6 +3284,13 @@ public class SemanticAnalysis {
                 cd.symbol(), name, name.pos());
     }
 
+    void checkUnmodifiable(PrimaryExpression s, Method m, Entity e) {
+        if (!unmodifiable(s, true)) return;
+        if (m.unmodifiable()) return;
+        semantic("unmodifiable '%s' call modifiable method: %s",
+                s, e.pos());
+    }
+
     private Groups.G2<Expression, TypeDeclarer>
     optimizeMember(PrimaryExpression s, ClassDefinition cd,
                    Identifier name, DerivedTypeDeclarer st,
@@ -3303,6 +3316,7 @@ public class SemanticAnalysis {
         var om = cd.allMethods().tryGet(name);
         if (om.has()) {
             var m = checkExport(om.get(), cd, name);
+            checkUnmodifiable(s, m, name);
             var gm = genericMap(name, st.gm(), m.generic(), generic);
             var prot = gm.instantiate(m.prototype());
             var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
@@ -3351,14 +3365,16 @@ public class SemanticAnalysis {
             if (!s.expectCallable())
                 return semantic("interface has no field '%s': %s",
                         name, s.pos());
-            var m = id.allMethods().tryGet(name);
-            if (m.has()) {
-                var gm = genericMap(name, st.gm(), m.get().generic(), generic);
-                var prot = gm.instantiate(m.get().prototype());
+            var om = id.allMethods().tryGet(name);
+            if (om.has()) {
+                var m = om.get();
+                checkUnmodifiable(s, m, name);
+                var gm = genericMap(name, st.gm(), m.generic(), generic);
+                var prot = gm.instantiate(m.prototype());
                 var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
                 var n = wrapRelayExpr(s, t, _s -> {
                     return new MethodExpression(s.pos(),
-                            (PrimaryExpression) _s, m.get(), generic);
+                            (PrimaryExpression) _s, m, generic);
                 });
                 return Groups.g2(n, t);
             }
@@ -3385,6 +3401,14 @@ public class SemanticAnalysis {
         return Groups.g2(n, f.type());
     }
 
+    private void checkOptional(Expression e) {
+        var t = e.resultType.must();
+        if (t.maybeRefer().match(r -> !r.required()))
+            warn("need to check nil before use '%s': %s",
+                    e, e.pos());
+
+    }
+
     private Groups.G2<Expression, TypeDeclarer> optimize(MemberOfExpression e) {
         analyse(e.generic());
         var sg = optimize(e.subject());
@@ -3398,6 +3422,8 @@ public class SemanticAnalysis {
         }
 
         var s = (PrimaryExpression) sg.a();
+        checkOptional(s);
+
         if (sg.b() instanceof ArrayTypeDeclarer atd) {
             invalid(e.generic());
             return optimizeArray(s, atd, e.member());
@@ -3531,13 +3557,18 @@ public class SemanticAnalysis {
         if (s.module().none() && enterClass != null) {
             var om = enterClass.allMethods().tryGet(s.name());
             if (om.has()) {
+                var m = om.get();
+                if (enterMethod.unmodifiable() && !m.unmodifiable()) {
+                    return semantic("unmodifiable method can't call " +
+                            "modifiable method: %s", re.pos());
+                }
                 // 叠加上继承的泛型替换
                 var gm = enterClass.inherit().map(DerivedType::gm)
                         .getOrElse(GenericMap.EMPTY);
-                gm = genericMap(re, gm, om.get().generic(), re.generic());
-                var prot = gm.instantiate(om.get().prototype());
+                gm = genericMap(re, gm, m.generic(), re.generic());
+                var prot = gm.instantiate(m.prototype());
                 // 函数调用加上`this.`前缀，方便后续处理
-                var n = wrapThis(re, om.get());
+                var n = wrapThis(re, m);
                 var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
                 return Groups.g2(n, td);
             }
@@ -3774,6 +3805,7 @@ public class SemanticAnalysis {
         dereferable(g.b());
 
         var s = (PrimaryExpression) g.a();
+        checkOptional(s);
         var t = g.b().derefer().must();
         var n = wrapRelayExpr(s, t, _s -> {
             return new DereferExpression(e.pos(), (PrimaryExpression) _s);
@@ -3958,7 +3990,7 @@ public class SemanticAnalysis {
         var body = new BlockStatement(mf.pos(), mf.procedure().body(), false);
         var proc = new Procedure(mf.pos(), pt, body, Map.of());
         var cm = new ClassMethod(mf.pos(), Modifier.empty(),
-                mf.makeId(), TypeParameters.empty(), proc, false);
+                mf.makeId(), TypeParameters.empty(), false, proc, false);
         cd.methods().add(cm.name(), cm);
         cd.resourceFree().set(cm);
     }
@@ -4032,7 +4064,7 @@ public class SemanticAnalysis {
         if (mp.value().none())
             semantic("operator missing result: %s", mp.pos());
 
-        return macro2Method(cd, mf, params, Optional.of(retType));
+        return macro2Method(cd, mf, params, Optional.of(retType), true);
     }
 
     private void macroIndexOperator(ClassDefinition cd) {
@@ -4067,7 +4099,7 @@ public class SemanticAnalysis {
         var param = new Variable(mv.pos(), Modifier.empty(), Declare.CONST,
                 mv.name(), Lazy.of(mv.type()), Lazy.nil());
 
-        return macro2Method(cd, mf, List.of(param), Optional.empty());
+        return macro2Method(cd, mf, List.of(param), Optional.empty(), true);
     }
 
     private ClassMethod macroIndexSet(ClassDefinition cd, Macro m) {
@@ -4091,12 +4123,13 @@ public class SemanticAnalysis {
                     mv.name(), Lazy.of(mv.type()), Lazy.nil());
             params.add(v);
         }
-        return macro2Method(cd, mf, params, Optional.empty());
+        return macro2Method(cd, mf, params, Optional.empty(), false);
     }
 
     private ClassMethod macro2Method(
             ClassDefinition cd, MacroFunc mf,
-            List<Variable> params, Optional<TypeDeclarer> ret) {
+            List<Variable> params, Optional<TypeDeclarer> ret,
+            boolean unmodifiable) {
         var mp = mf.procedure();
         var ps = new ParameterSet(params);
         var pt = new Prototype(mf.pos(), ps, mp.result().orElse(ret));
@@ -4110,7 +4143,7 @@ public class SemanticAnalysis {
         rs.procedure().set(proc);
 
         var cm = new ClassMethod(mf.pos(), Modifier.empty(), mf.makeId(),
-                TypeParameters.empty(), proc, false);
+                TypeParameters.empty(), unmodifiable, proc, false);
         cm.master(cd);
         return cm;
     }

@@ -19,6 +19,7 @@ public class ClassMethod extends Method
     private Modifier modifier;
     private Identifier name;
     private TypeParameters generic;
+    private boolean unmodifiable;
     private Prototype prototype;
     private Optional<Procedure> procedure;
     private boolean returnThis;
@@ -27,6 +28,7 @@ public class ClassMethod extends Method
                        Modifier modifier,
                        Identifier name,
                        TypeParameters generic,
+                       boolean unmodifiable,
                        Prototype prototype,
                        Optional<Procedure> procedure,
                        boolean returnThis) {
@@ -34,6 +36,7 @@ public class ClassMethod extends Method
         this.modifier = modifier;
         this.name = name;
         this.generic = generic;
+        this.unmodifiable = unmodifiable;
         this.prototype = prototype;
         this.procedure = procedure;
         this.returnThis = returnThis;
@@ -43,10 +46,11 @@ public class ClassMethod extends Method
                        Modifier modifier,
                        Identifier name,
                        TypeParameters generic,
+                       boolean unmodifiable,
                        Procedure procedure,
                        boolean returnThis) {
         this(pos, modifier, name, generic,
-                procedure.prototype(),
+                unmodifiable, procedure.prototype(),
                 Optional.of(procedure), returnThis);
     }
 
@@ -54,9 +58,10 @@ public class ClassMethod extends Method
                        Modifier modifier,
                        Identifier name,
                        TypeParameters generic,
+                       boolean unmodifiable,
                        Prototype prototype,
                        boolean returnThis) {
-        this(pos, modifier, name, generic,
+        this(pos, modifier, name, generic, unmodifiable,
                 prototype, Optional.empty(), returnThis);
     }
 
@@ -92,9 +97,13 @@ public class ClassMethod extends Method
         return generic;
     }
 
+    public boolean unmodifiable() {
+        return unmodifiable;
+    }
+
     public ClassMethod declaration() {
-        return new ClassMethod(pos(), modifier,
-                name, generic, prototype, returnThis);
+        return new ClassMethod(pos(), modifier, name,
+                generic, unmodifiable, prototype, returnThis);
     }
 
     public Position pos() {
@@ -105,7 +114,6 @@ public class ClassMethod extends Method
 
     private ClassDefinition master;
     private List<ClassMethod> override = new ArrayList<>();
-    private boolean updater;
 
     public ClassDefinition master() {
         return master;
@@ -126,17 +134,7 @@ public class ClassMethod extends Method
         }
     }
 
-    public boolean updater() {
-        return updater;
-    }
-
-    public void updater(boolean updater) {
-        this.updater = updater;
-    }
-
     //
-
-
     @Override
     public String toString() {
         if (master == null)

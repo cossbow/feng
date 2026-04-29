@@ -37,4 +37,8 @@ public class Method extends Entity {
             m.seeOverride(user);
         }
     }
+
+    public boolean unmodifiable() {
+        return false;
+    }
 }

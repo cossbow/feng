@@ -709,10 +709,11 @@ final class SourceParseVisitor
         var name = identifier(ctx.name);
         methodReturnThis = false;
         var generic = typeParameters(ctx.typeParameters());
+        var unmodifiable = ctx.unmodifiable != null;
         genericStack.push(generic);
         var prototype = (Prototype) visit(ctx.prototype());
         var method = new InterfaceMethod(pos, modifier, name, generic,
-                prototype, methodReturnThis);
+                unmodifiable, prototype, methodReturnThis);
         genericStack.pop();
         methodReturnThis = false;
         return method;
@@ -785,6 +786,7 @@ final class SourceParseVisitor
                 var mName = identifier(def.name);
                 methodReturnThis = false;
                 var mGeneric = typeParameters(def.typeParameters());
+                var unmodifiable = def.unmodifiable != null;
                 genericStack.push(mGeneric);
                 var proc = this.<Procedure>visitOptional(def.procedure());
                 var pt = this.<Prototype>visitOptional(def.prototype());
@@ -796,14 +798,14 @@ final class SourceParseVisitor
                                 posOf(def));
                     }
                     method = new ClassMethod(posOf(mi), mModifier, mName,
-                            mGeneric, proc.get(), methodReturnThis);
+                            mGeneric, unmodifiable, proc.get(), methodReturnThis);
                 } else {
                     if (!metadata) {
                         return semantic("method declaration can't be in source: %s",
                                 posOf(def));
                     }
                     method = new ClassMethod(posOf(mi), mModifier, mName,
-                            mGeneric, pt.must(), methodReturnThis);
+                            mGeneric, unmodifiable, pt.must(), methodReturnThis);
                 }
                 methods.add(mName, method);
                 methodReturnThis = false;

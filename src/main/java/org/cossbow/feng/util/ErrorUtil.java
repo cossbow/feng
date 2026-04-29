@@ -12,6 +12,16 @@ public class ErrorUtil {
     private ErrorUtil() {
     }
 
+    static volatile boolean warnngAsError;
+
+    public static void warn(String fmt, Object... args) {
+        var msg = "warn: " + fmt.formatted(args);
+        if (warnngAsError) {
+            throw new WarnException(msg);
+        }
+        System.err.println(msg);
+    }
+
     public static <T> T argument(String fmt, Object... args) {
         throw new IllegalArgumentException(String.format(fmt, args));
     }
@@ -67,6 +77,12 @@ public class ErrorUtil {
     public static class RuntimeIOException extends RuntimeException {
         public RuntimeIOException(Throwable e) {
             super("IO error", e, true, false);
+        }
+    }
+
+    public static class WarnException extends RuntimeException {
+        public WarnException(String msg) {
+            super(msg, null, true, false);
         }
     }
 }
