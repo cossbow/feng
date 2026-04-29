@@ -347,17 +347,8 @@ that evaluates to the index value.
 There are two usage patterns:
 
 1. Index expression on the right side is a read operation, retrieving the value of the element at the index as the
-   result. There are two ways to receive the value in a statement:
-    1. Use two variables on the left: the first receives the value; the second receives a boolean indicating whether the
-       element exists. _[Incomplete]_
-       ```feng
-       func test(arr [16]int) {
-           if (var v, exists = arr[16]; exists) {
-               // Index 16 is out of bounds, so exists=false, this branch cannot be entered
-           }
-       }
-       ```
-    2. When using a single variable on the left or using it in an expression, only the element value is returned. If the
+   result.
+   When using a single variable on the left or using it in an expression, only the element value is returned. If the
        element does not exist, execution terminates and an [exception](#exceptions-_[Incomplete]_) is thrown.
        ```feng
        func test(arr [16]int) int {
@@ -2187,7 +2178,7 @@ func f(a *!int, b *int) {
 
 ##### Unmodifiable Reference
 
-References can be marked as unmodifiable (with a `#` symbol), indicating that instances cannot be modified 
+References can be marked as unmodifiable (with a `#` symbol), indicating that instances cannot be modified
 through that reference. This is also a one-way transfer: modifiable → unmodifiable.
 
 ```feng
@@ -2288,6 +2279,9 @@ Phantom references can only be local variables or parameters. They can be passed
 5. Within a class instance's phantom-reachable scope:
     1. Its value type fields can be phantom-referenced.
     2. Instances referenced by its constant fields can be phantom-referenced.
+6. Only phantom reference parameters can: They allow referencing temporary instances (i.e., instances that are about to
+   be destroyed and released, including literals, initialization expressions, newly created instances, and return
+   values).
 
 Global variables can be referenced from any code:
 
@@ -2338,8 +2332,28 @@ func sample2(dev *Device) {
 }
 ```
 
-**Phantom references are restricted to the above scenarios.** For example, function return values cannot be of phantom
-reference type.
+Phantom reference parameters allow such usage:
+
+```feng
+func use1(a &int) {
+}
+func use2(a &Device) {
+}
+func use3(a [&]int) {
+}
+func sample() {
+    use1(0);
+    use1(new(int));
+    use1(get());
+    use2(Device{});
+    use2(new(Device));
+    use3([]int[1,2]);
+    use3(new([2]int));
+}
+func get() int {
+    return 0;
+}
+```
 
 #### Enumeration Variables
 
