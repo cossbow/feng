@@ -481,8 +481,6 @@ struct Feng$Array {
 		return values[index];
 	}
 
-	bool operator()(Int64 index) const {}
-
 	auto operator<=>(const Feng$Array<E, L> &) const = default;
 };
 

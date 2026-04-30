@@ -5,7 +5,7 @@ class Complex final {
     var real,imag float;
 
     export
-    func neg() Complex {
+    func neg#() Complex {
         return {
             real = -real,
             imag = -imag
@@ -13,7 +13,7 @@ class Complex final {
     }
 
     export
-    func add(c &!#Complex) Complex {
+    func add#(c &!#Complex) Complex {
         return {
             real = real + c.real,
             imag = imag + c.imag
@@ -21,7 +21,7 @@ class Complex final {
     }
 
     export
-    func sub(c &!#Complex) Complex {
+    func sub#(c &!#Complex) Complex {
         return {
             real = real - c.real,
             imag = imag - c.imag
@@ -29,7 +29,7 @@ class Complex final {
     }
 
     export
-    func mul(c &!#Complex) Complex {
+    func mul#(c &!#Complex) Complex {
         return {
             real = real*c.real - imag*c.imag,
             imag = real*c.imag + imag*c.real
@@ -37,7 +37,7 @@ class Complex final {
     }
 
     export
-    func div(c &!#Complex) Complex {
+    func div#(c &!#Complex) Complex {
         var d = c.real*c.real + c.imag* c.imag;
         return {
             real = (real*c.real + imag*c.imag) / d,

@@ -12,14 +12,15 @@ public class ErrorUtil {
     private ErrorUtil() {
     }
 
-    static volatile boolean warnngAsError;
+    static volatile boolean printWarn;
+
+    public static void setPrintWarn(boolean w) {
+        printWarn = w;
+    }
 
     public static void warn(String fmt, Object... args) {
         var msg = "warn: " + fmt.formatted(args);
-        if (warnngAsError) {
-            throw new WarnException(msg);
-        }
-        System.err.println(msg);
+        if (printWarn) System.err.println(msg);
     }
 
     public static <T> T argument(String fmt, Object... args) {

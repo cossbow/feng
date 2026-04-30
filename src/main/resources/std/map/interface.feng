@@ -10,5 +10,5 @@ class Result`V` final {
 export
 interface Map`K, V` {
     set(key K, value V) Result`V`;
-    get(key K) Result`V`;
+    get#(key K) Result`V`;
 }

@@ -5,7 +5,7 @@ class Vector final {
     var x1,x2,x3 float64;
 
     export
-    func add(o Vector) Vector {
+    func add#(o Vector) Vector {
         return {
             x1=x1+o.x1,
             x2=x2+o.x2,
@@ -14,7 +14,7 @@ class Vector final {
     }
 
     export
-    func sub(o Vector) Vector {
+    func sub#(o Vector) Vector {
         return {
             x1=x1-o.x1,
             x2=x2-o.x2,
@@ -23,7 +23,7 @@ class Vector final {
     }
 
     export
-    func dot(o Vector) float64 {
+    func dot#(o Vector) float64 {
         return x1*o.x1+x2*o.x2+x3*o.x3;
     }
 

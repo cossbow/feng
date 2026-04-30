@@ -14,7 +14,7 @@ class HashMap`K, V` (Map`K, V`) {
     var size int;
     var threshold int;
 
-    func indexed(n &Node`K,V`) int {
+    func indexed#(n &Node`K,V`) int {
         var h = hashing(n);
         return h & (buckets.length-1);
     }
@@ -73,10 +73,14 @@ class HashMap`K, V` (Map`K, V`) {
     }
 
     export
-    func get(key K) Result`V` {
+    func get#(key K) Result`V` {
+        var bk = buckets;
+        if (bk == nil) {
+            return {};
+        }
         var kn Node`K,V` = {key=key};
         var idx = indexed(kn);
-        var cur = buckets[idx];
+        var cur = bk[idx];
         if (cur == nil) {
             return {};
         }
