@@ -99,4 +99,17 @@ public class GlobalSymbolContext implements SymbolContext {
         return false;
     }
 
+    @Override
+    public void setNotNil(Variable v) {
+    }
+
+    @Override
+    public void delNotNil(Variable v) {
+    }
+
+    @Override
+    public boolean isNotNil(Variable v) {
+        return false;
+    }
+
 }

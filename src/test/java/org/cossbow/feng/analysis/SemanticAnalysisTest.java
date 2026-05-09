@@ -1598,10 +1598,25 @@ public class SemanticAnalysisTest {
     @Test
     public void testRequired3() {
         checkFail("func f(a *int){var v *!int = a;}");
+        checkFail("func f(a *int){var v *!int = (a);}");
         checkSucc("func f(a *int){if(a != nil) var v *!int = a;}");
         checkSucc("func f(a *int){if(a != nil) var v *!int = (a);}");
-        checkFail("func f(a *int){if(a == nil) var v *!int = a;}");
-        checkSucc("func f(a *int){if(a == nil) {} else var v *!int = a;}");
+        checkFail("func f(a *int){if(a==nil) var v *!int = a;}");
+        checkSucc("func f(a *int){if(a==nil) {} else var v *!int = a;}");
+
+        checkSucc("func f(a,b *int){if(a!=nil&&b!=nil){var x *!int = a;var y *!int = b;} }");
+        checkFail("func f(a,b *int){if(a!=nil&&b==nil){var x *!int = a;var y *!int = b;} }");
+        checkSucc("func f(a,b *int){if(a!=nil&&b==nil){var x *!int = a;} }");
+        checkFail("func f(a,b *int){if(a!=nil&&(b!=nil||*b>0)){var x *!int = a;var y *!int = b;} }");
+        checkSucc("func f(a,b *int){if(a!=nil&&(b!=nil||*b>0)){var x *!int = a;} }");
+        checkFail("func f(a,b *int){if(a!=nil&&b!=nil||*b>0){var x *!int = a;} }");
+
+        checkFail("func f(a,b *int){if(a==nil||b==nil){var x *!int = a;} }");
+        checkSucc("func f(a,b *int){if(!(a==nil||b==nil)){var x *!int = a;} }");
+        checkFail("func f(a,b *int){if(!!(a==nil||b==nil)){var x *!int = a;} }");
+        checkSucc("func f(a,b *int){if(a==nil||b==nil){}else{var x *!int = a;} }");
+        checkFail("func f(a,b *int){if(!(a==nil||b==nil)){}else{var x *!int = a;} }");
+
     }
 
     @Test

@@ -74,12 +74,29 @@ public class StackedContext implements SymbolContext {
         return getScope().local();
     }
 
+    @Override
     public boolean lockVar(Variable variable) {
         return getScope().lockVar(variable);
     }
 
+    @Override
     public boolean isVarLocked(Variable variable) {
         return getScope().isVarLocked(variable);
+    }
+
+    @Override
+    public void setNotNil(Variable v) {
+        getScope().setNotNil(v);
+    }
+
+    @Override
+    public void delNotNil(Variable v) {
+        getScope().delNotNil(v);
+    }
+
+    @Override
+    public boolean isNotNil(Variable v) {
+        return getScope().isNotNil(v);
     }
 
 }

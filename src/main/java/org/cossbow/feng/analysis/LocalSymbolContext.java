@@ -7,9 +7,7 @@ import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.util.Optional;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Stream;
 
 public class LocalSymbolContext implements SymbolContext {
@@ -20,8 +18,8 @@ public class LocalSymbolContext implements SymbolContext {
     }
 
     private final IdentifierMap<Variable> variables = new IdentifierMap<>();
-    private final HashMap<Integer, Variable> lockedVars = new HashMap<>();
-    private final HashMap<Integer, Variable> checkedNonNil = new HashMap<>();
+    private final Set<Variable> lockedVars = new HashSet<>();
+    private final Set<Variable> varNotNil = new HashSet<>();
 
     @Override
     public boolean isLocal(Symbol s) {
@@ -61,20 +59,29 @@ public class LocalSymbolContext implements SymbolContext {
     }
 
     public boolean lockVar(Variable v) {
-        lockedVars.put(v.id(), v);
+        lockedVars.add(v);
         return true;
     }
 
     public boolean isVarLocked(Variable v) {
-        return lockedVars.containsKey(v.id());
+        return lockedVars.contains(v);
     }
 
-    public void checkedNonNil(Variable v) {
-        checkedNonNil.put(v.id(), v);
+    @Override
+    public void setNotNil(Variable v) {
+        varNotNil.add(v);
     }
 
+    @Override
+    public void delNotNil(Variable v) {
+        if (!varNotNil.remove(v)) {
+            parent.delNotNil(v);
+        }
+    }
+
+    @Override
     public boolean isNotNil(Variable v) {
-        return checkedNonNil.containsKey(v.id());
+        return varNotNil.contains(v) || parent.isNotNil(v);
     }
 
 }

@@ -119,9 +119,29 @@ public class CommonUtil {
     }
 
     public static <K, V> Map<K, V> merge(Map<K, V> a, Map<K, V> b) {
+        if (a.isEmpty()) {
+            if (b.isEmpty()) return Map.of();
+            return b;
+        }
+
+        if (b.isEmpty()) return a;
+
         var r = new HashMap<K, V>(a.size(), b.size());
         r.putAll(a);
         r.putAll(b);
+        return r;
+    }
+
+    public static <K> Set<K> merge(Set<K> a, Set<K> b) {
+        if (a.isEmpty()) {
+            if (b.isEmpty()) return Set.of();
+            return b;
+        }
+        if (b.isEmpty()) return a;
+
+        var r = new HashSet<K>(a.size(), b.size());
+        r.addAll(a);
+        r.addAll(b);
         return r;
     }
 

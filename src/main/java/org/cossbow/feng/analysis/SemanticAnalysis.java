@@ -10,7 +10,9 @@ import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
-import org.cossbow.feng.ast.micro.*;
+import org.cossbow.feng.ast.micro.Macro;
+import org.cossbow.feng.ast.micro.MacroFunc;
+import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
@@ -1801,7 +1803,7 @@ public class SemanticAnalysis {
 
     private int typeNest = -1;
 
-    private void unmarkNonNilVar(Assignment a) {
+    private void updateNilState(Assignment a) {
         if (!(a.operand() instanceof VariableOperand vo)) return;
         var v = vo.variable().must();
         var t = v.type().must();
@@ -1809,13 +1811,13 @@ public class SemanticAnalysis {
 
         if (a.value() instanceof LiteralExpression le
                 && le.literal() instanceof NilLiteral) {
-            ifUnmarkNonNil(v);
+            context.delNotNil(v);
             return;
         }
 
         var vt = a.value().resultType.must();
         if (vt.required()) return;
-        ifUnmarkNonNil(v);
+        context.delNotNil(v);
     }
 
     private void index2Call(Assignment a) {
@@ -1851,7 +1853,7 @@ public class SemanticAnalysis {
             return;
         }
         assignable(og.b(), vg.b(), Optional.of(vg.a()), a).valid();
-        unmarkNonNilVar(a);
+        updateNilState(a);
     }
 
     private Statement analyse(AssignmentsStatement as) {
@@ -2012,9 +2014,10 @@ public class SemanticAnalysis {
         context.enterScope();
         if (e instanceof ConditionalForStatement ce) {
             analyse(ce);
-            ifCheckNonNil(ce.condition(), true);
+            var vars = collectNotNil(ce.condition(), true);
+            setNilState(vars);
             analyse(e.body());
-            ifExitNonNilScope(e.body());
+            delNilState(vars);
         } else if (e instanceof IterableForStatement ie) {
             analyse(ie);
             analyse(e.body());
@@ -2147,60 +2150,60 @@ public class SemanticAnalysis {
         return e;
     }
 
-    private void ifCheckNonNil(
-            Expression e, Set<Variable> vars, boolean yes) {
+
+    private Set<Variable> collectNotNil(Expression e, boolean yes) {
+        if (e instanceof UnaryExpression ue) {
+            if (ue.operator() != UnaryOperator.INVERT)
+                return Set.of();
+            return collectNotNil(ue.operand(), !yes);
+        }
+
+        if (e instanceof BinaryExpression be) {
+            var isAnd = switch (be.operator()) {
+                case AND -> true;
+                case OR -> false;
+                default -> null;
+            };
+            if (isAnd == null || isAnd != yes) return Set.of();
+
+            var l = collectNotNil(be.left(), yes);
+            var r = collectNotNil(be.right(), yes);
+            return CommonUtil.merge(l, r);
+        }
+
         if (e instanceof CheckNilExpression cne) {
             if (cne.subject() instanceof VariableExpression ve) {
-                if (yes != cne.nil())
-                    vars.add(ve.variable());
+                var v = ve.variable();
+                if (cne.nil()) {
+                    return yes ? Set.of() : Set.of(v);
+                } else {
+                    return yes ? Set.of(v) : Set.of();
+                }
             }
-        } else if (e instanceof BinaryExpression ve) {
-            if (ve.operator() == BinaryOperator.AND) {
-                ifCheckNonNil(ve.left(), vars, yes);
-                ifCheckNonNil(ve.right(), vars, yes);
-            }
-        } else if (e instanceof ParenExpression pe) {
-            ifCheckNonNil(pe.child(), vars, yes);
+            return Set.of();
+        }
+        return Set.of();
+    }
+
+    private void setNilState(Set<Variable> set) {
+        for (var v : set) {
+            context.setNotNil(v);
         }
     }
 
-    private static class NonNilCheckSet {
-        private final Set<Variable> checked = new HashSet<>();
-    }
-
-    // 变量显式判断非空之后将其标记，作为反向传递依据
-    private final Stack<NonNilCheckSet> ifNonNilVars = new Stack<>();
-
-    private void ifCheckNonNil(Expression e, boolean yes) {
-        var set = new NonNilCheckSet();
-        ifCheckNonNil(e, set.checked, yes);
-        ifNonNilVars.push(set);
-    }
-
-    private void ifExitNonNilScope(Statement s) {
-        ifNonNilVars.pop();
-    }
-
-    private void ifUnmarkNonNil(Variable v) {
-        for (NonNilCheckSet set : ifNonNilVars) {
-            set.checked.remove(v);
+    private void delNilState(Set<Variable> set) {
+        for (var v : set) {
+            context.delNotNil(v);
         }
     }
 
     private boolean ifMarkNonNil(Expression e) {
         if (e instanceof VariableExpression ve)
-            return ifMarkNonNil(ve.variable());
+            return context.isNotNil(ve.variable());
 
         if (e instanceof ParenExpression ve)
             return ifMarkNonNil(ve.child());
 
-        return false;
-    }
-
-    private boolean ifMarkNonNil(Variable v) {
-        for (var set : ifNonNilVars) {
-            if (set.checked.contains(v)) return true;
-        }
         return false;
     }
 
@@ -2217,13 +2220,17 @@ public class SemanticAnalysis {
         if (g.a() instanceof LiteralExpression le)
             e.cond().set((BoolLiteral) le.literal());
 
-        ifCheckNonNil(g.a(), true);
-        analyse(e.yes());
-        ifExitNonNilScope(e.yes());
+        {
+            var vars = collectNotNil(g.a(), true);
+            setNilState(vars);
+            analyse(e.yes());
+            delNilState(vars);
+        }
         e.not().use(not -> {
-            ifCheckNonNil(g.a(), false);
+            var vars = collectNotNil(g.a(), false);
+            setNilState(vars);
             analyse(not);
-            ifExitNonNilScope(not);
+            delNilState(vars);
         });
 
         context.exitScope(e);

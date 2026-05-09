@@ -29,4 +29,10 @@ public interface SymbolContext {
 
     boolean isVarLocked(Variable v);
 
+    void setNotNil(Variable v);
+
+    void delNotNil(Variable v);
+
+    boolean isNotNil(Variable v);
+
 }
