@@ -1390,8 +1390,8 @@ public class CppGenerator {
 
     private CppGenerator write(ArrayExpression e) {
         var t = (ArrayTypeDeclarer) e.resultType.must();
-        e.expectType.use(this::write, () -> {
-            e.type().use(this::write, () -> {
+        e.type().use(this::write, () -> {
+            e.expectType.use(this::write, () -> {
                 write(t);
             });
         });
@@ -1450,20 +1450,17 @@ public class CppGenerator {
     }
 
     private CppGenerator write(BoolLiteral e) {
-        write(Primitive.BOOL).write('(');
-        write(Boolean.toString(e.value())).write(')');
+        write(Boolean.toString(e.value()));
         return this;
     }
 
     private CppGenerator write(FloatLiteral e) {
-        write(Primitive.FLOAT).write('(');
-        write(e.value().toString()).write(')');
+        write(e.value().toString());
         return this;
     }
 
     private CppGenerator write(IntegerLiteral e) {
-        write(Primitive.INT).write('(');
-        write(e.value().toString(e.radix())).write(')');
+        write(e.value().toString(e.radix()));
         return this;
     }
 
@@ -1490,7 +1487,8 @@ public class CppGenerator {
         if (r.has()) {
             return write(e.literal());
         }
-        write(e.literal());
+        write(rt).write('(');
+        write(e.literal()).write(')');
         return this;
     }
 

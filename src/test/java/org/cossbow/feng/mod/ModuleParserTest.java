@@ -16,13 +16,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class ModuleParserTest {
 
-    static final ModuleParser std;
-
-    static {
-        std = new ModuleParser("std", ResourceUtil.getDir("std"), UTF_8);
-    }
-
     public static Map<Identifier, ModuleParser> libs() {
+        var std = new ModuleParser("std",
+                ResourceUtil.getDir("std"), UTF_8);
         return Map.of(std.pkg(), std);
     }
 

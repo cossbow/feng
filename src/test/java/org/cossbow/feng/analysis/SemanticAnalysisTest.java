@@ -1671,24 +1671,36 @@ public class SemanticAnalysisTest {
         checkSucc("func f(c func(&int)){ var v int; c(v); }");
         checkFail("func f(c func(&int)){ c(0); }");
         checkSucc("func f(c func(&int)){ c(int(0)); }");
+        checkSucc("func f(c func(&int)){ c({0}); }");
+        checkSucc("func f(c func(&int), g func()int){ c(g()); }");
 
         checkSucc("func f(c func([&]int)){ var v [2]int; c(v); }");
         checkSucc("func f(c func([&]int)){ c([]int[2]); }");
+        checkSucc("func f(c func([&]int)){ c({[]int[2]}); }");
+        checkSucc("func f(c func([&]int), g func()[2]int){ c(g()); }");
 
         checkSucc("func f(c func(&int)){ var v = new(int); c(v); }");
         checkSucc("func f(c func(&int)){ c(new(int)); }");
+        checkSucc("func f(c func(&int)){ c({new(int)}); }");
+        checkSucc("func f(c func(&int), g func()*int){ c(g()); }");
 
         var d = "class A{} ";
         checkSucc(d + "func f(c func(&A)){ var v A; c(v); }");
         checkSucc(d + "func f(c func(&A)){ c(A{}); }");
         checkSucc(d + "func f(c func(&Object)){ c(A{}); }");
+        checkSucc(d + "func f(c func(&Object)){ c({A{}}); }");
+        checkSucc(d + "func f(c func(&Object), g func()A){ c(g()); }");
 
         checkSucc(d + "func f(c func([&]A)){ var v [2]A; c(v); }");
         checkSucc(d + "func f(c func([&]A)){ c([]A[{}]); }");
+        checkSucc(d + "func f(c func([&]A)){ c({[]A[{}]}); }");
+        checkSucc(d + "func f(c func([&]A), g func()[2]A){ c(g()); }");
 
         checkSucc(d + "func f(c func(&A)){ var v = new(A); c(v); }");
         checkSucc(d + "func f(c func(&A)){ c(new(A)); }");
         checkSucc(d + "func f(c func(&Object)){ c(new(A)); }");
+        checkSucc(d + "func f(c func(&Object)){ c({new(A)}); }");
+        checkSucc(d + "func f(c func(&Object), g func()*A){ c(g()); }");
     }
 
     @Test

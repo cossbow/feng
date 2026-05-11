@@ -6,17 +6,38 @@ func use1(a &A) {}
 func use2(a [&]int) {}
 func use3(o &Object) {}
 
+func make0() int {
+    return 0;
+}
+func make1() A {
+    return {};
+}
+func make2() [4]int {
+    return [1,2,3];
+}
+
 func test1() {
     use0(int(0));
+    use0({0});
+    use0(make0());
 
     use1(A{});
     use1(new(A));
+    use1({A{}});
+    use1({new(A)});
+    use1(make1());
 
     use2([]int[1,2,3]);
     use2(new([4]int));
+    use2({[]int[1,2,3]});
+    use2({new([4]int)});
+    use2(make2());
 
     use3(A{});
     use3(new(A));
+    use3({A{}});
+    use3({new(A)});
+    use3(make1());
 }
 
 

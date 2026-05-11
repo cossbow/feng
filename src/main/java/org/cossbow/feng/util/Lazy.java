@@ -17,6 +17,10 @@ public class Lazy<T> implements Cloneable {
         return Optional.of(value);
     }
 
+    public Optional<T> getOrElse(Lazy<T> el) {
+        return has() ? get() : el.get();
+    }
+
     public T must() {
         if (value == null) {
             throw new NoSuchElementException("No value present");

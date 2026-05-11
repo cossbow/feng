@@ -64,6 +64,7 @@ public class CppGeneratorTest {
     public void testOne(Path dir, Path file) throws IOException {
         CppGenerator.copyBaseHeader(dir);
         var fn = file.getFileName();
+        System.out.printf("parse: %s\n", fn);
         var name = CommonUtil.trimExt(fn.toString())
                 .replace("-", "_");
         var subDir = dir.resolve(name);

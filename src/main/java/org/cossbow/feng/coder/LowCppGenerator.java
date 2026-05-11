@@ -1447,8 +1447,8 @@ public class LowCppGenerator {
 
     private LowCppGenerator write(ArrayExpression e) {
         var t = (ArrayTypeDeclarer) e.resultType.must();
-        e.expectType.use(this::write, () -> {
-            e.type().use(this::write, () -> {
+        e.type().use(this::write, () -> {
+            e.expectType.use(this::write, () -> {
                 write(t);
             });
         });

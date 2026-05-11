@@ -1202,6 +1202,8 @@ public class SemanticAnalysis {
             case ObjectExpression ee -> passingParameters;
             case ArrayExpression ee -> passingParameters;
             case NewExpression ee -> passingParameters;
+            case CallExpression ee -> passingParameters;
+            case BlockExpression ee -> passingParameters;
             case EnumExpression ee -> false;
             default -> false;
         };
@@ -2388,13 +2390,15 @@ public class SemanticAnalysis {
         }
         var t = e.resultType.must();
         var ref = t.maybeRefer();
-        return ref.none() || ref.get().unmodifiable();
+        if (ref.none()) return left;
+        return ref.get().unmodifiable();
     }
 
-    private boolean unmodifiable(CallExpression e) {
+    private boolean unmodifiable(CallExpression e, boolean left) {
         var t = e.resultType.must();
         var ref = t.maybeRefer();
-        return ref.none() || ref.get().unmodifiable();
+        if (ref.none()) return left;
+        return ref.get().unmodifiable();
     }
 
     private boolean unmodifiable(Variable v) {
@@ -2418,7 +2422,7 @@ public class SemanticAnalysis {
     // 检查不可修改值的入口
     private boolean unmodifiable(Expression e, boolean left) {
         return switch (e) {
-            case CallExpression ee -> unmodifiable(ee);
+            case CallExpression ee -> unmodifiable(ee, left);
             case IndexOfExpression ee -> unmodifiable(ee, left);
             case MemberOfExpression ee -> unmodifiable(ee, left);
             case ParenExpression ee -> unmodifiable(ee.child(), left);
@@ -3271,7 +3275,7 @@ public class SemanticAnalysis {
     }
 
     void checkUnmodifiable(PrimaryExpression s, Method m, Entity e) {
-        if (!unmodifiable(s, true)) return;
+        if (!unmodifiable(s, false)) return;
         if (m.unmodifiable()) return;
         semantic("unmodifiable '%s' call modifiable method: %s",
                 s, e.pos());
@@ -3775,9 +3779,11 @@ public class SemanticAnalysis {
         context.enterScope();
         for (var s : e.block()) analyse(s);
         var r = optimize(e.result());
+        var t = fromLiteral(r.b());
+        r.a().resultType.set(t);
         e.result(r.a());
         context.exitScope(e);
-        return Groups.g2(e, r.b());
+        return Groups.g2(e, t);
     }
 
     private void dereferable(TypeDeclarer td) {
