@@ -2212,9 +2212,17 @@ public class SemanticAnalysis {
             setNilState(vars);
             analyse(not);
             delNilState(vars);
+            context.exitScope(e);
+        }, () -> {
+            // Auto narrow to non-nil if the yes-branch always terminates:
+            // > if (a == nil) return;
+            // > var b *!int = a;
+            context.exitScope(e);
+            if (!analyzer.check(e.yes())) return;
+            var vars = collectNotNil(g.a(), false);
+            setNilState(vars);
         });
 
-        context.exitScope(e);
         return e;
     }
 

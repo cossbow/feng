@@ -1563,7 +1563,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testUnmodifiable6(){
+    public void testUnmodifiable6() {
         checkSucc("class A{func a(){}} class B:A{func a(){}}");
         checkFail("class A{func a#(){}} class B:A{func a(){}}");
         checkFail("class A{func a(){}} class B:A{func a#(){}}");
@@ -1594,6 +1594,10 @@ public class SemanticAnalysisTest {
         checkSucc("func f(a *!int){var v *int = a;}");
         checkSucc("func f(a *!int){var v *!int = a;}");
         checkFail("func f(a *int){var v *!int = a;}");
+
+        checkSucc("func f(a *!int){if(a!=nil){}}");
+        checkSucc("func f(){var a int; const r &int = a;}");
+        checkSucc("func f(){var a int; const r &!int = a;}");
     }
 
     @Test
@@ -1622,9 +1626,12 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testRequired4() {
-        checkSucc("func f(a *!int){if(a!=nil){}}");
-        checkSucc("func f(){var a int; const r &int = a;}");
-        checkSucc("func f(){var a int; const r &!int = a;}");
+        checkSucc("func f(a *int){if(a==nil) return; var v *!int = a;}");
+        checkFail("func f(a *int){if(a!=nil) return; var v *!int = a;}");
+        checkSucc("func f(a,b *int){if(a==nil||b==nil) return; var v *!int = a; v = b;}");
+        checkFail("func f(a,b *int){if(a!=nil||b==nil) return; var v *!int = a; v = b;}");
+        checkSucc("func f(a *int){{if(a==nil) return; var v *!int = a;}}");
+        checkFail("func f(a *int){{if(a!=nil) return; var v *!int = a;}}");
     }
 
     //
