@@ -48,7 +48,6 @@ public class SemanticAnalysis {
     private final boolean low;
 
     private final LiteralComputer computer = new LiteralComputer();
-    private final ReturnAnalyzer analyzer = new ReturnAnalyzer();
     private final DedupCache<StringLiteral> stringCache;
 
     public SemanticAnalysis(ParseSymbolTable table,
@@ -1164,7 +1163,7 @@ public class SemanticAnalysis {
 
     // 检查所有路径均有return
     private void checkAllPathReturn(Procedure proc) {
-        if (analyzer.check(proc.body()))
+        if (terminated(proc.body()))
             return;
         if (proc.prototype().returnSet().none()) return;
 
@@ -2218,7 +2217,7 @@ public class SemanticAnalysis {
             // > if (a == nil) return;
             // > var b *!int = a;
             context.exitScope(e);
-            if (!analyzer.check(e.yes())) return;
+            if (!terminated(e.yes())) return;
             var vars = collectNotNil(g.a(), false);
             setNilState(vars);
         });
@@ -2372,6 +2371,161 @@ public class SemanticAnalysis {
         return e;
     }
 
+    //
+
+    /**
+     * A procedure with a return value must have a Termination in every branch.
+     * <p>
+     * The return-statements and throw-statements both are termination.
+     *
+     */
+    public boolean terminated(Statement s) {
+        return switch (s) {
+            case BlockStatement ee -> terminated(ee);
+            case ConditionalForStatement fs -> terminated(fs);
+            case IfStatement ee -> terminated(ee);
+            case LabeledStatement ee -> terminated(ee.target());
+            case SwitchStatement ee -> terminated(ee);
+            case TryStatement ee -> terminated(ee);
+            case ThrowStatement ee -> true;
+            case ReturnStatement ee -> true;
+            case null, default -> false;
+        };
+    }
+
+    private boolean terminated(Optional<? extends Statement> o) {
+        return o.has() && terminated(o.get());
+    }
+
+    private boolean terminated(List<? extends Statement> list) {
+        var found = false;
+        for (var s : list) {
+            if (found) {
+                semantic("unreachable statement: %s", s.pos());
+            } else if (terminated(s)) {
+                found = true;
+            }
+        }
+        return found;
+    }
+
+    private boolean terminated(BlockStatement bs) {
+        return terminated(bs.list());
+    }
+
+    private boolean terminated(ConditionalForStatement s) {
+        // If the condition is a constant true, it will inevitably
+        // enter the loop, so the loop body must be checked.
+        if (!s.cond().match(BoolLiteral::value)) return false;
+        // An infinite-loop is equivalent to termination,
+        // so we need to check the termination within
+        // the loop body:
+        if (terminated(s.body())) return true;
+        // Even without a termination, but the
+        // break-statement will break infinite-loop:
+        return !loopBroken(s.body());
+    }
+
+    private boolean terminated(IfStatement s) {
+        if (s.cond().none()) {
+            // If condition is not a constant, must check both branches:
+            return terminated(s.yes()) &&
+                    terminated(s.not());
+        }
+        // Constant-condition means that only one branch can enter:
+        if (s.cond().must().value()) {
+            return terminated(s.yes());
+        } else {
+            return terminated(s.not());
+        }
+    }
+
+    private boolean terminated(SwitchStatement s) {
+        // Need to check all branches:
+        var found = true;
+        for (var b : s.branches()) {
+            found = found && terminated(b.body());
+        }
+        if (s.defaultBranch().none()) return found;
+
+        return found && terminated(s.defaultBranch().get().body());
+    }
+
+    private boolean terminated(TryStatement s) {
+        var found = terminated(s.body());
+        for (var c : s.catchClauses()) {
+            found = found && terminated(c.body());
+        }
+        // If all the try and catch branches have termination,
+        // there is no need to check the finally branch:
+        if (found) return true;
+        // Otherwise, the final branch must have termination:
+        return s.finallyClause().match(this::terminated);
+    }
+
+    /**
+     * Check if exists break-statement.
+     * <p>
+     * Ignore break-statements in the inner loop.
+     */
+    private boolean loopBroken(Statement s) {
+        return switch (s) {
+            case BlockStatement ee -> loopBroken(ee.list());
+            case IfStatement ee -> loopBroken(ee);
+            case LabeledStatement ee -> loopBroken(ee.target());
+            case SwitchStatement ee -> loopBroken(ee);
+            case Branch ee -> loopBroken(ee.body());
+            case TryStatement ee -> loopBroken(ee);
+            case BreakStatement ee -> true;
+            case null, default -> false;
+        };
+    }
+
+    private boolean loopBroken(
+            Optional<? extends Statement> o) {
+        return o.has() && loopBroken(o.get());
+    }
+
+    private boolean loopBroken(List<? extends Statement> list) {
+        var found = false;
+        for (var s : list) {
+            if (found) {
+                semantic("unreachable statement: %s", s.pos());
+            } else if (loopBroken(s)) {
+                found = true;
+            }
+        }
+        return found;
+    }
+
+    private boolean loopBroken(IfStatement s) {
+        if (s.cond().none()) {
+            // In the case of nonconstant conditions,
+            // any branch needs to have a break-statement:
+            return loopBroken(s.yes()) ||
+                    loopBroken(s.not());
+        }
+        // If it is a constant condition, only the branch
+        // that will definitely be entered needs to be checked:
+        if (s.cond().must().value()) {
+            return loopBroken(s.yes());
+        } else {
+            return loopBroken(s.not());
+        }
+    }
+
+    private boolean loopBroken(SwitchStatement s) {
+        // Break is required in any branch
+        return loopBroken(s.branches()) ||
+                loopBroken(s.defaultBranch());
+    }
+
+    private boolean loopBroken(TryStatement s) {
+        // Break is required in any branch
+        return loopBroken(s.body()) ||
+                loopBroken(s.catchClauses()) ||
+                loopBroken(s.finallyClause());
+    }
 
     //
 

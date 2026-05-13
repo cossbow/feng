@@ -1401,12 +1401,14 @@ final class SourceParseVisitor
     @Override
     public Entity visitContinueStatement(FengParser.ContinueStatementContext ctx) {
         var label = identifierOptional(ctx.label);
+        label.use(id -> unsupported("continue label: %s", id.pos()));
         return new ContinueStatement(posOf(ctx), label);
     }
 
     @Override
     public Entity visitBreakStatement(FengParser.BreakStatementContext ctx) {
         var label = identifierOptional(ctx.label);
+        label.use(id -> unsupported("break label: %s", id.pos()));
         return new BreakStatement(posOf(ctx), label);
     }
 
