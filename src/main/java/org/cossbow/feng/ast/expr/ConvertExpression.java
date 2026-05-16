@@ -3,6 +3,9 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Primitive;
 
+/**
+ * Only basic types support conversion expressions
+ */
 public class ConvertExpression extends PrimaryExpression {
     private final Primitive primitive;
     private final Expression operand;

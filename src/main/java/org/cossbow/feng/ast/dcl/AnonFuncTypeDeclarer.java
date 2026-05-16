@@ -3,6 +3,15 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.proc.Prototype;
 
+/**
+ * Anonymous prototype type:
+ * <p>
+ * {@code var a func();}, {@code var a func(int);}, {@code var a func() int;}
+ * <p>
+ * {@link #required}:
+ * <p>
+ * {@code var a !func();}, {@code var a !func(int);}, {@code var a !func() int;}
+ */
 public class AnonFuncTypeDeclarer extends FuncTypeDeclarer {
     private final Prototype prototype;
 

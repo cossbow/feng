@@ -2,8 +2,14 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 
+/**
+ * {@code *a}, {@code *a.v}, {@code *a[i]}
+ */
 public class DereferExpression extends PrimaryExpression {
-    private PrimaryExpression subject;
+    /**
+     * type of {@code subject} must be reference
+     */
+    private final PrimaryExpression subject;
 
     public DereferExpression(Position pos,
                              PrimaryExpression subject) {

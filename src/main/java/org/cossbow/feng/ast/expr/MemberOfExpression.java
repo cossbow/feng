@@ -6,12 +6,19 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.util.Optional;
 
+/**
+ * Used to reference members, including fields and methods,
+ * and to display the use of enumeration values.
+ */
 public class MemberOfExpression extends PrimaryExpression {
-    private PrimaryExpression subject;
-    private Identifier member;
-    private TypeArguments generic;
+    private final PrimaryExpression subject;
+    private final Identifier member;
+    private final TypeArguments generic;
 
-    private Optional<? extends Field> field;
+    /**
+     * If the member is a field, set the field definition here
+     */
+    private final Optional<? extends Field> field;
 
     public MemberOfExpression(Position pos,
                               PrimaryExpression subject,

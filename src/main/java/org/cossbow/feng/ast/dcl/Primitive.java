@@ -9,6 +9,10 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Primitive types are built-in types that can be directly stored
+ * in registers, so they all have a fixed bit width.
+ */
 public enum Primitive {
     BYTE("byte", Kind.INTEGER, 8),
     INT("int", Kind.INTEGER, 64),

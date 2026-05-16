@@ -2,6 +2,10 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 
+/**
+ * Expressions used to determine nil are generated
+ * during analysis for ease of analysis
+ */
 public class CheckNilExpression extends PrimaryExpression {
     private final Expression subject;
     private final boolean nil;

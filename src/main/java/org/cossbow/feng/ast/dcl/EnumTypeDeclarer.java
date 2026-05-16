@@ -3,6 +3,15 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.EnumDefinition;
 import org.cossbow.feng.ast.Position;
 
+/**
+ * The internal type of the compiler cannot be defined syntactically.
+ * <p>
+ * This is the type of enumeration value:
+ * <p>
+ * {@code enum State{S1,} var s State;}
+ * <p>
+ * The type of variable {@code s}  is represented by this class.
+ */
 public class EnumTypeDeclarer extends TypeDeclarer {
     private final EnumDefinition def;
 

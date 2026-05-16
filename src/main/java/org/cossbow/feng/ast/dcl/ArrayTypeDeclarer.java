@@ -8,11 +8,24 @@ import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.util.Optional;
 
+/**
+ * Array type:
+ * <p>
+ * If fixed the length, array will be value-type: {@code [2]int}, {@code [2][4]int}
+ * <p>
+ * It will be array-reference if no length: {@code [*]int}, {@code [&]int}
+ */
 public class ArrayTypeDeclarer extends TypeDeclarer
         implements Referable {
     private TypeDeclarer element;
     private Optional<Expression> length;
+    /**
+     * If not set {@code length}, must set the {@code refer}
+     */
     private Optional<Refer> refer;
+    /**
+     * True if the type is inferred from array-literal
+     */
     private boolean literal;
 
     public ArrayTypeDeclarer(Position pos,
@@ -58,9 +71,16 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         return literal;
     }
 
+
     //
 
+    /**
+     * cache the fixed length
+     */
     private Long len;
+    /**
+     * cache the element size, if element type was mappable
+     */
     private Long unit;
 
     public Long len() {
@@ -79,24 +99,24 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         this.unit = unit;
     }
 
-    public boolean hasTemplate() {
-        return element.hasTemplate();
+    public boolean hasTypeVar() {
+        return element.hasTypeVar();
     }
 
     //
 
     public static ArrayTypeDeclarer make(
-            TypeDeclarer et, int len, Entity e) {
-        var l = new IntegerLiteral(e.pos(), len).expr();
-        var t = new ArrayTypeDeclarer(e.pos(), et,
+            TypeDeclarer et, int len, Position pos) {
+        var l = new IntegerLiteral(pos, len).expr();
+        var t = new ArrayTypeDeclarer(pos, et,
                 Optional.of(l), Optional.empty(), true);
         t.len(len);
         return t;
     }
 
     public static ArrayTypeDeclarer make(
-            TypeDeclarer et, Optional<Refer> r, Entity e) {
-        return new ArrayTypeDeclarer(e.pos(), et, Optional.empty(),
+            TypeDeclarer et, Optional<Refer> r, Position pos) {
+        return new ArrayTypeDeclarer(pos, et, Optional.empty(),
                 r, false);
     }
 

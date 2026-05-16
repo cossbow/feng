@@ -6,6 +6,9 @@ import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.util.CommonUtil;
 
+/**
+ * Symbol link to a custom derived-type.
+ */
 public class DerivedType extends DefinedType {
     private final Symbol symbol;
     private TypeArguments generic;
@@ -55,8 +58,14 @@ public class DerivedType extends DefinedType {
         this.gm = CommonUtil.required(gm);
     }
 
-    public boolean hasTemplate() {
-        return generic.hasTemplate();
+    /**
+     * check if this type contains type-paramster:
+     * <p>
+     * If {@code T} is type-parameter in this context, a type with
+     * type-var is like: {@code T}, {@code List`T`}, etc.
+     */
+    public boolean hasTypeVar() {
+        return generic.hasTypeVar();
     }
 
     public DerivedType clone() {

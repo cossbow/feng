@@ -8,6 +8,11 @@ import org.cossbow.feng.util.Optional;
 
 import java.util.stream.Collectors;
 
+/**
+ * Used to initialize fields of class and structure types.
+ * <p>
+ * {@code {id=1, ok=true}}
+ */
 public class ObjectExpression extends PrimaryExpression {
     private final IdentifierMap<Expression> entries;
     private final Optional<DerivedTypeDeclarer> type;

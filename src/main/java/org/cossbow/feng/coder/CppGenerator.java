@@ -1390,8 +1390,8 @@ public class CppGenerator {
 
     private CppGenerator write(ArrayExpression e) {
         var t = (ArrayTypeDeclarer) e.resultType.must();
-        e.type().use(this::write, () -> {
-            e.lt.use(this::write, () -> {
+        e.expectType.use(this::write, () -> {
+            e.type().use(this::write, () -> {
                 write(t);
             });
         });
@@ -1485,8 +1485,7 @@ public class CppGenerator {
     }
 
     private CppGenerator write(LiteralExpression e) {
-        var rt = e.lt.has() ? e.lt.must()
-                : e.resultType.must();
+        var rt = e.type();
         var r = rt.maybeRefer();
         if (r.has()) {
             return write(e.literal());

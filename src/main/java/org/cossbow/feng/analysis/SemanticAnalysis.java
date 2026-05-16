@@ -405,10 +405,9 @@ public class SemanticAnalysis {
     }
 
     private void illegalPhantom(TypeDeclarer td) {
-        if (!td.referKind(PHANTOM))
-            return;
-        semantic("can't be phantom-reference: %s",
-                td.pos());
+        if (td instanceof Referable r && r.isKind(PHANTOM))
+            semantic("can't be phantom-reference: %s",
+                    td.pos());
     }
 
     private ArrayTypeDeclarer analyse(ArrayTypeDeclarer td) {
@@ -1458,7 +1457,6 @@ public class SemanticAnalysis {
     }
 
     private TypeValid assignRefer(TypeDeclarer l, LiteralExpression re) {
-        re.lt.set(l);
         var lr = l.maybeRefer().must();
         if (re.literal() instanceof NilLiteral) {
             if (!lr.required()) {
@@ -1633,7 +1631,6 @@ public class SemanticAnalysis {
             TypeDeclarer l, LiteralTypeDeclarer r,
             Optional<Expression> re) {
         assert l.maybeRefer().none();
-        re.use(e -> ((LiteralExpression) e).lt.set(l));
 
         if (l instanceof PrimitiveTypeDeclarer ptd) {
             var c = r.literal().compatible();
@@ -1675,26 +1672,9 @@ public class SemanticAnalysis {
                 "value-type '%s' can't assign to refer-type '%s': %s",
                 r, l, e.pos());
 
-        if (re.has()) {
-            if (re.get() instanceof ArrayExpression ae) {
-                ae.lt.set(l);
-                // 数组初始化分析
-                for (var ev : ae.elements()) {
-                    var tv = assignable(l.element(), r.element(),
-                            Optional.of(ev), e);
-                    if (!tv.ok) return tv;
-                }
-            } else {
-                // 分析元素
-                var tv = assignable(l.element(), r.element(),
-                        Optional.empty(), e);
-                if (!tv.ok) return tv;
-            }
-        } else {
-            var tv = assignable(l.element(), r.element(),
-                    Optional.empty(), e);
-            if (!tv.ok) return tv;
-        }
+        var tv = assignable(l.element(), r.element(),
+                Optional.empty(), e);
+        if (!tv.ok) return tv;
 
         if (re.match(v -> v instanceof ArrayExpression)) {
             if (!l.literal() && l.len() < r.len()) {
@@ -1831,7 +1811,7 @@ public class SemanticAnalysis {
         var set = cd.indexOperator().must().set().must();
         var m = new MethodExpression(io.pos(), s, set, TypeArguments.EMPTY);
         var n = new CallExpression(a.pos(), m, List.of(io.index(), a.value()),
-                Optional.of(set.prototype()));
+                set.prototype());
         n.resultType.set(set.prototype().returnType());
         var stmt = new CallStatement(a.pos(), n);
         a.replacer().set(stmt);
@@ -1930,7 +1910,6 @@ public class SemanticAnalysis {
     }
 
     private Statement analyse(CallStatement e) {
-        e.call().stmt().set(e);
         var g = optimize((Expression) e.call());
         if (g.a() instanceof CallExpression ce) {
             e.call(ce);
@@ -3051,7 +3030,7 @@ public class SemanticAnalysis {
         if (!(call instanceof BlockExpression be
                 && be.origin().has())) {
             var n = new CallExpression(e.pos(), call,
-                    nArgs, Optional.of(p));
+                    nArgs, p);
             var rt = p.returnType();
             return Groups.g2(n, rt);
         }
@@ -3061,7 +3040,7 @@ public class SemanticAnalysis {
         var t = (FuncTypeDeclarer) tmpVar.type().must();
         var v = (PrimaryExpression) tmpVar.value().must();
         var n = new CallExpression(e.pos(), v, nArgs,
-                Optional.of(t.prototype()));
+                t.prototype());
         var rt = t.prototype().returnType();
         n.resultType.set(rt);
         tmpVar.value().set(n);
@@ -3209,7 +3188,7 @@ public class SemanticAnalysis {
                 var s = new MethodExpression(a.pos(), a, cm, TypeArguments.EMPTY);
                 var ig = optimize(e.index());
                 var n = new CallExpression(e.pos(), s, List.of(ig.a()),
-                        Optional.of(cm.prototype()));
+                        cm.prototype());
                 var td = cm.prototype().returnSet().must();
                 return Groups.g2(n, td);
             }
@@ -3341,7 +3320,8 @@ public class SemanticAnalysis {
                 var t = st.gm().mapIf(f.type());
                 var n = wrapRelayExpr(s, t, _s -> {
                     return new MemberOfExpression(_s.pos(),
-                            (PrimaryExpression) _s, name, TypeArguments.EMPTY);
+                            (PrimaryExpression) _s, name,
+                            TypeArguments.EMPTY, of.get());
                 });
                 return Groups.g2(n, t);
             }
@@ -3374,10 +3354,10 @@ public class SemanticAnalysis {
                         name, s.pos());
             var om = id.allMethods().tryGet(name);
             if (om.has()) {
+                invalid(generic);
                 var m = om.get();
                 checkUnmodifiable(s, m, name);
-                var gm = genericMap(name, st.gm(), m.generic(), generic);
-                var prot = gm.instantiate(m.prototype());
+                var prot = st.gm().instantiate(m.prototype());
                 var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
                 var n = wrapRelayExpr(s, t, _s -> {
                     return new MethodExpression(s.pos(),
@@ -3508,13 +3488,13 @@ public class SemanticAnalysis {
         nt.length(lg.a());
 
         var ref = new Refer(nt.pos(), STRONG, true, false);
-        var td = ArrayTypeDeclarer.make(nt.element(), Optional.of(ref), e);
+        var td = ArrayTypeDeclarer.make(nt.element(), Optional.of(ref), e.pos());
         if (e.arg().none()) {
             return Groups.g2(e, td);
         }
 
         var arg = e.arg().get();
-        var etd = ArrayTypeDeclarer.make(nt.element(), Optional.empty(), e);
+        var etd = ArrayTypeDeclarer.make(nt.element(), Optional.empty(), e.pos());
         arg.expectType.set(etd); // for ArrayExpression
         var ag = optimize(arg);
         if (ag.b() instanceof ArrayTypeDeclarer atd) {

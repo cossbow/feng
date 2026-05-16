@@ -11,6 +11,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * The specific type passed to the type parameter,
+ * one parameter should replace to {@code TypeDeclarer}
+ */
 public class TypeArguments extends Entity
         implements Iterable<TypeDeclarer> {
     private final List<TypeDeclarer> arguments;
@@ -53,9 +57,15 @@ public class TypeArguments extends Entity
         return new TypeArguments(pos(), list);
     }
 
-    public boolean hasTemplate() {
+    /**
+     * check if this type contains type-paramster:
+     * <p>
+     * If {@code T} is type-parameter in this context, a type with
+     * type-var is like: {@code T}, {@code List`T`}, etc.
+     */
+    public boolean hasTypeVar() {
         return arguments.stream().anyMatch(
-                TypeDeclarer::hasTemplate);
+                TypeDeclarer::hasTypeVar);
     }
 
     //

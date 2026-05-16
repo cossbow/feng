@@ -8,8 +8,18 @@ import org.cossbow.feng.util.Lazy;
 
 import java.util.List;
 
-public class BlockExpression extends PrimaryExpression implements Scope {
+/**
+ * {@code var a = {var i int = 10; i}}
+ */
+public class BlockExpression extends PrimaryExpression
+        implements Scope {
+    /**
+     * The sequence of statements within the block
+     */
     private final List<Statement> block;
+    /**
+     * The return value of an expression
+     */
     private Expression result;
 
     public BlockExpression(Position pos,
@@ -33,14 +43,26 @@ public class BlockExpression extends PrimaryExpression implements Scope {
         this.result = result;
     }
 
+    /**
+     * The return value of a block statement is
+     * also a temporary value
+     */
+    @Override
     public boolean unbound() {
         return true;
     }
 
     //
 
+    /**
+     * Variables defined in block expressions
+     */
     private List<Variable> stack = List.of();
-    private Lazy<Expression> origin = Lazy.nil();
+    /**
+     * When necessary, the expression will be converted into
+     * a block expression, referring to the original expression
+     */
+    private final Lazy<Expression> origin = Lazy.nil();
 
     public List<Variable> stack() {
         return stack;

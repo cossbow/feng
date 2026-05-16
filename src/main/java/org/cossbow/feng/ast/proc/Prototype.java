@@ -38,9 +38,15 @@ public class Prototype extends Entity {
         return returnSet.getOrElse(new VoidTypeDeclarer(pos()));
     }
 
-    public boolean hasTemplate() {
-        return parameterSet.hasTemplate() ||
-                returnSet.match(TypeDeclarer::hasTemplate);
+    /**
+     * check if this type contains type-paramster:
+     * <p>
+     * If {@code T} is type-parameter in this context, a type with
+     * type-var is like: {@code T}, {@code List`T`}, etc.
+     */
+    public boolean hasTypeVar() {
+        return parameterSet.hasTypeVar() ||
+                returnSet.match(TypeDeclarer::hasTypeVar);
     }
 
     //

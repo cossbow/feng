@@ -3,9 +3,15 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.util.Optional;
 
+/**
+ * Used to represent primitive-types.
+ */
 public class PrimitiveTypeDeclarer extends TypeDeclarer
         implements Referable {
     private final Primitive primitive;
+    /**
+     * Can be a reference
+     */
     private final Optional<Refer> refer;
 
     public PrimitiveTypeDeclarer(Position pos,

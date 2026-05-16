@@ -9,21 +9,51 @@ import org.cossbow.feng.util.Optional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Use to calling procedure, example:
+ * <p>
+ * {@code max(a, b)}
+ * {@code th.start()}
+ */
 public class CallExpression extends PrimaryExpression {
-    private PrimaryExpression callee;
-    private List<Expression> arguments;
+    /**
+     * return type of {@code callee} is a procedure, such
+     * as function or method.
+     */
+    private final PrimaryExpression callee;
+    /**
+     * The atgument passed to the procedure
+     */
+    private final List<Expression> arguments;
+    /**
+     * The call expression created during the analysis phase
+     * will be set as the actual procedure prototype
+     */
     private final Optional<Prototype> prototype;
 
-    public CallExpression(Position pos,
-                          PrimaryExpression callee,
-                          List<Expression> arguments,
-                          Optional<Prototype> prototype) {
+    private CallExpression(Position pos,
+                           PrimaryExpression callee,
+                           List<Expression> arguments,
+                           Optional<Prototype> prototype) {
         super(pos);
         this.callee = callee;
         this.arguments = arguments;
         this.prototype = prototype;
     }
 
+    /**
+     * Created in the analysis stage
+     */
+    public CallExpression(Position pos,
+                          PrimaryExpression callee,
+                          List<Expression> arguments,
+                          Prototype prototype) {
+        this(pos, callee, arguments, Optional.of(prototype));
+    }
+
+    /**
+     * Created during the parsing stage
+     */
     public CallExpression(Position pos,
                           PrimaryExpression callee,
                           List<Expression> arguments) {
@@ -44,13 +74,9 @@ public class CallExpression extends PrimaryExpression {
 
     //
 
-
-    private final Lazy<CallStatement> stmt = Lazy.nil();
-
-    public Lazy<CallStatement> stmt() {
-        return stmt;
-    }
-
+    /**
+     * The procedure return value is a temporary value, unbound
+     */
     @Override
     public boolean unbound() {
         return true;

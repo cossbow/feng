@@ -1446,11 +1446,13 @@ public class LowCppGenerator {
     }
 
     private LowCppGenerator write(ArrayExpression e) {
-        e.type().use(this::write, () -> {
-            e.lt.use(this::write);
+        var t = (ArrayTypeDeclarer) e.resultType.must();
+        e.expectType.use(this::write, () -> {
+            e.type().use(this::write, () -> {
+                write(t);
+            });
         });
         write("{.values = {");
-        var t = (ArrayTypeDeclarer) e.resultType.must();
         var types = new RepeatList<>(
                 t.element(), e.size());
         writeValues(e.elements(), types);
@@ -1539,8 +1541,7 @@ public class LowCppGenerator {
     }
 
     private LowCppGenerator write(LiteralExpression e) {
-        var rt = e.lt.has() ? e.lt.must()
-                : e.resultType.must();
+        var rt = e.type();
         if (rt instanceof ArrayTypeDeclarer atd
                 && atd.refer().has()) {
             return write("{}");

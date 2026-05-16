@@ -2,10 +2,13 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 
+/**
+ * {@code a ? b : c}
+ */
 public class ConditionalExpression extends Expression {
-    private Expression condition;
-    private Expression yes;
-    private Expression not;
+    private final Expression condition;
+    private final Expression yes;
+    private final Expression not;
 
     public ConditionalExpression(Position pos,
                                  Expression condition,

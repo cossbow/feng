@@ -59,9 +59,15 @@ public class ParameterSet implements Iterable<Variable> {
         return variables.stream();
     }
 
-    public boolean hasTemplate() {
+    /**
+     * check if this type contains type-paramster:
+     * <p>
+     * If {@code T} is type-parameter in this context, a type with
+     * type-var is like: {@code T}, {@code List`T`}, etc.
+     */
+    public boolean hasTypeVar() {
         return variables.stream().anyMatch(v ->
-                v.type().match(TypeDeclarer::hasTemplate));
+                v.type().match(TypeDeclarer::hasTypeVar));
     }
 
     //

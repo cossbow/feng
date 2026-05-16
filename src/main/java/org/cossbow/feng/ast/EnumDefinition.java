@@ -123,18 +123,19 @@ public class EnumDefinition extends TypeDefinition {
     }
 
     public final EnumField IdField = makeField(TokenFieldId,
-            Primitive.INT.declarer(ZERO), false);
+            Primitive.INT.declarer(pos()), false);
     public final EnumField ValueField = makeField(TokenFieldValue,
-            Primitive.INT.declarer(ZERO), false);
+            Primitive.INT.declarer(pos()), false);
     public final EnumField NameField = makeField(TokenFieldName,
-            new ArrayTypeDeclarer(ZERO, Primitive.BYTE.declarer(pos()),
-                    Optional.empty(),
-                    Optional.of(new Refer(ZERO, ReferKind.STRONG,
-                            true, true))),
-            true);
+            ArrayTypeDeclarer.make(Primitive.BYTE.declarer(pos()),
+                    Optional.of(new Refer(pos(), ReferKind.STRONG,
+                            true, true)),
+                    pos()), true);
 
-    private EnumField makeField(String name, TypeDeclarer td, boolean enablePhantom) {
-        return new EnumField(new Identifier(pos(), name), td, enablePhantom);
+    private EnumField makeField(String name, TypeDeclarer td,
+                                boolean enablePhantom) {
+        return new EnumField(new Identifier(pos(), name), td,
+                enablePhantom);
     }
 
     public class EnumField extends Field {

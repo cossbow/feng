@@ -3,7 +3,10 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Position;
 
 /**
- * 临时，不在AST上
+ * The internal type of the compiler cannot be defined syntactically.
+ * <p>
+ * When a function or method has no return value, it is equivalent
+ * to having a return type of void.
  */
 public class VoidTypeDeclarer extends TypeDeclarer {
     public VoidTypeDeclarer(Position pos) {

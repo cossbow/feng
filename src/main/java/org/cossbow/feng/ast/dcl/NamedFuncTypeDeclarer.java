@@ -8,7 +8,10 @@ import org.cossbow.feng.util.Lazy;
 
 import java.util.Objects;
 
-
+/**
+ * Like {@link DerivedTypeDeclarer}, it refers to a defined prototype through a symbol.
+ * but variables of this type can only point to one function.
+ */
 public class NamedFuncTypeDeclarer extends FuncTypeDeclarer {
     private DerivedType derivedType;
     private Lazy<PrototypeDefinition> def;

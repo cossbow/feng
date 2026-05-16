@@ -8,6 +8,11 @@ import org.cossbow.feng.util.Optional;
 
 import java.util.List;
 
+/**
+ * Expression for initialize array:
+ * <p>
+ * {@code [1,2,3]} or {@code [4]int[1,2,3]} or {@code []int[1,2,3]}
+ */
 public class ArrayExpression extends PrimaryExpression {
     private List<Expression> elements;
     private final Optional<ArrayTypeDeclarer> type;
@@ -53,8 +58,6 @@ public class ArrayExpression extends PrimaryExpression {
     public boolean unbound() {
         return true;
     }
-
-    public final Lazy<TypeDeclarer> lt = Lazy.nil();
 
     //
 

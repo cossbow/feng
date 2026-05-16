@@ -7,9 +7,18 @@ import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.util.Optional;
 
+/**
+ * Type base on custom derived-type.
+ */
 public class DerivedTypeDeclarer extends TypeDeclarer
         implements Referable {
+    /**
+     * Symbol link to a custom type
+     */
     private DerivedType derivedType;
+    /**
+     * Can be a reference
+     */
     private Optional<Refer> refer;
 
     public DerivedTypeDeclarer(Position pos,
@@ -47,8 +56,8 @@ public class DerivedTypeDeclarer extends TypeDeclarer
 
     //
 
-    public boolean hasTemplate() {
-        return derivedType.hasTemplate();
+    public boolean hasTypeVar() {
+        return derivedType.hasTypeVar();
     }
 
     public Optional<TypeDeclarer> derefer() {

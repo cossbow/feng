@@ -6,7 +6,9 @@ import org.cossbow.feng.ast.lit.*;
 import java.util.Objects;
 
 /**
- * 临时，不在AST上
+ * The internal type of the compiler cannot be defined syntactically.
+ * <p>
+ * The type used to represent literal values.
  */
 public class LiteralTypeDeclarer extends TypeDeclarer {
     private final Literal literal;

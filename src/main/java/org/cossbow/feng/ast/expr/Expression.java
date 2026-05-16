@@ -5,6 +5,9 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.util.Lazy;
 
+/**
+ * Expression root type
+ */
 abstract
 public class Expression extends Entity {
 
@@ -12,21 +15,31 @@ public class Expression extends Entity {
         super(pos);
     }
 
-    // 游离的，未被变量、字段或数组元素绑定的
+    /**
+     * A free, temporary value that is not bound to a
+     * variable, field, or array element
+     */
     public boolean unbound() {
         return false;
     }
 
-    // 表达式推导出来的类型缓存在这里
+    /**
+     * Composite literals require an expected type for checking.
+     * Please fill in the type of the expression on the left here.
+     */
+    public final Lazy<TypeDeclarer> expectType = Lazy.nil();
+    /**
+     * The type inferred from the expression is placed here
+     */
     public final Lazy<TypeDeclarer> resultType = Lazy.nil();
 
-    // 对于复合字面量，需要在顶层指定类型，这里放置左边的类型
-    public final Lazy<TypeDeclarer> expectType = Lazy.nil();
-
-    //
-
-    // 用于标记需要引用的是可调用的过程：函数或方法
-    private volatile boolean expectCallable;
+    /**
+     * For analysis
+     * <p>
+     * used to indicate the expected value is a callable procedure:
+     * a function or method
+     */
+    private boolean expectCallable;
 
     public boolean expectCallable() {
         return expectCallable;

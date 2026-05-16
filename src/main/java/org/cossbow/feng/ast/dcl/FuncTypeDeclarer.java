@@ -4,10 +4,16 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.proc.Prototype;
 
 /**
- * 临时及(AST)都有
+ * This type of variable or field will reference a function.
+ *
  */
 abstract
 public class FuncTypeDeclarer extends TypeDeclarer {
+    /**
+     * required: it can't be nil if true.
+     * <p>
+     * example: {@code var f !func();}, {@code var f !Task;}
+     */
     private final boolean required;
 
     public FuncTypeDeclarer(Position pos,
@@ -23,8 +29,8 @@ public class FuncTypeDeclarer extends TypeDeclarer {
     abstract
     public Prototype prototype();
 
-    public boolean hasTemplate() {
-        return prototype().hasTemplate();
+    public boolean hasTypeVar() {
+        return prototype().hasTypeVar();
     }
 
 }

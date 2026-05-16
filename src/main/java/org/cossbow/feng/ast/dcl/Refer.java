@@ -3,12 +3,28 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
 
+/**
+ * Reference attribute of {@link TypeDeclarer}.
+ * <p>
+ * {@code var v *int;} is normal reference
+ * <p>
+ * {@code var v *!int;} is a required reference
+ * <p>
+ * {@code var v *#int;} is a unmodifiable reference
+ * <p>
+ * {@code var v *!#int;} is a required and unmodifiable reference
+ */
 public class Refer extends Entity {
-    private ReferKind kind;
-    // 不能为空（nil）
-    private boolean required;
-    // 实例不可修改
-    private boolean unmodifiable;
+    private final ReferKind kind;
+    /**
+     * required: it can't be nil if true.
+     */
+    private final boolean required;
+    /**
+     * unmodifiable: can't modify the instance
+     * which be reference if true.
+     */
+    private final boolean unmodifiable;
 
     public Refer(Position pos,
                  ReferKind kind,

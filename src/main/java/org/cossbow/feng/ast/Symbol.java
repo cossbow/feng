@@ -3,8 +3,20 @@ package org.cossbow.feng.ast;
 import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.util.Optional;
 
+/**
+ * Used to link all available defined symbols,
+ * maybe derived types, variables, or functions etc.
+ */
 public class Symbol extends Entity {
+    /**
+     * The full path of module where symbol defined.
+     * <p>
+     * If module empty, will search symbol in current module.
+     */
     private final Optional<ModulePath> module;
+    /**
+     * symbol name
+     */
     private final Identifier name;
 
     public Symbol(Position pos,

@@ -2127,6 +2127,12 @@ public class SemanticAnalysisTest {
         checkSucc("var a = [][4]byte [\"xx\",\"ggg\"];");
     }
 
+    @Test
+    public void testDeclareMultiArray6(){
+        checkSucc("var a [2]int ; var b [3][2]int = [[1],[2,3],a];");
+        checkFail("var a [3]int ; var b [3][2]int = [[1],[2,3],a];");
+    }
+
     //
 
     @Test

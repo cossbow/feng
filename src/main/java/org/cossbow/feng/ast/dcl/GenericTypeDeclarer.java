@@ -22,7 +22,7 @@ public class GenericTypeDeclarer extends TypeDeclarer {
         return type.param();
     }
 
-    public boolean hasTemplate() {
+    public boolean hasTypeVar() {
         return true;
     }
 

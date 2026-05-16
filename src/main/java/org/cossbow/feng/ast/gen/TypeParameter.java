@@ -7,6 +7,10 @@ import org.cossbow.feng.util.Optional;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Generic type variable defined in functions and types,
+ * should be replaced by {@link TypeArguments}.
+ */
 public class TypeParameter extends Entity {
     private Identifier name;
     private Optional<TypeConstraint> constraint;

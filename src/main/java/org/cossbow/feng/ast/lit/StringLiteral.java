@@ -48,11 +48,13 @@ public class StringLiteral extends Literal {
     }
 
     public ArrayTypeDeclarer array(Optional<ReferKind> kind) {
-        var len = new IntegerLiteral(ZERO, value.length).expr();
+        var et = Primitive.BYTE.declarer(ZERO);
+        if (kind.none())
+            return ArrayTypeDeclarer.make(et, value.length, ZERO);
+
         var r = kind.map(k ->
                 new Refer(ZERO, k, true, true));
-        return new ArrayTypeDeclarer(pos(), Primitive.BYTE.declarer(ZERO),
-                Optional.of(len), r);
+        return ArrayTypeDeclarer.make(et, r, ZERO);
     }
 
     //

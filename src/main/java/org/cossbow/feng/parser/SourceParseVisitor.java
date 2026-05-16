@@ -948,12 +948,8 @@ final class SourceParseVisitor
         var otd = Optional.<ArrayTypeDeclarer>empty();
         if (ctx.et != null) {
             var et = (TypeDeclarer) visit(ctx.et);
-            var len = this.<Expression>visitOptional(ctx.len);
-            if (len.none()) {
-                len = Optional.of(new IntegerLiteral(pos, elements.size()).expr());
-            }
-            var td = new ArrayTypeDeclarer(pos, et, len, Optional.empty(), true);
-            if (len.none()) td.len(elements.size());
+            var td = new ArrayTypeDeclarer(pos, et, visitOptional(ctx.len),
+                    Optional.empty(), true);
             otd = Optional.of(td);
         }
         return new ArrayExpression(pos, elements, otd);

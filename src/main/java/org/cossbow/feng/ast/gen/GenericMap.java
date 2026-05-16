@@ -9,8 +9,17 @@ import org.cossbow.feng.util.ErrorUtil;
 import java.util.Map;
 import java.util.function.Function;
 
+/**
+ * GenericMap: used for replace type-varieble to specific type.
+ */
 public class GenericMap {
-    private GenericMap parent;
+    /**
+     * The GenericMap of master type.
+     * <p>
+     * Class method can define type-parameters, then the
+     * type-parameters of the class should be replaced too.
+     */
+    private final GenericMap parent;
     private final Map<TypeParameter, TypeDeclarer> map;
 
     public GenericMap(GenericMap parent,
@@ -23,8 +32,20 @@ public class GenericMap {
         this(null, map);
     }
 
+    /**
+     * GenericMap chain:
+     * <p>
+     * If use a generic-type {@code T} in other generic-type {@code S},
+     * The type variables need to be continuously replaced until all of
+     * them are replaced with specific types.
+     * <p>
+     * The next point points to the next GenericMap that will be used.
+     */
     private GenericMap next;
 
+    /**
+     * Copy a new GenericMap to make a chain.
+     */
     public GenericMap overlay(GenericMap next) {
         if (isEmpty()) return next;
         var n = new GenericMap(parent, map);
@@ -44,7 +65,7 @@ public class GenericMap {
         if (t == null)
             return ErrorUtil.unreachable();
         if (next == null) return t;
-        if (!t.hasTemplate()) return t;
+        if (!t.hasTypeVar()) return t;
         return next.mapIf(t);
     }
 
@@ -52,7 +73,7 @@ public class GenericMap {
         var t = find(gtd.param());
         if (t == null) return gtd;
         if (next == null) return t;
-        if (!t.hasTemplate()) return t;
+        if (!t.hasTypeVar()) return t;
         return next.mapIf(t);
     }
 
@@ -77,7 +98,7 @@ public class GenericMap {
     }
 
     public TypeDeclarer mapIf(TypeDeclarer td) {
-        if (isEmpty() || !td.hasTemplate()) return td;
+        if (isEmpty() || !td.hasTypeVar()) return td;
 
         return switch (td) {
             case GenericTypeDeclarer gt -> mapIf(gt);
