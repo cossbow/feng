@@ -1414,6 +1414,11 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitGotoStatement(FengParser.GotoStatementContext ctx) {
+        // Currently, CFG is not implemented, and it is difficult to perform
+        // flow analysis in the presence of goto statements, including checks
+        // for miss-returns and non-empty narrowing. Therefore, goto statements
+        // are not supported at this time.
+        unsupported("goto");
         return new GotoStatement(posOf(ctx), identifier(ctx.label));
     }
 
