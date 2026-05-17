@@ -1,4 +1,4 @@
-**【Fèng】编程语言**
+**Fēng编程语言**
 
 # 语法
 
@@ -144,7 +144,7 @@ class Foo {
 ```feng
 import com$cossbow$fmt;
 func test() {
-   fmt$println(string("Hello Fèng!"));
+   fmt$println(string("Hello Fēng!"));
 }
 ```
 
@@ -153,7 +153,7 @@ func test() {
 ```feng
 import com$cossbow$fmt ccfmt;
 func test() {
-    var m Sring = ccfmt$sprintf("Hello Fèng!");
+    var m Sring = ccfmt$sprintf("Hello Fēng!");
     ccfmt$println(m);
 }
 ```
@@ -2277,7 +2277,7 @@ func test() {
 func test() {
    var v = "Hello"; // 变量v的生命周期在当前函数内
    {
-      var s = "Fèng!"; // 变量s的生命周期在当前块内
+      var s = "Fēng!"; // 变量s的生命周期在当前块内
       printf("%s %s\n", v, s);   // 可使用外部声明的变量v
    }
    // printf("%s %s\n", v, s);  // 错误✖：不能使用内层块内的变量s
@@ -2285,10 +2285,10 @@ func test() {
       // printf("%s %s\n", v, s);  // 错误✖：不能使用另一个块内的变量s
    }
    {
-      var v = "Dear Fèng"; // 内层重新声明同名的变量，外层的变量v就被遮住了
-      printf("%s\n", v); // 打印：Dear Fèng
+      var v = "Dear Fēng"; // 内层重新声明同名的变量，外层的变量v就被遮住了
+      printf("%s\n", v); // 打印：Dear Fēng
    }
-   // var v = "Fèng"; // 错误✖：不能重新声明
+   // var v = "Fēng"; // 错误✖：不能重新声明
 }
 ```
 

@@ -1,4 +1,4 @@
-**【Fèng】Programming Language**
+**Fēng Programming Language**
 
 # Syntax
 
@@ -152,7 +152,7 @@ Declare importing the `com$cossbow$fmt` module:
 ```feng
 import com$cossbow$fmt;
 func test() {
-   fmt$println(string("Hello Fèng!"));
+   fmt$println(string("Hello Fēng!"));
 }
 ```
 
@@ -161,7 +161,7 @@ You can set a module alias:
 ```feng
 import com$cossbow$fmt ccfmt;
 func test() {
-    var m Sring = ccfmt$sprintf("Hello Fèng!");
+    var m Sring = ccfmt$sprintf("Hello Fēng!");
     ccfmt$println(m);
 }
 ```
@@ -2405,7 +2405,7 @@ Local variables are declared within functions or methods:
 func test() {
    var v = "Hello"; // v's lifetime is within the current function
    {
-      var s = "Fèng!"; // s's lifetime is within this block
+      var s = "Fēng!"; // s's lifetime is within this block
       printf("%s %s\n", v, s);   // Can access outer variable v
    }
    // printf("%s %s\n", v, s);  // Error: cannot access s from inner block
@@ -2413,10 +2413,10 @@ func test() {
       // printf("%s %s\n", v, s);  // Error: cannot access s from another block
    }
    {
-      var v = "Dear Fèng"; // Inner redeclaration shadows outer v
-      printf("%s\n", v); // Prints: Dear Fèng
+      var v = "Dear Fēng"; // Inner redeclaration shadows outer v
+      printf("%s\n", v); // Prints: Dear Fēng
    }
-   // var v = "Fèng"; // Error: cannot redeclare
+   // var v = "Fēng"; // Error: cannot redeclare
 }
 ```
 

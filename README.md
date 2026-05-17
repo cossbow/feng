@@ -1,19 +1,22 @@
-**【Fèng】Programming Language**
+**Fēng Programming Language**
 
-The Fèng language is a compiled language that prioritizes simplicity, ease of use, and memory safety.
+The Fēng language is a statically typed, object-oriented programming language that prioritizes memory safety:
 
-* `struct` and `union` are basically the same as in C, and support conversion between each other.
-* Classes and interfaces are simplified from Java, but can also define value types like in C++, reducing unnecessary
-  dynamic memory allocation.
-* Designed with automatic memory; currently uses ARC, with the ability to switch to GC.
-* Resource classes with destructors make it easy to manage resources from interop languages.
-* Phantom references, similar to those borrowed in C++.
-* Compile-time generics.
-* Operator overloading.
-* Definable non-null references and read-only references.
-* Modular code organization.
+* Memory safety as a top priority, with mandatory type and bounds checking.
+* Class and interface designs simplified from Java, supporting inheritance and abstraction.
+* No forms of abstraction other than classes and interfaces.
+* Automatic reference counting (ARC).
+* Resource classes with destructors.
+* `struct` and `union` like in C, supporting arbitrary conversion between them.
+* Phantom reference mechanism, similar to C++ references or Rust borrowing.
+* Simple compile-time generics.
+* References and methods support an immutable (`read-only`) marker, enabling write protection of data without
+  encapsulation.
+* Non-null references and non-null checks help reduce null pointer issues and improve code quality.
+* Simple modular code organization.
+* Supports partial operator overloading.
 
-For detailed syntax design, please refer to the [reference manual](reference_zh.md).
+For detailed syntax design, please refer to the [reference manual](reference.md).
 
 # Development Progress
 
@@ -117,7 +120,7 @@ The generated C++ requires a C/C++ compilation environment, and the C++20 standa
 c++ --std=c++20 -c jjj.cpp -o jjj.o
 ```
 
-If the Fèng code contains a `main` function, a `main` function will be created in the corresponding C++ file, allowing
+If the Fēng code contains a `main` function, a `main` function will be created in the corresponding C++ file, allowing
 it to be compiled into an executable:
 
 ```shell
