@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 
 /**
- * {@code this}, {@code super}
+ * Create by parse keywords {@code this} or {@code super}
  */
 public class CurrentExpression extends PrimaryExpression {
     private final Symbol className;

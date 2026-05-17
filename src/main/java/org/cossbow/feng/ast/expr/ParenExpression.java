@@ -2,6 +2,9 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 
+/**
+ * {@code var v = (a);}
+ */
 public class ParenExpression extends PrimaryExpression {
     private Expression child;
 

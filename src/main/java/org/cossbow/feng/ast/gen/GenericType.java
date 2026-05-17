@@ -3,6 +3,9 @@ package org.cossbow.feng.ast.gen;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 
+/**
+ * Type Variance: reference the type-paratemer in the generic-type
+ */
 public class GenericType extends DefinedType {
     private final TypeParameter param;
 

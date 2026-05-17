@@ -17,6 +17,10 @@ import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
+/**
+ * The parsed symbol table is generated after syntax parsing
+ * and is used as input for semantic analysis.
+ */
 public class ParseSymbolTable {
     public final Optional<ModulePath> module;
     public final DedupCache<StringLiteral> stringCache;
@@ -27,10 +31,26 @@ public class ParseSymbolTable {
         this.stringCache = stringCache;
     }
 
+    /**
+     * Collection of custom types
+     */
     public final IdentifierMap<TypeDefinition> types = new IdentifierMap<>();
+    /**
+     * Collection of custom functions
+     */
     public final IdentifierMap<FunctionDefinition> functions = new IdentifierMap<>();
+    /**
+     * Collection of global variables
+     */
     public final IdentifierMap<GlobalVariable> variables = new IdentifierMap<>();
+    /**
+     * Collection of global macros
+     */
     public final MacroTable macros = new MacroTable();
+    /**
+     * main function: the entry function of an executable program,
+     * if empty, indicates that the current module is a library.
+     */
     public final Lazy<FunctionDefinition> main = Lazy.nil();
 
     public void merge(ParseSymbolTable ot) {
@@ -82,6 +102,9 @@ public class ParseSymbolTable {
                 BUILTIN.variables.exists(name);
     }
 
+    /**
+     * built-in symbol table
+     */
     public static final ParseSymbolTable BUILTIN = new ParseSymbolTable(
             Optional.empty(), new DedupCache<>());
 

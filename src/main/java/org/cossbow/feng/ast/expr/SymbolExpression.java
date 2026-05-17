@@ -4,6 +4,9 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.gen.TypeArguments;
 
+/**
+ * A symbolic expression that references a variable, function, or type.
+ */
 public class SymbolExpression extends PrimaryExpression {
     private Symbol symbol;
     private TypeArguments generic;

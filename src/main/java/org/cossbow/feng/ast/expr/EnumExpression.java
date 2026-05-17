@@ -3,6 +3,11 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.EnumDefinition;
 import org.cossbow.feng.ast.Position;
 
+/**
+ * The internal expressions of a compiler cannot be syntactically defined.
+ * <p>
+ * To facilitate the representation of enumeration values.
+ */
 abstract
 public class EnumExpression extends PrimaryExpression {
     private final EnumDefinition def;

@@ -4,6 +4,10 @@ import org.cossbow.feng.ast.Method;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.gen.TypeArguments;
 
+/**
+ * The internal type of the compiler cannot be defined syntactically.
+ * Created when a method is detected during the analysis process.
+ */
 public class MethodExpression extends PrimaryExpression {
     private PrimaryExpression subject;
     private Method method;

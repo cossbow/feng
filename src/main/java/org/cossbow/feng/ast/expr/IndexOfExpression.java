@@ -9,7 +9,8 @@ import org.cossbow.feng.ast.Position;
  * index is integer: {@code arr[1]}
  * <p>
  * 2. Enumerated types can obtain their values through
- * integer indexing: {@code State[1]}
+ * integer indexing: {@code State[1]}, But it will be
+ * converted to {@link EnumIdExpression} during analysis
  * <p>
  * 3. The class can support custom indexing operations,
  * and the index type is also customizable: {@code map["id"]}

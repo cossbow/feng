@@ -2,6 +2,11 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 
+/**
+ * The internal type of the compiler cannot be defined syntactically.
+ * <p>
+ * Used to compare whether two references are identical.
+ */
 public class ReferEqualExpression extends PrimaryExpression {
     private final PrimaryExpression left, right;
     private final boolean same;

@@ -3,6 +3,16 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.Position;
 
+/**
+ * Unified class of all binary operation expressions
+ * <p>
+ * Example:
+ * {@code left + right},
+ * {@code left - right},
+ * {@code left * right},
+ * {@code left / right},
+ * etc.
+ */
 public class BinaryExpression extends Expression {
     private final BinaryOperator operator;
     private Expression left, right;

@@ -5,7 +5,7 @@ import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.lit.Literal;
 
 /**
- *
+ * Expressions using literals
  */
 public class LiteralExpression extends PrimaryExpression {
     private final Literal literal;

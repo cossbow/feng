@@ -3,6 +3,9 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.proc.Procedure;
 
+/**
+ * Anonymous function definition not implemented.
+ */
 public class LambdaExpression extends PrimaryExpression {
     private final Procedure procedure;
 

@@ -3,6 +3,13 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.UnaryOperator;
 
+/**
+ * Unary Expression:
+ * <p>
+ * {@code +a;},
+ * {@code -a;},
+ * {@code !a;}
+ */
 public class UnaryExpression extends Expression {
     private UnaryOperator operator;
     private Expression operand;

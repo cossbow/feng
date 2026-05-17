@@ -16,6 +16,10 @@ import org.cossbow.feng.util.Lazy;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * The analysis symbol table is generated after syntax analysis
+ * and is used as input for the generation of target code.
+ */
 public class AnalyseSymbolTable {
     public final Lazy<FModule> module = Lazy.nil();
 

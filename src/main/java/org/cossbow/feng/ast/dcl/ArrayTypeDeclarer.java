@@ -128,7 +128,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
     }
 
     public final ArrayField LengthField = new ArrayField(pos(),
-            new Identifier(pos(), "length"),
+            new Identifier(pos(), FIELD_LENGTH),
             Primitive.INT.declarer(pos()), this);
 
     public static class ArrayField extends Field {
@@ -155,6 +155,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         }
     }
 
+    public static final String FIELD_LENGTH = "length";
 
     //
 

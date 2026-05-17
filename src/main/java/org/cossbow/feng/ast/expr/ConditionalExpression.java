@@ -3,9 +3,21 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.Position;
 
 /**
- * {@code a ? b : c}
+ * Unlike if..else statements, conditional expressions can
+ * have a direct return value.
+ * <p>
+ * Example: {@code a ? b : c}
+ * <p>
+ * Based on the calculated value of condition {@code a},
+ * if it is {@code true}, then the value of {@code b} will
+ * be used; if it is {@code false}, then the value of
+ * {@code c} will be used.
+ *
  */
 public class ConditionalExpression extends Expression {
+    /**
+     * Must be bool type
+     */
     private final Expression condition;
     private final Expression yes;
     private final Expression not;

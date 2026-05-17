@@ -9,7 +9,23 @@ import org.cossbow.feng.util.Lazy;
 import java.util.List;
 
 /**
- * {@code var a = {var i int = 10; i}}
+ * A block expression is enclosed by a pair of curly braces {}
+ * and contains an optional series of statements and a final
+ * expression.
+ * <p>
+ * 1. Scope: Variables declared within a block are only valid
+ * within that block, and the scope of the block limits the
+ * visibility of the variables.
+ * <p>
+ * 2. Execution order: Statements within a block are executed
+ * sequentially, with the final expression being executed last.
+ * <p>
+ * 3. Type: The type of the block is the type of the final
+ * expression.
+ *
+ * <p>
+ * Example:
+ * {@code {var i int = 10; i += 1; i};}
  */
 public class BlockExpression extends PrimaryExpression
         implements Scope {
@@ -18,7 +34,7 @@ public class BlockExpression extends PrimaryExpression
      */
     private final List<Statement> block;
     /**
-     * The return value of an expression
+     * The final expression
      */
     private Expression result;
 

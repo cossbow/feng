@@ -2077,7 +2077,7 @@ public class SemanticAnalysis {
         var vn = args.getFirst();
         var size = atd.refer().none() ?
                 new IntegerLiteral(ZERO, atd.len()).expr() :
-                new ArrayLenExpression(ZERO, e.iterable(), atd);
+                new ArrayLenExpression(ZERO, e.iterable());
 
         var rp = forReplace(in, vn, atd.element(), ie ->
                         new IndexOfExpression(vn.pos(), e.iterable(), ie),
@@ -3252,7 +3252,7 @@ public class SemanticAnalysis {
             }
             var n = wrapRelayExpr(s, td, _s -> {
                 return new ArrayLenExpression(_s.pos(),
-                        (PrimaryExpression) _s, atd);
+                        (PrimaryExpression) _s);
             });
             return Groups.g2(n, td);
         }

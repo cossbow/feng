@@ -10,15 +10,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Use to calling procedure, example:
+ * Use to calling a procedure (a function or a method), example:
  * <p>
  * {@code max(a, b)}
  * {@code th.start()}
  */
 public class CallExpression extends PrimaryExpression {
     /**
-     * return type of {@code callee} is a procedure, such
-     * as function or method.
+     * return type of {@code callee} is a procedure
      */
     private final PrimaryExpression callee;
     /**

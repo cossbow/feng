@@ -5,6 +5,9 @@ import org.cossbow.feng.ast.gen.GenericType;
 import org.cossbow.feng.ast.gen.TypeParameter;
 import org.cossbow.feng.util.Lazy;
 
+/**
+ * Use type variant as type
+ */
 public class GenericTypeDeclarer extends TypeDeclarer {
     private final GenericType type;
 

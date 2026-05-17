@@ -3,6 +3,13 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
+/**
+ * Memory size occupied by the acquisition type.
+ * <p>
+ * {@code var s = sizeof(int);},
+ * {@code var s = sizeof(Block);},
+ * etc.
+ */
 public class SizeofExpression extends PrimaryExpression {
     private final TypeDeclarer type;
 

@@ -5,6 +5,11 @@ import org.cossbow.feng.ast.Position;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Temporarily useless expression type.
+ * <p>
+ * {@code {1:a,2:b}}
+ */
 public class PairsExpression extends PrimaryExpression {
     private List<Pair> pairs;
 

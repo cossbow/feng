@@ -3,6 +3,11 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.Position;
 
 /**
+ * Dereference-Operation is used to directly read an instance
+ * through a reference.
+ *
+ *
+ * <p>
  * {@code *a}, {@code *a.v}, {@code *a[i]}
  */
 public class DereferExpression extends PrimaryExpression {
