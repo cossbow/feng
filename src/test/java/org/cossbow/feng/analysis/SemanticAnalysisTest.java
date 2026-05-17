@@ -1123,13 +1123,14 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testDereferExpression1() {
-        var d = "struct A{} class B{} ";
+        var d = "struct A{} class B{} interface C{}";
         checkSucc(d + "func f(a*int){var v int = *a;}");
         checkFail(d + "func f(a*int){var v int = a;}");
         checkSucc(d + "func f(a*A){var v A = *a;}");
         checkFail(d + "func f(a*A){var v A = a;}");
         checkSucc(d + "func f(a*B){var v B = *a;}");
         checkFail(d + "func f(a*B){var v B = a;}");
+        checkFail(d + "func f(a*C){var v = *a;}");
 
         checkFail(d + "func f(a [*]int){var v = *a;}");
         checkFail(d + "func f(a [*]A){var v = *a;}");

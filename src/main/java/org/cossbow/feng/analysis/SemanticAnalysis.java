@@ -3785,6 +3785,10 @@ public class SemanticAnalysis {
             semantic("can't de-refer array-refer: %s", td.pos());
         if (td.maybeRefer().none())
             semantic("can't de-refer a value: %s", td.pos());
+        if (td instanceof DerivedTypeDeclarer dtd &&
+                dtd.def() instanceof InterfaceDefinition) {
+            semantic("can't de-refer interface: %s", td.pos());
+        }
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(DereferExpression e) {
