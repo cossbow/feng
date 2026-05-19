@@ -18,6 +18,17 @@ public class Prototype extends Entity {
         this.returnSet = returnSet;
     }
 
+    public Prototype(Position pos,
+                     ParameterSet parameterSet,
+                     TypeDeclarer returnSet) {
+        this(pos, parameterSet, Optional.of(returnSet));
+    }
+
+    public Prototype(Position pos,
+                     ParameterSet parameterSet) {
+        this(pos, parameterSet, Optional.empty());
+    }
+
     public ParameterSet parameterSet() {
         return parameterSet;
     }

@@ -25,6 +25,6 @@ public class ArrayLenExpression extends PrimaryExpression {
 
     @Override
     public String toString() {
-        return subject + "." + ArrayTypeDeclarer.FIELD_LENGTH;
+        return subject + "." + ArrayTypeDeclarer.FieldLength.name();
     }
 }

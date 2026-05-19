@@ -50,6 +50,10 @@ public enum Primitive {
         return declarer(pos, Optional.empty());
     }
 
+    public PrimitiveTypeDeclarer declarer() {
+        return declarer(Position.ZERO, Optional.empty());
+    }
+
     public PrimitiveDefinition type() {
         return PrimitiveDefinition.types.get(this);
     }

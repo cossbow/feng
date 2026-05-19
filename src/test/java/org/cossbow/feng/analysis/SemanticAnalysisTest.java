@@ -1068,6 +1068,24 @@ public class SemanticAnalysisTest {
     }
 
     @Test
+    public void testCallExpression2() {
+        var d = "func r(){} ";
+        checkSucc(d + "func f() { r(); }");
+        checkFail(d + "func f() { r(0); }");
+
+        d = "func r(a int){} ";
+        checkFail(d + "func f() { r(); }");
+        checkSucc(d + "func f() { r(0); }");
+        checkFail(d + "func f() { r(0,1); }");
+
+        d = "func r(a,b int){} ";
+        checkFail(d + "func f() { r(); }");
+        checkFail(d + "func f() { r(0); }");
+        checkSucc(d + "func f() { r(0,1); }");
+        checkFail(d + "func f() { r(0,1,2); }");
+    }
+
+    @Test
     public void testNewExpression1() {
         var d = "func A=(); enum E{U,V,W,} class C{} interface I{}";
         checkFail(d + "func f(){var v = new(A);}");
@@ -2148,7 +2166,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testDeclareMultiArray6(){
+    public void testDeclareMultiArray6() {
         checkSucc("var a [2]int ; var b [3][2]int = [[1],[2,3],a];");
         checkFail("var a [3]int ; var b [3][2]int = [[1],[2,3],a];");
     }
@@ -2855,7 +2873,7 @@ public class SemanticAnalysisTest {
         checkFail("func f(){for(true){}continue;}");
     }
 
-//    @Test
+    //    @Test
     public void testStatementGoto() {
         checkSucc("func f(){var i=0; jjj:i+=1; if(i<10) goto jjj;}");
         checkFail("func f(){var i=0; jjj:i+=1; if(i<10) goto jj;}");

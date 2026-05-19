@@ -701,7 +701,7 @@ public class ExpressionParseTest extends BaseParseTest {
             var ae = (ArrayExpression) parseExpr("[]%s[%s]".formatted(type, idList(list)));
             Assertions.assertTrue(ae.type().has());
             var at = ae.type().must();
-            Assertions.assertEquals(size, integer(at.length()).value());
+            Assertions.assertTrue(at.length().none());
             Assertions.assertEquals(type, typeName(at.element()));
         }
     }

@@ -1,12 +1,19 @@
 package org.cossbow.feng.ast.dcl;
 
-import org.cossbow.feng.ast.Entity;
-import org.cossbow.feng.ast.Field;
-import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
+import org.cossbow.feng.ast.oop.ClassMethod;
+import org.cossbow.feng.ast.proc.ParameterSet;
+import org.cossbow.feng.ast.proc.Prototype;
+import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.cossbow.feng.ast.Position.ZERO;
 
 /**
  * Array type:
@@ -120,30 +127,15 @@ public class ArrayTypeDeclarer extends TypeDeclarer
                 r, false);
     }
 
-    public Optional<ArrayField> getField(Identifier name) {
-        if (LengthField.name().equals(name))
-            return Optional.of(LengthField);
-
-        return Optional.empty();
-    }
-
-    public final ArrayField LengthField = new ArrayField(pos(),
-            new Identifier(pos(), FIELD_LENGTH),
-            Primitive.INT.declarer(pos()), this);
+    public static final ArrayField FieldLength = new ArrayField(ZERO,
+            new Identifier("length"),
+            Primitive.INT.declarer());
 
     public static class ArrayField extends Field {
-        private final ArrayTypeDeclarer master;
-
         private ArrayField(Position pos,
                            Identifier name,
-                           TypeDeclarer type,
-                           ArrayTypeDeclarer master) {
+                           TypeDeclarer type) {
             super(pos, name, type);
-            this.master = master;
-        }
-
-        public ArrayTypeDeclarer master() {
-            return master;
         }
 
         public boolean unmodifiable() {
@@ -155,7 +147,79 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         }
     }
 
-    public static final String FIELD_LENGTH = "length";
+    //
+
+    static final PrimitiveTypeDeclarer PARAM_INT = Primitive.INT.declarer();
+    static final PrimitiveTypeDeclarer PARAM_BOOL = Primitive.BOOL.declarer();
+
+    static final ArrayMethod MethodSwap = new ArrayMethod("swap",
+            ParameterSet.anon(List.of(PARAM_INT, PARAM_INT)), false);
+    static final ArrayMethod MethodMove = new ArrayMethod("move",
+            ParameterSet.anon(List.of(PARAM_INT, PARAM_INT)), false);
+
+    public static class ArrayMethod extends Method {
+        private final Identifier name;
+        private final Prototype prototype;
+        private final boolean unmodifiable;
+
+        public ArrayMethod(String name,
+                           ParameterSet parameterSet,
+                           TypeDeclarer returnSet,
+                           boolean unmodifiable) {
+            super(ZERO);
+            this.name = new Identifier(name);
+            this.prototype = new Prototype(ZERO, parameterSet, returnSet);
+            this.unmodifiable = unmodifiable;
+        }
+
+        public ArrayMethod(String name,
+                           ParameterSet parameterSet,
+                           boolean unmodifiable) {
+            super(ZERO);
+            this.name = new Identifier(name);
+            this.prototype = new Prototype(ZERO, parameterSet);
+            this.unmodifiable = unmodifiable;
+        }
+
+        @Override
+        public Identifier name() {
+            return name;
+        }
+
+        @Override
+        public Prototype prototype() {
+            return prototype;
+        }
+
+        @Override
+        public TypeParameters generic() {
+            return TypeParameters.empty();
+        }
+
+        @Override
+        public TypeDefinition master() {
+            return ErrorUtil.unreachable();
+        }
+
+        @Override
+        public List<ClassMethod> override() {
+            return List.of();
+        }
+
+        @Override
+        public boolean unmodifiable() {
+            return unmodifiable;
+        }
+    }
+
+    static final Map<Identifier, ArrayMethod> METHODS = Map.of(
+            MethodSwap.name, MethodSwap,
+            MethodMove.name, MethodMove
+    );
+
+    public static Optional<ArrayMethod> methodOf(Identifier name) {
+        return Optional.of(METHODS.get(name));
+    }
 
     //
 

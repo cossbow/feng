@@ -1448,22 +1448,16 @@ final class SourceParseVisitor
     // procedure: start
     //
 
-    private ParameterSet parseParameters(FengParser.ParametersSetContext ctx) {
+    private ParameterSet parseParameters(
+            Position pos,
+            FengParser.ParametersSetContext ctx) {
+        if (ctx == null) return new ParameterSet(pos);
         var params = new IdentifierMap<Variable>();
-
-        if (ctx == null) return new ParameterSet(params);
 
         var ps = ctx.parameters();
         if (ps == null) {
             var types = parseTypeDeclarerList(ctx.typeDeclarerList());
-            for (int i = 0, typesSize = types.size(); i < typesSize; i++) {
-                var td = types.get(i);
-                var name = new Identifier(td.pos(), "feng$arg" + i, true);
-                var v = new Variable(td.pos(), Modifier.empty(),
-                        Declare.CONST, name, Lazy.of(td), Lazy.nil());
-                params.add(name, v);
-            }
-            return new ParameterSet(params);
+            return ParameterSet.anon(types);
         }
 
         for (var pc : ps.parameter()) {
@@ -1476,7 +1470,7 @@ final class SourceParseVisitor
                 params.add(name, v);
             }
         }
-        return new ParameterSet(params);
+        return new ParameterSet(pos, params);
     }
 
     private Optional<TypeDeclarer> parseReturnSet(FengParser.ReturnSetContext ctx) {
@@ -1492,7 +1486,8 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitPrototype(FengParser.PrototypeContext ctx) {
-        var parameters = parseParameters(ctx.parametersSet());
+        var parameters = parseParameters(posOf(ctx.PAREN_L()),
+                ctx.parametersSet());
         var returnSet = parseReturnSet(ctx.returnSet());
         return new Prototype(posOf(ctx), parameters, returnSet);
     }

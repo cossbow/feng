@@ -128,7 +128,7 @@ public class GenericMap {
             v1.type().update(mapper());
             vs.add(v1.name(), v1);
         }
-        var ps = new ParameterSet(vs);
+        var ps = new ParameterSet(p0.parameterSet().pos(), vs);
         var rs = p0.returnSet().map(mapper());
         return new Prototype(p0.pos(), ps, rs);
     }

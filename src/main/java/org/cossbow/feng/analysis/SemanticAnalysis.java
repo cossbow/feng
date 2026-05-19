@@ -1810,7 +1810,7 @@ public class SemanticAnalysis {
         var td = (DerivedTypeDeclarer) s.resultType.must();
         var cd = (ClassDefinition) td.def();
         var set = cd.indexOperator().must().set().must();
-        var m = new MethodExpression(io.pos(), s, set, TypeArguments.EMPTY);
+        var m = new MethodExpression(io.pos(), s, set);
         var n = new CallExpression(a.pos(), m, List.of(io.index(), a.value()),
                 set.prototype());
         n.resultType.set(set.prototype().returnType());
@@ -3173,9 +3173,11 @@ public class SemanticAnalysis {
         var p = td.prototype();
         var left = p.parameterSet().types();
         if (left.size() > args.size()) {
-            return semantic("missing arguments: %s", e.pos());
+            var pos = args.isEmpty() ? e.pos() : args.getLast().pos();
+            return semantic("missing arguments: %s", pos);
         } else if (left.size() < args.size()) {
-            return semantic("redundant arguments: %s", e.pos());
+            var more = args.get(left.size());
+            return semantic("redundant arguments: %s", more.pos());
         }
 
         context.enterScope(); // enter a new scope for check arguments
@@ -3351,7 +3353,7 @@ public class SemanticAnalysis {
             if (op.get().has()) {
                 var cm = op.get().get();
                 var a = (PrimaryExpression) sg.a();
-                var s = new MethodExpression(a.pos(), a, cm, TypeArguments.EMPTY);
+                var s = new MethodExpression(a.pos(), a, cm);
                 var ig = optimize(e.index());
                 var n = new CallExpression(e.pos(), s, List.of(ig.a()),
                         cm.prototype());
@@ -3408,22 +3410,34 @@ public class SemanticAnalysis {
     private Groups.G2<Expression, TypeDeclarer>
     optimizeArray(PrimaryExpression s, ArrayTypeDeclarer atd,
                   Identifier name) {
-        var af = atd.getField(name);
-        if (af.has()) {
-            var td = Primitive.INT.declarer(s.pos());
-            if (atd.length().has()) {
-                var lit = new IntegerLiteral(s.pos(), atd.len());
-                var n = new LiteralExpression(s.pos(), lit);
-                return Groups.g2(n, td);
+        if (s.expectCallable()) {
+            var o = ArrayTypeDeclarer.methodOf(name);
+            if (o.none()) {
+                return semantic("array has no method %s: %s",
+                        name, name.pos());
             }
-            var n = wrapRelayExpr(s, td, _s -> {
-                return new ArrayLenExpression(_s.pos(),
-                        (PrimaryExpression) _s);
-            });
+            var am = o.get();
+            var t = new AnonFuncTypeDeclarer(s.pos(), true, am.prototype());
+            var n = new MethodExpression(s.pos(), s, am);
+            return Groups.g2(n, t);
+        }
+
+        if (!ArrayTypeDeclarer.FieldLength.name().equals(name)) {
+            return semantic("array has no field %s: %s",
+                    name, name.pos());
+        }
+
+        var td = Primitive.INT.declarer(s.pos());
+        if (atd.refer().none()) {
+            var n = new IntegerLiteral(s.pos(), atd.len()).expr();
             return Groups.g2(n, td);
         }
-        return semantic("array has no field %s: %s",
-                name, name.pos());
+        var n = wrapRelayExpr(s, td, _s -> {
+            return new ArrayLenExpression(_s.pos(),
+                    (PrimaryExpression) _s);
+        });
+        return Groups.g2(n, td);
+
     }
 
     private <T extends Exportable, D extends Definition> T
@@ -3576,6 +3590,7 @@ public class SemanticAnalysis {
 
         var s = (PrimaryExpression) sg.a();
         checkOptional(s);
+        s.expectCallable(e.expectCallable());
 
         if (sg.b() instanceof ArrayTypeDeclarer atd) {
             invalid(e.generic());
@@ -3583,7 +3598,6 @@ public class SemanticAnalysis {
         }
 
         if (sg.b() instanceof DerivedTypeDeclarer dtd) {
-            s.expectCallable(e.expectCallable());
             return optimizeMember(s, dtd, e.member(), e.generic());
         }
 
@@ -4145,7 +4159,7 @@ public class SemanticAnalysis {
         if (!mf.procedure().params().isEmpty())
             semantic("'%s' has no parameters: %s", mf, mf.pos());
 
-        var pt = new Prototype(mf.pos(), new ParameterSet(), Optional.empty());
+        var pt = new Prototype(mf.pos(), new ParameterSet(mf.pos()));
         var body = new BlockStatement(mf.pos(), mf.procedure().body(), false);
         var proc = new Procedure(mf.pos(), pt, body, Map.of());
         var cm = new ClassMethod(mf.pos(), Modifier.empty(),
@@ -4290,7 +4304,7 @@ public class SemanticAnalysis {
             List<Variable> params, Optional<TypeDeclarer> ret,
             boolean unmodifiable) {
         var mp = mf.procedure();
-        var ps = new ParameterSet(params);
+        var ps = new ParameterSet(mf.pos(), params);
         var pt = new Prototype(mf.pos(), ps, mp.result().orElse(ret));
 
         var list = new ArrayList<Statement>(mp.body().size() + 1);

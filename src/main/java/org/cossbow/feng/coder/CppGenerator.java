@@ -1128,8 +1128,7 @@ public class CppGenerator {
     }
 
     private CppGenerator write(FieldOperand e) {
-        var td = (DerivedTypeDeclarer) e.subject().resultType.must();
-        return ofMember(e.subject(), td).write(e.field());
+        return ofMember(e.subject()).write(e.field());
     }
 
     private CppGenerator write(DereferOperand e) {
@@ -1505,10 +1504,12 @@ public class CppGenerator {
         return write("(").write(e).write("))");
     }
 
-    private CppGenerator ofMember(Expression subject, Referable ra) {
-        if (ra.refer().none())
-            return write(subject).write('.');
+    private CppGenerator ofMember(Expression subject) {
         write(subject);
+        var td = subject.resultType.must();
+        if (td instanceof ArrayTypeDeclarer ||
+                td.maybeRefer().none())
+            return write('.');
         if (subject instanceof CurrentExpression ce
                 && !ce.isSelf()) {
             return write("::");
@@ -1541,17 +1542,14 @@ public class CppGenerator {
             return enumMember(e, ed);
         }
 
-        ofMember(e.subject(), dtd);
+        ofMember(e.subject());
         if (!e.generic().isEmpty()) return unreachable();
         write(e.member());
         return this;
     }
 
     private CppGenerator write(MethodExpression e) {
-        var td = (DerivedTypeDeclarer) e.subject().resultType.must();
-        var def = td.def();
-
-        ofMember(e.subject(), td);
+        ofMember(e.subject());
         return write(e.method().name()).write(e.generic());
     }
 

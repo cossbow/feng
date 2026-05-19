@@ -122,15 +122,17 @@ public class DAGGraphTest {
                 Groups.g2(3, 4),
                 Groups.g2(5, 6)
         );
-        DAGGraph.make(nodes, edges).acyclic().bfs(System.out::println);
+        var r = DAGGraph.make(nodes, edges).acyclic();
+        for (var i : r) {
+        }
     }
 
     @Test
     public void testRand() {
         var size = ThreadLocalRandom.current().nextInt(10, 100);
-        System.out.println("size=" + size);
         var r = randDAG(size);
-        r.bfs(System.out::println);
+        for (var i : r) {
+        }
     }
 
     @Test

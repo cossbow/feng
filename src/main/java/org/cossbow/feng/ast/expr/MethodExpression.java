@@ -23,6 +23,12 @@ public class MethodExpression extends PrimaryExpression {
         this.generic = generic;
     }
 
+    public MethodExpression(Position pos,
+                            PrimaryExpression subject,
+                            Method method) {
+        this(pos, subject, method, TypeArguments.EMPTY);
+    }
+
     public PrimaryExpression subject() {
         return subject;
     }

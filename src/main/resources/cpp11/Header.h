@@ -217,6 +217,7 @@ static inline T *Feng$cast(S *s) {
 	}
 }
 
+// Strong Reference
 template<typename T>
 struct Feng$SRefer {
 	T *t;
@@ -262,10 +263,8 @@ struct Feng$SRefer {
 		Feng$dec(t);
 	}
 
-	// var t1 &S = t0;
-	T *borrow() const {
-		return t;
-	}
+	// t = a; a = b; b = t;
+	void swap(Feng$SRefer<T> &r) noexcept;
 
 	// t = nil;
 	void clear() {
@@ -361,6 +360,18 @@ static Feng$SRefer<T> Feng$newMem(T &&init) {
 }
 
 template<typename T>
+void swap(Feng$SRefer<T> &a, Feng$SRefer<T> &b) noexcept {
+	a.swap(b);
+}
+
+template<typename T>
+void Feng$SRefer<T>::swap(Feng$SRefer<T> &r) noexcept {
+	using std::swap;
+	swap(t, r.t);
+}
+
+// Phantom Reference
+template<typename T>
 struct Feng$PRefer {
 	T *t;
 
@@ -423,12 +434,7 @@ static Feng$PRefer<T> Feng$assert(const Feng$PRefer<S> &p) {
 	return Feng$PRefer<T>{dynamic_cast<T *>(p.t)};
 }
 
-
-/**
- * 数组
- * @tparam E 元素类型
- * @tparam L 长度常量
- */
+// array: value-type
 template<typename E, Int64 L>
 struct Feng$Array {
 	E values[L] = {};
@@ -482,12 +488,28 @@ struct Feng$Array {
 	}
 
 	auto operator<=>(const Feng$Array<E, L> &) const = default;
+
+	//
+
+	// swap this[i] and this[j]
+	void $swap(Int i, Int j) {
+		Feng$checkIndex(i, L);
+		Feng$checkIndex(j, L);
+		using std::swap;
+		swap(values[i], values[j]);
+	}
+
+	// move this[i] to cover this[j]
+	void $move(Int i, Int j) {
+		Feng$checkIndex(i, L);
+		Feng$checkIndex(j, L);
+		values[j] = std::move(values[i]);
+		values[i] = E{};
+	}
+
 };
 
-/**
- * 数组索引
- * @tparam E 元素类型
- */
+// the base-class for Array Reference
 template<typename E>
 struct Feng$ArrayRefer {
 	E *start;
@@ -506,6 +528,7 @@ struct Feng$ArrayRefer {
 		Feng$required(start);
 		if (index < 0 || index >= this->len)
 			throw Feng$OutOfBounds();
+		Feng$checkIndex(index, len);
 		return this->start[index];
 	}
 
@@ -523,9 +546,27 @@ struct Feng$ArrayRefer {
 		return std::strong_ordering::equal;
 	}
 
+	// swap this[i] and this[j]
+	void $swap(Int i, Int j) {
+		Feng$required(start);
+		Feng$checkIndex(i, len);
+		Feng$checkIndex(j, len);
+		using std::swap;
+		swap(start[i], start[j]);
+	}
+
+	// move this[i] to cover this[j]
+	void $move(Int i, Int j) {
+		Feng$required(start);
+		Feng$checkIndex(i, len);
+		Feng$checkIndex(j, len);
+		start[j] = std::move(start[i]);
+		start[i] = E{};
+	}
+
 };
 
-// 数组引用：强引用
+// Strong Array Reference
 template<typename E>
 struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 
@@ -565,6 +606,9 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 	~Feng$ArraySRefer() {
 		dec();
 	}
+
+	// t = a; a = b; b = t;
+	void swap(Feng$ArraySRefer<E> &r) noexcept;
 
 	Feng$ArraySRefer<E> &operator=(std::nullptr_t) {
 		if (this->start == nullptr) return *this;
@@ -606,7 +650,19 @@ private:
 	}
 };
 
-// 数组引用：虚引用
+template<typename E>
+void swap(Feng$ArraySRefer<E> &a, Feng$ArraySRefer<E> &b) noexcept {
+	a.swap(b);
+}
+
+template<typename E>
+void Feng$ArraySRefer<E>::swap(Feng$ArraySRefer<E> &r) noexcept {
+	using std::swap;
+	swap(this->start, r.start);
+	swap(this->len, r.len);
+}
+
+// Phantom Array Reference
 template<typename E>
 struct Feng$ArrayPRefer : public Feng$ArrayRefer<E> {
 
@@ -628,7 +684,7 @@ struct Feng$ArrayPRefer : public Feng$ArrayRefer<E> {
 template<typename E, typename T>
 concept BaseArrayRefer = std::is_base_of_v<Feng$ArrayRefer<E>, T>;
 
-// 创建数组实例
+// new([len]E)
 template<typename E>
 static Feng$ArraySRefer<E> Feng$newArray(Int64 len) {
 	if (len < 0) throw Feng$NegativeInteger();
@@ -638,7 +694,7 @@ static Feng$ArraySRefer<E> Feng$newArray(Int64 len) {
 	return {e, len};
 }
 
-// 创建数组实例
+// new([len]E, [...args])
 template<typename E, typename ...Args>
 static Feng$ArraySRefer<E> Feng$newArrayInit(Int64 len, Args &&... args) {
 	Int64 num = sizeof...(Args);
@@ -649,7 +705,7 @@ static Feng$ArraySRefer<E> Feng$newArrayInit(Int64 len, Args &&... args) {
 	return a;
 }
 
-// 创建数组实例
+// new([len]E, init)
 template<typename E, Int64 L0>
 static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 len, Feng$Array<E, L0> &init) {
 	if (len < L0) throw Feng$OutOfBounds();
@@ -671,7 +727,9 @@ static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 len, A &init) {
 	return a;
 }
 
-// mappable数组转换，例如：[*]int32 -> [*]int8
+// [*]S -> [*]T
+// [*]S -> [&]T
+// [&]S -> [&]T
 template<typename S, typename A, typename T>
 requires BaseArrayRefer<S, A>
 static Feng$ArrayRefer<T> Feng$mapA2A(A &s) {
@@ -679,44 +737,53 @@ static Feng$ArrayRefer<T> Feng$mapA2A(A &s) {
 	return {(T *) s.start, len};
 }
 
+// [L]S -> [&]R
 template<typename S, Int64 L, typename R>
 static Feng$ArrayPRefer<R> Feng$mapA2A(Feng$Array<S, L> &s) {
 	Int64 l = sizeof(S) * L / sizeof(R);
 	return {(R *) s.values, l};
 }
 
-// mappable数组转换，例如： *int32 -> [*]int8
+// S -> [&]T
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(S *s) {
 	Int64 len = sizeof(S) / sizeof(T);
 	return {(T *) s, len};
 }
 
+// *S -> [*]T
+// *S -> [&]T
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$SRefer<S> &s) {
 	Int64 len = sizeof(S) / sizeof(T);
 	return {(T *) s.t, len};
 }
 
+// *S -> [*]T
+// *S -> [&]T
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$SRefer<S> &&s) {
 	Int64 len = sizeof(S) / sizeof(T);
 	return {(T *) s.t, len};
 }
 
+// &S -> [&]T
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$PRefer<S> &s) {
 	Int64 len = sizeof(S) / sizeof(T);
 	return {(T *) s.t, len};
 }
 
+// &S -> [&]T
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$PRefer<S> &&s) {
 	Int64 len = sizeof(S) / sizeof(T);
 	return {(T *) s.t, len};
 }
 
-// mappable数组转换，例如：[*]int8 -> *int32
+// [*]E -> *U
+// [*]E -> &U
+// [&]E -> &U
 template<typename E, typename A, typename U>
 requires BaseArrayRefer<E, A>
 static Feng$Refer<U> Feng$mapA2U(A &s) {
@@ -740,7 +807,7 @@ struct Feng$GlobalArray {
 	}
 };
 
-// enum type struct
+// enum meta struct
 struct Feng$Enum {
 	Int $value;
 	Feng$ArrayPRefer<Byte> $name;
@@ -767,16 +834,17 @@ public:
 		return fp(std::forward<Args>(args)...);
 	}
 
-	// 使用模板化的调用操作符，支持参数隐式转换
+	// Template-based invocation
+	// Implicit parameter conversion
 	template<typename... CallArgs>
 	Ret operator()(CallArgs &&... args) const {
 		Feng$required(fp);
-		// 将参数转换为期望的类型
+		// Convert parameter to expect type
 		return fp(static_cast<Args>(std::forward<CallArgs>(args))...);
 	}
 
 	Feng$Prototype &operator=(Feng$CppFun fp) {
-		fp = fp;
+		this->fp = fp;
 		return *this;
 	}
 
@@ -788,16 +856,18 @@ public:
 		return fp;
 	}
 
+	// Comparing function pointers
 	bool operator==(const Feng$Prototype &o) const {
 		return fp == o.fp;
 	}
 
+	// Comparing function pointers
 	bool operator!=(const Feng$Prototype &o) const {
 		return fp != o.fp;
 	}
 
+	// Comparing function pointers
 	auto operator<=>(const Feng$Prototype &o) const {
-		// 函数指针的比较返回 bool，需要转换为 ordering
 		if ((void *) fp < (void *) o.fp) return std::strong_ordering::less;
 		if ((void *) fp > (void *) o.fp) return std::strong_ordering::greater;
 		return std::strong_ordering::equal;

@@ -1,0 +1,49 @@
+
+func init1(a [&]int) {
+    for (var i=0; i<a.length; i+=1) {
+        a[i] = 1+i;
+    }
+}
+func init2(a [&]*int) {
+    for (var i=0; i<a.length; i+=1) {
+        a[i] = new(int, 1+i);
+    }
+}
+
+func array1(n int) {
+    var a = new([n]int);
+    init1(a);
+    a.swap(0,1);
+    a.move(2,3);
+}
+
+func array2(n int) {
+    var a = new([n]*int);
+    init2(a);
+    a.swap(0,1);
+    a.move(2,3);
+}
+func array3() {
+    var a [15]int;
+    init1(a);
+    a.swap(0,1);
+    a.move(2,3);
+}
+
+func array4() {
+    var a [15]*int;
+    init2(a);
+    a.swap(0,1);
+    a.move(2,3);
+}
+
+func test(n int) {
+    array1(n);
+    array2(n);
+    array3();
+    array4();
+}
+
+func main(args [&!#][*!#]byte) {
+    test(15);
+}
