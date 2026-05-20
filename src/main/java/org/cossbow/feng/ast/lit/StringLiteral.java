@@ -38,8 +38,13 @@ public class StringLiteral extends Literal {
         return value.length;
     }
 
+    //
+
+    private String s;
+
     public String string() {
-        return new String(value, charset);
+        if (s == null) s = new String(value, charset);
+        return s;
     }
 
     public StringLiteral concat(StringLiteral o) {

@@ -1302,6 +1302,12 @@ public class SemanticAnalysisTest {
         checkSucc("func f() { const a [4]byte =\"true\"; const c [4]byte = a; }");
         checkFail("func f() { const a=\"true\"; const c [4]byte = a; }");
         checkSucc("func f() { const a=\"true\"; const c [&!#]byte = a; }");
+
+        checkSucc("func f() { var a byte = \"x\"; }");
+        checkFail("func f() { var a byte = \"xy\"; }");
+        checkFail("func f() { var a byte = \"风\"; }");
+        checkSucc("func f() { var a int16 = \"风\"; }");
+        checkSucc("func f() { var a uint16 = \"风\"; }");
     }
 
     @Test

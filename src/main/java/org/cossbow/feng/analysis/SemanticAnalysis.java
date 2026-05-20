@@ -3390,6 +3390,26 @@ public class SemanticAnalysis {
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(LiteralExpression e) {
+        var et = e.expectType.get();
+        if (et.has() &&
+                et.get() instanceof PrimitiveTypeDeclarer ptd
+                && ptd.isInteger() &&
+                e.literal() instanceof StringLiteral sl) {
+            // If an attempt is made to use a string literal as an integer,
+            // the first character will be converted into an integer literal.
+            if (sl.string().length() != 1) {
+                return semantic("init char must use single char: %s",
+                        sl.pos());
+            }
+            int c = sl.string().charAt(0);
+            var p = ptd.primitive();
+            if (p.width == 8 && c > 255) {
+                return semantic("char too large for init %s: %s",
+                        p, sl.pos());
+            }
+            e = new IntegerLiteral(sl.pos(), c).expr();
+            e.expectType.set(et);
+        }
         return Groups.g2(e, new LiteralTypeDeclarer(e.pos(), e.literal()));
     }
 
