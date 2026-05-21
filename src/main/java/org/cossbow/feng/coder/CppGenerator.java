@@ -1055,7 +1055,6 @@ public class CppGenerator {
             case CallStatement ee -> write(ee);
             case ContinueStatement ee -> write(ee);
             case ForStatement ee -> write(ee);
-            case GotoStatement ee -> write(ee);
             case IfStatement ee -> write(ee);
             case LabeledStatement ee -> write(ee);
             case ReturnStatement ee -> write(ee);
@@ -1214,10 +1213,6 @@ public class CppGenerator {
     private CppGenerator write(BreakStatement s) {
         var g = loopLabels.get(s.target.must());
         return writeGoto(g.b());
-    }
-
-    private CppGenerator write(GotoStatement e) {
-        return writeGoto(e.target.must());
     }
 
     private CppGenerator writeGoto(Label l) {

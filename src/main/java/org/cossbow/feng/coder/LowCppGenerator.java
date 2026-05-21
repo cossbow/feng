@@ -1042,7 +1042,6 @@ public class LowCppGenerator {
             case CallStatement ee -> write(ee);
             case ContinueStatement ee -> write(ee);
             case ForStatement ee -> write(ee);
-            case GotoStatement ee -> write(ee);
             case IfStatement ee -> write(ee);
             case LabeledStatement ee -> write(ee);
             case ReturnStatement ee -> write(ee);
@@ -1278,10 +1277,6 @@ public class LowCppGenerator {
         write("continue ");
         s.label().use(this::write);
         return endStmt();
-    }
-
-    private LowCppGenerator write(GotoStatement e) {
-        return unsupported("goto");
     }
 
     private LowCppGenerator write(IfStatement is) {

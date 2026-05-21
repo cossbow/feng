@@ -908,19 +908,23 @@ public class SemanticAnalysis {
 
     private void declareMethod(ClassDefinition cd) {
         for (var m : cd.methods()) {
-            analyse(m.modifier());
-            analyse(m.prototype(), false);
+            declareMethod(m);
         }
         for (var m : cd.binaryOperators().values()) {
-            analyse(m.prototype(), false);
+            declareMethod(m);
         }
         for (var m : cd.unaryOperators().values()) {
-            analyse(m.prototype(), false);
+            declareMethod(m);
         }
         cd.indexOperator().use(io -> {
-            io.get().use(m -> analyse(m.prototype(), false));
-            io.set().use(m -> analyse(m.prototype(), false));
+            io.get().use(this::declareMethod);
+            io.set().use(this::declareMethod);
         });
+    }
+
+    private void declareMethod(ClassMethod m) {
+        analyse(m.modifier());
+        analyse(m.prototype(), false);
     }
 
     private void implMethod(ClassDefinition cd) {
@@ -1263,7 +1267,6 @@ public class SemanticAnalysis {
             case CallStatement ss -> analyse(ss);
             case ContinueStatement ss -> analyse(ss);
             case ForStatement ss -> analyse(ss);
-            case GotoStatement ss -> analyse(ss);
             case IfStatement ss -> analyse(ss);
             case LabeledStatement ss -> analyse(ss);
             case ReturnStatement ss -> analyse(ss);
@@ -2123,11 +2126,6 @@ public class SemanticAnalysis {
         return semantic("no iterable implement %s: %s",
                 g.b(), e.iterable().pos());
 
-    }
-
-    private Statement analyse(GotoStatement e) {
-        e.target.set(checkLabel(e.label()).label());
-        return e;
     }
 
 
@@ -4032,10 +4030,12 @@ public class SemanticAnalysis {
 
 
     //
-    // relay: 检查到临时对象，内部生成一个relay变量指向它，方便后面的自动内存管理
-    // 例如：“new(A).run(); ” 没有变量指向new创建的临时对象，会导致引用计数无法释放
-    // 这种会重构成block表达式
-    //
+    // Check and convert to block-expression if:
+    // 1. Detected a temporary object, such as: "new(A).run();"
+    // 2. When indirectly calling a method (e.g., a.b.run()),
+    //    the called process or other threads may modify the field,
+    //    leading to premature release.
+    // Warning: It's incomplete now, requires refactor.
 
     private boolean needRelay(TypeDeclarer t) {
         if (!low) return false;

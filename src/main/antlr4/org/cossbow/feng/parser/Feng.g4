@@ -392,7 +392,6 @@ statement
     | returnStatement
     | continueStatement
     | breakStatement
-    | gotoStatement
     | labeledStatement
     ;
 // statement: block, usefull
@@ -503,9 +502,6 @@ continueStatement
     ;
 breakStatement
     : BREAK label=Identifier? SEMI
-    ;
-gotoStatement
-    : GOTO label=Identifier SEMI
     ;
 // statement: mark label to a statement
 labeledStatement
@@ -769,11 +765,11 @@ BREAK           : 'break' ;
 SWITCH          : 'switch' ;
 CASE            : 'case' ;
 DEFAULT         : 'default' ;
-GOTO            : 'goto' ;
 THROW           : 'throw' ;
 TRY             : 'try' ;
 CATCH           : 'catch' ;
 FINAL           : 'final' ;
+STATIC          : 'static' ;
 // Class
 THIS            : 'this' ;
 SUPER           : 'super' ;
