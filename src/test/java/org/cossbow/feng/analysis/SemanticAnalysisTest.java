@@ -892,7 +892,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testAssertExpression0() {
+    public void testIsExpression0() {
         var d = "interface I{} struct S{} class C{}";
         checkFail(d + "func f(s *Object){ var e = s?(I); }");
         checkFail(d + "func f(s *Object){ var e = s?(S); }");
@@ -903,7 +903,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testAssertExpression1() {
+    public void testIsExpression1() {
         var d = "class A{} class B:A{} class C{}";
         checkSucc(d + "func f(s *Object){ var e = s?(*A); }");
         checkSucc(d + "func f(s *A){ var e = s?(*A); }");
@@ -912,7 +912,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testAssertExpression2() {
+    public void testIsExpression2() {
         var d = "interface A{} class B(A){} class C{}";
         checkSucc(d + "func f(s *B){ var e = s?(*A); }");
         checkSucc(d + "func f(s *C){ var e = s?(*A); }");
@@ -923,21 +923,21 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testAssertExpression3() {
+    public void testIsExpression3() {
         var d = "interface A{} interface B{A;} interface C{}";
         checkSucc(d + "func f(s *B){ var e = s?(*A); }");
         checkSucc(d + "func f(s *C){ var e = s?(*A); }");
     }
 
     @Test
-    public void testAssertExpression4() {
+    public void testIsExpression4() {
         var d = "interface A{} class B(A){} class C{}";
         checkSucc(d + "func f(s*B){ var e = s?(*A); }");
         checkFail(d + "func f(s*B){ var e = s?(*C); }");
     }
 
     @Test
-    public void testAssertExpression5() {
+    public void testIsExpression5() {
         checkFail("func f(s *Object){ var e = s?(int); }");
         checkFail("func f(s *Object){ var e = s?(*int); }");
         var d = "enum E{S,T,} struct S{} func F=();";
@@ -947,7 +947,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testAssertExpression6() {
+    public void testIsExpression6() {
         var d = "class A{} ";
         checkSucc(d + "func f(o *Object){ var a = o?(*A); }");
         checkSucc(d + "func f(o &Object){ var a = o?(&A); }");
@@ -956,14 +956,14 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testAssertExpression7() {
+    public void testIsExpression7() {
         var d = "class A{} ";
         checkSucc(d + "func f(o *Object){ var a = o?(*A); }");
         checkFail(d + "func f(o *Object){ var a = o?(*!A); }");
     }
 
     @Test
-    public void testAssertExpression8() {
+    public void testIsExpression8() {
         var d = "class A{} class B{}";
         checkSucc(d + "func f(o *#Object){ var a = o?(*#A); }");
         checkFail(d + "func f(o *#Object){ var a = o?(*A); }");

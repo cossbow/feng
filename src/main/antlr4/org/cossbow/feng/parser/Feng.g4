@@ -551,7 +551,7 @@ dereferExpr
 
 primaryExpr
     : operandExpr                                       # OperandExpression_
-    | primaryExpr assert                                # AssertExpression
+    | primaryExpr is                                    # IsExpression
     | primaryExpr indexOf                               # IndexOfExpression
     | primaryExpr memberOf typeArguments?               # MemberOfExpression
     | primaryExpr argumentSet                           # CallExpression
@@ -628,7 +628,7 @@ memberOf
 new
     : NEW '(' newType (COMMA expression)? ')'
     ;
-assert
+is
     : QUESTION '(' typeDeclarer ')'
     ;
 newType
@@ -770,6 +770,7 @@ TRY             : 'try' ;
 CATCH           : 'catch' ;
 FINAL           : 'final' ;
 STATIC          : 'static' ;
+ASSERT          : 'assert' ;
 // Class
 THIS            : 'this' ;
 SUPER           : 'super' ;

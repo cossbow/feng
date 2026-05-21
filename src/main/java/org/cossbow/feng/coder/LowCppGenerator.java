@@ -1352,7 +1352,7 @@ public class LowCppGenerator {
             case ReferEqualExpression ee -> write(ee);
             case UnaryExpression ee -> write(ee);
             case ArrayExpression ee -> write(ee);
-            case AssertExpression ee -> write(ee);
+            case IsExpression ee -> write(ee);
             case ConvertExpression ee -> write(ee);
             case CallExpression ee -> write(ee);
             case CurrentExpression ee -> write(ee);
@@ -1455,7 +1455,7 @@ public class LowCppGenerator {
         return this;
     }
 
-    private LowCppGenerator write(AssertExpression e) {
+    private LowCppGenerator write(IsExpression e) {
         if (!e.needCheck())
             return castPtr(e.subject(), e.type());
 

@@ -93,12 +93,12 @@ public class ExpressionParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testAssert() {
+    public void testIs() {
         var name = randVarSymbol(8);
         var typeName = randTypeSymbol(16);
-        var expr = (AssertExpression) parseExpr("%s?(*%s)".formatted(name, typeName));
+        var expr = (IsExpression) parseExpr("%s?(*%s)".formatted(name, typeName));
         Assertions.assertEquals(name, varName(expr.subject()));
-        var type = (DerivedTypeDeclarer) expr.type();
+        var type = expr.type();
         Assertions.assertEquals(typeName, type.derivedType().symbol());
         Assertions.assertTrue(type.derivedType().generic().isEmpty());
         var ref = type.refer().get();
@@ -375,7 +375,7 @@ public class ExpressionParseTest extends BaseParseTest {
             var type = randTypeSymbol(12);
             var unary = (UnaryExpression) parseExpr(operator(op) + name + "?(" + type + ")");
             Assertions.assertSame(op, unary.operator());
-            var ass = (AssertExpression) unary.operand();
+            var ass = (IsExpression) unary.operand();
             Assertions.assertEquals(name, varName(ass.subject()));
             Assertions.assertEquals(type, typeName(ass.type()));
         }

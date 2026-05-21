@@ -1290,7 +1290,7 @@ public class CppGenerator {
             case ReferEqualExpression ee -> write(ee);
             case UnaryExpression ee -> write(ee);
             case ArrayExpression ee -> write(ee);
-            case AssertExpression ee -> write(ee);
+            case IsExpression ee -> write(ee);
             case ConvertExpression ee -> write(ee);
             case CallExpression ee -> write(ee);
             case CurrentExpression ee -> write(ee);
@@ -1397,7 +1397,7 @@ public class CppGenerator {
         return this;
     }
 
-    private CppGenerator write(AssertExpression e) {
+    private CppGenerator write(IsExpression e) {
         if (!e.needCheck())
             return castRef(e.subject(), e.type());
 

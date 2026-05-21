@@ -2574,7 +2574,7 @@ public class SemanticAnalysis {
         return unmodifiable(o.get());
     }
 
-    private boolean unmodifiable(AssertExpression e, boolean left) {
+    private boolean unmodifiable(IsExpression e, boolean left) {
         var im = e.type().maybeRefer().match(Refer::unmodifiable);
         return im || unmodifiable(e.subject(), left);
     }
@@ -2588,7 +2588,7 @@ public class SemanticAnalysis {
             case ParenExpression ee -> unmodifiable(ee.child(), left);
             case SymbolExpression ee -> unmodifiable(ee);
             case VariableExpression ee -> unmodifiable(ee.variable());
-            case AssertExpression ee -> unmodifiable(ee, left);
+            case IsExpression ee -> unmodifiable(ee, left);
             case BlockExpression ee -> unmodifiable(ee, left);
             case MethodExpression ee -> true;
             case NewExpression ee -> false;
@@ -2759,7 +2759,7 @@ public class SemanticAnalysis {
             case BinaryExpression ee -> optimize(ee);
             case UnaryExpression ee -> optimize(ee);
             case ArrayExpression ee -> optimize(ee);
-            case AssertExpression ee -> optimize(ee);
+            case IsExpression ee -> optimize(ee);
             case SizeofExpression ee -> optimize(ee);
             case CallExpression ee -> optimize(ee);
             case ConvertExpression ee -> optimize(ee);
@@ -3091,41 +3091,41 @@ public class SemanticAnalysis {
         return semantic("require class or interface: %s", td.pos());
     }
 
-    private void assertFinalClass(ObjectDefinition def, Entity e) {
+    private void invalidFinalClass(ObjectDefinition def, Entity e) {
         if (!(def instanceof ClassDefinition cd) || !cd.isFinal())
             return;
 
         semantic("contravariance can't use for final class %s: %s", def, e.pos());
     }
 
-    private Groups.G2<Expression, TypeDeclarer> optimize(AssertExpression e) {
+    private Groups.G2<Expression, TypeDeclarer> optimize(IsExpression e) {
         var g = optimize(e.subject());
         if (!(g.b() instanceof DerivedTypeDeclarer srcType)) {
-            return semantic("assert can't used for %s: %s", g.b(), e.pos());
+            return semantic("can't used for %s: %s", g.b(), e.pos());
         }
         var sr = srcType.refer();
         if (sr.none()) return semantic(
-                "assert only for refer: %s", e.subject().pos());
+                "only for reference: %s", e.subject().pos());
 
         var et = analyse(e.type());
         if (!(et instanceof DerivedTypeDeclarer dstType))
-            return semantic("assert can't used for %s: %s", et, e.pos());
+            return semantic("can't used for %s: %s", et, e.pos());
 
         var dr = dstType.maybeRefer();
         if (dr.none()) return semantic(
-                "type must refer: %s", dstType.pos());
+                "can't cast to a value: %s", dstType.pos());
         if (dr.get().required()) return semantic(
-                "assert result will be nil if failed: %s", dstType.pos());
+                "can't cast to a required-reference: %s", dstType.pos());
 
         if (!referable(dr.get(), sr, Optional.of(g.a()), e).valid())
             return unreachable();
 
-        var n = new AssertExpression(e.pos(),
+        var n = new IsExpression(e.pos(),
                 (PrimaryExpression) g.a(), dstType);
         var srcDef = getObject(srcType);
         var tgtDef = getObject(dstType);
-        assertFinalClass(srcDef, e);
-        assertFinalClass(tgtDef, e);
+        invalidFinalClass(srcDef, e);
+        invalidFinalClass(tgtDef, e);
 
         if (assignable(dstType, tgtDef, srcType, srcDef).ok) {
             return Groups.g2(n, dstType);

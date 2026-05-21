@@ -4,7 +4,9 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
 
 /**
- * Assert: The type of the {@code  subject} is the expected {@code type}.
+ * Type Checking and Conversion:
+ * <p>
+ * Checking the type of {@code  subject} is matched {@code type}.
  * <p>
  * Only classes (non-final classes) and interfaces are supported.
  * <p>
@@ -13,18 +15,18 @@ import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
  * <p>
  * {@code var a *Animal = new(Cat); var c = a?(*Cat);}
  * <p>
- * Assertion would fail if real type not match, and return nil. Example:
+ * If real type not match {@code type}, nil is returned:
  * <p>
  * {@code var a *Animal = new(Dog); var c = a?(*Cat);}
  * {@code c} will be set to nil.
  */
-public class AssertExpression extends PrimaryExpression {
+public class IsExpression extends PrimaryExpression {
     private final PrimaryExpression subject;
     private final DerivedTypeDeclarer type;
 
-    public AssertExpression(Position pos,
-                            PrimaryExpression subject,
-                            DerivedTypeDeclarer type) {
+    public IsExpression(Position pos,
+                        PrimaryExpression subject,
+                        DerivedTypeDeclarer type) {
         super(pos);
         this.subject = subject;
         this.type = type;

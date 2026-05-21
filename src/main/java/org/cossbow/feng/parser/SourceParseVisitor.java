@@ -884,11 +884,11 @@ final class SourceParseVisitor
     }
 
     @Override
-    public Entity visitAssertExpression(FengParser.AssertExpressionContext ctx) {
+    public Entity visitIsExpression(FengParser.IsExpressionContext ctx) {
         var subject = (PrimaryExpression) visit(ctx.primaryExpr());
-        var type = (TypeDeclarer) visit(ctx.assert_().typeDeclarer());
+        var type = (TypeDeclarer) visit(ctx.is().typeDeclarer());
         if (type instanceof DerivedTypeDeclarer ptd)
-            return new AssertExpression(posOf(ctx), subject, ptd);
+            return new IsExpression(posOf(ctx), subject, ptd);
         return semantic("assert require a derived type, not %s: %s",
                 type, type.pos());
     }
@@ -1581,6 +1581,10 @@ final class SourceParseVisitor
     public Entity visitFunctionDefinition(
             FengParser.FunctionDefinitionContext ctx) {
         var modifier = parseModifier(ctx.modifier());
+        if (ctx.def.unmodifiable != null) {
+            return semantic("function not support unmodifiable mark: %s",
+                    posOf(ctx.def.unmodifiable));
+        }
         var name = defineSymbol(ctx.def.name);
         var generic = typeParameters(ctx.def.typeParameters());
         genericStack.push(generic);
