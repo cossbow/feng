@@ -1,10 +1,8 @@
 package org.cossbow.feng.ast;
 
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.proc.Prototype;
-import org.cossbow.feng.util.Lazy;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -36,6 +34,10 @@ public class Method extends Entity {
             user.accept(m);
             m.seeOverride(user);
         }
+    }
+
+    public boolean escaped() {
+        return false;
     }
 
     public boolean unmodifiable() {

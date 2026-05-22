@@ -1500,6 +1500,65 @@ public class SemanticAnalysisTest {
     }
 
     @Test
+    public void testMethodEscaped1() {
+        checkSucc( "class A { func run*(){var r *A = this;} }");
+        checkFail( "class A { func run(){var r *A = this;} }");
+
+        checkSucc( "class A { func run*()*A{return this;} }");
+        checkFail( "class A { func run()*A{return this;} }");
+
+        checkSucc( "class A { func run*()*A{return this;} }");
+        checkFail( "class A { func run()*A{return this;} }");
+
+        checkSucc( "class A { func run*(f func(*A)){f(this);} }");
+        checkFail( "class A { func run(f func(*A)){f(this);} }");
+
+        checkSucc( "class A { func run*(f func(&A)){f(this);} }");
+        checkSucc( "class A { func run(f func(&A)){f(this);} }");
+
+    }
+
+    @Test
+    public void testMethodEscaped2() {
+        var d = "class A { func run*() {} } ";
+        checkSucc(d + "func f(a *A){ a.run(); }");
+        checkFail(d + "func f(a &A){ a.run(); }");
+        checkFail(d + "func f(){ var a A; a.run(); }");
+    }
+
+    @Test
+    public void testMethodEscaped3() {
+        checkSucc("class A{func a(){} func b(){a();}}");
+        checkFail("class A{func a*(){} func b(){a();}}");
+        checkSucc("class A{func a(){} func b*(){a();}}");
+        checkSucc("class A{func a*(){} func b*(){a();}}");
+
+        checkSucc("class A{func a(){} func b(){this.a();}}");
+        checkFail("class A{func a*(){} func b(){this.a();}}");
+        checkSucc("class A{func a(){} func b*(){this.a();}}");
+        checkSucc("class A{func a*(){} func b*(){this.a();}}");
+    }
+
+    @Test
+    public void testMethodEscaped6() {
+        checkSucc("class A{func a(){}} class B:A{func a(){}}");
+        checkFail("class A{func a*(){}} class B:A{func a(){}}");
+        checkFail("class A{func a(){}} class B:A{func a*(){}}");
+        checkSucc("class A{func a*(){}} class B:A{func a*(){}}");
+
+        checkSucc("interface A{a();} class B(A){func a(){}}");
+        checkFail("interface A{a*();} class B(A){func a(){}}");
+        checkFail("interface A{a();} class B(A){func a*(){}}");
+        checkSucc("interface A{a*();} class B(A){func a*(){}}");
+
+        checkSucc("interface A{a();} interface B{A;a();}");
+        checkFail("interface A{a();} interface B{A;a*();}");
+        checkFail("interface A{a*();} interface B{A;a();}");
+        checkSucc("interface A{a*();} interface B{A;a*();}");
+    }
+
+
+    @Test
     public void testUnmodifiable1() {
         checkSucc("func f(a *int){var v *#int = a;}");
         checkSucc("func f(a *#int){var v *#int = a;}");
@@ -1517,6 +1576,8 @@ public class SemanticAnalysisTest {
         checkSucc(d + "func f(a *C){const v &#C = a;}");
         checkSucc(d + "func f(a *#C){const v &#C = a;}");
         checkFail(d + "func f(a *#C){const v &C = a;}");
+
+        checkFail("func f#(){}");
     }
 
     @Test

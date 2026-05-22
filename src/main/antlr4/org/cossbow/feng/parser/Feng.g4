@@ -152,7 +152,7 @@ interfaceMember
     | macro
     ;
 interfaceMemberMethod
-    : modifier name=Identifier typeParameters? unmodifiable=HASH? prototype SEMI
+    : modifier name=Identifier typeParameters? escaped=MUL? unmodifiable=HASH? prototype SEMI
     ;
 interfaceMemberPart
     : definedType  SEMI
@@ -209,7 +209,7 @@ enumValue
 // function
 //
 funcDef
-    : FUNC name=Identifier typeParameters? unmodifiable=HASH? (procedure|prototype SEMI)
+    : FUNC name=Identifier typeParameters? escaped=MUL? unmodifiable=HASH? (procedure|prototype SEMI)
     ;
 functionDefinition
     : modifier def=funcDef
@@ -563,6 +563,7 @@ operandExpr
     | arrayExpr                 # ArrayExpression
     | pairsExpr                 # PairsExpression
     | symbol typeArguments?     # SymbolExpression
+    | symbol NOT?               # MacroExpression
     | current=(THIS|SUPER)      # CurrentExpression
     | FUNC procedure            # LambdaExpression
     | '(' expression ')'        # ParenExpression
@@ -753,6 +754,7 @@ FUNC            : 'func' ;
 MACRO           : 'macro' ;
 CONST           : 'const' ;
 VAR             : 'var' ;
+LET             : 'let' ;
 NEW             : 'new' ;
 SIZEOF          : 'sizeof' ;
 // Keywords: Control

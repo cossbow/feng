@@ -15,7 +15,8 @@ public class InterfaceMethod extends Method {
     private final Modifier modifier;
     private final Identifier name;
     private final TypeParameters generic;
-    private boolean unmodifiable;
+    private final boolean escaped;
+    private final boolean unmodifiable;
     private final Prototype prototype;
     private final boolean returnThis;
 
@@ -23,6 +24,7 @@ public class InterfaceMethod extends Method {
                            Modifier modifier,
                            Identifier name,
                            TypeParameters generic,
+                           boolean escaped,
                            boolean unmodifiable,
                            Prototype prototype,
                            boolean returnThis) {
@@ -30,6 +32,7 @@ public class InterfaceMethod extends Method {
         this.modifier = modifier;
         this.name = name;
         this.generic = generic;
+        this.escaped = escaped;
         this.unmodifiable = unmodifiable;
         this.prototype = prototype;
         this.returnThis = returnThis;
@@ -45,6 +48,10 @@ public class InterfaceMethod extends Method {
 
     public TypeParameters generic() {
         return generic;
+    }
+
+    public boolean escaped() {
+        return escaped;
     }
 
     public boolean unmodifiable() {

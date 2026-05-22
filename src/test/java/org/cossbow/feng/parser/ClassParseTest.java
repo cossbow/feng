@@ -139,6 +139,8 @@ public class ClassParseTest extends BaseParseTest {
         var m = def.methods().get(name);
         Assertions.assertEquals(name, m.name());
         Assertions.assertFalse(m.export());
+        Assertions.assertFalse(m.unmodifiable());
+        Assertions.assertFalse(m.escaped());
     }
 
     @Test
@@ -149,6 +151,44 @@ public class ClassParseTest extends BaseParseTest {
         var method = def.methods().get(name);
         Assertions.assertEquals(name, method.name());
         Assertions.assertTrue(method.export());
+        Assertions.assertFalse(method.unmodifiable());
+        Assertions.assertFalse(method.escaped());
+    }
+
+    @Test
+    public void testMethod3() {
+        var name = randVarName(16);
+        var code = "class A { export func %s#() {} }".formatted(name);
+        var def = (ClassDefinition) doParseType(code, "A");
+        var method = def.methods().get(name);
+        Assertions.assertEquals(name, method.name());
+        Assertions.assertTrue(method.export());
+        Assertions.assertTrue(method.unmodifiable());
+        Assertions.assertFalse(method.escaped());
+    }
+
+    @Test
+    public void testMethod4() {
+        var name = randVarName(16);
+        var code = "class A { export func %s*() {} }".formatted(name);
+        var def = (ClassDefinition) doParseType(code, "A");
+        var method = def.methods().get(name);
+        Assertions.assertEquals(name, method.name());
+        Assertions.assertTrue(method.export());
+        Assertions.assertFalse(method.unmodifiable());
+        Assertions.assertTrue(method.escaped());
+    }
+
+    @Test
+    public void testMethod5() {
+        var name = randVarName(16);
+        var code = "class A { export func %s*#() {} }".formatted(name);
+        var def = (ClassDefinition) doParseType(code, "A");
+        var method = def.methods().get(name);
+        Assertions.assertEquals(name, method.name());
+        Assertions.assertTrue(method.export());
+        Assertions.assertTrue(method.unmodifiable());
+        Assertions.assertTrue(method.escaped());
     }
 
 }

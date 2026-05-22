@@ -12,14 +12,14 @@ import org.cossbow.feng.util.Optional;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 
 public class ClassMethod extends Method
         implements Exportable {
     private Modifier modifier;
     private Identifier name;
     private TypeParameters generic;
-    private boolean unmodifiable;
+    private final boolean escaped;
+    private final boolean unmodifiable;
     private Prototype prototype;
     private Optional<Procedure> procedure;
     private boolean returnThis;
@@ -28,6 +28,7 @@ public class ClassMethod extends Method
                        Modifier modifier,
                        Identifier name,
                        TypeParameters generic,
+                       boolean escaped,
                        boolean unmodifiable,
                        Prototype prototype,
                        Optional<Procedure> procedure,
@@ -36,6 +37,7 @@ public class ClassMethod extends Method
         this.modifier = modifier;
         this.name = name;
         this.generic = generic;
+        this.escaped = escaped;
         this.unmodifiable = unmodifiable;
         this.prototype = prototype;
         this.procedure = procedure;
@@ -46,10 +48,11 @@ public class ClassMethod extends Method
                        Modifier modifier,
                        Identifier name,
                        TypeParameters generic,
+                       boolean escaped,
                        boolean unmodifiable,
                        Procedure procedure,
                        boolean returnThis) {
-        this(pos, modifier, name, generic,
+        this(pos, modifier, name, generic, escaped,
                 unmodifiable, procedure.prototype(),
                 Optional.of(procedure), returnThis);
     }
@@ -58,11 +61,13 @@ public class ClassMethod extends Method
                        Modifier modifier,
                        Identifier name,
                        TypeParameters generic,
+                       boolean escaped,
                        boolean unmodifiable,
                        Prototype prototype,
                        boolean returnThis) {
-        this(pos, modifier, name, generic, unmodifiable,
-                prototype, Optional.empty(), returnThis);
+        this(pos, modifier, name, generic, escaped,
+                unmodifiable, prototype,
+                Optional.empty(), returnThis);
     }
 
     public boolean export() {
@@ -97,13 +102,18 @@ public class ClassMethod extends Method
         return generic;
     }
 
+    public boolean escaped() {
+        return escaped;
+    }
+
     public boolean unmodifiable() {
         return unmodifiable;
     }
 
     public ClassMethod declaration() {
         return new ClassMethod(pos(), modifier, name,
-                generic, unmodifiable, prototype, returnThis);
+                generic, escaped, unmodifiable, prototype,
+                returnThis);
     }
 
     public Position pos() {
@@ -127,12 +137,6 @@ public class ClassMethod extends Method
         return override;
     }
 
-    public void seeOverride(Consumer<ClassMethod> user) {
-        for (var m : override) {
-            user.accept(m);
-            m.seeOverride(user);
-        }
-    }
 
     //
     @Override

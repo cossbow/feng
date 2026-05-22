@@ -245,6 +245,9 @@ public class SemanticAnalysis {
         result.dagInterfaces = visitInterfaces(table.types);
         // 最后分析类
         result.dagClasses = visitClasses(table.types);
+        // 检查函数声明
+        result.functionList = table.functions.stream()
+                .map(this::declareFunc).toList();
 
         // 然后分析其他全局变量
         var rest = subtract(table.variables.values(),
@@ -258,10 +261,7 @@ public class SemanticAnalysis {
         visitAttribute(table.types);
 
         // 分析函数：包括函数中的语句
-        result.functionList = table.functions
-                .stream().map(this::analyse)
-                .filter(f -> !f.entry())
-                .toList();
+        result.functionList.forEach(this::analyse);
         table.main.use(this::checkMain);
         result.main.set(table.main);
 
@@ -725,7 +725,7 @@ public class SemanticAnalysis {
                         pm, cm, cm.pos());
                 return;
             }
-            checkUnmodifiable(pm, cm);
+            checkMethodFlags(pm, cm);
             if (pm.export() != cm.export()) {
                 semantic("override require same export: ",
                         cm.pos());
@@ -774,17 +774,21 @@ public class SemanticAnalysis {
                         semantic("%s unimplement method: %s%s",
                                 cd.symbol(), im.name(), cd.pos());
                     }
-                    checkUnmodifiable(im, om.get());
+                    checkMethodFlags(im, om.get());
                 }
             }
         });
     }
 
-    void checkUnmodifiable(Method pm, Method sm) {
-        if (pm.unmodifiable() == sm.unmodifiable())
-            return;
-        semantic("method's unmodifiable-flag must same: %s <--> %s",
-                pm.pos(), sm.pos());
+    void checkMethodFlags(Method pm, Method sm) {
+        if (pm.escaped() != sm.escaped()) {
+            semantic("method's escaped-flag must same: %s <--> %s",
+                    pm.pos(), sm.pos());
+        }
+        if (pm.unmodifiable() != sm.unmodifiable()) {
+            semantic("method's unmodifiable-flag must same: %s <--> %s",
+                    pm.pos(), sm.pos());
+        }
     }
 
     private void checkImplList(
@@ -1077,13 +1081,13 @@ public class SemanticAnalysis {
             for (var m : pd.methods()) {
                 var om = id.allMethods().tryGet(m.name());
                 if (om.has()) {
-                    checkUnmodifiable(m, om.get());
+                    checkMethodFlags(m, om.get());
                     continue;
                 }
                 var pt = gm.instantiate(m.prototype());
                 var nm = new InterfaceMethod(m.pos(), m.modifier(),
-                        m.name(), m.generic(), m.unmodifiable(),
-                        pt, m.returnThis());
+                        m.name(), m.generic(), m.escaped(),
+                        m.unmodifiable(), pt, m.returnThis());
                 id.allMethods().add(m.name(), nm);
             }
         });
@@ -1137,8 +1141,14 @@ public class SemanticAnalysis {
 
     private FunctionDefinition enterFunc;
 
-    private FunctionDefinition analyse(FunctionDefinition fd) {
+    private FunctionDefinition declareFunc(FunctionDefinition fd) {
         analyse(fd.modifier());
+        analyse(fd.prototype(), false);
+        return fd;
+    }
+
+    private FunctionDefinition analyse(FunctionDefinition fd) {
+
         assert enterFunc == null;
         enterFunc = fd;
         analyse(fd.procedure());
@@ -1435,6 +1445,8 @@ public class SemanticAnalysis {
     private TypeValid referable(Refer lr, Optional<Refer> r,
                                 Optional<Expression> re, Entity e) {
         if (lr.kind() == PHANTOM) {
+            if (r.match(ref -> ref.isKind(PHANTOM)))
+                return TypeValid.ok();
             // 检查虚引用是否允许
             if (re.none()) return TypeValid.err(
                     "can't assign '%s' to phantom-refer: %s", r, e.pos());
@@ -1443,7 +1455,8 @@ public class SemanticAnalysis {
                 // 不可修改引用必须单向传递
                 if (!unmodifiable(v, false) || lr.unmodifiable())
                     return TypeValid.ok();
-                return TypeValid.err("can't convert: unmodifiable -> mutable: %s", lr.pos());
+                return TypeValid.err("can't convert: unmodifiable -> mutable: %s",
+                        v.pos());
             }
             return TypeValid.err("can't convert '%s' to phantom refer: %s",
                     v, v.pos());
@@ -1451,11 +1464,11 @@ public class SemanticAnalysis {
         assert lr.kind() == STRONG;
 
         if (!r.has())
-            return TypeValid.err("strong-refer can't refer value: %s", lr.pos());
+            return TypeValid.err("strong-refer can't refer value: %s", e.pos());
 
         var rr = r.get();
         if (rr.isKind(PHANTOM))
-            return TypeValid.err("can't convert: phantom -> strong: %s", lr.pos());
+            return TypeValid.err("can't convert: phantom -> strong: %s", e.pos());
 
         return checkUnmodifiable(lr, rr);
     }
@@ -3268,10 +3281,12 @@ public class SemanticAnalysis {
 
     private Groups.G2<Expression, TypeDeclarer> optimize(CurrentExpression e) {
         assert enterClass != null;
+        assert enterMethod != null;
         // 必定是在类的方法里
         var dt = new DerivedType(e.pos(), e.type(), TypeArguments.EMPTY);
         dt.def(enterClass);
-        var ref = new Refer(e.pos(), PHANTOM, true, false);
+        var kind = enterMethod.escaped() ? STRONG : PHANTOM;
+        var ref = new Refer(e.pos(), kind, true, false);
         var td = new DerivedTypeDeclarer(e.pos(), dt, Optional.of(ref));
         return Groups.g2(e, td);
     }
@@ -3468,6 +3483,12 @@ public class SemanticAnalysis {
                 cd.symbol(), name, name.pos());
     }
 
+    void checkEscaped(DerivedTypeDeclarer st, Method m, Entity e) {
+        if (!m.escaped() || st.isKind(STRONG))
+            return;
+        semantic("only Strong-Refer can call escaped-method '%s': %s", m, e.pos());
+    }
+
     void checkUnmodifiable(PrimaryExpression s, Method m, Entity e) {
         if (!unmodifiable(s, false)) return;
         if (m.unmodifiable()) return;
@@ -3500,6 +3521,7 @@ public class SemanticAnalysis {
         var om = cd.allMethods().tryGet(name);
         if (om.has()) {
             var m = checkExport(om.get(), cd, name);
+            checkEscaped(st, m, name);
             checkUnmodifiable(s, m, name);
             var gm = genericMap(name, st.gm(), m.generic(), generic);
             var prot = gm.instantiate(m.prototype());
@@ -3554,6 +3576,7 @@ public class SemanticAnalysis {
             if (om.has()) {
                 invalid(generic);
                 var m = om.get();
+                checkEscaped(st, m, name);
                 checkUnmodifiable(s, m, name);
                 var prot = st.gm().instantiate(m.prototype());
                 var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
@@ -3743,6 +3766,10 @@ public class SemanticAnalysis {
             var om = enterClass.allMethods().tryGet(s.name());
             if (om.has()) {
                 var m = om.get();
+                if (!enterMethod.escaped() && m.escaped()) {
+                    return semantic("unescaped method can't call " +
+                            "escaped method: %s", re.pos());
+                }
                 if (enterMethod.unmodifiable() && !m.unmodifiable()) {
                     return semantic("unmodifiable method can't call " +
                             "modifiable method: %s", re.pos());
@@ -4182,8 +4209,8 @@ public class SemanticAnalysis {
         var pt = new Prototype(mf.pos(), new ParameterSet(mf.pos()));
         var body = new BlockStatement(mf.pos(), mf.procedure().body(), false);
         var proc = new Procedure(mf.pos(), pt, body, Map.of());
-        var cm = new ClassMethod(mf.pos(), Modifier.empty(),
-                mf.makeId(), TypeParameters.empty(), false, proc, false);
+        var cm = new ClassMethod(mf.pos(), Modifier.empty(), mf.makeId(),
+                TypeParameters.empty(), false, false, proc, false);
         cd.methods().add(cm.name(), cm);
         cd.resourceFree().set(cm);
     }
@@ -4336,7 +4363,7 @@ public class SemanticAnalysis {
         rs.procedure().set(proc);
 
         var cm = new ClassMethod(mf.pos(), Modifier.empty(), mf.makeId(),
-                TypeParameters.empty(), unmodifiable, proc, false);
+                TypeParameters.empty(), false, unmodifiable, proc, false);
         cm.master(cd);
         return cm;
     }

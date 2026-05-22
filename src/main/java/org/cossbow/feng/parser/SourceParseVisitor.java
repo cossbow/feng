@@ -709,11 +709,12 @@ final class SourceParseVisitor
         var name = identifier(ctx.name);
         methodReturnThis = false;
         var generic = typeParameters(ctx.typeParameters());
+        var escaped = ctx.escaped != null;
         var unmodifiable = ctx.unmodifiable != null;
         genericStack.push(generic);
         var prototype = (Prototype) visit(ctx.prototype());
         var method = new InterfaceMethod(pos, modifier, name, generic,
-                unmodifiable, prototype, methodReturnThis);
+                escaped, unmodifiable, prototype, methodReturnThis);
         genericStack.pop();
         methodReturnThis = false;
         return method;
@@ -786,6 +787,7 @@ final class SourceParseVisitor
                 var mName = identifier(def.name);
                 methodReturnThis = false;
                 var mGeneric = typeParameters(def.typeParameters());
+                var escaped = def.escaped != null;
                 var unmodifiable = def.unmodifiable != null;
                 genericStack.push(mGeneric);
                 var proc = this.<Procedure>visitOptional(def.procedure());
@@ -797,15 +799,15 @@ final class SourceParseVisitor
                         return semantic("method implementation can't be in metadata: %s",
                                 posOf(def));
                     }
-                    method = new ClassMethod(posOf(mi), mModifier, mName,
-                            mGeneric, unmodifiable, proc.get(), methodReturnThis);
+                    method = new ClassMethod(posOf(mi), mModifier, mName, mGeneric,
+                            escaped, unmodifiable, proc.get(), methodReturnThis);
                 } else {
                     if (!metadata) {
                         return semantic("method declaration can't be in source: %s",
                                 posOf(def));
                     }
-                    method = new ClassMethod(posOf(mi), mModifier, mName,
-                            mGeneric, unmodifiable, pt.must(), methodReturnThis);
+                    method = new ClassMethod(posOf(mi), mModifier, mName, mGeneric,
+                            escaped, unmodifiable, pt.must(), methodReturnThis);
                 }
                 methods.add(mName, method);
                 methodReturnThis = false;
@@ -1581,6 +1583,10 @@ final class SourceParseVisitor
     public Entity visitFunctionDefinition(
             FengParser.FunctionDefinitionContext ctx) {
         var modifier = parseModifier(ctx.modifier());
+        if (ctx.def.escaped != null) {
+            return semantic("function not support escaped mark: %s",
+                    posOf(ctx.def.unmodifiable));
+        }
         if (ctx.def.unmodifiable != null) {
             return semantic("function not support unmodifiable mark: %s",
                     posOf(ctx.def.unmodifiable));
