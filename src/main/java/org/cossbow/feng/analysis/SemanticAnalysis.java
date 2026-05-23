@@ -47,8 +47,12 @@ public class SemanticAnalysis {
     private final StackedContext context;
     private final boolean low;
 
-    private final LiteralComputer computer = new LiteralComputer();
+    // Constant expression calculator
+    private final LiteralCalculator calculator = new LiteralCalculator();
+    // Used for deduplication of string literals
     private final DedupCache<StringLiteral> stringCache;
+    // The current tool class has some states, so it cannot be reused
+    private boolean used;
 
     public SemanticAnalysis(ParseSymbolTable table,
                             SymbolContext root,
@@ -136,6 +140,14 @@ public class SemanticAnalysis {
         }
     }
 
+    /**
+     * Search for dependencies of global variables to
+     * construct a dependency graph
+     * @param all Global variable symbol table
+     * @param expr The expression to be searched
+     * @param isConst Only constants are being searched
+     * @return Dependent variables
+     */
     private Set<GlobalVariable> searchDependencies(
             IdentifierMap<GlobalVariable> all,
             Expression expr, boolean isConst) {
@@ -147,8 +159,10 @@ public class SemanticAnalysis {
             switch (c) {
                 case SymbolExpression e -> {
                     var s = e.symbol();
-                    if (s.module().has())
+                    if (s.module().has()) {
+                        // Not Support cross-module dependencies
                         return unsupported("module");
+                    }
 
                     var ov = all.tryGet(s.name());
                     if (ov.none()) {
@@ -180,14 +194,15 @@ public class SemanticAnalysis {
                 case MemberOfExpression e -> q.add(e.subject());
                 case LiteralExpression e -> {
                 }
-                // 其他的Expression类型并不是通过解析创建的，这时不用管
                 case null, default -> semantic("can't depend of global: %s", c);
             }
         }
         return deps;
     }
 
-    // 创建全局变量的依赖图：便于bfs遍历分析
+    /**
+     * Construct global variable dependency graph
+     */
     private DAGGraph<GlobalVariable>
     globalGraph(Collection<GlobalVariable> list,
                 IdentifierMap<GlobalVariable> all,
@@ -208,6 +223,9 @@ public class SemanticAnalysis {
         return makeDAG(gvs.values(), edges);
     }
 
+    /**
+     * Build dependency graph and analyze based on topological order
+     */
     private DAGGraph<GlobalVariable>
     globalVarInit(Collection<GlobalVariable> list,
                   IdentifierMap<GlobalVariable> all,
@@ -226,41 +244,55 @@ public class SemanticAnalysis {
     }
 
     public AnalyseSymbolTable analyse() {
+        if (used) throw new IllegalStateException(
+                "The analysis tool is disposable");
+        used = true;
+
         var result = new AnalyseSymbolTable();
-        // 先分析全局常量：必须是const的基本类型才能是常量
+        // First, analyze the global basic type constants.
+        // Constant expressions include literals and
+        // arithmetic expressions.
         var constValues = table.variables.stream()
                 .filter(v -> v.declare() == Declare.CONST)
                 .collect(Collectors.toSet());
         var dagConst = globalVarInit(constValues, table.variables, true);
         result.constVars = dagConst.stream().filter(this::isConstVar).toList();
 
-        // 再依次分析定义的类型：先分析各类型的依赖图，检查循环依赖后再按BFS分析
-        // 枚举只可能依赖常量，第一个分析
+        // Then analyze the definitions
+        // Enums can only rely on global constants, so analyze first.
         result.enumList = visitEnum(table.types);
-        // 结构类型也只依赖常量：优先分析
+        // Structures can also only rely on global constants.
+        // The sizeof expression is only used for basic types,
+        // structure types, and their arrays. So the dependencies
+        // between structures can include sizeof expressions.
         result.dagStructures = visitStructures(table.types);
-        // 原型定义先分析：！！！这个可能有问题
+        // In prototype definition, only the array length needs
+        // to be initialized and determined.
         result.dagPrototypes = visitPrototype(table.types);
-        // 先分析接口
+        // In the interface definition, there are also arrays
+        // that need to be initialized, similar to the prototype.
         result.dagInterfaces = visitInterfaces(table.types);
-        // 最后分析类
+        // Class definition is the most complex, as it may relies
+        // on all types and functions. Therefore, we should
+        // first analyze the declaration part
         result.dagClasses = visitClasses(table.types);
-        // 检查函数声明
+        // A function may also depend on all types, so its
+        // prototype should also be analyzed first
         result.functionList = table.functions.stream()
                 .map(this::declareFunc).toList();
 
-        // 然后分析其他全局变量
+        // Then analyze the remaining global variables
         var rest = subtract(table.variables.values(),
                 result.constVars);
         result.dagVars = globalVarInit(rest, table.variables, false);
 
-        // 分析类的方法：包括方法中的语句
+        // Next, let's analyze the sentences in the method
         result.dagClasses.bfs(this::implMethod);
 
-        // 【未实现】属性
+        // [Unrealized] attribute
         visitAttribute(table.types);
 
-        // 分析函数：包括函数中的语句
+        // Finally, analyze the statements within the function
         result.functionList.forEach(this::analyse);
         table.main.use(this::checkMain);
         result.main.set(table.main);
@@ -2813,7 +2845,7 @@ public class SemanticAnalysis {
 
         if (lv instanceof IntegerLiteral ill &&
                 rv instanceof IntegerLiteral irl) {
-            var lit = computer.calc(op, ill, irl);
+            var lit = calculator.calc(op, ill, irl);
             var td = lit instanceof IntegerLiteral ?
                     Primitive.INT : Primitive.BOOL;
             return Groups.g2(new LiteralExpression(e.pos(), lit),
@@ -2822,7 +2854,7 @@ public class SemanticAnalysis {
 
         if (lv instanceof FloatLiteral fll &&
                 rv instanceof FloatLiteral frl) {
-            var lit = computer.calc(op, fll, frl);
+            var lit = calculator.calc(op, fll, frl);
             var td = lit instanceof FloatLiteral ?
                     Primitive.FLOAT : Primitive.BOOL;
             return Groups.g2(new LiteralExpression(e.pos(), lit),
@@ -2832,12 +2864,12 @@ public class SemanticAnalysis {
         if (lv instanceof BoolLiteral bll &&
                 rv instanceof BoolLiteral brl)
             return Groups.g2(new LiteralExpression(e.pos(),
-                            computer.calc(op, bll, brl)),
+                            calculator.calc(op, bll, brl)),
                     Primitive.BOOL.declarer(e.pos()));
 
         if (lv instanceof StringLiteral sll &&
                 rv instanceof StringLiteral srl) {
-            var lit = computer.calc(op, sll, srl);
+            var lit = calculator.calc(op, sll, srl);
             lit = stringCache.dedup(lit);
             var td = new LiteralTypeDeclarer(e.pos(), lit);
             return Groups.g2(new LiteralExpression(e.pos(), lit), td);
@@ -2845,7 +2877,7 @@ public class SemanticAnalysis {
 
         if (lv instanceof NilLiteral a &&
                 rv instanceof NilLiteral b) {
-            var lit = computer.calc(op, a, b);
+            var lit = calculator.calc(op, a, b);
             var td = new LiteralTypeDeclarer(e.pos(), lit);
             return Groups.g2(new LiteralExpression(e.pos(), lit), td);
         }

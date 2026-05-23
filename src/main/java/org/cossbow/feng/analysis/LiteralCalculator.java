@@ -10,7 +10,10 @@ import java.util.function.BiFunction;
 
 import static org.cossbow.feng.util.ErrorUtil.semantic;
 
-public class LiteralComputer {
+/**
+ * Constant expression calculator
+ */
+public class LiteralCalculator {
 
     static final BigInteger MaxBits = BigInteger.valueOf(64);
     static final BigInteger MaxInt32 = BigInteger.valueOf(Integer.MAX_VALUE);
@@ -52,7 +55,7 @@ public class LiteralComputer {
             Map.entry(BinaryOperator.MUL, BigInteger::multiply),
             Map.entry(BinaryOperator.DIV, BigInteger::divide),
             Map.entry(BinaryOperator.MOD, BigInteger::mod),
-            Map.entry(BinaryOperator.POW, LiteralComputer::pow));
+            Map.entry(BinaryOperator.POW, LiteralCalculator::pow));
     static final Map<BinaryOperator, BiFunction<BigInteger, BigInteger, BigInteger>>
             integerBit = Map.ofEntries(
             Map.entry(BinaryOperator.BITAND, BigInteger::and),
@@ -134,7 +137,7 @@ public class LiteralComputer {
             Map.entry(BinaryOperator.MUL, BigDecimal::multiply),
             Map.entry(BinaryOperator.DIV, BigDecimal::divide),
             Map.entry(BinaryOperator.MOD, BigDecimal::remainder),
-            Map.entry(BinaryOperator.POW, LiteralComputer::pow));
+            Map.entry(BinaryOperator.POW, LiteralCalculator::pow));
 
     public static final Map<BinaryOperator, BiFunction<BigDecimal, BigDecimal, Boolean>>
             floatRel = Map.ofEntries(
