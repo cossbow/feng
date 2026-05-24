@@ -14,6 +14,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.cossbow.feng.ast.Position.*;
 
+/**
+ * The string literal does not correspond to the primitive type,
+ * and will be converted internally to a {@code [*]byte}.
+ * It can also initialize {@code [&]byte} or {@code [N]byte}.
+ */
 public class StringLiteral extends Literal {
     private final Charset charset;
     private final byte[] value;

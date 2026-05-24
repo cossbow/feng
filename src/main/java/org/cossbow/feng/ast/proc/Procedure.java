@@ -11,9 +11,22 @@ import org.cossbow.feng.ast.stmt.LabeledStatement;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * This is the executable body of function and class-method.
+ */
 public class Procedure extends Entity implements Scope {
+    /**
+     * This prototype is the same as the prototypes
+     * of functions and methods
+     */
     private final Prototype prototype;
+    /**
+     * The executable body
+     */
     private final BlockStatement body;
+    /**
+     * The labels defined in body of procedure
+     */
     private final Map<Identifier, LabeledStatement> labels;
 
     public Procedure(Position pos,
@@ -41,6 +54,9 @@ public class Procedure extends Entity implements Scope {
 
     //
 
+    /**
+     * Defined variables in this procedure, including parameters
+     */
     private volatile List<Variable> stack = List.of();
 
     public List<Variable> stack() {

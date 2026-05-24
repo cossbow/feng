@@ -3,8 +3,17 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 
+/**
+ * {@code new} an array instance of dynamic quantity elements
+ */
 public class NewArrayType extends NewType {
+    /**
+     * The element type of array
+     */
     private TypeDeclarer element;
+    /**
+     * The number of elements
+     */
     private Expression length;
 
     public NewArrayType(Position pos,

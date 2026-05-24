@@ -7,6 +7,9 @@ import org.cossbow.feng.util.Optional;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+/**
+ * Used to initialize the {@link Primitive.Kind#INTEGER} value.
+ */
 public class IntegerLiteral extends Literal
         implements Comparable<IntegerLiteral> {
     private final BigInteger value;

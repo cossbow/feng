@@ -17,13 +17,16 @@ public class InterfaceDefinition extends ObjectDefinition {
     /**
      * Methods declaration
      */
-    private IdentifierMap<InterfaceMethod> methods;
+    private final IdentifierMap<InterfaceMethod> methods;
     /**
      * The interface supports combination mode, where
      * other interfaces are referenced as components.
      */
-    private SymbolMap<DerivedType> parts;
-    private MacroTable macros;
+    private final SymbolMap<DerivedType> parts;
+    /**
+     * [imcompleted]
+     */
+    private final MacroTable macros;
 
     public InterfaceDefinition(Position pos,
                                Modifier modifier,

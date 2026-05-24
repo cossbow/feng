@@ -4,6 +4,11 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.util.Optional;
 
+/**
+ * Used to initialize the {@code bool} type value.
+ * <p>
+ * But there are only two values: {@code true} or {@code false}.
+ */
 public class BoolLiteral extends Literal {
     private final boolean value;
 

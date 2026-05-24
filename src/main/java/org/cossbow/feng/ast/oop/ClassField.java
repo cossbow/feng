@@ -9,9 +9,25 @@ import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 import java.util.Objects;
 
+/**
+ * Fields defined in a subclass cannot shadow fields
+ * of the same name in the superclass.
+ * <p>
+ * Define fields in classes:
+ * <p>
+ * Define a unmodifiable field: {@code const id int;}.
+ * <p>
+ * Define a modifiable field: {@code var count int;}
+ */
 public class ClassField extends Field {
-    private Modifier modifier;
-    private Declare declare;
+    /**
+     * Independent setting modifier
+     */
+    private final Modifier modifier;
+    /**
+     * Field can be const
+     */
+    private final Declare declare;
 
     public ClassField(Position pos,
                       Modifier modifier,
@@ -42,6 +58,9 @@ public class ClassField extends Field {
 
     //
 
+    /**
+     * Which class this field belong to
+     */
     private ClassDefinition master;
 
     public ClassDefinition master() {

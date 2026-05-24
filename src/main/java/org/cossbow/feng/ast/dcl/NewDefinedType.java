@@ -4,6 +4,9 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.DerivedType;
 
+/**
+ * {@code new} a single instance
+ */
 public class NewDefinedType extends NewType {
     private final DefinedType type;
 

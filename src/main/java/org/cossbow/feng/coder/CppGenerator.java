@@ -365,7 +365,6 @@ public class CppGenerator {
     }
 
     void declareFunction(FunctionDefinition fd) {
-        if (fd.entry()) return;
         write(fd.generic());
         write(fd.symbol(), fd.procedure().prototype());
         endStmt();

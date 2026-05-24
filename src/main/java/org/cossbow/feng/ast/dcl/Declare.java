@@ -1,7 +1,16 @@
 package org.cossbow.feng.ast.dcl;
 
+/**
+ * Use to declare variables and class fields.
+ */
 public enum Declare {
+    /**
+     * Declare a mutable variable
+     */
     VAR("var"),
+    /**
+     * Declare a immutable variable
+     */
     CONST("const"),
     ;
 

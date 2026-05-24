@@ -6,8 +6,15 @@ import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.dcl.VoidTypeDeclarer;
 import org.cossbow.feng.util.Optional;
 
+/**
+ * The prototype of a procedure includes a parameter table
+ * declaration and a return value declaration.
+ * <p>
+ * All callable programs have a prototype, including functions,
+ * methods, and variables of function types
+ */
 public class Prototype extends Entity {
-    private ParameterSet parameterSet;
+    private final ParameterSet parameterSet;
     private Optional<TypeDeclarer> returnSet;
 
     public Prototype(Position pos,
@@ -31,10 +38,6 @@ public class Prototype extends Entity {
 
     public ParameterSet parameterSet() {
         return parameterSet;
-    }
-
-    public void parameterSet(ParameterSet parameterSet) {
-        this.parameterSet = parameterSet;
     }
 
     public Optional<TypeDeclarer> returnSet() {
@@ -75,9 +78,8 @@ public class Prototype extends Entity {
         result = 31 * result + returnSet.hashCode();
         return result;
     }
-//
 
-
+    //
     @Override
     public String toString() {
         if (returnSet.none())

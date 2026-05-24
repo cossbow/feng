@@ -178,7 +178,7 @@ public class MetaDataExtractor {
     }
 
     private void write(FunctionDefinition fd) {
-        if (fd.builtin() || fd.entry()) return;
+        if (fd.builtin()) return;
         write(fd.modifier());
         write(TypeDomain.FUNC).space().write(fd.symbol().name());
         write(fd.generic()).write(fd.prototype()).endStmt();

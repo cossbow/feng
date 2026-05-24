@@ -13,16 +13,46 @@ import org.cossbow.feng.util.Optional;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Class method is an executable procedure.
+ */
 public class ClassMethod extends Method
         implements Exportable {
-    private Modifier modifier;
-    private Identifier name;
-    private TypeParameters generic;
+    /**
+     * Independent setting modifier
+     */
+    private final Modifier modifier;
+    /**
+     * For identify method
+     */
+    private final Identifier name;
+    /**
+     * Allow generic parameters to be defined on methods
+     */
+    private final TypeParameters generic;
+    /**
+     * This method must be an escaped instance to be called
+     */
     private final boolean escaped;
+    /**
+     * This method can't modify the instance
+     */
     private final boolean unmodifiable;
-    private Prototype prototype;
-    private Optional<Procedure> procedure;
-    private boolean returnThis;
+    /**
+     * The prototype of this method
+     */
+    private final Prototype prototype;
+    /**
+     * Procedure is the implementation of this method,
+     * it is non empty in the defined class.
+     * <p>
+     * The metadata does not include the procedure.
+     */
+    private final Optional<Procedure> procedure;
+    /**
+     * [imcompleted]
+     */
+    private final boolean returnThis;
 
     public ClassMethod(Position pos,
                        Modifier modifier,
@@ -90,10 +120,6 @@ public class ClassMethod extends Method
         return prototype;
     }
 
-    public void prototype(Prototype prototype) {
-        this.prototype = prototype;
-    }
-
     public Optional<Procedure> procedure() {
         return procedure;
     }
@@ -110,20 +136,20 @@ public class ClassMethod extends Method
         return unmodifiable;
     }
 
-    public ClassMethod declaration() {
-        return new ClassMethod(pos(), modifier, name,
-                generic, escaped, unmodifiable, prototype,
-                returnThis);
-    }
-
     public Position pos() {
         return name.pos();
     }
 
     //
 
+    /**
+     * Which class this method belong to
+     */
     private ClassDefinition master;
-    private List<ClassMethod> override = new ArrayList<>();
+    /**
+     * Recorded all the method definition that override this method
+     */
+    private final List<ClassMethod> override = new ArrayList<>();
 
     public ClassDefinition master() {
         return master;

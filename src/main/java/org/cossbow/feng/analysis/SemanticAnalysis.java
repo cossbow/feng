@@ -143,8 +143,9 @@ public class SemanticAnalysis {
     /**
      * Search for dependencies of global variables to
      * construct a dependency graph
-     * @param all Global variable symbol table
-     * @param expr The expression to be searched
+     *
+     * @param all     Global variable symbol table
+     * @param expr    The expression to be searched
      * @param isConst Only constants are being searched
      * @return Dependent variables
      */
@@ -739,13 +740,16 @@ public class SemanticAnalysis {
             return;
         }
 
-        // 检查方法覆盖是否兼容
+        // Check if the method override is compatible
+        // and create a declaration cache that replaces
+        // the template parameters in the subclass definition
         for (var pm : pd.allMethods()) {
             var o = cd.methods().tryGet(pm.name());
             if (o.none()) {
-                var cm = pm.declaration();
-                var pp = pt.gm().instantiate(cm.prototype());
-                cm.prototype(pp);
+                var pp = pt.gm().instantiate(pm.prototype());
+                var cm = new ClassMethod(pm.pos(), pm.modifier(),
+                        pm.name(), pm.generic(), pm.escaped(),
+                        pm.unmodifiable(), pp, pm.returnThis());
                 cm.master(cd);
                 cd.inheritMethods().add(cm.name(), cm);
                 cd.allMethods().add(cm.name(), cm);
@@ -1144,7 +1148,6 @@ public class SemanticAnalysis {
     //
 
     private void checkMain(FunctionDefinition fd) {
-        assert fd.entry() : "only check main function";
         analyse(fd);
 
         var prot = fd.prototype();
@@ -1153,9 +1156,9 @@ public class SemanticAnalysis {
                     prot.returnSet().get().pos());
             return;
         }
-        if (prot.parameterSet().size() > 1) {
-            semantic("func main can't has more parameters: %s",
-                    prot.parameterSet().getVar(1).pos());
+        if (prot.parameterSet().size() != 1) {
+            semantic("func main can have only one parameter: %s",
+                    prot.parameterSet().pos());
             return;
         }
         var t = prot.parameterSet().getType(0);
@@ -3720,11 +3723,23 @@ public class SemanticAnalysis {
         return Groups.g2(n, dtd);
     }
 
+    /**
+     * New generic types rely on the property of
+     * generic constraints, as we only allow the
+     * creation of non referenced types and do
+     * not support multi-level references.
+     */
+    private Groups.G2<Expression, TypeDeclarer>
+    analyseNewType(NewExpression e, GenericType dt) {
+        return unsupported("new generic type");
+    }
+
     private Groups.G2<Expression, TypeDeclarer>
     analyseNewType(NewExpression e, NewDefinedType nt) {
         return switch (nt.type()) {
             case PrimitiveType pt -> analyseNewType(e, pt);
             case DerivedType dt -> analyseNewType(e, dt);
+            case GenericType gt -> analyseNewType(e, gt);
             case null, default -> unreachable();
         };
     }

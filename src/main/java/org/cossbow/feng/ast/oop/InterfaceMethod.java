@@ -11,13 +11,38 @@ import org.cossbow.feng.util.CommonUtil;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Unlike {@link ClassMethod}, {@link InterfaceMethod} only have
+ * prototype declarations and do not include implementation.
+ */
 public class InterfaceMethod extends Method {
+    /**
+     * {@link ClassMethod#modifier}
+     */
     private final Modifier modifier;
+    /**
+     * {@link ClassMethod#name}
+     */
     private final Identifier name;
+    /**
+     * {@link ClassMethod#generic}
+     */
     private final TypeParameters generic;
+    /**
+     * {@link ClassMethod#escaped}
+     */
     private final boolean escaped;
+    /**
+     * {@link ClassMethod#unmodifiable}
+     */
     private final boolean unmodifiable;
+    /**
+     * {@link ClassMethod#prototype}
+     */
     private final Prototype prototype;
+    /**
+     * {@link ClassMethod#returnThis}
+     */
     private final boolean returnThis;
 
     public InterfaceMethod(Position pos,
@@ -66,7 +91,15 @@ public class InterfaceMethod extends Method {
         return returnThis;
     }
 
+    //
+
+    /**
+     * Which interface this method belong to
+     */
     private InterfaceDefinition master;
+    /**
+     * Recorded all implementations of this method
+     */
     private final List<ClassMethod> override = new ArrayList<>();
 
     public InterfaceDefinition master() {

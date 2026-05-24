@@ -6,6 +6,9 @@ import org.cossbow.feng.util.Optional;
 
 import java.math.BigDecimal;
 
+/**
+ * Used to initialize the {@link Primitive.Kind#FLOAT} value.
+ */
 public class FloatLiteral extends Literal {
     private final BigDecimal value;
 

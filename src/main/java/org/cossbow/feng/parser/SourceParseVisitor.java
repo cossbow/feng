@@ -142,6 +142,9 @@ final class SourceParseVisitor
         if (ParseSymbolTable.isBuiltin(id)) {
             return semantic("name '%s' has used by builtin-type: %s", id, id.pos());
         }
+        if (FunctionDefinition.MAIN_ID.equals(id)) {
+            return FunctionDefinition.MAIN_SYMBOL;
+        }
         return new Symbol(id.pos(), module, id);
     }
 
@@ -205,7 +208,7 @@ final class SourceParseVisitor
             FengParser.GlobalFunctionDefinitionContext ctx) {
         var fd = (FunctionDefinition) visit(ctx.def);
         checkGlobalName(fd.symbol().name(), fd);
-        if (fd.entry()) {
+        if (FunctionDefinition.MAIN_SYMBOL.equals(fd.symbol())) {
             table.main.setIfNone(fd);
         } else {
             table.functions.add(fd.symbol().name(), fd);

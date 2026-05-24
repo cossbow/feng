@@ -8,10 +8,18 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.util.Optional;
 
+/**
+ * Function is an executable procedure.
+ */
 public class FunctionDefinition extends Definition {
-    private Prototype prototype;
-    private Optional<Procedure> procedure;
-    private boolean entry;
+    /**
+     * The prototype of this function
+     */
+    private final Prototype prototype;
+    /**
+     * This field is non empty unless it is in the metadata
+     */
+    private final Optional<Procedure> procedure;
 
     private FunctionDefinition(Position pos,
                                Modifier modifier,
@@ -19,10 +27,9 @@ public class FunctionDefinition extends Definition {
                                TypeParameters generic,
                                Prototype prototype,
                                Optional<Procedure> procedure) {
-        super(pos, modifier, checkEntry(symbol), generic);
+        super(pos, modifier, symbol, generic);
         this.prototype = prototype;
         this.procedure = procedure;
-        entry = MAIN_ID.equals(symbol().name());
     }
 
     public FunctionDefinition(Position pos,
@@ -44,11 +51,6 @@ public class FunctionDefinition extends Definition {
                 prototype, Optional.empty());
     }
 
-    private static Symbol checkEntry(Symbol s) {
-        if (!MAIN_ID.equals(s.name())) return s;
-        return new Symbol(s.name());
-    }
-
     public Procedure procedure() {
         return procedure.must();
     }
@@ -58,13 +60,13 @@ public class FunctionDefinition extends Definition {
     }
 
 
-    public boolean entry() {
-        return entry;
-    }
-
     //
 
+    /**
+     * func main is the entry of a executable program
+     */
     public static final Identifier MAIN_ID = new Identifier("main");
+    public static final Symbol MAIN_SYMBOL = new Symbol(MAIN_ID);
 
 
     //

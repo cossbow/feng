@@ -12,10 +12,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class Variable extends Entity
         implements Exportable {
+    /**
+     * For modifying variable
+     */
     private final Modifier modifier;
     private final Declare declare;
+    /**
+     * For identifying variables
+     */
     private final Identifier name;
+    /**
+     * If the type is omitted, it's inferred in the analysis
+     */
     private Lazy<TypeDeclarer> type;
+    /**
+     * For initialization
+     */
     private Lazy<Expression> value;
 
     public Variable(Position pos,
@@ -58,6 +70,10 @@ public class Variable extends Entity
 
     //
 
+    /**
+     * Because variable Shadowing is allowed, this self
+     * increasing ID is used to distinguish it.
+     */
     private final int id = IdGenerator.getAndIncrement();
 
     public int id() {
@@ -70,7 +86,7 @@ public class Variable extends Entity
     @Override
     public Entity clone() {
         var r = (Variable) super.clone();
-        // clone Lazy<T>: 防止被修改
+        // Sharing Lazy<T>may result in unexpected modifications
         r.type = type.clone();
         r.value = value.clone();
         return r;

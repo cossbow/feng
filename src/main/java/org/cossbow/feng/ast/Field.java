@@ -2,10 +2,26 @@ package org.cossbow.feng.ast;
 
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
+/**
+ * Using to storage the value:
+ * <p>
+ * 1. read the value: {@code var id = user.id;}
+ * <p>
+ * 2. write the value: {@code user.id = id;}
+ */
 abstract
 public class Field extends Entity
         implements Exportable {
-    private Identifier name;
+    /**
+     * The identifier for the field
+     */
+    private final Identifier name;
+    /**
+     * The type can be resetted in analysis,
+     * because the length of the array may be
+     * a constant expression, it needs to be
+     * set to the calculated value during analysis.
+     */
     private TypeDeclarer type;
 
     public Field(Position pos,
@@ -16,6 +32,10 @@ public class Field extends Entity
         this.type = type;
     }
 
+    /**
+     * Allow some types to set whether to export
+     * when defining fields
+     */
     public boolean export() {
         return true;
     }
@@ -36,6 +56,9 @@ public class Field extends Entity
         return false;
     }
 
+    /**
+     * Some abstract field can't be phantom-referenced
+     */
     public boolean enablePhantom() {
         return true;
     }

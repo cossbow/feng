@@ -1,7 +1,16 @@
 package org.cossbow.feng.ast.dcl;
 
+/**
+ * Reference Kind
+ */
 public enum ReferKind {
+    /**
+     * reference a escaped instance
+     */
     STRONG('*'),
+    /**
+     * reference for a while
+     */
     PHANTOM('&'),
     ;
 
@@ -11,3 +20,4 @@ public enum ReferKind {
         this.symbol = symbol;
     }
 }
+
