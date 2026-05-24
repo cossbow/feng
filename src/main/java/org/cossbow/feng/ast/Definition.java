@@ -1,19 +1,26 @@
 package org.cossbow.feng.ast;
 
 import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.ast.proc.FunctionDefinition;
 
-import java.util.HashMap;
-import java.util.Map;
-
+/**
+ * Mainly divided into two branches:
+ * {@link TypeDefinition} and {@link FunctionDefinition}.
+ */
 abstract
 public class Definition extends Entity
         implements Exportable {
-    private Modifier modifier;
-    private Symbol symbol;
-    private TypeParameters generic;
+    private final Modifier modifier;
+    /**
+     * The defined name is converted into
+     * a unified symbol during parsing
+     */
+    private final Symbol symbol;
+    /**
+     * Declared generic type parameters
+     */
+    private final TypeParameters generic;
 
     public Definition(Position pos,
                       Modifier modifier,
@@ -43,9 +50,10 @@ public class Definition extends Entity
 
     //
 
+    /**
+     * Set when automatically creating builtin definitions
+     */
     private boolean builtin;
-    public final Map<TypeArguments, Definition> instantiated = new HashMap<>();
-    public final Lazy<Definition> template = Lazy.nil();
 
     public boolean builtin() {
         return builtin;

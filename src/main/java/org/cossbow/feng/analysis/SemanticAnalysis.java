@@ -249,7 +249,7 @@ public class SemanticAnalysis {
         used = true;
 
         var result = new AnalyseSymbolTable();
-        // First, analyze the global basic type constants.
+        // First, analyze the global primitive-type constants.
         // Constant expressions include literals and
         // arithmetic expressions.
         var constValues = table.variables.stream()
@@ -262,7 +262,7 @@ public class SemanticAnalysis {
         // Enums can only rely on global constants, so analyze first.
         result.enumList = visitEnum(table.types);
         // Structures can also only rely on global constants.
-        // The sizeof expression is only used for basic types,
+        // The sizeof expression is only used for primitive-types,
         // structure types, and their arrays. So the dependencies
         // between structures can include sizeof expressions.
         result.dagStructures = visitStructures(table.types);

@@ -14,12 +14,34 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 public class ClassDefinition extends ObjectDefinition {
-    private boolean isFinal;
-    private Optional<DerivedType> inherit;
-    private SymbolMap<DerivedType> impl;
-    private IdentifierMap<ClassField> fields;
-    private IdentifierMap<ClassMethod> methods;
-    private MacroTable macros;
+    // The following are the properties defined in the syntax:
+    /**
+     * Final classes do not allow inheritance, being inherited,
+     * or abstraction. Without dynamic features, some optimizations
+     * can be made, such as omitting type pointers when allocating
+     * memory.
+     */
+    private final boolean isFinal;
+    /**
+     * Inheritance declaration is optional, only the final class
+     * and built-in Object class are empty. In other cases,
+     * if not declared, it will automatically be set as a
+     * symbolic reference to the Object class.
+     */
+    private final Optional<DerivedType> inherit;
+    /**
+     * Implement the interface set for declaration.
+     */
+    private final SymbolMap<DerivedType> impl;
+    /**
+     * Fields Definition
+     */
+    private final IdentifierMap<ClassField> fields;
+    /**
+     * Methods Definition
+     */
+    private final IdentifierMap<ClassMethod> methods;
+    private final MacroTable macros;
 
     public ClassDefinition(Position pos,
                            Modifier modifier,
@@ -80,10 +102,6 @@ public class ClassDefinition extends ObjectDefinition {
         return fields;
     }
 
-    public void fields(IdentifierMap<ClassField> fields) {
-        this.fields = fields;
-    }
-
     public IdentifierMap<ClassMethod> methods() {
         return methods;
     }
@@ -98,17 +116,59 @@ public class ClassDefinition extends ObjectDefinition {
 
     //
 
+    /**
+     * Automatically generate class IDs for implementing dynamic features
+     */
     private final int id = IdGenerator.getAndIncrement();
+    /**
+     * After analyzing the {@link #inherit}, cache will be defined here
+     */
     private final Lazy<ClassDefinition> parent = Lazy.nil();
+    /**
+     * Cache all ancestors when analyzing inheritance
+     */
     private final Set<ClassDefinition> ancestors = new HashSet<>();
+    /**
+     * All interfaces implemented directly or indirectly
+     */
     private final Set<InterfaceDefinition> allImpls = new HashSet<>();
+    /**
+     * All field sets: including {@link #fields} and {@link #inheritFields}
+     */
     private IdentifierMap<ClassField> allFields = new IdentifierMap<>();
+    /**
+     * All inherited field sets
+     */
     private IdentifierMap<ClassField> inheritFields = new IdentifierMap<>();
+    /**
+     * All method sets: including {@link #methods} and {@link #inheritMethods}
+     */
     private IdentifierMap<ClassMethod> allMethods = new IdentifierMap<>();
+    /**
+     * All inherited method sets
+     */
     private IdentifierMap<ClassMethod> inheritMethods = new IdentifierMap<>();
+    /**
+     * Resource class analysis callback：
+     * <p>
+     * {@code  macro resource free() {}}
+     */
     private final Lazy<ClassMethod> resourceFree = Lazy.nil();
+    /**
+     * Implemented binary operations
+     */
     private Map<BinaryOperator, ClassMethod> binaryOperators = new HashMap<>();
+    /**
+     * Implemented unary operations
+     */
     private Map<UnaryOperator, ClassMethod> unaryOperators = new HashMap<>();
+    /**
+     * Implemented index operation:
+     * <p>
+     * {@code var v = a[i];}
+     * <p>
+     * {@code a[i] = v;}
+     */
     private final Lazy<IndexOperator> indexOperator = Lazy.nil();
 
     public int id() {
@@ -185,7 +245,7 @@ public class ClassDefinition extends ObjectDefinition {
     public static final Symbol ObjectSymbol = new Symbol(ObjectName);
     public static final DerivedType ObjectType = new DerivedType(
             Position.ZERO, ObjectSymbol, TypeArguments.EMPTY);
-
+    // The root class of all non-final class
     public static final ClassDefinition ObjectClass =
             new ClassDefinition(Position.ZERO, Modifier.empty(),
                     new Symbol(new Identifier(Position.ZERO, "Object")),

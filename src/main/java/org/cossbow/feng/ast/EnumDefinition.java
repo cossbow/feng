@@ -10,6 +10,14 @@ import org.cossbow.feng.util.Optional;
 
 import static org.cossbow.feng.ast.Position.*;
 
+/**
+ * An enum is defined such that its domain is strictly limited
+ * to a finite set of values.
+ * <p>
+ * {@code enum TaskState {WAIT, RUN, DONE,}}
+ * <p>
+ * {@code enum TaskState {WAIT, RUN=100, DONE,}}
+ */
 public class EnumDefinition extends TypeDefinition {
     private IdentifierMap<Value> values;
 
@@ -40,9 +48,26 @@ public class EnumDefinition extends TypeDefinition {
 
 
     public static final class Value extends Entity {
+        /**
+         * The ID of the value is defined in order and is
+         * automatically generated
+         */
         private final int id;
+        /**
+         * The name of the enum value definition is also
+         * the symbol that references the value
+         */
         private final Identifier name;
+        /**
+         * Allow setting a constant or constant expression
+         * bound to an enum value.
+         * <p>
+         * Default equals {@link Value#id}.
+         */
         private final Lazy<Expression> init;
+        /**
+         * Literal of {@link Value#name}.
+         */
         private final StringLiteral nameLit;
 
         public Value(Position pos,
@@ -138,6 +163,9 @@ public class EnumDefinition extends TypeDefinition {
                 enablePhantom);
     }
 
+    /**
+     * Builtin fields of enum.
+     */
     public class EnumField extends Field {
         private final boolean enablePhantom;
 

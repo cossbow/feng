@@ -166,9 +166,10 @@ func test() {
 }
 ```
 
-## Basic Types
+## Primitive Types
 
-Basic types are built into the language and, from a memory perspective, can be placed directly in registers. Basic types
+Primitive Types are built into the language and, from a memory perspective, can be placed directly in registers.
+Primitive Types
 include integers, floating-point numbers, and booleans.
 
 Although string literals exist, there is no built-in string type: strings cannot be stored directly in registers, and
@@ -349,12 +350,12 @@ There are two usage patterns:
 1. Index expression on the right side is a read operation, retrieving the value of the element at the index as the
    result.
    When using a single variable on the left or using it in an expression, only the element value is returned. If the
-       element does not exist, execution terminates and an [exception](#exceptions-_[Incomplete]_) is thrown.
-       ```feng
-       func test(arr [16]int) int {
-           return arr[16]; // Index out of bounds, terminates and throws an exception
-       }
-       ```
+   element does not exist, execution terminates and an [exception](#exceptions-_[Incomplete]_) is thrown.
+   ```feng
+   func test(arr [16]int) int {
+       return arr[16]; // Index out of bounds, terminates and throws an exception
+   }
+   ```
 2. On the left side as a write operation, modifying the value of the element at the index.
    ```feng
    func test() {
@@ -534,7 +535,7 @@ Supported types:
 For example, array reference `[*]int` cannot be used because its size is only known at runtime.
 Classes do not support `sizeof` because field reordering is allowed.
 Enumerations must remain simple and do not support `sizeof`.
-`bool` is a special basic type that the compiler may store efficiently, so `sizeof` is not supported.
+`bool` is a special primitive type that the compiler may store efficiently, so `sizeof` is not supported.
 
 #### Assignment Operation
 
@@ -903,28 +904,7 @@ func use3(f &Foo) {
 }
 ```
 
-`this` can be used as a return value, but it does not represent a specific type—it represents the current instance
-itself.
-It can be used for method chaining or assigned to variables of the same type as the caller:
-
-```feng
-class Car {
-   var speed int;
-   func forward() this {}
-   func stop() this {}
-   func backward() this {}
-}
-func sample1(c Car) {
-   var speed = c.forward().stop().backward().speed;   // Chained calls
-   var c2 Car = c.forward();
-}
-func sample2(c *Car) {
-    var c2 *Car = c.forward();
-}
-func sample2(c &Car) {
-    var c2 &Car = c.forward();
-}
-```
+`this` can only be passed to strong references within the [escaping method](#escaping-methods).
 
 ### Inheritance
 
@@ -1131,6 +1111,62 @@ call `cFree(buf);` repeatedly.
 Some external resource releases, like file closures, are often time-consuming and may involve I/O errors or exceptions.
 Such operations should be handled with [exception statements](#exception-statements) rather than in `free`.
 
+### Unmodifiable Methods
+
+Inside a method marked as unmodifiable, `this` becomes an unmodifiable reference, meaning the instance cannot be
+modified. If a constant [value type variable](#value-type-variables)
+or [unmodifiable reference](#unmodifiable-reference) calls a method that would modify the instance,
+the rules of constness and immutability would be broken. Therefore, only unmodifiable methods can be called under such
+circumstances.
+
+The unmodifiable marker is `#`, placed before the parameter parentheses. For example, the `get` method:
+
+```feng
+class User {
+   var id int;
+   
+   func get#() int {
+      // this.id = 0;            // ✖: Cannot modify field
+      // id = 0;                 // ✖: Cannot modify field
+      // *this = {};             // ✖: Cannot assign via dereference
+      // const r &User = this;   // ✖: Cannot pass to mutable reference
+      
+      // this.set(0);            // ✖: Cannot call mutable method
+      // set(0);                 // ✖: Cannot call mutable method
+      return id;
+   }
+   
+   func set(id int) {
+      this.id = id;
+   }
+}
+```
+
+### Escaping Methods
+
+In ordinary methods, `this` can only be used as a phantom reference. Inside an escaping method, `this` is used as a
+`const` strong reference.
+
+Once a method is marked with the escaping marker, it can only be called via
+a [strong reference](#strong-reference-type):
+
+```feng
+class User {
+   
+   func foo*() {
+      const r &User = this;      // ✔: Can be used as phantom reference by default
+      const r *User = this;      // ✔: Can be used as strong reference
+      gar();                     // ✔: Can call non-escaping method
+   }
+   
+   func gar() {
+      const r &User = this;      // ✔: Can be used as phantom reference by default
+      // const r *User = this;   // ✖: Cannot be used as strong reference
+      // foo();                  // ✖: Cannot call escaping method
+   }
+}
+```
+
 ## Interfaces
 
 Interfaces are a feature separated from polymorphism—they are parent classes without concrete implementations and
@@ -1203,7 +1239,9 @@ func sample4(lc *LocalCache) {
 
 ## Enumerations
 
-Enumeration types have a finite number of values, all of which must be listed at definition time:
+An enum is defined such that its domain is strictly limited to a finite set of values. As such, it cannot be null and
+will default to the first value in the sequence.
+Because the number of possible values is limited, all values must be enumerated exhaustively at the time of definition:
 
 ```feng
 enum TaskState {WAIT, RUN, DONE,}   // Note the required trailing comma ","
@@ -1311,7 +1349,7 @@ struct Request {
 }
 ```
 
-Bit-fields specify the actual bit width used for a field, applicable only to basic types.
+Bit-fields specify the actual bit width used for a field, applicable only to Primitive Types.
 The bit-field value is within the range of the field's type width, placed after the field name.
 Example setting `code` bit-field to `6` (with `type` unspecified):
 
@@ -1349,7 +1387,7 @@ Each element is equivalent to a [variable](#variables) and can be either a [valu
 a [reference type](#reference-type-variables):
 
 ```feng
-var a [4]int;       // Basic type array
+var a [4]int;       // primitive-type array
 var b [4]Host;      // Class array
 var c [16]*Bus;     // Class reference array
 var d [12][4]int;   // Array of fixed-length arrays: multi-dimensional array
@@ -1360,7 +1398,7 @@ Value type array elements' memory is allocated together with the array and can b
 
 ```feng
 func test() {
-    // Basic type array
+    // primitive type array
     var a [4]int = [1,2,3,4];
     a[0] += a[1];
     // Class array
@@ -2114,7 +2152,7 @@ data:
    ```feng
    class Vector { var x,y,z float64; }
    var a Vector = { x=1.0, y=0, z=-1.0 };
-   var b Vector = a; // Like basic types, copy all field data from a to b
+   var b Vector = a; // Like primitive types, copy all field data from a to b
    b.x += 2.0; // Modifying b does not affect a; a.x remains '1.0'
    ```
 3. [Fixed-length array](#fixed-length-array) assignment is equivalent to iterating over all elements and assigning each:
@@ -2463,7 +2501,7 @@ and [function prototype variables](#function-prototype-variables).
 
 ### String Literals
 
-Strings are not basic types; the compiler encodes string literals.
+Strings are not belong to primitive type; the compiler encodes string literals.
 String literals are string constants and cannot be modified, so they can only be referenced by unmodifiable variables.
 String constants are not allocated on the function stack but are placed in a constant region:
 

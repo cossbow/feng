@@ -7,6 +7,9 @@ import org.cossbow.feng.ast.gen.TypeParameters;
 
 import java.util.List;
 
+/**
+ * Type definition for implementing OOP
+ */
 abstract
 public class ObjectDefinition extends TypeDefinition {
     public ObjectDefinition(Position pos,

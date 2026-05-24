@@ -14,7 +14,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 public class InterfaceDefinition extends ObjectDefinition {
+    /**
+     * Methods declaration
+     */
     private IdentifierMap<InterfaceMethod> methods;
+    /**
+     * The interface supports combination mode, where
+     * other interfaces are referenced as components.
+     */
     private SymbolMap<DerivedType> parts;
     private MacroTable macros;
 
@@ -45,9 +52,22 @@ public class InterfaceDefinition extends ObjectDefinition {
 
     //
 
+    /**
+     * Automatically generate class IDs for implementing dynamic features
+     */
     private final int id = IdGenerator.getAndIncrement();
+    /**
+     * Collection of cached interface definitions after analyzing {@link #parts}
+     */
     public final List<InterfaceDefinition> partDefs = new ArrayList<>();
+    /**
+     * All method declarations: including method declarations
+     * inherited from composite interfaces
+     */
     private final IdentifierMap<InterfaceMethod> allMethods = new IdentifierMap<>();
+    /**
+     * The collection of classes that implement this interface
+     */
     public final Set<ClassDefinition> impls = new HashSet<>();
 
     public int id() {

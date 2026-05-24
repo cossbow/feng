@@ -11,7 +11,7 @@ import java.util.function.BiFunction;
 import static org.cossbow.feng.util.ErrorUtil.semantic;
 
 /**
- * Constant expression calculator
+ * Constant binary expression calculator
  */
 public class LiteralCalculator {
 

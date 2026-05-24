@@ -5,8 +5,14 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.SymbolMap;
 
 public class Modifier extends Entity {
-    private boolean export;
-    private SymbolMap<Attribute> attributes;
+    /**
+     * Export to other modules for use
+     */
+    private final boolean export;
+    /**
+     * List of attributes used for decoration
+     */
+    private final SymbolMap<Attribute> attributes;
 
     public Modifier(Position pos, boolean export,
                     SymbolMap<Attribute> attributes) {

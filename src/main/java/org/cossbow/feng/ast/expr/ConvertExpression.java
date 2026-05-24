@@ -4,7 +4,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Primitive;
 
 /**
- * Only basic types support conversion expressions:
+ * Only primitive-types support conversion expressions:
  * <p>
  * {@code var a = uint(b);},
  * {@code var a = float32(b);},

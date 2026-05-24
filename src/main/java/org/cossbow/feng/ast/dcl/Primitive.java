@@ -10,7 +10,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Primitive types are built-in types that can be directly stored
+ * Primitive types are builtin types that can be directly stored
  * in registers, so they all have a fixed bit width.
  */
 public enum Primitive {
@@ -31,8 +31,17 @@ public enum Primitive {
     BOOL("bool", Kind.BOOL, 8),
     ;
 
+    /**
+     * The name a used in grammar
+     */
     public final String code;
+    /**
+     * Kind of primitive types
+     */
     public final Kind kind;
+    /**
+     * bits width of type
+     */
     public final int width;
 
     Primitive(String code, Kind kind, int width) {
@@ -58,6 +67,9 @@ public enum Primitive {
         return PrimitiveDefinition.types.get(this);
     }
 
+    /**
+     * bytes of the type
+     */
     public int size() {
         return width >> 3;
     }
@@ -99,12 +111,6 @@ public enum Primitive {
 
     public static Optional<Primitive> ofCode(Identifier id) {
         return ofCode(id.value());
-    }
-
-    public static Optional<PrimitiveDefinition> findType(String name) {
-        var p = CodeMap.get(name);
-        if (p == null) return Optional.empty();
-        return Optional.of(p.type());
     }
 
     static {
