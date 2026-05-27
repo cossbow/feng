@@ -157,12 +157,14 @@ public class SemanticAnalysis {
         q.add(expr);
         while (!q.isEmpty()) {
             var c = q.poll();
+            // Search for and check global variables in the initialization expressions.
+            // If initialization dependencies are required, place them in the "deps" set;
+            // otherwise, break the switch.
             switch (c) {
                 case SymbolExpression e -> {
                     var s = e.symbol();
                     if (s.module().has()) {
-                        // Not Support cross-module dependencies
-                        return unsupported("module");
+                        break;
                     }
 
                     var ov = all.tryGet(s.name());
@@ -175,10 +177,10 @@ public class SemanticAnalysis {
                     var v = ov.get();
 
                     if (isConst) {
-                        if (v.declare() != Declare.CONST)
+                        if (!maybeConstVar(v))
                             return semantic("const can't depend var: %s", e.pos());
                     } else {
-                        if (v.declare() == Declare.CONST)
+                        if (maybeConstVar(v))
                             break;
                     }
                     deps.add(v);
@@ -210,9 +212,6 @@ public class SemanticAnalysis {
                 boolean isConst) {
         if (list.isEmpty()) return DAGGraph.empty();
 
-        var gvs = new IdentifierMap<GlobalVariable>(list.size());
-        for (var gv : list) gvs.add(gv.name(), gv);
-
         var edges = new ArrayList<Groups.G2<
                 GlobalVariable, GlobalVariable>>();
         for (var gv : list) {
@@ -221,7 +220,7 @@ public class SemanticAnalysis {
                     gv.value().must(), isConst);
             for (var dep : deps) edges.add(Groups.g2(dep, gv));
         }
-        return makeDAG(gvs.values(), edges);
+        return makeDAG(list, edges);
     }
 
     /**
@@ -233,15 +232,32 @@ public class SemanticAnalysis {
                   boolean isConst) {
         var dag = globalGraph(list, all, isConst);
         if (dag.isEmpty()) return dag;
+        for (var gv : dag) {
+            if (gv.type().match(t -> t.checkRefer(PHANTOM))) {
+                semantic("global variable can't be phantom reference: %s", gv.pos());
+            }
+        }
         dag.bfs(this::analyse);
         return dag;
     }
 
-    private boolean isConstVar(Variable v) {
-        var t = v.type().must();
-        if (t instanceof PrimitiveTypeDeclarer)
-            return v.declare() == Declare.CONST;
-        return t instanceof LiteralTypeDeclarer;
+    private boolean maybeConstExpr(Expression v) {
+        return switch (v) {
+            case LiteralExpression e -> true;
+            case ParenExpression e -> maybeConstExpr(e.child());
+            case UnaryExpression e -> maybeConstExpr(e.operand());
+            case BinaryExpression e -> maybeConstExpr(e.left())
+                    && maybeConstExpr(e.right());
+            case SymbolExpression e -> true;
+            case null, default -> false;
+        };
+    }
+
+    private boolean maybeConstVar(GlobalVariable gv) {
+        if (gv.declare() != Declare.CONST) return false;
+        if (gv.type().match(t -> !(t instanceof PrimitiveTypeDeclarer)))
+            return false;
+        return gv.value().match(this::maybeConstExpr);
     }
 
     public AnalyseSymbolTable analyse() {
@@ -254,10 +270,11 @@ public class SemanticAnalysis {
         // Constant expressions include literals and
         // arithmetic expressions.
         var constValues = table.variables.stream()
-                .filter(v -> v.declare() == Declare.CONST)
+                .filter(this::maybeConstVar)
                 .collect(Collectors.toSet());
-        var dagConst = globalVarInit(constValues, table.variables, true);
-        result.constVars = dagConst.stream().filter(this::isConstVar).toList();
+        var dagConst = globalVarInit(constValues,
+                table.variables, true);
+        result.constVars = dagConst.stream().toList();
 
         // Then analyze the definitions
         // Enums can only rely on global constants, so analyze first.
@@ -394,6 +411,7 @@ public class SemanticAnalysis {
             case ArrayTypeDeclarer ee -> analyse(ee);
             case DerivedTypeDeclarer ee -> analyse(ee);
             case FuncTypeDeclarer ee -> analyse(ee);
+            case TupleTypeDeclarer ee -> analyse(ee);
             default -> td;
         };
     }
@@ -1936,6 +1954,10 @@ public class SemanticAnalysis {
     private void analyse(Variable v) {
         analyse(v.modifier());
         v.type().update(t -> {
+            if (t.checkRefer(PHANTOM) && v.declare() != Declare.CONST) {
+                return semantic("phantom reference must be const: %s",
+                        t.pos());
+            }
             enablePhantom = true;
             return analyse(t);
         });

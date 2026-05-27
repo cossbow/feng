@@ -43,17 +43,25 @@ public class TypeDeclarer extends Entity {
     abstract public boolean equals(Object obj);
 
     /**
-     * Can used for HashMap, see {@link #equals(Object)}
+     * Can use for HashMap, see {@link #equals(Object)}
      */
     abstract public int hashCode();
 
     /**
-     * Try get the {@link Refer} of this type.
+     * Try to get the {@link Refer} of this type.
      */
     public Optional<Refer> maybeRefer() {
         if (this instanceof Referable r)
             return r.refer();
         return Optional.empty();
+    }
+
+    /**
+     * Check kind if this is a reference
+     */
+    public boolean checkRefer(ReferKind kind) {
+        return this instanceof Referable r &&
+                r.isKind(kind);
     }
 
     /**

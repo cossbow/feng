@@ -1,5 +1,7 @@
 import test$aaa;
 
+const zero = aaa$ComplexZero;
+
 export
 func test1() {
     var a aaa$Complex = {real=1.1,imag=2.3};

@@ -5,10 +5,7 @@ import org.cossbow.feng.ast.attr.Attribute;
 import org.cossbow.feng.ast.attr.AttributeDefinition;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
-import org.cossbow.feng.ast.expr.ArrayExpression;
-import org.cossbow.feng.ast.expr.Expression;
-import org.cossbow.feng.ast.expr.LiteralExpression;
-import org.cossbow.feng.ast.expr.ObjectExpression;
+import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.mod.FModule;
@@ -405,9 +402,13 @@ public class MetaDataExtractor {
 
     private MetaDataExtractor write(Expression ex) {
         return switch (ex) {
+            case BinaryExpression e -> write(e.toString());
+            case UnaryExpression e -> write(e.toString());
+            case ParenExpression e -> write(e.toString());
             case LiteralExpression e -> write(e);
             case ArrayExpression e -> write(e);
             case ObjectExpression e -> write(e);
+            case VariableExpression e -> write(e);
             case null, default -> unreachable();
         };
     }
@@ -443,6 +444,11 @@ public class MetaDataExtractor {
         }
         write('}');
         return this;
+    }
+
+    private MetaDataExtractor write(VariableExpression e) {
+        var v = (GlobalVariable) e.variable();
+        return write(v.symbol());
     }
 
     //

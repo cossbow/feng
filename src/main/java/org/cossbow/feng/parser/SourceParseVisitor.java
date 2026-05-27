@@ -216,20 +216,11 @@ final class SourceParseVisitor
         return fd;
     }
 
-    private void globalVarCheck(Variable v) {
-        if (v.type().none()) return;
-        var r = v.type().must().maybeRefer();
-        if (r.none()) return;
-        if (!r.must().isKind(PHANTOM)) return;
-        semantic("global variable can't be phantom reference: %s", v.pos());
-    }
-
     @Override
     public Entity visitGlobalDeclaration(FengParser.GlobalDeclarationContext ctx) {
         var export = isExport(ctx.exportable());
         var stmt = (DeclarationStatement) visit(ctx.declaration());
         for (var v : stmt.variables()) {
-            globalVarCheck(v);
             var gv = new GlobalVariable(export, v, defineSymbol(v.name()));
             checkGlobalName(gv.name(), gv);
             table.variables.add(gv.name(), gv);
@@ -1126,12 +1117,6 @@ final class SourceParseVisitor
         var attrs = parseAttributes(dnCtx.attributes());
         var modifier = new Modifier(posOf(dnCtx), false, attrs);
         var dcl = parseDeclare(dnCtx.declare);
-        type.use(td -> {
-            var r = td.maybeRefer();
-            if (r.none() || r.get().kind() != PHANTOM) return;
-            if (dcl == Declare.CONST) return;
-            semantic("phantom refer must declare const: %s", td.pos());
-        });
         var names = identifiers(dnCtx.identifierList());
         var vars = new ArrayList<Variable>(names.size());
         var unique = new OrderlyMap<Identifier, Identifier>(names.size());
