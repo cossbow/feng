@@ -280,10 +280,11 @@ operands
 // assignable on left hand side
 //
 operand
-    : symbol                # VariableOperand
-    | primaryExpr indexOf   # IndexOperand
-    | primaryExpr memberOf  # FieldOperand
-    | MUL primaryExpr       # DereferOperand
+    : symbol                    # VariableOperand
+    | primaryExpr indexOf       # IndexOperand
+    | primaryExpr memberOf      # FieldOperand
+    | primaryExpr tupleIndex    # TupleOperand
+    | MUL primaryExpr           # DereferOperand
     ;
 
 
@@ -325,6 +326,7 @@ arrayType
 primaryTypeDeclarer
     : definedTypeDeclarer
     | funcTypeDeclarer
+    | tupleTypeDeclarer
     ;
 definedTypeDeclarer
     : refer? definedType
@@ -334,8 +336,12 @@ refer
     ;
 funcTypeDeclarer
     : required=NOT? FUNC prototype
-    // 由于语法有冲突，仅匹配非空，可空的由definedTypeDeclarer代管
+    // Exists syntax conflicts, so only matching the not-empty,
+    // the empty will be matched by definedTypeDeclarer
     | required=NOT definedType
+    ;
+tupleTypeDeclarer
+    : '(' typeDeclarer (COMMA typeDeclarer)+ ')'
     ;
 // typeDeclarer list
 typeDeclarerList
@@ -554,6 +560,7 @@ primaryExpr
     | primaryExpr is                                    # IsExpression
     | primaryExpr indexOf                               # IndexOfExpression
     | primaryExpr memberOf typeArguments?               # MemberOfExpression
+    | primaryExpr tupleIndex                            # TupleIndexExpression
     | primaryExpr argumentSet                           # CallExpression
     ;
 
@@ -561,6 +568,7 @@ operandExpr
     : literal                   # LiteralExpression
     | objectExpr                # ObjectExpression
     | arrayExpr                 # ArrayExpression
+    | tupleExpr                 # TupleExpression
     | pairsExpr                 # PairsExpression
     | symbol typeArguments?     # SymbolExpression
     | symbol NOT?               # MacroExpression
@@ -603,6 +611,13 @@ objectEntry
 arrayExpr
     : ('[' len=expression? ']' et=typeDeclarer)? '[' elements=expressionList? COMMA? ']'
     ;
+// init tuple
+tupleExpr
+    : '(' tupleElement (COMMA tupleElement)+ ')'
+    ;
+tupleElement
+    : expression (COLON typeDeclarer)?
+    ;
 // init with key-value pair
 pairsExpr
     : '{' pair (COMMA pair)* '}'
@@ -624,6 +639,9 @@ memberOf
     : DOT member=Identifier
     ;
 
+tupleIndex
+    : DOT index=DecimalInteger
+    ;
 
 // type for new
 new
@@ -700,7 +718,6 @@ FloatLiteral
     : Digits DOT Digits? ExponentPart?
     | Digits ExponentPart
     | Digits DOT
-    | DOT Digits
     ;
 fragment ExponentPart               : [eE] [+-]? Digits ;
 
@@ -788,6 +805,8 @@ BRACK_R         : ']' ;
 SEMI            : ';' ;
 COMMA           : ',' ;
 DOT             : '.' ;
+DOT_X2          : '..' ;
+DOT_X3          : '...' ;
 COLON           : ':' ;
 QUESTION        : '?' ;
 AT              : '@' ;

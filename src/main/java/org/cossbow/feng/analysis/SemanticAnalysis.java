@@ -490,6 +490,15 @@ public class SemanticAnalysis {
         return td;
     }
 
+    private TupleTypeDeclarer analyse(TupleTypeDeclarer td) {
+        var elements = new ArrayList<TypeDeclarer>(td.elements().size());
+        for (var et : td.elements()) {
+            var nt = analyse(et);
+            elements.add(nt);
+        }
+        return new TupleTypeDeclarer(td.pos(), elements);
+    }
+
     private void analyse(TypeParameters e) {
         // TODO: check generic constants
     }
@@ -1259,6 +1268,7 @@ public class SemanticAnalysis {
         return switch (e) {
             case IndexOfExpression ee -> enablePhantom(lr, ee);
             case MemberOfExpression ee -> enablePhantom(lr, ee);
+            case TupleIndexExpression ee -> enablePhantom(lr, ee);
             case ParenExpression ee -> enablePhantom(lr, ee.child());
             case ConditionalExpression ee -> enablePhantom(lr, ee);
             case VariableExpression ee -> enablePhantom(lr, ee.variable());
@@ -1267,6 +1277,7 @@ public class SemanticAnalysis {
             case LiteralExpression ee -> passingParameters;
             case ObjectExpression ee -> passingParameters;
             case ArrayExpression ee -> passingParameters;
+            case TupleExpression ee -> passingParameters;
             case NewExpression ee -> passingParameters;
             case CallExpression ee -> passingParameters;
             case BlockExpression ee -> passingParameters;
@@ -1299,6 +1310,10 @@ public class SemanticAnalysis {
             return enablePhantom(lr, e.subject());
         return semantic("can't convert refer-element to phantom-refer: %s",
                 etd.pos());
+    }
+
+    private boolean enablePhantom(Refer lr, TupleIndexExpression e) {
+        return enablePhantom(lr, e.subject());
     }
 
     private boolean enablePhantom(Refer lr, MemberOfExpression e) {
@@ -2613,6 +2628,10 @@ public class SemanticAnalysis {
         return unmodifiable(e.subject(), left);
     }
 
+    private boolean unmodifiable(TupleIndexExpression e, boolean left) {
+        return unmodifiable(e.subject(), left);
+    }
+
     private boolean unmodifiable(BlockExpression e, boolean left) {
         if (e.origin().has()) {
             var o = e.origin().must();
@@ -2655,6 +2674,7 @@ public class SemanticAnalysis {
             case CallExpression ee -> unmodifiable(ee, left);
             case IndexOfExpression ee -> unmodifiable(ee, left);
             case MemberOfExpression ee -> unmodifiable(ee, left);
+            case TupleIndexExpression ee -> unmodifiable(ee, left);
             case ParenExpression ee -> unmodifiable(ee.child(), left);
             case SymbolExpression ee -> unmodifiable(ee);
             case VariableExpression ee -> unmodifiable(ee.variable());
@@ -2666,6 +2686,7 @@ public class SemanticAnalysis {
             case DereferExpression ee -> left;
             case ObjectExpression ee -> left;
             case ArrayExpression ee -> left;
+            case TupleExpression ee -> left;
             case SizeofExpression ee -> left;
             case LiteralExpression ee -> left;
             case CheckNilExpression ee -> left;
@@ -2682,6 +2703,7 @@ public class SemanticAnalysis {
     private Groups.G2<Operand, TypeDeclarer> optimize(Operand o) {
         Groups.G2<Operand, TypeDeclarer> g = switch (o) {
             case IndexOperand io -> optimize(io);
+            case TupleOperand to -> optimize(to);
             case FieldOperand fo -> optimize(fo);
             case VariableOperand vo -> optimize(vo);
             case DereferOperand op -> optimize(op);
@@ -2689,6 +2711,23 @@ public class SemanticAnalysis {
         };
         g.a().type.set(g.b());
         return g;
+    }
+
+    private Groups.G2<Operand, TypeDeclarer> optimize(TupleOperand op) {
+        var sg = optimize(op.subject());
+        if (!(sg.b() instanceof TupleTypeDeclarer ttd)) {
+            return semantic("tuple-index operand require a tuple: %s", op.pos());
+        }
+
+        if (unmodifiable(sg.a(), true)) {
+            return semantic("unmodifiable tuple '%s': %s", op, op.pos());
+        }
+
+        var s = (PrimaryExpression) sg.a();
+        var n = wrapRelayOperand(s, _s -> {
+            return new TupleOperand(op.pos(), _s, op.index());
+        });
+        return Groups.g2(n, ttd.get(op.index()));
     }
 
     private Groups.G2<Operand, TypeDeclarer> optimize(IndexOperand op) {
@@ -2829,6 +2868,7 @@ public class SemanticAnalysis {
             case BinaryExpression ee -> optimize(ee);
             case UnaryExpression ee -> optimize(ee);
             case ArrayExpression ee -> optimize(ee);
+            case TupleExpression ee -> optimize(ee);
             case IsExpression ee -> optimize(ee);
             case SizeofExpression ee -> optimize(ee);
             case CallExpression ee -> optimize(ee);
@@ -2838,6 +2878,7 @@ public class SemanticAnalysis {
             case LambdaExpression ee -> optimize(ee);
             case LiteralExpression ee -> optimize(ee);
             case MemberOfExpression ee -> optimize(ee);
+            case TupleIndexExpression ee -> optimize(ee);
             case NewExpression ee -> optimize(ee);
             case ObjectExpression ee -> optimize(ee);
             case PairsExpression ee -> optimize(ee);
@@ -3460,6 +3501,12 @@ public class SemanticAnalysis {
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(LiteralExpression e) {
+        if (e.literal() instanceof BoolLiteral) {
+            // BoolLiteral can be assigned only to the `bool` type.
+            // Therefore, the value is returned directly
+            return Groups.g2(e, Primitive.BOOL.declarer(e.pos()));
+        }
+
         var et = e.expectType.get();
         if (et.has() &&
                 et.get() instanceof PrimitiveTypeDeclarer ptd
@@ -4097,6 +4144,66 @@ public class SemanticAnalysis {
         var n = wrapRelayExpr(s, t, _s -> {
             return new DereferExpression(e.pos(), (PrimaryExpression) _s);
         });
+        return Groups.g2(n, t);
+    }
+
+    private Groups.G2<Expression, TypeDeclarer> optimize(TupleExpression e) {
+        var ttd = e.expectType.get().map(t -> {
+            if (t instanceof TupleTypeDeclarer td) return td;
+            return semantic("can't use '%s' as type '%s': %s", e, t, e.pos());
+        });
+
+        var evs = new ArrayList<Expression>(e.elements().size());
+        var ets = new ArrayList<TypeDeclarer>(e.elements().size());
+        for (int i = 0; i < e.elements().size(); i++) {
+            var ot = e.types().get(i);
+            ot.use(this::analyse);
+            // Prioritize the type marked after the element is adopted.
+            // If no marked type, get the element type from the target
+            // type to which the value is assigned:
+            TypeDeclarer t = ot.has() ? ot.get() :
+                    (ttd.has() ? ttd.get().get(i) : null);
+            // Analyze the element's expression:
+            var v = e.elements().get(i);
+            v.expectType.set(t);
+            var g = optimize(v);
+            v = g.a();
+            evs.add(v);
+            // If no type marked and no target type provided, use
+            // the type inferred from the expression.
+            if (t == null) {
+                // not support the types inferred from literal expressions.
+                if (g.b() instanceof LiteralTypeDeclarer)
+                    return semantic("missing type-declarer: %s", v.pos());
+                t = g.b();
+            }
+            // Check whether the expression on the element matches the type
+            assignable(t, g.b(), Optional.of(v), v).valid();
+            ets.add(t);
+        }
+        var ne = new TupleExpression(e.pos(), evs, List.of());
+        var nt = new TupleTypeDeclarer(e.pos(), ets);
+        return Groups.g2(ne, nt);
+    }
+
+    private Groups.G2<Expression, TypeDeclarer>
+    optimize(TupleIndexExpression e) {
+        var s = optimize(e.subject());
+        if (!(s.b() instanceof TupleTypeDeclarer ttd)) {
+            return semantic("tuple-index require a tuple: %s", e.pos());
+        }
+
+        if (s.a() instanceof TupleExpression te) {
+            // If it is a tuple initialization expression,
+            // directly take the element value and return it.
+            var v = te.elements().get(e.index());
+            return Groups.g2(v, v.expectType
+                    .getOrElse(v.resultType).must());
+        }
+
+        var n = new TupleIndexExpression(e.pos(),
+                (PrimaryExpression) s.a(), e.index());
+        var t = ttd.get(e.index());
         return Groups.g2(n, t);
     }
 

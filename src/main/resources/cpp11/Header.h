@@ -7,6 +7,7 @@
 #include <cstring>
 #include <list>
 #include <vector>
+#include <tuple>
 
 // define primitives
 typedef uint8_t Byte;

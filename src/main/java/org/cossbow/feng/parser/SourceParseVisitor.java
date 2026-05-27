@@ -364,6 +364,12 @@ final class SourceParseVisitor
         return new NamedFuncTypeDeclarer(posOf(ctx), required, dt);
     }
 
+    @Override
+    public Entity visitTupleTypeDeclarer(FengParser.TupleTypeDeclarerContext ctx) {
+        List<TypeDeclarer> elements = visitList(ctx.typeDeclarer());
+        return new TupleTypeDeclarer(posOf(ctx), elements);
+    }
+
     public List<TypeDeclarer> parseTypeDeclarerList(
             FengParser.TypeDeclarerListContext ctx) {
         return visitList(ctx.typeDeclarer());
@@ -952,6 +958,20 @@ final class SourceParseVisitor
     }
 
     @Override
+    public Entity visitTupleExpr(FengParser.TupleExprContext ctx) {
+        var list = ctx.tupleElement();
+        var values = new ArrayList<Expression>(list.size());
+        var types = new ArrayList<Optional<TypeDeclarer>>(list.size());
+        for (var ec : list) {
+            var e = (Expression) visit(ec.expression());
+            values.add(e);
+            var t = this.<TypeDeclarer>visitOptional(ec.typeDeclarer());
+            types.add(t);
+        }
+        return new TupleExpression(posOf(ctx), values, types);
+    }
+
+    @Override
     public Entity visitSymbolExpression(
             FengParser.SymbolExpressionContext ctx) {
         var pos = posOf(ctx);
@@ -976,6 +996,15 @@ final class SourceParseVisitor
         var member = identifier(ctx.memberOf().member);
         var generic = typeArguments(ctx.typeArguments());
         return new MemberOfExpression(posOf(ctx), subject, member, generic);
+    }
+
+    @Override
+    public Entity visitTupleIndexExpression(
+            FengParser.TupleIndexExpressionContext ctx) {
+        var subject = (PrimaryExpression) visit(ctx.primaryExpr());
+        var index = Integer.parseInt(ctx
+                .tupleIndex().DecimalInteger().getText());
+        return new TupleIndexExpression(posOf(ctx), subject, index);
     }
 
     @Override
@@ -1180,6 +1209,14 @@ final class SourceParseVisitor
         var subject = (PrimaryExpression) visit(ctx.primaryExpr());
         var field = identifier(ctx.memberOf().member);
         return new FieldOperand(posOf(ctx), subject, field);
+    }
+
+    @Override
+    public Entity visitTupleOperand(FengParser.TupleOperandContext ctx) {
+        var subject = (PrimaryExpression) visit(ctx.primaryExpr());
+        var index = Integer.parseInt(ctx
+                .tupleIndex().DecimalInteger().getText());
+        return new TupleOperand(posOf(ctx), subject, index);
     }
 
     @Override

@@ -580,6 +580,12 @@ public class CppGenerator {
         return write(td.element()).write('>');
     }
 
+    private CppGenerator write(TupleTypeDeclarer td) {
+        write("std::tuple<");
+        joinByComma(td.elements(), this::write);
+        return write('>');
+    }
+
     private CppGenerator write(DerivedTypeDeclarer td) {
         var def = td.def();
         if (def instanceof EnumDefinition)
@@ -640,6 +646,7 @@ public class CppGenerator {
     private CppGenerator write(TypeDeclarer e) {
         return switch (e) {
             case ArrayTypeDeclarer ee -> write(ee);
+            case TupleTypeDeclarer ee -> write(ee);
             case DerivedTypeDeclarer ee -> write(ee);
             case FuncTypeDeclarer ee -> write(ee);
             case PrimitiveTypeDeclarer ee -> write(ee);
@@ -1108,6 +1115,7 @@ public class CppGenerator {
     private CppGenerator write(Operand e) {
         switch (e) {
             case IndexOperand ee -> write(ee);
+            case TupleOperand ee -> write(ee);
             case FieldOperand ee -> write(ee);
             case VariableOperand ee -> write(ee);
             case DereferOperand ee -> write(ee);
@@ -1123,6 +1131,12 @@ public class CppGenerator {
 
     private CppGenerator write(IndexOperand e) {
         return index(e.subject(), e.index());
+    }
+
+    private CppGenerator write(TupleOperand e) {
+        write("std::get<").write(e.index());
+        write(">(").write(e.subject());
+        return write(")");
     }
 
     private CppGenerator write(FieldOperand e) {
@@ -1289,11 +1303,13 @@ public class CppGenerator {
             case ReferEqualExpression ee -> write(ee);
             case UnaryExpression ee -> write(ee);
             case ArrayExpression ee -> write(ee);
+            case TupleExpression ee -> write(ee);
             case IsExpression ee -> write(ee);
             case ConvertExpression ee -> write(ee);
             case CallExpression ee -> write(ee);
             case CurrentExpression ee -> write(ee);
             case IndexOfExpression ee -> write(ee);
+            case TupleIndexExpression ee -> write(ee);
             case LambdaExpression ee -> write(ee);
             case LiteralExpression ee -> write(ee);
             case MemberOfExpression ee -> write(ee);
@@ -1396,6 +1412,12 @@ public class CppGenerator {
         return this;
     }
 
+    private CppGenerator write(TupleExpression te) {
+        write('{');
+        joinByComma(te.elements(), this::write);
+        return write('}');
+    }
+
     private CppGenerator write(IsExpression e) {
         if (!e.needCheck())
             return castRef(e.subject(), e.type());
@@ -1417,6 +1439,12 @@ public class CppGenerator {
 
     private CppGenerator write(IndexOfExpression e) {
         return index(e.subject(), e.index());
+    }
+
+    private CppGenerator write(TupleIndexExpression e) {
+        write("std::get<").write(e.index());
+        write(">(").write(e.subject());
+        return write(")");
     }
 
     private CppGenerator write(VariableExpression e) {

@@ -696,6 +696,27 @@ public class SemanticAnalysisTest {
         checkFail(d + "func f(a [*]*Object) {a[0]?(*#A).id=0;}");
     }
 
+    @Test
+    public void testOperand9() {
+        checkSucc("func f() {var a (int,bool); a.0 = 1;}");
+        checkFail("func f() {var a (int,bool); a.0 = 1.1;}");
+        checkSucc("func f() {var a (int,bool); a.1 = true;}");
+        checkFail("func f() {var a (int,bool); a.1 = 1;}");
+
+        checkFail("func f(){ (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true).0 = 0; }");
+        checkFail("func f(){ (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true).1 = 0.0; }");
+        checkFail("func f(){ (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true).2 = \"\"; }");
+        checkFail("func f(){ (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true).3 = nil; }");
+        checkFail("func f(){ (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true).4 = false; }");
+
+        checkSucc("func f(){var a (int,bool) = (1,true); a.1 = false;}");
+        checkFail("func f(){const a (int,bool) = (1,true); a.1 = false;}");
+
+        checkFail("func f() { var a int; a.0 = 1; }");
+        checkFail("func f() { var a [4]int; a.0 = 1; }");
+        checkFail("class A{var v1 int; var v2 bool;} func f() { var a A; a.0 = 1; }");
+    }
+
     // variable
 
     @Test
@@ -1226,10 +1247,64 @@ public class SemanticAnalysisTest {
         checkSucc("func f(a int, b*int){const v &#int = a>*b ? a : b; }");
     }
 
+
+    @Test
+    public void testTupleExpression1() {
+        checkSucc("func f(){ var a = (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true); }");
+        checkFail("func f(){ var a = (1,2.5:float32,\"\":[0]byte,nil:*int,true); }");
+        checkSucc("func f(){ var a (int8,float32,[0]byte,*int,bool) = (1,2.5,\"\",nil,true); }");
+        checkFail("func f(){ var a (bool,float32,[0]byte,*int,bool) = (1,2.5,\"\",nil,true); }");
+        checkFail("func f(){ var a (int8,float32,[0]byte,*int,bool) = (1:uint8,2.5,\"\",nil,true); }");
+    }
+
+    @Test
+    public void testTupleExpression2() {
+        checkSucc("func f(a (int,bool)){var b (int,bool) = a;}");
+        checkFail("func f(a (int,bool)){var b (uint,bool) = a;}");
+    }
+
+    @Test
+    public void testTupleExpression3(){
+        checkSucc("func f() { var a (int,bool) = (1,false); }");
+        checkFail("func f() { var a (int,bool) = false; }");
+        checkFail("class A{var v1 int; var v2 bool;} func f() { var a (int,bool) = A{}; }");
+        checkFail("class A{var v1 int; var v2 bool;} func f() { var a A = (1:int,false:bool); }");
+        checkFail("class A{var v1 int; var v2 bool;} func f(t (int,bool)) { var a A = t; }");
+    }
+
+    @Test
+    public void testTupleIndexExpression1() {
+        checkSucc("func f(){ var a = (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true); var v int8 = a.0; }");
+        checkSucc("func f(){ var a = (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true); var v float32 = a.1; }");
+        checkSucc("func f(){ var a = (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true); var v [0]byte = a.2; }");
+        checkSucc("func f(){ var a = (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true); var v *int = a.3; }");
+        checkSucc("func f(){ var a = (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true); var v bool = a.4; }");
+    }
+
+    @Test
+    public void testTupleIndexExpression2() {
+        checkSucc("func f(){ var v int8 = (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true).0; }");
+        checkSucc("func f(){ var v float32 = (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true).1; }");
+        checkSucc("func f(){ var v [0]byte = (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true).2; }");
+        checkSucc("func f(){ var v *int = (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true).3; }");
+        checkSucc("func f(){ var v bool = (1:int8,2.5:float32,\"\":[0]byte,nil:*int,true).4; }");
+    }
+
+    @Test
+    public void testTupleIndexExpression3() {
+        checkSucc("func f(a (int,bool)){var b int = a.0;}");
+        checkFail("func f(a (int,bool)){var b int = a.1;}");
+
+        checkFail("func f() { var a int; var v = a.0; }");
+        checkFail("func f() { var a [4]int; var v = a.0; }");
+        checkFail("class A{var v1 int; var v2 bool;} func f() { var a A; var v = a.0; }");
+    }
+
+
     //
 
     @Test
-    public void testAssignTuple1() {
+    public void testAssignment1() {
         checkSucc("func f() { var i,j int = 1,2; }");
         checkSucc("func f() { var i,j int; i,j = 1,2; }");
         checkSucc("func f(a,b int) { var i,j int; i,j = a-b,a+b; }");
@@ -1237,7 +1312,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testAssignTuple2() {
+    public void testAssignment2() {
         checkFail("func f() { var i,j int = 1; }");
         checkFail("func f() { var i,j int = 1,2,3; }");
         checkFail("func f() { var i,j int = 1,2.5; }");
@@ -1501,20 +1576,20 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testMethodEscaped1() {
-        checkSucc( "class A { func run*(){var r *A = this;} }");
-        checkFail( "class A { func run(){var r *A = this;} }");
+        checkSucc("class A { func run*(){var r *A = this;} }");
+        checkFail("class A { func run(){var r *A = this;} }");
 
-        checkSucc( "class A { func run*()*A{return this;} }");
-        checkFail( "class A { func run()*A{return this;} }");
+        checkSucc("class A { func run*()*A{return this;} }");
+        checkFail("class A { func run()*A{return this;} }");
 
-        checkSucc( "class A { func run*()*A{return this;} }");
-        checkFail( "class A { func run()*A{return this;} }");
+        checkSucc("class A { func run*()*A{return this;} }");
+        checkFail("class A { func run()*A{return this;} }");
 
-        checkSucc( "class A { func run*(f func(*A)){f(this);} }");
-        checkFail( "class A { func run(f func(*A)){f(this);} }");
+        checkSucc("class A { func run*(f func(*A)){f(this);} }");
+        checkFail("class A { func run(f func(*A)){f(this);} }");
 
-        checkSucc( "class A { func run*(f func(&A)){f(this);} }");
-        checkSucc( "class A { func run(f func(&A)){f(this);} }");
+        checkSucc("class A { func run*(f func(&A)){f(this);} }");
+        checkSucc("class A { func run(f func(&A)){f(this);} }");
 
     }
 
@@ -2000,6 +2075,13 @@ public class SemanticAnalysisTest {
     @Test
     public void testPhantomArray5() {
         checkSucc("union U{t [2]int;} struct S{h [13]U;} func f(){ var s S; const r [&]U = s.h; }");
+    }
+
+    @Test
+    public void testPhantomTuple1() {
+        checkSucc("func f(a (int,bool)){const i &#int = a.0;}");
+        checkFail("func f(a (int,bool)){const i &int = a.0;}");
+        checkSucc("func f(){var a (int,bool); const i &int = a.0;}");
     }
 
     //

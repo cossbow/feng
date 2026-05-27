@@ -3,7 +3,7 @@ package org.cossbow.feng.ast.lit;
 import org.cossbow.feng.ast.Position;
 
 /**
- * The literal {@code nil} is used to initliaze
+ * The literal {@code nil} is used to initialize
  * reference or functional type.
  */
 public class NilLiteral extends Literal {
