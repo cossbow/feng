@@ -1,11 +1,15 @@
 package org.cossbow.feng.ast.var;
 
 import org.cossbow.feng.ast.Entity;
+import org.cossbow.feng.ast.IndexOperator;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.stmt.Statement;
 import org.cossbow.feng.util.Lazy;
 
+/**
+ * Assign the {@link #value} to the {@link #operand}.
+ */
 public class Assignment extends Entity {
     private Operand operand;
     private Expression value;
@@ -36,7 +40,14 @@ public class Assignment extends Entity {
 
     //
 
-    private Lazy<Statement> replacer = Lazy.nil();
+    /**
+     * In some scenarios, it is necessary to convert
+     * the assignment into another alternative statement
+     * and cache it here.
+     * <p>
+     * {@link IndexOperator#set()}
+     */
+    private final Lazy<Statement> replacer = Lazy.nil();
 
     public Lazy<Statement> replacer() {
         return replacer;

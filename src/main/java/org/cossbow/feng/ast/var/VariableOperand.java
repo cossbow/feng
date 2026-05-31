@@ -8,7 +8,13 @@ import org.cossbow.feng.ast.expr.SymbolExpression;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.util.Lazy;
 
+/**
+ * Variable operand: used for modify a variable.
+ */
 public class VariableOperand extends Operand {
+    /**
+     * The symbol for find the variable
+     */
     private final Symbol symbol;
 
     public VariableOperand(Position pos,
@@ -26,6 +32,9 @@ public class VariableOperand extends Operand {
         return new SymbolExpression(pos(), symbol, TypeArguments.EMPTY);
     }
 
+    /**
+     * Cache the variable in analyzing.
+     */
     private final Lazy<Variable> variable = Lazy.nil();
 
     public Lazy<Variable> variable() {

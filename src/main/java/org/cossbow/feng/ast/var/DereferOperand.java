@@ -5,8 +5,24 @@ import org.cossbow.feng.ast.expr.DereferExpression;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 
+/**
+ * Dereference operand: used for directly modify the instance.
+ * <p>
+ * Example:
+ * <p>
+ * {@code *a = t;}
+ * <p>
+ * {@code *a.b = x;}
+ * <p>
+ * {@code *a.[0] = y;}
+ * <p>
+ * {@code *a.0 = z;}
+ */
 public class DereferOperand extends Operand {
-    private PrimaryExpression subject;
+    /**
+     * The target of dereference must be a reference type
+     */
+    private final PrimaryExpression subject;
 
     public DereferOperand(Position pos,
                           PrimaryExpression subject) {
@@ -16,10 +32,6 @@ public class DereferOperand extends Operand {
 
     public PrimaryExpression subject() {
         return subject;
-    }
-
-    public void subject(PrimaryExpression subject) {
-        this.subject = subject;
     }
 
     @Override

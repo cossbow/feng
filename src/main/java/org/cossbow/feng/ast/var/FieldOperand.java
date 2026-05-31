@@ -7,8 +7,26 @@ import org.cossbow.feng.ast.expr.MemberOfExpression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 import org.cossbow.feng.ast.gen.TypeArguments;
 
+/**
+ * Field operand: used for modify the fields of instance.
+ * <p>
+ * Requires the type of the instance have modifable field,
+ * and the instance must be modifable.
+ * <p>
+ * Example:
+ * <p>
+ * {@code a.id = i;}
+ * <p>
+ * {@code a.b.value = v;}
+ */
 public class FieldOperand extends Operand {
+    /**
+     * The instance of the field belong to.
+     */
     private final PrimaryExpression subject;
+    /**
+     * The field name
+     */
     private final Identifier field;
 
     public FieldOperand(Position pos,
