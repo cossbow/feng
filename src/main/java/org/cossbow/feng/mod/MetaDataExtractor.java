@@ -64,20 +64,24 @@ public class MetaDataExtractor {
 
     //
 
-    private int indentValue;
+    private int dent;
 
     private MetaDataExtractor indent() {
-        indentValue++;
-        return this;
+        dent++;
+        return newLine();
     }
 
     private MetaDataExtractor dedent() {
-        indentValue--;
-        return this;
+        dent--;
+        return newLine();
     }
 
     private MetaDataExtractor newLine() {
-        return write('\n');
+        write('\n');
+        for (int i = 0; i < dent; i++) {
+            write('\t');
+        }
+        return this;
     }
 
     private MetaDataExtractor space() {
@@ -85,7 +89,7 @@ public class MetaDataExtractor {
     }
 
     private MetaDataExtractor comma() {
-        return write(',');
+        return write(',').space();
     }
 
     private MetaDataExtractor colon() {
@@ -170,7 +174,8 @@ public class MetaDataExtractor {
         write(gv.modifier());
         write(gv.declare()).space().write(gv.symbol().name()).space();
         write(gv.type().must());
-        gv.value().use(e -> write('=').write(e));
+        gv.value().use(e ->
+                space().write('=').space().write(e));
         endStmt();
     }
 
@@ -204,25 +209,27 @@ public class MetaDataExtractor {
     }
 
     private void write(StructureDefinition sd) {
-        write('{').newLine();
+        write('{').indent();
         for (var f : sd.fields()) {
             write(f.name()).space().write(f.type()).endStmt();
         }
-        write('}').newLine();
+        dedent().write('}').newLine();
     }
 
     private void write(ClassDefinition cd) {
+        space();
         if (cd.isFinal()) {
-            space().write("final");
+            write("final").space();
         } else {
-            cd.inherit().use(dt -> write(':').write(dt));
+            cd.inherit().use(dt ->
+                    write(':').space().write(dt).space());
             if (!cd.impl().isEmpty()) {
                 write('(');
                 joinByComma(cd.impl(), this::write);
-                write(')');
+                write(')').space();
             }
         }
-        write('{').newLine();
+        write('{').indent();
 
         for (var f : cd.inheritFields()) {
             write(InheritAttr);
@@ -240,7 +247,7 @@ public class MetaDataExtractor {
             write(m);
         }
 
-        write('}').newLine();
+        dedent().write('}').newLine();
     }
 
     private void write(ClassField f) {
@@ -442,18 +449,16 @@ public class MetaDataExtractor {
 
     private MetaDataExtractor write(ArrayExpression ae) {
         write('[');
-        for (var v : ae.elements()) {
-            write(v);
-        }
+        joinByComma(ae.elements(), this::write);
         write(']');
         return this;
     }
 
-    private MetaDataExtractor write(ObjectExpression e) {
+    private MetaDataExtractor write(ObjectExpression oe) {
         write('{');
-        for (var n : e.entries().nodes()) {
-            write(n.key()).write('=').write(n.value()).write(',');
-        }
+        joinByComma(oe.entries().nodes(), n -> {
+            write(n.key()).write('=').write(n.value());
+        });
         write('}');
         return this;
     }

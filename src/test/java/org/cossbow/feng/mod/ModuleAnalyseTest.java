@@ -24,13 +24,14 @@ public class ModuleAnalyseTest {
              var w = new BufferedWriter(osw)) {
             new MetaDataExtractor(m, w).write();
         }
-        var save = ModuleParserTest.getDir()
-                .resolve(m.path().toPath()).resolve("feng.meta");
+
+        var file = m.path().toPath().resolve("feng.meta");
+        var save = ModuleParserTest.getDir().resolve(file);
         Files.copy(buf.read(), save, StandardCopyOption.REPLACE_EXISTING);
         System.out.println(save);
 
         var src = new SourceParser(m.path(), UTF_8, true)
-                .parse("buffer", CharStreams.fromStream(buf.read()));
+                .parse(file.toString(), CharStreams.fromStream(buf.read()));
         return src.table();
     }
 

@@ -56,6 +56,10 @@ public class Variable extends Entity
         return declare;
     }
 
+    public boolean isConst() {
+        return declare == Declare.CONST;
+    }
+
     public Identifier name() {
         return name;
     }
