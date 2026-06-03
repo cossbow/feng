@@ -33,6 +33,11 @@ public class TupleTypeDeclarer extends TypeDeclarer {
         return elements.get(i);
     }
 
+    @Override
+    public boolean hasTypeVar() {
+        return elements.stream().anyMatch(TypeDeclarer::hasTypeVar);
+    }
+
     //
 
     @Override

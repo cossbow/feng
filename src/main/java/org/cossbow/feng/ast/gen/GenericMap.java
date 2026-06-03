@@ -92,6 +92,11 @@ public class GenericMap {
         return td;
     }
 
+    public TupleTypeDeclarer mapIf(TupleTypeDeclarer td) {
+        var ets = td.elements().stream().map(this::mapIf).toList();
+        return new TupleTypeDeclarer(td.pos(), ets);
+    }
+
     public FuncTypeDeclarer mapIf(FuncTypeDeclarer ftd) {
         var prot = instantiate(ftd.prototype());
         return new AnonFuncTypeDeclarer(ftd.pos(), ftd.required(), prot);
@@ -104,6 +109,7 @@ public class GenericMap {
             case GenericTypeDeclarer gt -> mapIf(gt);
             case DerivedTypeDeclarer dt -> mapIf(dt);
             case ArrayTypeDeclarer atd -> mapIf(atd);
+            case TupleTypeDeclarer atd -> mapIf(atd);
             case FuncTypeDeclarer otd -> mapIf(otd);
             default -> td;
         };

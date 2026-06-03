@@ -1,22 +1,49 @@
+class Complex final {
+    const real,imag float;
+}
+
+const zero Complex = {real=0.0,imag=0.0};
+
+const zzz (Complex, bool) = (zero, false);
+
+class Box`T` {
+    var v T;
+    var s bool;
+    func get#() (T, bool) {
+        return (v, s);
+    }
+    func map`E`#(f func(T)E) (E, bool) {
+        return (f(v), s);
+    }
+}
+
+func convert(v int) Complex {
+    return Complex{real=float(v)*0.7,imag=float(v)/0.7};
+}
 
 func set(a (int,bool)) (int,bool) {
     return a;
 }
 
 func test(a bool) {
-    var v  = (1:int, true);
+    var v  = (174:int, true);
     v.1 = true;
     var b = v.0;
     var x (int,bool) = (1,false);
     var c = (1:int, false).0;
-//    (1:int, true).0 = 1;
     const r &int = v.0;
 
-    var z1 = (1:int8,2.5:float32,new(int):*int,true);
+    var x0 = (1:int8,2.5:float32,new(int):*int,true);
     x = set(v);
     if (x == v) {
     }
     x=set((2,true));
+
+    var z1 Complex = zzz.0;
+
+    var box Box`int` = {v=v.0+1,s=true};
+    x = box.get();
+    var s (Complex, bool) = box.map`Complex`(convert);
 }
 
 func main(args [&!#][*!#]byte) {

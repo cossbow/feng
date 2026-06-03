@@ -216,9 +216,11 @@ public class MetaDataExtractor {
             space().write("final");
         } else {
             cd.inherit().use(dt -> write(':').write(dt));
-            write('(');
-            joinByComma(cd.impl(), this::write);
-            write(')');
+            if (!cd.impl().isEmpty()) {
+                write('(');
+                joinByComma(cd.impl(), this::write);
+                write(')');
+            }
         }
         write('{').newLine();
 
@@ -345,6 +347,7 @@ public class MetaDataExtractor {
             case GenericTypeDeclarer td -> write(td);
             case AnonFuncTypeDeclarer td -> write(td);
             case NamedFuncTypeDeclarer td -> write(td);
+            case TupleTypeDeclarer td -> write(td);
             case null, default -> unreachable();
         };
     }
@@ -378,6 +381,13 @@ public class MetaDataExtractor {
         return required(td.required()).write(td.derivedType());
     }
 
+    private MetaDataExtractor write(TupleTypeDeclarer ttd) {
+        write('(');
+        joinByComma(ttd.elements(), this::write);
+        write(')');
+        return this;
+    }
+
     private MetaDataExtractor refer(Optional<Refer> o) {
         if (o.none()) return this;
         return write(o.get().toString());
@@ -408,6 +418,8 @@ public class MetaDataExtractor {
             case LiteralExpression e -> write(e);
             case ArrayExpression e -> write(e);
             case ObjectExpression e -> write(e);
+            case TupleExpression e -> write(e);
+            case TupleIndexExpression e -> write(e);
             case VariableExpression e -> write(e);
             case null, default -> unreachable();
         };
@@ -444,6 +456,17 @@ public class MetaDataExtractor {
         }
         write('}');
         return this;
+    }
+
+    private MetaDataExtractor write(TupleExpression te) {
+        write('(');
+        joinByComma(te.elements(), this::write);
+        write(')');
+        return this;
+    }
+
+    private MetaDataExtractor write(TupleIndexExpression e) {
+        return write(e.subject()).write('.').write(e.index());
     }
 
     private MetaDataExtractor write(VariableExpression e) {

@@ -1,7 +1,26 @@
 import test$aaa a;
 import test$aab v;
 import test$aac r;
+import test$aad;
 import std$map m;
+
+
+func defaultHash`T`(k T) T {
+    return (k);
+}
+
+func testHashmap(n int) {
+    var map = aad$newHashmap`int,int`(defaultHash`int`);
+    for(var i=0;i<n;i+=1) {
+        map.set(i, i+100);
+    }
+    if (var r=map.get(-1); r.1){}
+    if (var r=map.get(0); r.1){}
+    if (var r=map.get(1); r.1){}
+    if (var r=map.get(99); r.1){}
+    if (var r=map.get(100); r.1){}
+    if (var r=map.get(101); r.1){}
+}
 
 func intHashing(n &m$Node`int,int`) int {
     return n.key;

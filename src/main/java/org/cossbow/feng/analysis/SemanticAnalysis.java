@@ -191,10 +191,12 @@ public class SemanticAnalysis {
                 }
                 case UnaryExpression e -> q.add(e.operand());
                 case ArrayExpression e -> q.addAll(e.elements());
+                case TupleExpression e -> q.addAll(e.elements());
                 case ObjectExpression e -> q.addAll(e.entries().values());
                 case NewExpression e -> e.arg().use(q::add);
                 case ParenExpression e -> q.add(e.child());
                 case MemberOfExpression e -> q.add(e.subject());
+                case TupleIndexExpression e -> q.add(e.subject());
                 case LiteralExpression e -> {
                 }
                 case null, default -> semantic("can't depend of global: %s", c);
@@ -4154,7 +4156,8 @@ public class SemanticAnalysis {
         });
 
         var evs = new ArrayList<Expression>(e.elements().size());
-        var ets = new ArrayList<TypeDeclarer>(e.elements().size());
+        var ets = new ArrayList<Optional<TypeDeclarer>>(e.elements().size());
+        var types = new ArrayList<TypeDeclarer>(e.elements().size());
         for (int i = 0; i < e.elements().size(); i++) {
             var ot = e.types().get(i);
             ot.use(this::analyse);
@@ -4179,10 +4182,11 @@ public class SemanticAnalysis {
             }
             // Check whether the expression on the element matches the type
             assignable(t, g.b(), Optional.of(v), v).valid();
-            ets.add(t);
+            ets.add(Optional.of(t));
+            types.add(t);
         }
-        var ne = new TupleExpression(e.pos(), evs, List.of());
-        var nt = new TupleTypeDeclarer(e.pos(), ets);
+        var ne = new TupleExpression(e.pos(), evs, ets);
+        var nt = new TupleTypeDeclarer(e.pos(), types);
         return Groups.g2(ne, nt);
     }
 
