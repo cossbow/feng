@@ -955,21 +955,21 @@ public class LowCppGenerator {
     private volatile FunctionDefinition enterFunc;
 
     LowCppGenerator write(ParameterSet ps) {
-        var first = true;
-        for (var a : ps.variables()) {
-            if (first) first = false;
-            else write(COMMA);
-            declare(genName(a), a.type().must());
+        for (int i = 0; i < ps.size(); i++) {
+            var a = ps.fixed(i);
+            if (i > 0) write(COMMA);
+            var v = a.var();
+            if (v.none()) write(a.type());
+            else declare(genName(v.get()), a.type());
         }
         return this;
     }
 
     LowCppGenerator writeArgs(ParameterSet ps) {
-        var first = true;
-        for (var v : ps.variables()) {
-            if (first) first = false;
-            else write(COMMA);
-            varName(v);
+        for (int i = 0; i < ps.size(); i++) {
+            var a = ps.fixed(i);
+            if (i > 0) write(COMMA);
+            a.var().use(this::varName, () -> write("{}"));
         }
         return this;
     }

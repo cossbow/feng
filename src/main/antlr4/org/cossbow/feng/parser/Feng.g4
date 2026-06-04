@@ -231,14 +231,18 @@ prototype
     : '(' parametersSet? ')' returnSet?
     ;
 parametersSet
-    : parameters
-    | typeDeclarerList
+    : parameters COMMA? variadicParameter?
+    | typeDeclarerList COMMA?
+    | variadicParameter
     ;
 parameters
     : parameter (COMMA parameter)*
     ;
 parameter
     : modifier identifierList typeDeclarer
+    ;
+variadicParameter
+    : name=Identifier DOT_X3
     ;
 returnSet
     : typeDeclarer

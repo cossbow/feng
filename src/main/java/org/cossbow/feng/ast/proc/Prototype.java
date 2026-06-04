@@ -52,6 +52,10 @@ public class Prototype extends Entity {
         return returnSet.getOrElse(new VoidTypeDeclarer(pos()));
     }
 
+    public boolean variadic() {
+        return parameterSet.variadic();
+    }
+
     /**
      * check if this type contains type-paramster:
      * <p>

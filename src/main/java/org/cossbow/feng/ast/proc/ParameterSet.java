@@ -1,99 +1,92 @@
 package org.cossbow.feng.ast.proc;
 
-
 import org.cossbow.feng.ast.Entity;
-import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
-import org.cossbow.feng.ast.dcl.Variable;
-import org.cossbow.feng.util.Groups;
-import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.ErrorUtil;
 
 import java.util.AbstractList;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class ParameterSet extends Entity
-        implements Iterable<Variable> {
-    private IdentifierMap<Variable> variables;
+        implements Iterable<Parameter> {
+    private final List<Parameter> params;
+    private final boolean variadic;
 
     public ParameterSet(Position pos,
-                        IdentifierMap<Variable> variables) {
+                        List<Parameter> params) {
         super(pos);
-        this.variables = variables;
-    }
-
-    public ParameterSet(Position pos,
-                        List<Variable> list) {
-        this(pos, new IdentifierMap<>(list.stream()
-                .map(v -> Groups.g2(v.name(), v)).toList()));
+        this.params = params;
+        variadic = !params.isEmpty() &&
+                params.getLast() instanceof VariadicParameter;
     }
 
     public ParameterSet(Position pos) {
-        this(pos, new IdentifierMap<>());
+        this(pos, List.of());
     }
 
     public static ParameterSet anon(List<TypeDeclarer> types) {
         if (types.isEmpty())
             return new ParameterSet(Position.ZERO);
 
-        var params = new IdentifierMap<Variable>();
-        for (int i = 0, typesSize = types.size(); i < typesSize; i++) {
-            var td = types.get(i);
-            var name = new Identifier(td.pos(), "feng$arg" + i, true);
-            var v = new Variable(td.pos(), Modifier.empty(),
-                    Declare.CONST, name, Lazy.of(td), Lazy.nil());
-            params.add(name, v);
+        var params = new ArrayList<Parameter>();
+        for (var td : types) {
+            var param = new FixedParameter(td.pos(), td);
+            params.add(param);
         }
         return new ParameterSet(types.getFirst().pos(), params);
     }
 
-    public IdentifierMap<Variable> variables() {
-        return variables;
+    public List<Parameter> params() {
+        return params;
     }
 
     public List<TypeDeclarer> types() {
         return new PhantomList();
     }
 
-    public Variable getVar(int i) {
-        return variables.getValue(i);
+    public Parameter get(int i) {
+        return params.get(i);
     }
 
-    public TypeDeclarer getType(int i) {
-        return getVar(i).type().must();
+    public FixedParameter fixed(int i) {
+        return (FixedParameter) get(i);
     }
 
     public int size() {
-        return variables.size();
+        return params.size();
     }
 
     public boolean isEmpty() {
         return size() == 0;
     }
 
-    public Iterator<Variable> iterator() {
-        return variables.iterator();
+    public Iterator<Parameter> iterator() {
+        return params.iterator();
     }
 
-    public Stream<Variable> stream() {
-        return variables.stream();
+    public boolean variadic() {
+        return variadic;
     }
 
     /**
-     * check if this type contains type-paramster:
+     * check if this type contains type-parameter:
      * <p>
      * If {@code T} is type-parameter in this context, a type with
      * type-var is like: {@code T}, {@code List`T`}, etc.
      */
     public boolean hasTypeVar() {
-        return variables.stream().anyMatch(v ->
-                v.type().match(TypeDeclarer::hasTypeVar));
+        for (var p : params) {
+            if (p instanceof VariadicParameter)
+                return ErrorUtil.unreachable();
+            var fp = (FixedParameter) p;
+            if (fp.type().hasTypeVar())
+                return true;
+        }
+        return false;
     }
 
     //
@@ -114,12 +107,12 @@ public class ParameterSet extends Entity
 
         @Override
         public TypeDeclarer get(int index) {
-            return variables.getValue(index).type().must();
+            return fixed(index).type();
         }
 
         @Override
         public int size() {
-            return variables.size();
+            return params.size();
         }
     }
 
@@ -127,7 +120,7 @@ public class ParameterSet extends Entity
 
     @Override
     public String toString() {
-        return variables.stream().map(Variable::toString)
+        return params.stream().map(Parameter::toString)
                 .collect(Collectors.joining(", "));
     }
 }

@@ -986,7 +986,15 @@ public class CppGenerator {
     private volatile FunctionDefinition enterFunc;
 
     CppGenerator write(ParameterSet ps) {
-        joinByComma(ps, this::declare);
+        joinByComma(ps, p -> {
+            if (!(p instanceof FixedParameter fp)) {
+                unreachable();
+                return;
+            }
+            var v = fp.var();
+            if (v.none()) write(fp.type());
+            else declare(v.get());
+        });
         return this;
     }
 

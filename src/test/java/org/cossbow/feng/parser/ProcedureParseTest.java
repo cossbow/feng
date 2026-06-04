@@ -5,7 +5,8 @@ import org.cossbow.feng.Pair;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
-import org.cossbow.feng.ast.proc.*;
+import org.cossbow.feng.ast.proc.Procedure;
+import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.ast.stmt.BlockStatement;
 import org.cossbow.feng.ast.stmt.CallStatement;
 import org.junit.jupiter.api.Assertions;
@@ -67,12 +68,13 @@ public class ProcedureParseTest extends BaseParseTest {
             }
             var code = "(%s)".formatted(String.join(",", paramsSet));
             var prototype = parsePrototype(code);
-            var params = prototype.parameterSet().variables();
+            var params = prototype.parameterSet();
             Assertions.assertEquals(expectParams.size(), params.size());
+            var i = 0;
             for (var expect : expectParams) {
-                var variable = params.get(expect.a());
-                Assertions.assertEquals(expect.a(), variable.name());
-                var vtd = (DerivedTypeDeclarer) variable.type().must();
+                var param = params.fixed(i++);
+                Assertions.assertEquals(expect.a(), param.name().must());
+                var vtd = (DerivedTypeDeclarer) param.type();
                 Assertions.assertEquals(expect.b(), vtd.derivedType().symbol());
                 Assertions.assertTrue(vtd.refer().none());
             }
@@ -89,7 +91,7 @@ public class ProcedureParseTest extends BaseParseTest {
             Assertions.assertEquals(expectTypes.size(), params.size());
             for (int i = 0; i < size; i++) {
                 Assertions.assertEquals(expectTypes.get(i),
-                        typeName(params.getType(i)));
+                        typeName(params.fixed(i).type()));
             }
         }
     }

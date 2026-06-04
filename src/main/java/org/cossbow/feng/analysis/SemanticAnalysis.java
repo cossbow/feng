@@ -107,10 +107,11 @@ public class SemanticAnalysis {
     private List<PrototypeDefinition>
     findDepends(PrototypeDefinition pd) {
         var list = new ArrayList<PrototypeDefinition>(4);
-        var p = pd.prototype();
-        p.returnSet().flatmap(this::findPrototype).use(list::add);
-        for (var v : p.parameterSet()) {
-            v.type().flatmap(this::findPrototype).use(list::add);
+        var pt = pd.prototype();
+        pt.returnSet().flatmap(this::findPrototype).use(list::add);
+        for (var v : pt.parameterSet()) {
+            if (v instanceof FixedParameter fp)
+                findPrototype(fp.type()).use(list::add);
         }
         return list;
     }
@@ -771,8 +772,18 @@ public class SemanticAnalysis {
                 "missing arguments: %s", e.pos());
         var size = l.size();
         for (int i = 0; i < size; i++) {
-            var v = r.getVar(i);
-            var vt = checkParameter(l.getType(i), v.type().must(), e);
+            var lp = l.get(i);
+            var rp = r.get(i);
+            if (rp instanceof VariadicParameter vp)
+                return TypeValid.err("can't be variadic parameter '%s': %s",
+                        vp.name(), rp.pos());
+            if (lp instanceof VariadicParameter vp)
+                return TypeValid.err("can't be variadic parameter '%s': %s",
+                        vp.name(), rp.pos());
+
+            var lfp = (FixedParameter) lp;
+            var rfp = (FixedParameter) rp;
+            var vt = checkParameter(lfp.type(), rfp.type(), e);
             if (vt.ok) continue;
             return vt;
         }
@@ -1253,8 +1264,8 @@ public class SemanticAnalysis {
                     prot.parameterSet().pos());
             return;
         }
-        var t = prot.parameterSet().getType(0);
-        if (t instanceof ArrayTypeDeclarer at &&
+        var p = prot.parameterSet().fixed(0);
+        if (p.type() instanceof ArrayTypeDeclarer at &&
                 at.refer().match(r -> r.isKind(PHANTOM) && r.required() && r.unmodifiable())
                 && at.element() instanceof ArrayTypeDeclarer et &&
                 et.refer().match(r -> r.required() && r.unmodifiable()) &&
@@ -1263,7 +1274,7 @@ public class SemanticAnalysis {
             return;
         }
 
-        semantic("func main required parameter type as '[&!#][*!#]byte': %s", t.pos());
+        semantic("func main required parameter type as '[&!#][*!#]byte': %s", p.pos());
     }
 
     private FunctionDefinition enterFunc;
@@ -1319,11 +1330,15 @@ public class SemanticAnalysis {
     }
 
     private void analyse(ParameterSet ps, boolean addVar) {
-        for (var v : ps.variables()) {
-            analyse(v.modifier());
+        for (var p : ps.params()) {
+            if (!(p instanceof FixedParameter fp)) {
+                unsupported("require fixed parameter: %s", p.pos());
+                continue;
+            }
+            analyse(fp.modifier());
             enablePhantom = true;
-            v.type().update(this::analyse);
-            if (addVar) context.putVar(v);
+            fp.type(analyse(fp.type()));
+            if (addVar) fp.var().use(context::putVar);
         }
     }
 
@@ -4508,14 +4523,14 @@ public class SemanticAnalysis {
         var dt = new DerivedType(ZERO, cd.symbol(), tas);
 
         var mp = mf.procedure();
-        var params = new ArrayList<Variable>(mp.params().size());
+        var params = new ArrayList<Parameter>(mp.params().size());
         for (var mv : mp.params()) {
             mv.type().use(t -> semantic(
                     "can't set type of operator parameter: %s", t.pos()));
             var td = new DerivedTypeDeclarer(ZERO, dt, Optional.of(
                     new Refer(ZERO, PHANTOM, true, true)));
-            var v = new Variable(mv.pos(), Modifier.empty(),
-                    Declare.CONST, mv.name(), Lazy.of(td), Lazy.nil());
+            var v = new FixedParameter(mv.pos(), Modifier.empty(),
+                    mv.name(), td);
             params.add(v);
         }
         if (mp.result().has())
@@ -4559,8 +4574,8 @@ public class SemanticAnalysis {
             return semantic("index-get require return value: %s", m.pos());
         }
 
-        var param = new Variable(mv.pos(), Modifier.empty(), Declare.CONST,
-                mv.name(), Lazy.of(mv.type()), Lazy.nil());
+        var param = new FixedParameter(mv.pos(), Modifier.empty(),
+                mv.name(), mv.type().get());
 
         return macro2Method(cd, mf, List.of(param), Optional.empty(), true);
     }
@@ -4580,10 +4595,13 @@ public class SemanticAnalysis {
             return semantic("index-set has no return value: %s", m.pos());
         }
 
-        var params = new ArrayList<Variable>(2);
+        var params = new ArrayList<Parameter>(2);
         for (var mv : mp.params()) {
-            var v = new Variable(mv.pos(), Modifier.empty(), Declare.CONST,
-                    mv.name(), Lazy.of(mv.type()), Lazy.nil());
+            if (mv.type().none())
+                return semantic("index-set parameter miss type: %s", mv.pos());
+
+            var v = new FixedParameter(mv.pos(), Modifier.empty(),
+                    mv.name(), mv.type().must());
             params.add(v);
         }
         return macro2Method(cd, mf, params, Optional.empty(), false);
@@ -4591,7 +4609,7 @@ public class SemanticAnalysis {
 
     private ClassMethod macro2Method(
             ClassDefinition cd, MacroFunc mf,
-            List<Variable> params, Optional<TypeDeclarer> ret,
+            List<Parameter> params, Optional<TypeDeclarer> ret,
             boolean unmodifiable) {
         var mp = mf.procedure();
         var ps = new ParameterSet(mf.pos(), params);

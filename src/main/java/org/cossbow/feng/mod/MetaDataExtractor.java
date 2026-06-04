@@ -14,11 +14,13 @@ import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassField;
 import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
+import org.cossbow.feng.ast.proc.FixedParameter;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.ast.proc.PrototypeDefinition;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.parser.ParseSymbolTable;
+import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
 
 import java.io.IOException;
@@ -339,7 +341,13 @@ public class MetaDataExtractor {
     private MetaDataExtractor write(Prototype p) {
         write('(');
         joinByComma(p.parameterSet(), v -> {
-            write(v.name()).space().write(v.type().must());
+            if (!(v instanceof FixedParameter fp)) {
+                ErrorUtil.unreachable();
+                return;
+            }
+            if (fp.name().has())
+                write(fp.name().get()).space();
+            write(fp.type());
         });
         write(')');
         p.returnSet().use(this::write);

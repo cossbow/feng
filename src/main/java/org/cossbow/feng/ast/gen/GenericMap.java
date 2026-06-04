@@ -1,11 +1,13 @@
 package org.cossbow.feng.ast.gen;
 
-import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.dcl.*;
+import org.cossbow.feng.ast.proc.FixedParameter;
+import org.cossbow.feng.ast.proc.Parameter;
 import org.cossbow.feng.ast.proc.ParameterSet;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.util.ErrorUtil;
 
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -128,11 +130,12 @@ public class GenericMap {
     }
 
     public Prototype instantiate(Prototype p0) {
-        var vs = new IdentifierMap<Variable>(p0.parameterSet().size());
+        var vs = new ArrayList<Parameter>(p0.parameterSet().size());
         for (var v0 : p0.parameterSet()) {
-            var v1 = (Variable) v0.clone();
-            v1.type().update(mapper());
-            vs.add(v1.name(), v1);
+            var v = (FixedParameter) v0;
+            var t = mapIf(v.type());
+            var v1 = new FixedParameter(v0.pos(), v.modifier(), v.name(), t);
+            vs.add(v1);
         }
         var ps = new ParameterSet(p0.parameterSet().pos(), vs);
         var rs = p0.returnSet().map(mapper());

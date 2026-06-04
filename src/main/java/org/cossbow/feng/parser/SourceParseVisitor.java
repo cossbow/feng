@@ -1018,7 +1018,8 @@ final class SourceParseVisitor
     @Override
     public Entity visitCallExpression(FengParser.CallExpressionContext ctx) {
         var callee = (PrimaryExpression) visit(ctx.primaryExpr());
-        var args = parseExpressions(ctx.argumentSet().args);
+        var asc = ctx.argumentSet();
+        var args = parseExpressions(asc.args);
         if (callee instanceof SymbolExpression re) {
             if (re.generic().isEmpty() && re.symbol().module().none()) {
                 var op = Primitive.ofCode(re.symbol().name());
@@ -1031,7 +1032,7 @@ final class SourceParseVisitor
                 }
             }
         }
-        return new CallExpression(posOf(ctx), callee, args);
+        return new CallExpression(posOf(asc), callee, args);
     }
 
     @Override
@@ -1140,6 +1141,11 @@ final class SourceParseVisitor
         };
     }
 
+    private void checkIgnore(Identifier name) {
+        if (!"_".equals(name.value())) return;
+        unsupported("ignore name: %s", name.pos());
+    }
+
     private List<Variable> parseVariables(
             FengParser.DeclaredNamesContext dnCtx,
             Optional<TypeDeclarer> type) {
@@ -1150,6 +1156,7 @@ final class SourceParseVisitor
         var vars = new ArrayList<Variable>(names.size());
         var unique = new OrderlyMap<Identifier, Identifier>(names.size());
         for (var name : names) {
+            checkIgnore(name);
             unique.add(name, name);
             vars.add(new Variable(name.pos(), modifier, dcl, name,
                     Lazy.of(type), Lazy.nil()));
@@ -1469,24 +1476,35 @@ final class SourceParseVisitor
             Position pos,
             FengParser.ParametersSetContext ctx) {
         if (ctx == null) return new ParameterSet(pos);
-        var params = new IdentifierMap<Variable>();
+
+        var vpc = ctx.variadicParameter();
+        var variadic = vpc == null ? null :
+                new VariadicParameter(posOf(vpc.name), identifier(vpc.name));
 
         var ps = ctx.parameters();
         if (ps == null) {
             var types = parseTypeDeclarerList(ctx.typeDeclarerList());
-            return ParameterSet.anon(types);
+            var params = new ArrayList<Parameter>();
+            for (var td : types) {
+                params.add(new FixedParameter(td.pos(), td));
+            }
+            if (variadic != null) params.add(variadic);
+            return new ParameterSet(posOf(ctx), params);
         }
 
+        var params = new ArrayList<Parameter>();
         for (var pc : ps.parameter()) {
             var modifier = parseModifier(pc.modifier());
             var type = (TypeDeclarer) visit(pc.typeDeclarer());
             var names = identifiers(pc.identifierList());
+            var unique = new IdentifierMap<>(names.size());
             for (var name : names) {
-                var v = new Variable(name.pos(), modifier,
-                        Declare.CONST, name, Lazy.of(type), Lazy.nil());
-                params.add(name, v);
+                unique.add(name, name);
+                var p = new FixedParameter(name.pos(), modifier, name, type);
+                params.add(p);
             }
         }
+        if (variadic != null) params.add(variadic);
         return new ParameterSet(pos, params);
     }
 
