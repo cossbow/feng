@@ -2,9 +2,17 @@ package org.cossbow.feng.ast.oop;
 
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.Primitive;
+import org.cossbow.feng.ast.dcl.Refer;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.micro.MacroTable;
+import org.cossbow.feng.ast.proc.FixedParameter;
+import org.cossbow.feng.ast.proc.ParameterSet;
+import org.cossbow.feng.ast.proc.Prototype;
+import org.cossbow.feng.util.Optional;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -12,6 +20,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+
+import static org.cossbow.feng.ast.Position.ZERO;
+import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
 
 public class InterfaceDefinition extends ObjectDefinition {
     /**
@@ -92,6 +103,51 @@ public class InterfaceDefinition extends ObjectDefinition {
         return allMethods;
     }
 
+    public Optional<InterfaceMethod> method(Identifier name) {
+        return (allMethods.isEmpty() ? methods : allMethods).tryGet(name);
+    }
+
     //
     private static final AtomicInteger IdGenerator = new AtomicInteger(0);
+
+    /**
+     * The bytes writer interface
+     */
+    public static final InterfaceDefinition WriterType;
+
+    static {
+        var methods = new IdentifierMap<InterfaceMethod>(2);
+        var write = new InterfaceMethod(ZERO, new Identifier("write"),
+                false, new Prototype(ZERO,
+                new ParameterSet(ZERO, List.of(new FixedParameter(ZERO,
+                        StringLiteral.array(ZERO, PHANTOM))))));
+        methods.add(write.name(), write);
+        WriterType = new InterfaceDefinition(ZERO, Modifier.empty(),
+                new Symbol(new Identifier("Writer")),
+                TypeParameters.empty(), methods, new SymbolMap<>(),
+                new MacroTable());
+        WriterType.builtin(true);
+    }
+
+    /**
+     * The object can write to bytes
+     */
+    public static final InterfaceDefinition WritableType;
+
+    static {
+        var methods = new IdentifierMap<InterfaceMethod>(2);
+        var td = new DerivedTypeDeclarer(ZERO, WriterType.link(),
+                new Refer(ZERO, PHANTOM, true, false));
+        var write = new InterfaceMethod(ZERO, new Identifier("write"),
+                true, new Prototype(ZERO,
+                new ParameterSet(ZERO, List.of(new FixedParameter(ZERO, td))),
+                Primitive.INT.declarer(ZERO)));
+        methods.add(write.name(), write);
+        WritableType = new InterfaceDefinition(ZERO, Modifier.empty(),
+                new Symbol(new Identifier("Writable")),
+                TypeParameters.empty(), methods, new SymbolMap<>(),
+                new MacroTable());
+        WritableType.builtin(true);
+    }
+
 }

@@ -83,6 +83,22 @@ public class CallExpression extends PrimaryExpression {
 
     //
 
+    /**
+     * true: the call-expression use in expressions,
+     * false: directly call as call-statement
+     */
+    private boolean asExpr;
+
+    public boolean asExpr() {
+        return asExpr;
+    }
+
+    public void asExpr(boolean asExpr) {
+        this.asExpr = asExpr;
+    }
+
+    //
+
     @Override
     public String toString() {
         if (arguments.isEmpty())

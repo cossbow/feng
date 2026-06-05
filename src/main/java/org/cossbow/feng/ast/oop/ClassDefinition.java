@@ -205,6 +205,10 @@ public class ClassDefinition extends ObjectDefinition {
         return allMethods;
     }
 
+    public Optional<ClassMethod> method(Identifier name) {
+        return (allMethods.isEmpty() ? methods : allMethods).tryGet(name);
+    }
+
     public IdentifierMap<ClassMethod> inheritMethods() {
         return inheritMethods;
     }
@@ -240,18 +244,16 @@ public class ClassDefinition extends ObjectDefinition {
         return IdGenerator.get();
     }
 
-    public static final Identifier ObjectName = new Identifier(
-            Position.ZERO, "Object");
-    public static final Symbol ObjectSymbol = new Symbol(ObjectName);
+    public static final Symbol ObjectSymbol = new Symbol(new Identifier("Object"));
     public static final DerivedType ObjectType = new DerivedType(
             Position.ZERO, ObjectSymbol, TypeArguments.EMPTY);
     // The root class of all non-final class
     public static final ClassDefinition ObjectClass =
             new ClassDefinition(Position.ZERO, Modifier.empty(),
-                    new Symbol(new Identifier(Position.ZERO, "Object")),
-                    TypeParameters.empty(), Optional.empty(),
-                    new SymbolMap<>(), new IdentifierMap<>(),
-                    new IdentifierMap<>(), new MacroTable());
+                    ObjectSymbol, TypeParameters.empty(),
+                    Optional.empty(), new SymbolMap<>(),
+                    new IdentifierMap<>(), new IdentifierMap<>(),
+                    new MacroTable());
 
     static {
         ObjectClass.builtin(true);

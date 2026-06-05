@@ -12,7 +12,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.cossbow.feng.ast.Position.*;
+import static org.cossbow.feng.ast.Position.ZERO;
 
 /**
  * The string literal does not correspond to the primitive type,
@@ -62,9 +62,13 @@ public class StringLiteral extends Literal {
         if (kind.none())
             return ArrayTypeDeclarer.make(et, value.length, ZERO);
 
-        var r = kind.map(k ->
-                new Refer(ZERO, k, true, true));
-        return ArrayTypeDeclarer.make(et, r, ZERO);
+        return array(pos(), kind.get());
+    }
+
+    public static ArrayTypeDeclarer array(Position pos, ReferKind kind) {
+        var et = Primitive.BYTE.declarer(ZERO);
+        var r = new Refer(pos, kind, true, true);
+        return ArrayTypeDeclarer.make(et, Optional.of(r), ZERO);
     }
 
     //

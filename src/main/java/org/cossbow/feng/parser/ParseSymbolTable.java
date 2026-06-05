@@ -11,6 +11,7 @@ import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.ast.oop.ClassDefinition;
+import org.cossbow.feng.ast.oop.InterfaceDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.util.DedupCache;
 import org.cossbow.feng.util.ErrorUtil;
@@ -70,6 +71,14 @@ public class ParseSymbolTable {
         }
     }
 
+    public void add(TypeDefinition def) {
+        types.add(def.symbol().name(), def);
+    }
+
+    public void add(FunctionDefinition def) {
+        functions.add(def.symbol().name(), def);
+    }
+
     @SuppressWarnings("unchecked")
     private <T> Optional<T> find(Identifier name, IdentifierMap<T>... maps) {
         for (IdentifierMap<T> map : maps) {
@@ -111,7 +120,10 @@ public class ParseSymbolTable {
     static {
         PrimitiveDefinition.types.forEach((k, v) ->
                 BUILTIN.types.add(new Identifier(k.code), v));
-        BUILTIN.types.add(AttributeDefinition.InheritName, AttributeDefinition.InheritDef);
-        BUILTIN.types.add(ClassDefinition.ObjectName, ClassDefinition.ObjectClass);
+        BUILTIN.add(AttributeDefinition.InheritDef);
+        BUILTIN.add(ClassDefinition.ObjectClass);
+        BUILTIN.add(InterfaceDefinition.WriterType);
+        BUILTIN.add(InterfaceDefinition.WritableType);
+        BUILTIN.add(FunctionDefinition.FORMAT_FUNC);
     }
 }

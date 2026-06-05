@@ -1,5 +1,9 @@
 package org.cossbow.feng.analysis;
 
+import org.cossbow.feng.analysis.fmt.ArgumentSegment;
+import org.cossbow.feng.analysis.fmt.FormatSegment;
+import org.cossbow.feng.analysis.fmt.Formatter;
+import org.cossbow.feng.analysis.fmt.TextSegment;
 import org.cossbow.feng.analysis.layout.LayoutTool;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Attribute;
@@ -414,43 +418,13 @@ public class SemanticAnalysis {
         semantic("here can't use type parameters '%s'", tp);
     }
 
-    private GenericMap genericMap(
-            Entity e, TypeParameters params, TypeArguments args) {
-        return genericMap(e, GenericMap.EMPTY, params, args);
-    }
-
-    private GenericMap genericMap(
-            Entity e, GenericMap parent,
-            TypeParameters params, TypeArguments args) {
-        var size = params.size();
-        if (size > args.size()) {
-            return semantic("mismatch type arguments: %s", e.pos());
-        }
-        if (size < args.size()) {
-            return semantic("too much type arguments: %s", e.pos());
-        }
-        if (size == 0) return parent;
-
-        var gm = new HashMap<TypeParameter, TypeDeclarer>(size);
-        for (int i = 0; i < size; i++) {
-            var p = params.get(i);
-            var t = args.get(i);
-            if (t.maybeRefer().match(r -> r.isKind(PHANTOM))) {
-                return semantic("can't use phantom-refer as type argument: %s",
-                        t.pos());
-            }
-            gm.put(p, parent.mapIf(t));
-        }
-        return new GenericMap(parent, gm);
-    }
-
     private TypeDefinition findDef(DerivedType dt) {
         var s = dt.symbol();
         var o = context.findType(s);
         if (o.has()) {
             dt.def(o.get());
             analyse(dt.generic());
-            var gm = genericMap(dt, o.get().generic(), dt.generic());
+            var gm = GenericMap.make(dt, o.get().generic(), dt.generic());
             dt.gm(gm);
             return o.get();
         }
@@ -908,7 +882,7 @@ public class SemanticAnalysis {
             if (sd instanceof InterfaceDefinition id) {
                 cd.allImpls().add(id);
                 for (var im : id.methods()) {
-                    var om = cd.allMethods().tryGet(im.name());
+                    var om = cd.method(im.name());
                     if (om.none()) {
                         semantic("%s unimplement method: %s%s",
                                 cd.symbol(), im.name(), cd.pos());
@@ -934,7 +908,7 @@ public class SemanticAnalysis {
             ClassDefinition cd, InterfaceDefinition id,
             DerivedType dt) {
         for (var im : id.allMethods()) {
-            var o = cd.allMethods().tryGet(im.name());
+            var o = cd.method(im.name());
             if (o.none()) {
                 semantic("%s unimplement method: %s%s",
                         cd.symbol(), im.name(), im.pos());
@@ -1218,7 +1192,7 @@ public class SemanticAnalysis {
         checkGeneric(id, (sd, gm) -> {
             var pd = (InterfaceDefinition) sd;
             for (var m : pd.methods()) {
-                var om = id.allMethods().tryGet(m.name());
+                var om = id.method(m.name());
                 if (om.has()) {
                     checkMethodFlags(m, om.get());
                     continue;
@@ -2095,15 +2069,14 @@ public class SemanticAnalysis {
         var be = (BlockExpression) g.a();
         var bs = new BlockStatement(e.pos(), be.block());
         e.replace().set(bs);
-        var ds = (DeclarationStatement) be.block().getFirst();
-        if (needRelay(g.b())) {
-            bs.stack(ds.variables());
-        } else {
+
+        bs.stack(be.stack());
+        if (!(g.b() instanceof VoidTypeDeclarer)) {
+            var ds = (DeclarationStatement) be.block().getFirst();
             var v = ds.variables().removeLast();
             var ce = (CallExpression) v.value().must();
             var cs = new CallStatement(e.pos(), ce);
             bs.list().add(cs);
-            bs.stack(ds.variables());
         }
         return e;
     }
@@ -3359,6 +3332,9 @@ public class SemanticAnalysis {
     private boolean passingParameters = false;
 
     private Groups.G2<Expression, TypeDeclarer> optimize(CallExpression e) {
+        var rg = expand(e);
+        if (rg.has()) return rg.get();
+
         var call = e.callee();
         var args = e.arguments();
 
@@ -3710,12 +3686,12 @@ public class SemanticAnalysis {
                     cd, name, s.pos());
         }
 
-        var om = cd.allMethods().tryGet(name);
+        var om = cd.method(name);
         if (om.has()) {
             var m = checkExport(om.get(), cd, name);
             checkEscaped(st, m, name);
             checkUnmodifiable(s, m, name);
-            var gm = genericMap(name, st.gm(), m.generic(), generic);
+            var gm = GenericMap.make(name, st.gm(), m.generic(), generic);
             var prot = gm.instantiate(m.prototype());
             var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
             var n = wrapRelayExpr(s, t, _s -> {
@@ -3764,7 +3740,7 @@ public class SemanticAnalysis {
             if (!s.expectCallable())
                 return semantic("interface has no field '%s': %s",
                         name, s.pos());
-            var om = id.allMethods().tryGet(name);
+            var om = id.method(name);
             if (om.has()) {
                 invalid(generic);
                 var m = om.get();
@@ -3959,7 +3935,7 @@ public class SemanticAnalysis {
 
         var od = context.findFunc(s);
         if (od.has()) {
-            var gm = genericMap(re, od.get().generic(), re.generic());
+            var gm = GenericMap.make(re, od.get().generic(), re.generic());
             var prot = gm.instantiate(od.get().prototype());
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
             re.symbol(od.get().symbol());
@@ -3967,7 +3943,7 @@ public class SemanticAnalysis {
         }
 
         if (s.module().none() && enterClass != null) {
-            var om = enterClass.allMethods().tryGet(s.name());
+            var om = enterClass.method(s.name());
             if (om.has()) {
                 var m = om.get();
                 if (!enterMethod.escaped() && m.escaped()) {
@@ -3981,7 +3957,7 @@ public class SemanticAnalysis {
                 // 叠加上继承的泛型替换
                 var gm = enterClass.inherit().map(DerivedType::gm)
                         .getOrElse(GenericMap.EMPTY);
-                gm = genericMap(re, gm, m.generic(), re.generic());
+                gm = GenericMap.make(re, gm, m.generic(), re.generic());
                 var prot = gm.instantiate(m.prototype());
                 // 函数调用加上`this.`前缀，方便后续处理
                 var n = wrapThis(re, m);
@@ -4021,7 +3997,7 @@ public class SemanticAnalysis {
 
         var f = context.findFunc(s);
         if (f.has()) {
-            var gm = genericMap(re, f.get().generic(), re.generic());
+            var gm = GenericMap.make(re, f.get().generic(), re.generic());
             var prot = gm.instantiate(f.get().prototype());
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
             re.symbol(f.get().symbol());
@@ -4642,6 +4618,88 @@ public class SemanticAnalysis {
                 TypeParameters.empty(), false, unmodifiable, proc, false);
         cm.master(cd);
         return cm;
+    }
+
+    // variadic expand
+
+    private Optional<Groups.G2<Expression, TypeDeclarer>>
+    expand(CallExpression ce) {
+        // Check if the target of the call is the format function
+        if (!(ce.callee() instanceof SymbolExpression se))
+            return Optional.empty();
+        if (!FunctionDefinition.FORMAT_FUNC.symbol().equals(se.symbol()))
+            return Optional.empty();
+        invalid(se.generic());
+
+        // Requires at least 2 arguments
+        if (ce.arguments().size() <= 2) return semantic(
+                "missing arguments: %s", ce.pos());
+        // First analyze all arguments
+        var ags = ce.arguments().stream().map(this::optimize).toList();
+
+        // First argument is output that typed Writer
+        var og = ags.getFirst();
+        assignable(Formatter.FORMAT_OUT, og.b(),
+                Optional.of(og.a()), og.a()).valid();
+        var out = (PrimaryExpression) og.a();
+        // Second argument is format string
+        var fg = ags.get(1);
+        if (!(fg.b() instanceof LiteralTypeDeclarer ltd &&
+                ltd.literal() instanceof StringLiteral sl))
+            return semantic("requires format string: %s",
+                    fg.a().pos());
+        ags = ags.subList(2, ags.size());
+        // Parse format string
+        var fmt = Formatter.parse(sl);
+        if (ags.size() < fmt.argNum()) {
+            return semantic("missing arguments: %s", ce.pos());
+        } else if (ags.size() > fmt.argNum()) {
+            return semantic("redundant arguments: %s", ce.pos());
+        }
+        // Check if the parameters match and build sub statements
+        var block = new ArrayList<Statement>(fmt.segments().size());
+        for (var seg : fmt.segments()) {
+            CallExpression ne = switch (seg) {
+                case ArgumentSegment s -> format(ags.get(s.index()), out);
+                case TextSegment s -> format(s, out);
+                case null, default -> unreachable();
+            };
+            var stmt = new CallStatement(ne.pos(), ne);
+            block.add(stmt);
+        }
+        // Build block statement with sub statements, but we need to return
+        // an expression, so we use a block expression instead
+        var n = new BlockExpression(ce.pos(), block,
+                new NilLiteral(ce.pos()).expr());
+        return Optional.of(Groups.g2(n,
+                new VoidTypeDeclarer(ce.pos())));
+    }
+
+    private CallExpression format(
+            Groups.G2<Expression, TypeDeclarer> ag,
+            PrimaryExpression out) {
+        // To call the write method of arguments
+        assignable(Formatter.FORMAT_DATA, ag.b(),
+                Optional.of(ag.a()), ag.a()).valid();
+        var name = new Identifier("write");
+        var me = new MemberOfExpression(ZERO, (PrimaryExpression) ag.a(),
+                name, TypeArguments.EMPTY);
+        return new CallExpression(ZERO, me, List.of(out),
+                InterfaceDefinition.WritableType.method(name)
+                        .get().prototype());
+    }
+
+    private CallExpression format(
+            TextSegment seg,
+            PrimaryExpression out) {
+        // To call the write method of output
+        var name = new Identifier("write");
+        var me = new MemberOfExpression(ZERO, out,
+                name, TypeArguments.EMPTY);
+        var text = stringCache.dedup(seg.text());
+        return new CallExpression(ZERO, me, List.of(text.expr()),
+                InterfaceDefinition.WriterType.method(name)
+                        .get().prototype());
     }
 
     // attribute

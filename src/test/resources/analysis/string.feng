@@ -1,20 +1,21 @@
 
 export
-enum CharCode {
+enum CharEncoding {
     ASCII,
-    UTF8,
+    UTF16,
+    UTF32,
 }
 
 class String {
     const value [*]uint8;
-    const code CharCode;
+    const cc CharEncoding;
 
     func value() [*]uint8 {
         return value;
     }
 
     func char(index int) int32 {
-        if (CharCode.ASCII == code) {
+        if (CharEncoding.ASCII == cc) {
             const s [&]uint8 = value;
             return int32(s[index]);
         }
@@ -23,7 +24,7 @@ class String {
     }
 
     func len() int {
-        return value.length << code.id;
+        return value.length << cc.id;
     }
 
     func isEmpty() bool {

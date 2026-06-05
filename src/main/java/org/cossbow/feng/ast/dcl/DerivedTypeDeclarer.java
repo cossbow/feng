@@ -34,6 +34,12 @@ public class DerivedTypeDeclarer extends TypeDeclarer
         this(pos, derivedType, Optional.empty());
     }
 
+    public DerivedTypeDeclarer(Position pos,
+                               DerivedType derivedType,
+                               Refer refer) {
+        this(pos, derivedType, Optional.of(refer));
+    }
+
     public DerivedType derivedType() {
         return derivedType;
     }

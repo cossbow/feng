@@ -63,6 +63,14 @@ public class InterfaceMethod extends Method {
         this.returnThis = returnThis;
     }
 
+    public InterfaceMethod(Position pos,
+                           Identifier name,
+                           boolean unmodifiable,
+                           Prototype prototype) {
+        this(pos, Modifier.empty(), name, TypeParameters.empty(),
+                false, unmodifiable, prototype, false);
+    }
+
     public Modifier modifier() {
         return modifier;
     }

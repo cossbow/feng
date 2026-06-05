@@ -23,10 +23,10 @@ public class AttributeDefinition extends TypeDefinition {
 
     //
 
-    public static final Identifier InheritName = new Identifier("Inherit");
     public static final
     AttributeDefinition InheritDef = new AttributeDefinition(ZERO,
-            Modifier.empty(), new Symbol(InheritName),
+            Modifier.empty(),
+            new Symbol(new Identifier("Inherit")),
             new IdentifierMap<>());
 
     static {

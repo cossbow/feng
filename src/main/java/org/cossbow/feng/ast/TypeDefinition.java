@@ -1,6 +1,9 @@
 package org.cossbow.feng.ast;
 
 import org.cossbow.feng.ast.attr.Modifier;
+import org.cossbow.feng.ast.gen.DerivedType;
+import org.cossbow.feng.ast.gen.GenericMap;
+import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
 
 abstract
@@ -22,6 +25,20 @@ public class TypeDefinition extends Definition {
 
     public boolean newable() {
         return false;
+    }
+
+    //
+
+    public DerivedType link(TypeArguments tArgs) {
+        var dt = new DerivedType(Position.ZERO,
+                symbol(), tArgs);
+        dt.def(this);
+        dt.gm(GenericMap.make(this, generic(), tArgs));
+        return dt;
+    }
+
+    public DerivedType link() {
+        return link(TypeArguments.EMPTY);
     }
 
     //

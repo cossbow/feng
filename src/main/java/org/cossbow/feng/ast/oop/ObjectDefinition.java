@@ -4,6 +4,7 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.util.Optional;
 
 import java.util.List;
 
@@ -32,4 +33,9 @@ public class ObjectDefinition extends TypeDefinition {
     abstract
     public IdentifierMap<? extends Method> allMethods();
 
+    public Optional<? extends Method> method(Identifier name) {
+        var m = allMethods();
+        if (m.isEmpty()) return m.tryGet(name);
+        return methods().tryGet(name);
+    }
 }

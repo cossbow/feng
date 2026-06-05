@@ -877,4 +877,23 @@ public:
 };
 
 
+// builtin definitions
+class $Writer {
+public:
+    virtual void $write(Feng$ArrayPRefer<Byte> $buf_8) = 0;
+
+    virtual ~$Writer() = default;
+
+    auto operator<=>(const $Writer &) const = default;
+};
+class $Writable {
+public:
+    virtual Int $write(Feng$PRefer<$Writer> $w_9) = 0;
+
+    virtual ~$Writable() = default;
+
+    auto operator<=>(const $Writable &) const = default;
+};
+
+
 #endif //FENG_HEADER_H

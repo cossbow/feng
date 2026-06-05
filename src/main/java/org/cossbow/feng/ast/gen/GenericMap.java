@@ -1,5 +1,6 @@
 package org.cossbow.feng.ast.gen;
 
+import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.proc.FixedParameter;
 import org.cossbow.feng.ast.proc.Parameter;
@@ -8,8 +9,12 @@ import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.util.ErrorUtil;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+
+import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
+import static org.cossbow.feng.util.ErrorUtil.semantic;
 
 /**
  * GenericMap: used for replace type-varieble to specific type.
@@ -154,6 +159,37 @@ public class GenericMap {
     //
 
     public static final GenericMap EMPTY = new GenericMap(Map.of());
+
+    public static GenericMap make(
+            Entity e, TypeParameters params, TypeArguments args) {
+        return make(e, GenericMap.EMPTY, params, args);
+    }
+
+    public static GenericMap make(
+            Entity e, GenericMap parent,
+            TypeParameters params, TypeArguments args) {
+        var size = params.size();
+        if (size > args.size()) {
+            return semantic("mismatch type arguments: %s", e.pos());
+        }
+        if (size < args.size()) {
+            return semantic("too much type arguments: %s", e.pos());
+        }
+        if (size == 0) return parent;
+
+        var gm = new HashMap<TypeParameter, TypeDeclarer>(size);
+        for (int i = 0; i < size; i++) {
+            var p = params.get(i);
+            var t = args.get(i);
+            if (t.maybeRefer().match(r -> r.isKind(PHANTOM))) {
+                return semantic("can't use phantom-refer as type argument: %s",
+                        t.pos());
+            }
+            gm.put(p, parent.mapIf(t));
+        }
+        return new GenericMap(parent, gm);
+    }
+
 
     //
 
