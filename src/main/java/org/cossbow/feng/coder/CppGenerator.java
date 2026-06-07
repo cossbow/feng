@@ -210,6 +210,7 @@ public class CppGenerator {
         writeComment("global variable");
         declareGlobalVar(table.dagVars);
 
+        classMethods();
         functionDefinition();
 
         endFile();
@@ -524,7 +525,8 @@ public class CppGenerator {
     }
 
     private CppGenerator declare(Variable v) {
-        return declare(() -> varName(v), v.type().must());
+        return write(v.type().must()).write(' ')
+                .varName(v);
     }
 
     private CppGenerator declareVar(Variable v) {
@@ -701,8 +703,12 @@ public class CppGenerator {
 //        classRelation(table.dagClasses);
         table.dagInterfaces.bfs(this::declareInterface);
         table.dagClasses.bfs(this::declareClass);
-        table.dagClasses.bfs(this::implClass);
         newLine();
+    }
+
+    private void classMethods() {
+        writeComment("class method");
+        table.dagClasses.bfs(this::implClass);
     }
 
 
@@ -840,7 +846,11 @@ public class CppGenerator {
         write('(');
         joinByComma(cd.allFields().values(), f -> {
             var t = inherit.gm().mapIf(f.type());
-            declare(f.name(), t);
+            var sr = t.checkRefer(STRONG);
+            if (sr) write("const ");
+            write(t).write(' ');
+            if (sr) write('&');
+            write(f.name());
         });
         write("):");
         write(inherit);
@@ -850,8 +860,8 @@ public class CppGenerator {
         write(')');
         if (!cd.fields().isEmpty()) write(',');
         joinByComma(cd.fields().values(), f -> {
-            write(f.name()).write('(')
-                    .write(f.name()).write(')');
+            write(f.name()).write('(').write(f.name())
+                    .write(')');
         });
         write("{}").newLine();
     }
@@ -968,19 +978,10 @@ public class CppGenerator {
         return write(dt.primitive());
     }
 
-    private CppGenerator declare(Runnable namer, TypeDeclarer td) {
-        write(td).write(' ');
-        namer.run();
-        return this;
-    }
-
-    private CppGenerator declare(Identifier name, TypeDeclarer td) {
-        return declare(() -> write(name), td);
-    }
-
     private CppGenerator write(ClassField cf) {
         assert enterClass != null;
-        return declare(cf.name(), cf.type()).endStmt();
+        return write(cf.type()).write(' ')
+                .write(cf.name()).endStmt();
     }
 
     private volatile FunctionDefinition enterFunc;
