@@ -48,18 +48,26 @@ public class CompilerMain {
         try {
             return Paths.get(value);
         } catch (InvalidPathException e) {
-            throw new ParameterException(
-                    "invalid path: %s".formatted(value));
+            return ErrorUtil.argument(
+                    "invalid path: %s", value);
         }
     }
 
     private Map<Identifier, ModuleParser> getLibParsers() {
         if (lib == null || lib.isEmpty()) return Map.of();
         var parsers = new HashMap<Identifier, ModuleParser>();
+        if (lib.containsKey(pkg)) {
+            return ErrorUtil.argument(
+                    "package conflict with library '%s'", pkg);
+        }
         for (var le : lib.entrySet()) {
             var base = toPath(le.getValue());
             var p = new ModuleParser(le.getKey(), base, UTF_8);
-            parsers.put(p.pkg(), p);
+            if (parsers.put(p.pkg(), p) != null) {
+                return ErrorUtil.argument(
+                        "package '%s' conflict in libraries",
+                        le.getKey());
+            }
         }
         return parsers;
     }
@@ -146,12 +154,16 @@ public class CompilerMain {
     }
 
     public static void main(String[] args) throws IOException {
+        var main = new CompilerMain();
+        var cmd = JCommander.newBuilder().addObject(main).build();
         try {
-            var main = new CompilerMain();
-            JCommander.newBuilder().addObject(main).build().parse(args);
+            cmd.parse(args);
             main.run();
         } catch (ParameterException e) {
-            e.getJCommander().usage();
+            cmd.usage();
+            System.exit(1);
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage());
             System.exit(1);
         }
     }
