@@ -5,11 +5,13 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.attr.AttributeDefinition;
+import org.cossbow.feng.ast.attr.BuiltinAttributes;
 import org.cossbow.feng.ast.dcl.PrimitiveDefinition;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.ast.mod.ModulePath;
+import org.cossbow.feng.ast.oop.BuiltinClasses;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.util.DedupCache;
@@ -111,7 +113,11 @@ public class ParseSymbolTable {
     static {
         PrimitiveDefinition.types.forEach((k, v) ->
                 BUILTIN.types.add(new Identifier(k.code), v));
-        BUILTIN.types.add(AttributeDefinition.InheritName, AttributeDefinition.InheritDef);
-        BUILTIN.types.add(ClassDefinition.ObjectName, ClassDefinition.ObjectClass);
+        for (var ad : BuiltinAttributes.All) {
+            BUILTIN.types.add(ad.symbol().name(), ad);
+        }
+        for (var cd : BuiltinClasses.All) {
+            BUILTIN.types.add(cd.symbol().name(), cd);
+        }
     }
 }

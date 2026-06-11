@@ -491,7 +491,7 @@ public class MetaDataExtractor {
 
     public static final
     Attribute InheritAttr = new Attribute(ZERO,
-            AttributeDefinition.InheritDef.symbol(),
+            new Symbol(new Identifier("Inherit")),
             Optional.empty());
 
 }

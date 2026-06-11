@@ -44,7 +44,8 @@ class HashMap`K, V` (Map`K, V`) {
     }
 
     export
-    func set(key K, value V) Result`V` {
+    func set(key K, value V) (V, ok) {
+        var v0 V;
         var bucks = rehash();
         var nn Node`K,V` = {key=key,value=value};
         var idx = indexed(nn);
@@ -52,7 +53,7 @@ class HashMap`K, V` (Map`K, V`) {
         if (cur == nil) {
             bucks[idx] = new(Node`K, V`, nn);
             size += 1;
-            return {ok=true};
+            return (v0, true);
         }
 
         var prev *Node`K, V` = nil;
@@ -60,7 +61,7 @@ class HashMap`K, V` (Map`K, V`) {
             if (key == cur.key) {
                 var old = cur.value;
                 cur.value = value;
-                return {v=old};
+                return (old, false);
             }
             prev = cur;
             cur = cur.next;
@@ -69,27 +70,28 @@ class HashMap`K, V` (Map`K, V`) {
 
         size += 1;
 
-        return {ok=true};
+        return (v0, true);
     }
 
     export
-    func get#(key K) Result`V` {
+    func get#(key K) (V, ok) {
+        var v0 V;
         var bk = buckets;
         if (bk == nil) {
-            return {};
+            return (v0, false);
         }
         var kn Node`K,V` = {key=key};
         var idx = indexed(kn);
         var cur = bk[idx];
         if (cur == nil) {
-            return {};
+            return (v0, false);
         }
 
         for (cur != nil && cur.key != key) {
             cur = cur.next;
         }
-        if (cur == nil) return {};
-        return {ok=true, v=cur.value};
+        if (cur == nil) return (v0, false);
+        return (cur.value, true);
     }
 }
 

@@ -31,6 +31,10 @@ public class Symbol extends Entity {
         this(pos, Optional.empty(), name);
     }
 
+    public Symbol(ModulePath module, Identifier name) {
+        this(name.pos(), Optional.of(module), name);
+    }
+
     public Symbol(Identifier name) {
         this(name.pos(), Optional.empty(), name);
     }

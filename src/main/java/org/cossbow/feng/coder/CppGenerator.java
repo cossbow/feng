@@ -1297,7 +1297,7 @@ public class CppGenerator {
     }
 
     private CppGenerator write(ThrowStatement e) {
-        return unsupported("throw");
+        return write("throw ").write(e.exception()).endStmt();
     }
 
     private CppGenerator write(TryStatement e) {

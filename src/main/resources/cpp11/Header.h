@@ -30,26 +30,23 @@ typedef bool Bool;
 class Feng$DoubleFree : public std::exception {
 };
 
-class Feng$OutOfBounds : public std::exception {
-};
-
-class Feng$Unreachable : public std::exception {
-};
-
 class Feng$NegativeInteger : public std::exception {
 };
 
-class Feng$NilPointer : public std::exception {
+class Feng$UseAfterFree : public std::exception {
 };
 
-class Feng$UseAfterFree : public std::exception {
+class $NilPointer : public std::exception {
+};
+
+class $OutOfBounds : public std::exception {
 };
 
 template<typename T>
 requires std::integral<T>
 static T Feng$checkIndex(T index, T bounds) {
 	if (0 <= index && index < bounds) return index;
-	throw Feng$OutOfBounds();
+	throw $OutOfBounds();
 }
 
 // 快速幂：计算 a^b
@@ -81,7 +78,7 @@ static Float64 Feng$fastPow(Float64 a, Int64 b) {
 template<typename T>
 static T *Feng$required(T *p) {
 	if (p != nullptr) return p;
-	throw Feng$NilPointer();
+	throw $NilPointer();
 }
 
 // The root of polymorphism and abstraction classes
@@ -484,7 +481,7 @@ struct Feng$Array {
 
 	E &operator[](Int64 index) {
 		if (index < 0 || index >= L)
-			throw Feng$OutOfBounds();
+			throw $OutOfBounds();
 		return values[index];
 	}
 
@@ -528,7 +525,7 @@ struct Feng$ArrayRefer {
 	E &operator[](Int64 index) const {
 		Feng$required(start);
 		if (index < 0 || index >= this->len)
-			throw Feng$OutOfBounds();
+			throw $OutOfBounds();
 		Feng$checkIndex(index, len);
 		return this->start[index];
 	}
@@ -699,7 +696,7 @@ static Feng$ArraySRefer<E> Feng$newArray(Int64 len) {
 template<typename E, typename ...Args>
 static Feng$ArraySRefer<E> Feng$newArrayInit(Int64 len, Args &&... args) {
 	Int64 num = sizeof...(Args);
-	if (len < num) throw Feng$OutOfBounds();
+	if (len < num) throw $OutOfBounds();
 	auto a = Feng$newArray<E>(len);
 	int i = 0;
 	((a[i++] = std::forward<E>(args)), ...);
@@ -709,7 +706,7 @@ static Feng$ArraySRefer<E> Feng$newArrayInit(Int64 len, Args &&... args) {
 // new([len]E, init)
 template<typename E, Int64 L0>
 static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 len, Feng$Array<E, L0> &init) {
-	if (len < L0) throw Feng$OutOfBounds();
+	if (len < L0) throw $OutOfBounds();
 	auto a = Feng$newArray<E>(len);
 	for (int i = 0; i < L0; ++i) {
 		a[i] = init[i];
@@ -720,7 +717,7 @@ static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 len, Feng$Array<E, L0> &init)
 template<typename E, typename A>
 requires BaseArrayRefer<E, A>
 static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 len, A &init) {
-	if (len < init.len) throw Feng$OutOfBounds();
+	if (len < init.len) throw $OutOfBounds();
 	auto a = Feng$newArray<E>(len);
 	for (int i = 0; i < init.len; ++i) {
 		a[i] = init[i];
@@ -789,7 +786,7 @@ template<typename E, typename A, typename U>
 requires BaseArrayRefer<E, A>
 static Feng$Refer<U> Feng$mapA2U(A &s) {
 	if (sizeof(U) > (sizeof(E) * s.len))
-		throw Feng$OutOfBounds();
+		throw $OutOfBounds();
 	return {(U *) s.start};
 }
 

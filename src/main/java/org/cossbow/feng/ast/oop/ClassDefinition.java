@@ -86,6 +86,20 @@ public class ClassDefinition extends ObjectDefinition {
                 new SymbolMap<>(), fields, methods, macros);
     }
 
+    public ClassDefinition(Position pos, Symbol symbol,
+                           IdentifierMap<ClassField> fields,
+                           IdentifierMap<ClassMethod> methods) {
+        this(pos, Modifier.empty(), symbol, TypeParameters.empty(),
+                fields, methods, new MacroTable());
+    }
+
+    public ClassDefinition(Position pos, Symbol symbol,
+                           IdentifierMap<ClassField> fields) {
+        this(pos, Modifier.empty(), symbol, TypeParameters.empty(),
+                fields, new IdentifierMap<>(), new MacroTable());
+    }
+
+
     public boolean isFinal() {
         return isFinal;
     }
@@ -252,8 +266,4 @@ public class ClassDefinition extends ObjectDefinition {
                     TypeParameters.empty(), Optional.empty(),
                     new SymbolMap<>(), new IdentifierMap<>(),
                     new IdentifierMap<>(), new MacroTable());
-
-    static {
-        ObjectClass.builtin(true);
-    }
 }
