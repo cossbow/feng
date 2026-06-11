@@ -32,4 +32,10 @@ public class ReferEqualExpression extends PrimaryExpression {
     public boolean same() {
         return same;
     }
+
+    //
+    @Override
+    public String toString() {
+        return left + (same ? " == " : " != ") + right;
+    }
 }

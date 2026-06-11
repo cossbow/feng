@@ -3081,7 +3081,7 @@ public class SemanticAnalysis {
                     return Optional.of(Primitive.BOOL.declarer(e.pos()));
             }
             case BOOL -> {
-                if (BinaryOperator.SetLogic.contains(op))
+                if (BinaryOperator.SetBool.contains(op))
                     return Optional.of(expect);
             }
         }
@@ -3111,8 +3111,7 @@ public class SemanticAnalysis {
             return Groups.g2(n, t);
         }
 
-        var s = (PrimaryExpression) g.a();
-        var n = wrapRelayExpr(s, t, a -> {
+        var n = wrapRelayExpr(g.a(), t, a -> {
             return new CheckNilExpression(e.pos(), a, nil);
         });
         return Groups.g2(n, t);
@@ -3164,8 +3163,16 @@ public class SemanticAnalysis {
 
     private Groups.G2<Expression, TypeDeclarer>
     optimize(BinaryExpression e) {
+        var op = e.operator();
         var l = optimize(e.left());
+        Set<Variable> vars = Set.of();
+        if (BinaryOperator.SetLogic.contains(op)) {
+            vars = collectNotNil(l.a(), op == BinaryOperator.AND);
+            setNilState(vars);
+        }
         var r = optimize(e.right());
+        if (BinaryOperator.SetLogic.contains(op))
+            delNilState(vars);
         if (l.a() instanceof LiteralExpression le &&
                 r.a() instanceof LiteralExpression re) {
             return optimize(e, le, re);
@@ -3177,16 +3184,16 @@ public class SemanticAnalysis {
         var lr = l.b().maybeRefer();
         var rr = r.b().maybeRefer();
         if (lr.none() && rr.none()) {
-            var n = new BinaryExpression(e.pos(), e.operator(), l.a(), r.a());
+            var n = new BinaryExpression(e.pos(), op, l.a(), r.a());
             var t = primitiveBinOp(l.b(), r.b(), e);
             if (t.none()) t = derivedTypeBinOp(l.b(), r.b(), e);
             if (t.has()) return Groups.g2(n, t.get());
 
             return semantic("not support %s %s %s: %s",
-                    l.b(), e.operator(), r.b(), e.pos());
+                    l.b(), op, r.b(), e.pos());
         }
 
-        var isEqOp = BinaryOperator.SetEquals.contains(e.operator());
+        var isEqOp = BinaryOperator.SetEquals.contains(op);
         if (isEqOp && referCompare(l.b(), r.b(), e).ok) {
             var t = Primitive.BOOL.declarer(e.pos());
             var x = (PrimaryExpression) l.a();
@@ -3200,7 +3207,7 @@ public class SemanticAnalysis {
             return Groups.g2(n, t);
         }
         return semantic("not support %s %s %s: %s",
-                l.b(), e.operator(), r.b(), e.pos());
+                l.b(), op, r.b(), e.pos());
 
     }
 
@@ -3246,6 +3253,7 @@ public class SemanticAnalysis {
     }
 
     private boolean checkUnaryOperate(UnaryOperator op, TypeDeclarer td) {
+        if (td.maybeRefer().has()) return false;
         if (td instanceof PrimitiveTypeDeclarer ptd) {
             var p = ptd.primitive();
             if (p.isInteger()) return true;
@@ -3270,7 +3278,7 @@ public class SemanticAnalysis {
             var n = new UnaryExpression(e.pos(), e.operator(), o.a());
             return Groups.g2(n, o.b());
         }
-        return semantic("%s not support operate %s: %s",
+        return semantic("type '%s' not support operator '%s': %s",
                 o.b(), e.operator(), e.pos());
     }
 
@@ -4172,10 +4180,17 @@ public class SemanticAnalysis {
                     e.condition().pos());
 
         var lt = e.expectType.get();
+        var vars = collectNotNil(cg.a(), true);
+        setNilState(vars);
         e.yes().expectType.set(lt);
         var yg = optimize(e.yes());
+        delNilState(vars);
+
+        vars = collectNotNil(cg.a(), false);
+        setNilState(vars);
         e.not().expectType.set(lt);
         var ng = optimize(e.not());
+        delNilState(vars);
 
         var n = new ConditionalExpression(e.pos(), cg.a(), yg.a(), ng.a());
         if (lt.has()) {

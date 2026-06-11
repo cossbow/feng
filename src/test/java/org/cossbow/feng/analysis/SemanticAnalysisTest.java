@@ -795,7 +795,7 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testBinaryExpression4() {
-        for (var bo : BinaryOperator.SetLogic) {
+        for (var bo : BinaryOperator.SetBool) {
             for (var p : ofKind(Primitive.Kind.BOOL)) {
                 var s = BaseParseTest.operatorSymbols.get(bo);
                 var c = "func f(a,b %s) { var i bool; i = a %s b;}"
@@ -893,6 +893,9 @@ public class SemanticAnalysisTest {
         checkFail("func f(a bool){ var v = -a; }");
         checkSucc("func f(a bool){ var v = !a; }");
 
+        checkFail("func f(a *int){ var v = +a; }");
+        checkFail("func f(a *int){ var v = -a; }");
+        checkFail("func f(a *int){ var v = !a; }");
     }
 
     @Test
@@ -1264,7 +1267,7 @@ public class SemanticAnalysisTest {
     }
 
     @Test
-    public void testTupleExpression3(){
+    public void testTupleExpression3() {
         checkSucc("func f() { var a (int,bool) = (1,false); }");
         checkFail("func f() { var a (int,bool) = false; }");
         checkFail("class A{var v1 int; var v2 bool;} func f() { var a (int,bool) = A{}; }");
@@ -1792,6 +1795,30 @@ public class SemanticAnalysisTest {
         checkFail("func f(a,b *int){if(a!=nil||b==nil) return; var v *!int = a; v = b;}");
         checkSucc("func f(a *int){{if(a==nil) return; var v *!int = a;}}");
         checkFail("func f(a *int){{if(a!=nil) return; var v *!int = a;}}");
+    }
+
+    @Test
+    public void testRequired5() {
+        var d = "func u(a *!int) bool { return *a > 0; }";
+        checkSucc(d + "func f(a *int){ var v = a!=nil&&u(a); }");
+        checkFail(d + "func f(a *int){ var v = a==nil&&u(a); }");
+        checkFail(d + "func f(a *int){ var v = a!=nil||u(a); }");
+        checkSucc(d + "func f(a *int){ var v = a==nil||u(a); }");
+        checkSucc(d + "func f(a,b *int){ var v = (a!=nil&&b==nil)&&u(a); }");
+        checkFail(d + "func f(a,b *int){ var v = (a!=nil||b==nil)&&u(a); }");
+        checkSucc(d + "func f(a,b *int){ var v = (a==nil||b==nil)||u(a); }");
+        checkFail(d + "func f(a,b *int){ var v = (a==nil&&b==nil)||u(a); }");
+    }
+
+    @Test
+    public void testRequired6() {
+        var d = "func u(a *!int) int { return *a; }";
+        checkSucc(d + "func f(a *int){ var v = a!=nil ? u(a) : 0; }");
+        checkFail(d + "func f(a *int){ var v = a==nil ? u(a) : 0; }");
+        checkSucc(d + "func f(a *int){ var v = a==nil ? 0 : u(a); }");
+        checkFail(d + "func f(a *int){ var v = a!=nil ? 0 : u(a); }");
+        checkSucc(d + "func f(a,b *int){ var v = (a!=nil&&b==nil) ? u(a) : 0; }");
+        checkFail(d + "func f(a,b *int){ var v = (a!=nil||b==nil) ? u(a) : 0; }");
     }
 
     //

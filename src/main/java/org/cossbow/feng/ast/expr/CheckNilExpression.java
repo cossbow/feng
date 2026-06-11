@@ -26,4 +26,9 @@ public class CheckNilExpression extends PrimaryExpression {
         return nil;
     }
 
+    //
+    @Override
+    public String toString() {
+        return subject + (nil ? " == nil" : " != nil");
+    }
 }

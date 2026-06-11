@@ -26,4 +26,9 @@ public class DereferExpression extends PrimaryExpression {
         return subject;
     }
 
+    //
+    @Override
+    public String toString() {
+        return '*' + subject.toString();
+    }
 }
