@@ -62,8 +62,8 @@ public class C2FengConverter {
         for (var cf : struct.fields()) {
             var id = new Identifier(ZERO, cf.name());
             fields.add(id, new StructureField(ZERO, id,
-                    toFengOptional(cf.bitfieldWidth()
-                            .map(w -> new IntegerLiteral(ZERO, w).expr())),
+                    cf.bitfieldWidth().<Expression>map(w ->
+                            new IntegerLiteral(ZERO, w).expr()),
                     convertType(cf.type())));
         }
 
@@ -84,8 +84,8 @@ public class C2FengConverter {
         for (var cf : union.fields()) {
             var id = new Identifier(ZERO, cf.name());
             fields.add(id, new StructureField(ZERO, id,
-                    toFengOptional(cf.bitfieldWidth()
-                            .map(w -> new IntegerLiteral(ZERO, w).expr())),
+                    cf.bitfieldWidth().<Expression>map(w ->
+                            new IntegerLiteral(ZERO, w).expr()),
                     convertType(cf.type())));
         }
 
@@ -102,7 +102,7 @@ public class C2FengConverter {
     public void addEnum(CEnumType enumType) {
         long nextVal = 0;
         for (var c : enumType.constants()) {
-            long val = c.value().orElse(nextVal);
+            long val = c.value().getOrElse(nextVal);
             nextVal = val + 1;
 
             var constName = enumType.tagName() + "$" + c.name();
@@ -236,7 +236,7 @@ public class C2FengConverter {
     // ---------- Array mapping ----------
 
     private TypeDeclarer mapArrayType(CArrayType at) {
-        if (at.length().isPresent()) {
+        if (at.length().has()) {
             var td = new ArrayTypeDeclarer(ZERO,
                     convertType(at.elementType()),
                     Optional.of(new IntegerLiteral(ZERO, at.length().get()).expr()),
@@ -273,10 +273,6 @@ public class C2FengConverter {
 
     private static Modifier modifier(boolean export) {
         return new Modifier(ZERO, export, new SymbolMap<>());
-    }
-
-    private static <T> Optional<T> toFengOptional(java.util.Optional<T> jOpt) {
-        return jOpt.map(Optional::of).orElseGet(Optional::empty);
     }
 
     // ========== Output ==========

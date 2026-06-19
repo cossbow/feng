@@ -1,6 +1,6 @@
 package org.cossbow.feng.c2feng.model;
 
-import java.util.Optional;
+import org.cossbow.feng.util.Optional;
 
 /**
  * A field of a C struct or union.

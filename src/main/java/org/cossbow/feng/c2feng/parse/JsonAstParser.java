@@ -2,12 +2,16 @@ package org.cossbow.feng.c2feng.parse;
 
 import org.cossbow.feng.c2feng.convert.C2FengConverter;
 import org.cossbow.feng.c2feng.model.*;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.json.JsonNode;
 import org.cossbow.feng.util.json.JsonParser;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Parses clang's {@code -ast-dump=json} output and populates

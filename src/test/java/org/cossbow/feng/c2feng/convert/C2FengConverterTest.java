@@ -5,7 +5,8 @@ import org.junit.jupiter.api.Test;
 
 import java.io.StringWriter;
 import java.util.List;
-import java.util.Optional;
+
+import org.cossbow.feng.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 

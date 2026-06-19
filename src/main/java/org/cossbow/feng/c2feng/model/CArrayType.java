@@ -1,6 +1,6 @@
 package org.cossbow.feng.c2feng.model;
 
-import java.util.Optional;
+import org.cossbow.feng.util.Optional;
 
 /**
  * C array type:
@@ -14,7 +14,7 @@ public record CArrayType(CType elementType, Optional<Integer> length) implements
     @Override
     public String typeName() {
         return length.map(l -> elementType.typeName() + "[" + l + "]")
-                .orElseGet(() -> elementType.typeName() + "[]");
+                .getOrElse(elementType.typeName() + "[]");
     }
 
     /**
@@ -23,6 +23,6 @@ public record CArrayType(CType elementType, Optional<Integer> length) implements
      */
     @Override
     public boolean isComplete() {
-        return length.isPresent();
+        return length.has();
     }
 }
