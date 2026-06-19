@@ -278,7 +278,7 @@ struct Feng$SRefer {
 		return t == nullptr;
 	}
 
-	// t.start();
+	// t.$values();
 	T *operator->() const {
 		Feng$required(t);
 		return t;
@@ -407,7 +407,7 @@ struct Feng$PRefer {
 		return t == nullptr;
 	}
 
-	// t.start();
+	// t.$values();
 	T *operator->() const {
 		Feng$required(t);
 		return t;
@@ -438,19 +438,19 @@ static Feng$PRefer<T> Feng$assert(const Feng$PRefer<S> &p) {
 // array: value-type
 template<typename E, Int64 L>
 struct Feng$Array {
-	E values[L] = {};
+	E $values[L] = {};
 
 	Feng$Array() = default;
 
 	Feng$Array(Feng$Array<E, L> &a) {
 		for (int i = 0; i < L; ++i) {
-			values[i] = std::forward<E>(a.values[i]);
+			$values[i] = std::forward<E>(a.$values[i]);
 		}
 	}
 
 	Feng$Array(Feng$Array<E, L> &&a) noexcept {
 		for (int i = 0; i < L; ++i) {
-			values[i] = std::forward<E>(a.values[i]);
+			$values[i] = std::forward<E>(a.$values[i]);
 		}
 	}
 
@@ -458,19 +458,19 @@ struct Feng$Array {
 	Feng$Array(Args &&... args) {
 		static_assert(sizeof...(Args) <= L, "out of bounds");
 		int i = 0;
-		((values[i++] = std::forward<E>(args)), ...);
+		(($values[i++] = std::forward<E>(args)), ...);
 	}
 
 	Feng$Array<E, L> &operator=(Feng$Array<E, L> const &a) noexcept {
 		for (int i = 0; i < L; ++i) {
-			values[i] = a.values[i];
+			$values[i] = a.$values[i];
 		}
 		return *this;
 	}
 
 	Feng$Array<E, L> &operator=(Feng$Array<E, L> &&a) noexcept {
 		for (int i = 0; i < L; ++i) {
-			values[i] = std::forward<E>(a.values[i]);
+			$values[i] = std::forward<E>(a.$values[i]);
 		}
 		return *this;
 	}
@@ -478,14 +478,14 @@ struct Feng$Array {
 	template<typename... Args>
 	Feng$Array<E, L> &operator=(Args &&... args) {
 		int i = 0;
-		((values[i++] = std::forward<E>(args)), ...);
+		(($values[i++] = std::forward<E>(args)), ...);
 		return *this;
 	}
 
 	E &operator[](Int64 index) {
 		if (index < 0 || index >= L)
 			throw Feng$OutOfBounds();
-		return values[index];
+		return $values[index];
 	}
 
 	auto operator<=>(const Feng$Array<E, L> &) const = default;
@@ -497,15 +497,15 @@ struct Feng$Array {
 		Feng$checkIndex(i, L);
 		Feng$checkIndex(j, L);
 		using std::swap;
-		swap(values[i], values[j]);
+		swap($values[i], $values[j]);
 	}
 
 	// move this[i] to cover this[j]
 	void $move(Int i, Int j) {
 		Feng$checkIndex(i, L);
 		Feng$checkIndex(j, L);
-		values[j] = std::move(values[i]);
-		values[i] = E{};
+		$values[j] = std::move($values[i]);
+		$values[i] = E{};
 	}
 
 };
@@ -513,56 +513,56 @@ struct Feng$Array {
 // the base-class for Array Reference
 template<typename E>
 struct Feng$ArrayRefer {
-	E *start;
-	Int64 len;
+	E *$values;
+	Int64 $length;
 
-	Feng$ArrayRefer() : start(nullptr), len(0) {}
+	Feng$ArrayRefer() : $values(nullptr), $length(0) {}
 
-	Feng$ArrayRefer(E *start, Int64 len) : start(start), len(len) {}
+	Feng$ArrayRefer(E *$values, Int64 $length) : $values($values), $length($length) {}
 
 	// t == nil;
 	bool absent() const {
-		return start == nullptr;
+		return $values == nullptr;
 	}
 
 	E &operator[](Int64 index) const {
-		Feng$required(start);
-		if (index < 0 || index >= this->len)
+		Feng$required($values);
+		if (index < 0 || index >= this->$length)
 			throw Feng$OutOfBounds();
-		Feng$checkIndex(index, len);
-		return this->start[index];
+		Feng$checkIndex(index, $length);
+		return this->$values[index];
 	}
 
 	bool operator==(const Feng$ArrayRefer<E> &o) const {
-		return this->start == o.start;
+		return this->$values == o.$values;
 	}
 
 	bool operator!=(const Feng$ArrayRefer<E> &o) const {
-		return this->start != o.start;
+		return this->$values != o.$values;
 	}
 
 	auto operator<=>(const Feng$ArrayRefer<E> &o) const {
-		if (this->start < o.start) return std::strong_ordering::less;
-		if (this->start > o.start) return std::strong_ordering::greater;
+		if (this->$values < o.$values) return std::strong_ordering::less;
+		if (this->$values > o.$values) return std::strong_ordering::greater;
 		return std::strong_ordering::equal;
 	}
 
 	// swap this[i] and this[j]
 	void $swap(Int i, Int j) {
-		Feng$required(start);
-		Feng$checkIndex(i, len);
-		Feng$checkIndex(j, len);
+		Feng$required($values);
+		Feng$checkIndex(i, $length);
+		Feng$checkIndex(j, $length);
 		using std::swap;
-		swap(start[i], start[j]);
+		swap($values[i], $values[j]);
 	}
 
 	// move this[i] to cover this[j]
 	void $move(Int i, Int j) {
-		Feng$required(start);
-		Feng$checkIndex(i, len);
-		Feng$checkIndex(j, len);
-		start[j] = std::move(start[i]);
-		start[i] = E{};
+		Feng$required($values);
+		Feng$checkIndex(i, $length);
+		Feng$checkIndex(j, $length);
+		$values[j] = std::move($values[i]);
+		$values[i] = E{};
 	}
 
 };
@@ -575,33 +575,33 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 
 	Feng$ArraySRefer(std::nullptr_t) : Feng$ArrayRefer<E>() {}
 
-	Feng$ArraySRefer(E *start, Int64 len) {
-		this->start = start;
-		this->len = len;
+	Feng$ArraySRefer(E *$values, Int64 $length) {
+		this->$values = $values;
+		this->$length = $length;
 	}
 
 	Feng$ArraySRefer(const Feng$ArrayRefer<E> &r) {
-		this->start = Feng$inc(r.start);
-		this->len = r.len;
+		this->$values = Feng$inc(r.$values);
+		this->$length = r.$length;
 	}
 
 	Feng$ArraySRefer(Feng$ArrayRefer<E> &&r) {
-		this->start = Feng$inc(r.start);
-		this->len = r.len;
-		r.start = nullptr;
-		r.len = 0;
+		this->$values = Feng$inc(r.$values);
+		this->$length = r.$length;
+		r.$values = nullptr;
+		r.$length = 0;
 	}
 
 	Feng$ArraySRefer(const Feng$ArraySRefer<E> &r) {
-		this->start = Feng$inc(r.start);
-		this->len = r.len;
+		this->$values = Feng$inc(r.$values);
+		this->$length = r.$length;
 	}
 
 	Feng$ArraySRefer(Feng$ArraySRefer<E> &&r) noexcept {
-		this->start = r.start;
-		this->len = r.len;
-		r.start = nullptr;
-		r.len = 0;
+		this->$values = r.$values;
+		this->$length = r.$length;
+		r.$values = nullptr;
+		r.$length = 0;
 	}
 
 	~Feng$ArraySRefer() {
@@ -612,28 +612,28 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 	void swap(Feng$ArraySRefer<E> &r) noexcept;
 
 	Feng$ArraySRefer<E> &operator=(std::nullptr_t) {
-		if (this->start == nullptr) return *this;
+		if (this->$values == nullptr) return *this;
 		dec();
-		this->start = nullptr;
-		this->len = 0;
+		this->$values = nullptr;
+		this->$length = 0;
 		return *this;
 	}
 
 	Feng$ArraySRefer<E> &operator=(const Feng$ArraySRefer<E> &r) {
 		if (this == &r) return *this;
 		dec();
-		this->start = Feng$inc(r.start);
-		this->len = r.len;
+		this->$values = Feng$inc(r.$values);
+		this->$length = r.$length;
 		return *this;
 	}
 
 	Feng$ArraySRefer<E> &operator=(Feng$ArraySRefer<E> &&r) noexcept {
 		if (this == &r) return *this;
 		dec();
-		this->start = r.start;
-		this->len = r.len;
-		r.start = nullptr;
-		r.len = 0;
+		this->$values = r.$values;
+		this->$length = r.$length;
+		r.$values = nullptr;
+		r.$length = 0;
 		return *this;
 	}
 
@@ -641,13 +641,13 @@ struct Feng$ArraySRefer : public Feng$ArrayRefer<E> {
 
 private:
 	void dec() {
-		if (!Feng$dec0(this->start)) return;
+		if (!Feng$dec0(this->$values)) return;
 		if (std::is_destructible_v<E>) {
-			for (int i = 0; i < this->len; ++i) {
-				this->start[i].~E();
+			for (int i = 0; i < this->$length; ++i) {
+				this->$values[i].~E();
 			}
 		}
-		Feng$del(this->start);
+		Feng$del(this->$values);
 	}
 };
 
@@ -659,8 +659,8 @@ void swap(Feng$ArraySRefer<E> &a, Feng$ArraySRefer<E> &b) noexcept {
 template<typename E>
 void Feng$ArraySRefer<E>::swap(Feng$ArraySRefer<E> &r) noexcept {
 	using std::swap;
-	swap(this->start, r.start);
-	swap(this->len, r.len);
+	swap(this->$values, r.$values);
+	swap(this->$length, r.$length);
 }
 
 // Phantom Array Reference
@@ -671,7 +671,7 @@ struct Feng$ArrayPRefer : public Feng$ArrayRefer<E> {
 
 	Feng$ArrayPRefer(std::nullptr_t) : Feng$ArrayRefer<E>() {}
 
-	Feng$ArrayPRefer(E *start, Int64 len) : Feng$ArrayRefer<E>(start, len) {}
+	Feng$ArrayPRefer(E *$values, Int64 $length) : Feng$ArrayRefer<E>($values, $length) {}
 
 	Feng$ArrayPRefer(Feng$ArrayRefer<E> &&r) : Feng$ArrayRefer<E>(r) {}
 
@@ -685,32 +685,32 @@ struct Feng$ArrayPRefer : public Feng$ArrayRefer<E> {
 template<typename E, typename T>
 concept BaseArrayRefer = std::is_base_of_v<Feng$ArrayRefer<E>, T>;
 
-// new([len]E)
+// new([length]E)
 template<typename E>
-static Feng$ArraySRefer<E> Feng$newArray(Int64 len) {
-	if (len < 0) throw Feng$NegativeInteger();
-	void *p = Feng$alloc(sizeof(E) * len);
-	memset(p, 0, sizeof(E) * len);
-	E *e = new(p)E[len];
-	return {e, len};
+static Feng$ArraySRefer<E> Feng$newArray(Int64 $length) {
+	if ($length < 0) throw Feng$NegativeInteger();
+	void *p = Feng$alloc(sizeof(E) * $length);
+	memset(p, 0, sizeof(E) * $length);
+	E *e = new(p)E[$length];
+	return {e, $length};
 }
 
-// new([len]E, [...args])
+// new([length]E, [...args])
 template<typename E, typename ...Args>
-static Feng$ArraySRefer<E> Feng$newArrayInit(Int64 len, Args &&... args) {
+static Feng$ArraySRefer<E> Feng$newArrayInit(Int64 $length, Args &&... args) {
 	Int64 num = sizeof...(Args);
-	if (len < num) throw Feng$OutOfBounds();
-	auto a = Feng$newArray<E>(len);
+	if ($length < num) throw Feng$OutOfBounds();
+	auto a = Feng$newArray<E>($length);
 	int i = 0;
 	((a[i++] = std::forward<E>(args)), ...);
 	return a;
 }
 
-// new([len]E, init)
+// new([length]E, init)
 template<typename E, Int64 L0>
-static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 len, Feng$Array<E, L0> &init) {
-	if (len < L0) throw Feng$OutOfBounds();
-	auto a = Feng$newArray<E>(len);
+static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 $length, Feng$Array<E, L0> &init) {
+	if ($length < L0) throw Feng$OutOfBounds();
+	auto a = Feng$newArray<E>($length);
 	for (int i = 0; i < L0; ++i) {
 		a[i] = init[i];
 	}
@@ -719,10 +719,10 @@ static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 len, Feng$Array<E, L0> &init)
 
 template<typename E, typename A>
 requires BaseArrayRefer<E, A>
-static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 len, A &init) {
-	if (len < init.len) throw Feng$OutOfBounds();
-	auto a = Feng$newArray<E>(len);
-	for (int i = 0; i < init.len; ++i) {
+static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 $length, A &init) {
+	if ($length < init.$length) throw Feng$OutOfBounds();
+	auto a = Feng$newArray<E>($length);
+	for (int i = 0; i < init.$length; ++i) {
 		a[i] = init[i];
 	}
 	return a;
@@ -734,52 +734,52 @@ static Feng$ArraySRefer<E> Feng$newArrayCopy(Int64 len, A &init) {
 template<typename S, typename A, typename T>
 requires BaseArrayRefer<S, A>
 static Feng$ArrayRefer<T> Feng$mapA2A(A &s) {
-	Int64 len = (sizeof(S) * s.len) / sizeof(T);
-	return {(T *) s.start, len};
+	Int64 $length = (sizeof(S) * s.$length) / sizeof(T);
+	return {(T *) s.$values, $length};
 }
 
 // [L]S -> [&]R
 template<typename S, Int64 L, typename R>
 static Feng$ArrayPRefer<R> Feng$mapA2A(Feng$Array<S, L> &s) {
 	Int64 l = sizeof(S) * L / sizeof(R);
-	return {(R *) s.values, l};
+	return {(R *) s.$values, l};
 }
 
 // S -> [&]T
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(S *s) {
-	Int64 len = sizeof(S) / sizeof(T);
-	return {(T *) s, len};
+	Int64 $length = sizeof(S) / sizeof(T);
+	return {(T *) s, $length};
 }
 
 // *S -> [*]T
 // *S -> [&]T
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$SRefer<S> &s) {
-	Int64 len = sizeof(S) / sizeof(T);
-	return {(T *) s.t, len};
+	Int64 $length = sizeof(S) / sizeof(T);
+	return {(T *) s.t, $length};
 }
 
 // *S -> [*]T
 // *S -> [&]T
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$SRefer<S> &&s) {
-	Int64 len = sizeof(S) / sizeof(T);
-	return {(T *) s.t, len};
+	Int64 $length = sizeof(S) / sizeof(T);
+	return {(T *) s.t, $length};
 }
 
 // &S -> [&]T
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$PRefer<S> &s) {
-	Int64 len = sizeof(S) / sizeof(T);
-	return {(T *) s.t, len};
+	Int64 $length = sizeof(S) / sizeof(T);
+	return {(T *) s.t, $length};
 }
 
 // &S -> [&]T
 template<typename S, typename T>
 static Feng$ArrayRefer<T> Feng$mapU2A(Feng$PRefer<S> &&s) {
-	Int64 len = sizeof(S) / sizeof(T);
-	return {(T *) s.t, len};
+	Int64 $length = sizeof(S) / sizeof(T);
+	return {(T *) s.t, $length};
 }
 
 // [*]E -> *U
@@ -788,9 +788,9 @@ static Feng$ArrayRefer<T> Feng$mapU2A(Feng$PRefer<S> &&s) {
 template<typename E, typename A, typename U>
 requires BaseArrayRefer<E, A>
 static Feng$Refer<U> Feng$mapA2U(A &s) {
-	if (sizeof(U) > (sizeof(E) * s.len))
+	if (sizeof(U) > (sizeof(E) * s.$length))
 		throw Feng$OutOfBounds();
-	return {(U *) s.start};
+	return {(U *) s.$values};
 }
 
 
@@ -800,11 +800,11 @@ struct Feng$GlobalArray {
 	Feng$Array<T, L> array;
 
 	Feng$ArraySRefer<T> sr() {
-		return {Feng$inc(array.values), L};
+		return {Feng$inc(array.$values), L};
 	}
 
 	Feng$ArrayPRefer<T> pr() {
-		return {array.values, L};
+		return {array.$values, L};
 	}
 };
 

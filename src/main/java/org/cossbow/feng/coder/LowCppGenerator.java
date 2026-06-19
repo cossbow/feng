@@ -1371,7 +1371,6 @@ public class LowCppGenerator {
             case CheckNilExpression ee -> write(ee);
             case EnumValueExpression ee -> write(ee);
             case EnumIdExpression ee -> write(ee);
-            case ArrayLenExpression ee -> write(ee);
             case BlockExpression ee -> write(ee);
             default -> unreachable();
         };
@@ -1801,10 +1800,6 @@ public class LowCppGenerator {
                 write(e.index()).write(',')
                 .write('(').write(t).write(')')
                 .write(e.def().size()).write(')');
-    }
-
-    private LowCppGenerator write(ArrayLenExpression e) {
-        return write(e.subject()).write(".len");
     }
 
     private LowCppGenerator write(BlockExpression e) {

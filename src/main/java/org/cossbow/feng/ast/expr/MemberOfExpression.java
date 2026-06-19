@@ -35,9 +35,8 @@ public class MemberOfExpression extends PrimaryExpression {
     public MemberOfExpression(Position pos,
                               PrimaryExpression subject,
                               Identifier member,
-                              TypeArguments generic,
                               Field field) {
-        this(pos, subject, member, generic, Optional.of(field));
+        this(pos, subject, member, TypeArguments.EMPTY, Optional.of(field));
     }
 
     public MemberOfExpression(Position pos,

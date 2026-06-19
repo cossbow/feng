@@ -1333,7 +1333,6 @@ public class CppGenerator {
             case CheckNilExpression ee -> write(ee);
             case EnumValueExpression ee -> write(ee);
             case EnumIdExpression ee -> write(ee);
-            case ArrayLenExpression ee -> write(ee);
             case ConditionalExpression ee -> write(ee);
             case BlockExpression ee -> write(ee);
             default -> unreachable();
@@ -1566,11 +1565,11 @@ public class CppGenerator {
         if (td instanceof EnumTypeDeclarer etd) {
             return enumMember(e, etd.def());
         }
-
-        var dtd = (DerivedTypeDeclarer) td;
-        var def = dtd.def();
-        if (def instanceof EnumDefinition ed) {
-            return enumMember(e, ed);
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            var def = dtd.def();
+            if (def instanceof EnumDefinition ed) {
+                return enumMember(e, ed);
+            }
         }
 
         ofMember(e.subject());
@@ -1759,10 +1758,6 @@ public class CppGenerator {
                 write(e.index()).write(',')
                 .write('(').write(t).write(')')
                 .write(e.def().size()).write(')');
-    }
-
-    private CppGenerator write(ArrayLenExpression e) {
-        return write(e.subject()).write(".len");
     }
 
     private CppGenerator write(ConditionalExpression e) {

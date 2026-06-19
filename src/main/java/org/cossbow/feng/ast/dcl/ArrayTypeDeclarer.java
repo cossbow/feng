@@ -131,6 +131,23 @@ public class ArrayTypeDeclarer extends TypeDeclarer
             new Identifier("length"),
             Primitive.INT.declarer());
 
+    /**
+     * Returns the memory address of the first element as a raw pointer value.
+     * Used for passing Fēng array data to C functions (which expect uint64).
+     */
+    public static final ArrayField FieldValues = new ArrayField(ZERO,
+            new Identifier("values"),
+            Primitive.UINT64.declarer());
+
+    private static final Map<Identifier, ArrayField> Fields = Map.of(
+            FieldLength.name(), FieldLength,
+            FieldValues.name(), FieldValues
+    );
+
+    public static Optional<ArrayField> fieldOf(Identifier name) {
+        return Optional.of(Fields.get(name));
+    }
+
     public static class ArrayField extends Field {
         private ArrayField(Position pos,
                            Identifier name,

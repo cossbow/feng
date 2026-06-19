@@ -1,7 +1,6 @@
 package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.analysis.fmt.ArgumentSegment;
-import org.cossbow.feng.analysis.fmt.FormatSegment;
 import org.cossbow.feng.analysis.fmt.Formatter;
 import org.cossbow.feng.analysis.fmt.TextSegment;
 import org.cossbow.feng.analysis.layout.LayoutTool;
@@ -1083,7 +1082,7 @@ public class SemanticAnalysis {
     private MemberOfExpression wrapThis(Symbol s, Field f) {
         assert s.module().none();
         return new MemberOfExpression(s.pos(), newThis(s.pos()),
-                s.name(), TypeArguments.EMPTY, f);
+                s.name(), f);
     }
 
     private MethodExpression wrapThis(SymbolExpression e, ClassMethod m) {
@@ -2219,7 +2218,9 @@ public class SemanticAnalysis {
         var vn = args.getFirst();
         var size = atd.refer().none() ?
                 new IntegerLiteral(ZERO, atd.len()).expr() :
-                new ArrayLenExpression(ZERO, e.iterable());
+                new MemberOfExpression(ZERO, e.iterable(),
+                        ArrayTypeDeclarer.FieldLength.name(),
+                        ArrayTypeDeclarer.FieldLength);
 
         var rp = forReplace(in, vn, atd.element(), ie ->
                         new IndexOfExpression(vn.pos(), e.iterable(), ie),
@@ -3623,21 +3624,27 @@ public class SemanticAnalysis {
             return Groups.g2(n, t);
         }
 
-        if (!ArrayTypeDeclarer.FieldLength.name().equals(name)) {
+        var o = ArrayTypeDeclarer.fieldOf(name);
+        if (o.none()) {
             return semantic("array has no field %s: %s",
                     name, name.pos());
         }
-
-        var td = Primitive.INT.declarer(s.pos());
-        if (atd.refer().none()) {
-            var n = new IntegerLiteral(s.pos(), atd.len()).expr();
-            return Groups.g2(n, td);
+        if (ArrayTypeDeclarer.FieldLength.name().equals(name)) {
+            if (atd.refer().none()) {
+                var td = Primitive.INT.declarer(s.pos());
+                var n = new IntegerLiteral(s.pos(), atd.len()).expr();
+                return Groups.g2(n, td);
+            }
         }
-        var n = wrapRelayExpr(s, td, _s -> {
-            return new ArrayLenExpression(_s.pos(),
-                    (PrimaryExpression) _s);
+
+        var f = o.get();
+        var t = f.type();
+
+        var n = wrapRelayExpr(s, t, _s -> {
+            return new MemberOfExpression(_s.pos(),
+                    (PrimaryExpression) _s, f.name(), f);
         });
-        return Groups.g2(n, td);
+        return Groups.g2(n, t);
 
     }
 
@@ -3678,7 +3685,7 @@ public class SemanticAnalysis {
                 var n = wrapRelayExpr(s, t, _s -> {
                     return new MemberOfExpression(_s.pos(),
                             (PrimaryExpression) _s,
-                            name, TypeArguments.EMPTY, f);
+                            name, f);
                 });
                 return Groups.g2(n, t);
             }
@@ -3709,7 +3716,7 @@ public class SemanticAnalysis {
                 var n = wrapRelayExpr(s, t, _s -> {
                     return new MemberOfExpression(_s.pos(),
                             (PrimaryExpression) _s, name,
-                            TypeArguments.EMPTY, of.get());
+                            of.get());
                 });
                 return Groups.g2(n, t);
             }
@@ -3730,7 +3737,7 @@ public class SemanticAnalysis {
                 var f = o.get();
                 var n = wrapRelayExpr(s, f.type(), _s -> {
                     return new MemberOfExpression(_s.pos(),
-                            (PrimaryExpression) _s, name, TypeArguments.EMPTY, f);
+                            (PrimaryExpression) _s, name, f);
                 });
                 return Groups.g2(n, f.type());
             }
@@ -3755,9 +3762,10 @@ public class SemanticAnalysis {
                 return Groups.g2(n, t);
             }
         } else if (def instanceof EnumDefinition ed) {
+            invalid(generic);
             var f = ed.getField(name);
             if (f.has()) {
-                var n = new MemberOfExpression(s.pos(), s, name, generic, f.get());
+                var n = new MemberOfExpression(s.pos(), s, name, f.get());
                 return Groups.g2(n, f.get().type());
             }
         }
@@ -3773,7 +3781,7 @@ public class SemanticAnalysis {
                 etd.def(), name, name.pos());
 
         var f = o.get();
-        var n = new MemberOfExpression(eve.pos(), eve, name, TypeArguments.EMPTY, f);
+        var n = new MemberOfExpression(eve.pos(), eve, name, f);
         return Groups.g2(n, f.type());
     }
 

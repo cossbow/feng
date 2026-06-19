@@ -4,7 +4,7 @@ int main(int argc, char **argv) {
 		for (int i = 0; i < argc; ++i) {
 			int64_t len = (int64_t) strlen(argv[i]);
 			auto a = Feng$newArray<Byte>(len);
-			memcpy(a.start, argv[i], len);
+			memcpy(a.$values, argv[i], len);
 			list[i] = a;
 		}
 		$main(list);
