@@ -18,6 +18,7 @@ import org.cossbow.feng.ast.proc.FixedParameter;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.ast.proc.PrototypeDefinition;
+import org.cossbow.feng.ast.proc.VariadicParameter;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.ErrorUtil;
@@ -341,13 +342,15 @@ public class MetaDataExtractor {
     private MetaDataExtractor write(Prototype p) {
         write('(');
         joinByComma(p.parameterSet(), v -> {
-            if (!(v instanceof FixedParameter fp)) {
+            if (v instanceof VariadicParameter vp) {
+                write(vp.name()).write("...");
+            } else if (v instanceof FixedParameter fp) {
+                if (fp.name().has())
+                    write(fp.name().get()).space();
+                write(fp.type());
+            } else {
                 ErrorUtil.unreachable();
-                return;
             }
-            if (fp.name().has())
-                write(fp.name().get()).space();
-            write(fp.type());
         });
         write(')');
         p.returnSet().use(this::write);
