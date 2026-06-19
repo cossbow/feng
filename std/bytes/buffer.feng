@@ -1,0 +1,53 @@
+import std$util;
+
+func newCapacity(cur, need int) int {
+    var t = cur + need;
+    var g = cur<2^12 ? cur*2 : cur+2^12;
+    return t>=g ? t : g;
+}
+
+
+export
+class BytesBuffer (Writer) {
+    var buf [*!]byte;
+    var len int;
+
+    func growIfNeed(need int) {
+        if (buf==nil) {
+            var cap = newCapacity(0, need);
+            buf = new([cap]byte);
+            return;
+        }
+        if (len+need < buf.length)
+            return;
+
+        var newCap = newCapacity(buf.length, need);
+        var nb = new([newCap]byte);
+        for (var i=0; i<len; i += 1)
+            nb[i] = buf[i];
+        buf = nb;
+    }
+
+    export
+    func write(data [&!#]byte) {
+        growIfNeed(data.length);
+        var i = len;
+        for (b : data) {
+            buf[i] = b;
+            i += 1;
+        }
+    }
+
+    export
+    func get() ([*!#]byte, int) {
+        return (buf, len);
+    }
+
+    export
+    func copy() [*!#]byte {
+        var src = buf;
+        var dst = new([len]byte);
+        util$copy`byte`(src, dst, len);
+        return src;
+    }
+}

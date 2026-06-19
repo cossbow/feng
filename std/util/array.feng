@@ -1,0 +1,10 @@
+
+export
+func copy`T`(src [&!#]T, dst [&!]T, len int) {
+    var size = dst.length<=len?dst.length:len;
+    size = src.length<=len?src.length:len;
+    for (var i=0; i<size; i+=1) {
+        dst[i] = src[i];
+    }
+}
+

@@ -18,7 +18,7 @@ public class ModuleParserTest {
 
     public static Map<Identifier, ModuleParser> libs() {
         var std = new ModuleParser("std",
-                ResourceUtil.getDir("std"), UTF_8);
+                Path.of("std"), UTF_8);
         return Map.of(std.pkg(), std);
     }
 

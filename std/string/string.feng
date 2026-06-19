@@ -1,0 +1,62 @@
+
+export
+enum CharEncoding {
+    ASCII,
+    UTF16,
+    UTF32,
+}
+
+export
+class String (Writable) {
+    const value [*#]byte;
+    const enc CharEncoding;
+
+    export
+    func bytes() [*#]byte {
+        return value;
+    }
+
+    export
+    func write#(w &!Writer) int {
+        const v [&#]byte = value;
+        if (v==nil) return 0;
+        w.write(v);
+        return v.length;
+    }
+
+    export
+    func char(index int) int32 {
+        if (CharEncoding.ASCII == enc) {
+            const s [&#]uint8 = value;
+            return int32(s[index]);
+        }
+
+        if (CharEncoding.UTF16 == enc) {
+            const s [&#]uint16 = value;
+            return int32(s[index]);
+        }
+
+        const s [&#]uint32 = value;
+        return int32(s[index]);
+    }
+
+    export
+    func length() int {
+        return value.length << enc.id;
+    }
+
+    export
+    func isEmpty() bool {
+        return value.length == 0;
+    }
+
+}
+
+export
+func make(value [*#]byte, enc CharEncoding) String {
+    return {value=value, enc=enc};
+}
+export
+func makeUtf16(value [*#]byte) String {
+    return make(value, CharEncoding.UTF16);
+}
