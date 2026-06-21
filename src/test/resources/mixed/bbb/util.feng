@@ -1,0 +1,4 @@
+export
+func run() int {
+    return 42;
+}

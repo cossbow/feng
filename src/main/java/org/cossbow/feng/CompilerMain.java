@@ -44,8 +44,9 @@ public class CompilerMain {
             description = "search libraries: [name=path] ...")
     private Map<String, String> lib = new HashMap<>();
     @Parameter(names = {"-b", "--build"},
-            description = "run make after generating C++ code")
-    private boolean build = false;
+            description = "build system type: make (default), cmake",
+            converter = BuildConverter.class)
+    private Build build = Build.MAKE;
 
     //
 
@@ -81,9 +82,8 @@ public class CompilerMain {
         return new ModuleParser(pkg, dir, UTF_8, getLibParsers());
     }
 
-    private final List<String> moduleNames = new ArrayList<>();
-
-    private void generateCpp(AnalyseSymbolTable ast, Path dir, String name)
+    private void generateCpp(AnalyseSymbolTable ast, Path dir, String name,
+                             List<String> moduleNames)
             throws IOException {
         var cpp = dir.resolve(name + ".cpp");
         try (var w = Files.newBufferedWriter(cpp, UTF_8)) {
@@ -97,40 +97,126 @@ public class CompilerMain {
     }
 
     private void analyzeAndGenCpp(DAGGraph<FModule> dag) throws IOException {
-        moduleNames.clear();
+        var moduleNames = new ArrayList<String>();
         new ModuleAnalysis().analyse(dag);
         CppGenerator.copyBaseHeader(output);
+
+        // Collect all C source files from all modules
+        var allCSources = new ArrayList<Path>();
         for (var fm : dag) {
             var mp = fm.path();
-            generateCpp(fm.result.must(), output, mp.filename());
+            if (!fm.cSources().isEmpty()) {
+                // Pure C module — generate bridge header, copy sources, skip .cpp
+                genBridgeHeader(fm, output);
+                copyCSources(fm, output);
+                allCSources.addAll(fm.cSources());
+            } else {
+                generateCpp(fm.result.must(), output, mp.filename(), moduleNames);
+            }
         }
-        generateMakefile(output);
-        if (build) {
-            runMake(output);
+        if (build == Build.MAKE) {
+            generateMakefile(output, moduleNames, allCSources);
+        } else {
+            generateCMakeLists(output, moduleNames, allCSources);
+        }
+        runBuild(output);
+    }
+
+    private void genBridgeHeader(FModule fm, Path dir) throws IOException {
+        var name = fm.path().filename();
+        try (var w = Files.newBufferedWriter(dir.resolve(name + ".h"), UTF_8)) {
+            w.write("// auto-generated bridge for pure C module: " + name + "\n");
+            w.write("#ifdef __cplusplus\nextern \"C\" {\n#endif\n");
+            for (var hf : fm.headerFiles()) {
+                w.write("#include \"" + hf.getFileName() + "\"\n");
+            }
+            w.write("#ifdef __cplusplus\n}\n#endif\n");
+            // Typedef for struct/union types
+            var ast = fm.result.must();
+            for (var sd : ast.dagStructures) {
+                w.write("typedef ");
+                w.append(sd.domain().name).append(' ');
+                w.append(sd.symbol().name().value()).append(' ');
+                w.append(fm.path().toString()).append('$');
+                w.write(sd.symbol().name().value());
+                w.write(";\n");
+            }
+            for (var fd : ast.functionList) {
+                if (fd.builtin() || fd.hasProcedure()) continue;
+                var prefix = fm.path().toString() + "$";
+                w.write("inline int ");
+                w.write(prefix);
+                w.write(fd.symbol().name().value());
+                w.write("(");
+                boolean first = true;
+                for (var p : fd.prototype().parameterSet()) {
+                    if (!first) w.write(", ");
+                    first = false;
+                    w.write("int ");
+                    w.write(((org.cossbow.feng.ast.proc.FixedParameter) p).name()
+                            .get().value());
+                }
+                w.write(") { return ");
+                w.write(fd.symbol().name().value());
+                w.write("(");
+                first = true;
+                for (var p : fd.prototype().parameterSet()) {
+                    if (!first) w.write(", ");
+                    first = false;
+                    w.write(((org.cossbow.feng.ast.proc.FixedParameter) p).name()
+                            .get().value());
+                }
+                w.write("); }\n");
+            }
         }
     }
 
-    private void runMake(Path dir) throws IOException {
-        var pb = new ProcessBuilder("make")
+    private void runBuild(Path dir) throws IOException {
+        var cmd = build == Build.CMAKE ?
+                List.of("cmake", "--build", ".") :
+                List.of("make");
+        var pb = new ProcessBuilder(cmd)
                 .directory(dir.toFile())
                 .inheritIO();
         try {
             int ec = pb.start().waitFor();
             if (ec != 0) {
-                System.err.println("make failed (exit " + ec + ")");
+                System.err.println("build failed (exit " + ec + ")");
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            System.err.println("make interrupted");
+            System.err.println("build interrupted");
         }
     }
 
-    private void generateMakefile(Path dir) throws IOException {
+    private void generateCMakeLists(Path dir, List<String> moduleNames,
+                                    List<Path> cSources) throws IOException {
+        try (var w = Files.newBufferedWriter(dir.resolve("CMakeLists.txt"), UTF_8)) {
+            w.write("project(" + pkg + ")\n\n");
+            w.write("set(CMAKE_CXX_STANDARD 20)\n");
+            w.write("set(CMAKE_CXX_STANDARD_REQUIRED ON)\n\n");
+
+            w.write("set(SOURCES\n");
+            for (var n : moduleNames) {
+                w.write("\t" + n + ".cpp\n");
+            }
+            for (var c : cSources) {
+                w.write("\t" + c.getFileName() + "\n");
+            }
+            w.write(")\n\n");
+
+            w.write("add_executable(${PROJECT_NAME} ${SOURCES})\n");
+        }
+    }
+
+    private void generateMakefile(Path dir, List<String> moduleNames,
+                                  List<Path> cSources) throws IOException {
         try (var w = Files.newBufferedWriter(dir.resolve("Makefile"), UTF_8)) {
             w.write("# Makefile for Fēng generated C++ code\n");
             w.write("# Generated by the Fēng compiler\n\n");
 
             w.write("CXX ?= c++\n");
+            w.write("CC ?= cc\n");
             w.write("CXXFLAGS ?= --std=c++20 -O2\n\n");
 
             w.write("SRCS := ");
@@ -145,22 +231,56 @@ public class CompilerMain {
             w.write("OBJS := $(SRCS:.cpp=.o)\n");
             w.write("TARGET := " + pkg + "\n\n");
 
-            w.write(".PHONY: all clean\n\n");
+            if (!cSources.isEmpty()) {
+                w.write("C_SRCS := ");
+                first = true;
+                for (var c : cSources) {
+                    if (!first) w.write(" \\\n\t");
+                    else first = false;
+                    w.write(c.toString());
+                }
+                w.write("\n");
+                w.write("C_OBJS := $(C_SRCS:.c=.o)\n\n");
 
-            w.write("all: $(TARGET)\n\n");
+                w.write("$(TARGET): $(OBJS) $(C_OBJS)\n");
+                w.write("\t$(CXX) $(CXXFLAGS) -o $@ $^\n\n");
 
-            w.write("$(TARGET): $(OBJS)\n");
-            w.write("\t$(CXX) $(CXXFLAGS) -o $@ $^\n\n");
+                w.write("$(OBJS) $(C_OBJS): Header.h\n\n");
 
-            w.write("$(OBJS): Header.h\n\n");
+                w.write("$(C_OBJS): %.o: %.c\n");
+                w.write("\t$(CC) -c $< -o $@\n\n");
+            } else {
+                w.write("$(TARGET): $(OBJS)\n");
+                w.write("\t$(CXX) $(CXXFLAGS) -o $@ $^\n\n");
+
+                w.write("$(OBJS): Header.h\n\n");
+            }
 
             w.write("%.o: %.cpp\n");
             w.write("\t$(CXX) $(CXXFLAGS) -c $< -o $@\n\n");
 
             w.write("clean:\n");
-            w.write("\trm -f $(OBJS) $(TARGET)\n");
+            w.write("\trm -f $(OBJS)");
+            if (!cSources.isEmpty()) {
+                w.write(" $(C_OBJS)");
+            }
+            w.write(" $(TARGET)\n");
         }
     }
+
+    private void copyCSources(FModule fm, Path dir) throws IOException {
+        for (var src : fm.cSources()) {
+            var target = dir.resolve(src.getFileName());
+            Files.copy(src, target,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        for (var hdr : fm.headerFiles()) {
+            var target = dir.resolve(hdr.getFileName());
+            Files.copy(hdr, target,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
 
     private void compileFile() throws IOException {
         if (!Files.isRegularFile(input)) {
@@ -259,6 +379,32 @@ public class CompilerMain {
             }
             if (t != null) return t;
             return ErrorUtil.argument("Unknown input type: %s", s);
+        }
+    }
+
+    enum Build {
+        MAKE,
+        CMAKE,
+    }
+
+    static class BuildConverter implements IStringConverter<Build> {
+        public Build convert(String s) {
+            Build t;
+            if (s.length() == 1) {
+                t = switch (s.charAt(0)) {
+                    case 'm' -> Build.MAKE;
+                    case 'c' -> Build.CMAKE;
+                    default -> null;
+                };
+            } else {
+                t = switch (s) {
+                    case "make" -> Build.MAKE;
+                    case "cmake" -> Build.CMAKE;
+                    default -> null;
+                };
+            }
+            if (t != null) return t;
+            return ErrorUtil.argument("Unknown builder: %s", s);
         }
     }
 

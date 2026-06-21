@@ -371,8 +371,8 @@ public class LowCppGenerator {
     }
 
     void declareFunction(FunctionDefinition fd) {
-        cacheReturnFunc(fd.procedure().prototype());
-        write(fd.symbol().name(), fd.procedure().prototype());
+        cacheReturnFunc(fd.prototype());
+        write(fd.symbol().name(), fd.prototype());
         endStmt();
     }
 
@@ -995,12 +995,13 @@ public class LowCppGenerator {
     }
 
     private void implFunc(FunctionDefinition fd) {
+        var proc = fd.procedure();
+        if (proc.none()) return;
         assert enterFunc == null;
         enterFunc = fd;
-        var proc = fd.procedure();
-        write(fd.symbol().name(), proc.prototype());
+        write(fd.symbol().name(), fd.prototype());
         newLine();
-        write(proc);
+        write(proc.get());
         enterFunc = null;
     }
 

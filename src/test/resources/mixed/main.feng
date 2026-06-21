@@ -1,0 +1,8 @@
+import mixed$aaa a;
+
+export
+func main(args [&!#][*!#]byte) {
+    var x = a$add(10, 14);
+    var c a$Complex = {r=10.0,i=14.0};
+}
+

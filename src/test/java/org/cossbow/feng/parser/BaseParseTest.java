@@ -159,7 +159,7 @@ public class BaseParseTest {
         var fun = "func main() { %s }".formatted(stmt);
         var src = doParseFile(fun);
         var func = src.table().main.must();
-        return func.procedure().body().list().getFirst();
+        return func.procedure().must().body().list().getFirst();
     }
 
     public static Identifier identifier(String value) {

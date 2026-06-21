@@ -1,5 +1,7 @@
 package org.cossbow.feng.c2feng.parse;
 
+import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.c2feng.convert.C2FengConverter;
 
 import java.io.*;
@@ -65,7 +67,8 @@ public class CHeaderParser {
         Files.createDirectories(outputDir);
 
         var json = invokeClang();
-        var converter = new C2FengConverter(moduleName);
+        var mp = parseModulePath(moduleName);
+        var converter = new C2FengConverter(mp);
         new JsonAstParser(converter).parse(json);
 
         var outputFile = outputDir.resolve(moduleName + ".feng");
@@ -73,6 +76,19 @@ public class CHeaderParser {
             converter.write(w);
         }
         return outputFile;
+    }
+
+    /**
+     * Run clang and parse into an existing converter (for merging into
+     * an already-populated ParseSymbolTable). Does not write a .feng file.
+     */
+    public void runInto(C2FengConverter converter)
+            throws IOException, InterruptedException {
+        if (!Files.isRegularFile(headerPath)) {
+            throw new IOException("header file not found: " + headerPath);
+        }
+        var json = invokeClang();
+        new JsonAstParser(converter).parse(json);
     }
 
     // ========== clang invocation ==========
@@ -123,6 +139,20 @@ public class CHeaderParser {
     }
 
     // ========== helpers ==========
+
+    static ModulePath parseModulePath(String name) {
+        int dollar = name.indexOf('$');
+        Identifier pkg;
+        Path sub;
+        if (dollar < 0) {
+            pkg = new Identifier(name);
+            sub = Path.of("");
+        } else {
+            pkg = new Identifier(name.substring(0, dollar));
+            sub = Path.of(name.substring(dollar + 1));
+        }
+        return new ModulePath(pkg, sub);
+    }
 
     private static String readAll(BufferedReader reader) throws IOException {
         var sb = new StringBuilder(4096);

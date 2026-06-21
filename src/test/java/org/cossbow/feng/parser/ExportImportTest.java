@@ -109,8 +109,8 @@ public class ExportImportTest extends BaseParseTest {
     Statement parseLocal(String im, String stmt) {
         var fun = im + "func main() { %s }".formatted(stmt);
         var src = doParseFile(fun);
-        return src.table().main.must()
-                .procedure().body().list().getFirst();
+        return src.table().main.must().procedure().must()
+                .body().list().getFirst();
     }
 
     @Test

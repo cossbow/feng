@@ -20,7 +20,7 @@ public class ProcedureParseTest extends BaseParseTest {
     Procedure parseProcedure(String procedure) {
         var code = "func test" + procedure;
         var func = doParseFunc(code, "test");
-        return func.procedure();
+        return func.procedure().must();
     }
 
     Prototype parsePrototype(String prototype) {

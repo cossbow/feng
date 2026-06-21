@@ -62,6 +62,11 @@ public class JsonAstParser {
 
         var name = node.get("name");
         if (name == null || name.isNull()) return;
+
+        // Skip implicit declarations before dedup check,
+        // otherwise they'd block the real declaration.
+        if (isImplicit(node)) return;
+
         var key = kind.asText() + ":" + name.asText();
         if (!processed.add(key)) return; // skip duplicates
 

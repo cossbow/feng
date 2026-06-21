@@ -1,9 +1,12 @@
 package org.cossbow.feng.c2feng.convert;
 
+import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.c2feng.model.*;
 import org.junit.jupiter.api.Test;
 
 import java.io.StringWriter;
+import java.nio.file.Path;
 import java.util.List;
 
 import org.cossbow.feng.util.Optional;
@@ -15,9 +18,14 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class C2FengConverterTest {
 
+    private C2FengConverter newTestConverter(String name) {
+        return new C2FengConverter(new ModulePath(
+                new Identifier(name), Path.of("")));
+    }
+
     @Test
     public void testStruct() throws Exception {
-        var conv = new C2FengConverter("c_test");
+        var conv = newTestConverter("c_test");
 
         conv.addStruct(new CStructType("Point", List.of(
                 new CField("x", new CPrimitiveType("int")),
@@ -40,7 +48,7 @@ public class C2FengConverterTest {
 
     @Test
     public void testUnion() throws Exception {
-        var conv = new C2FengConverter("c_test");
+        var conv = newTestConverter("c_test");
 
         conv.addUnion(new CUnionType("Data", List.of(
                 new CField("i", new CPrimitiveType("int")),
@@ -63,7 +71,7 @@ public class C2FengConverterTest {
 
     @Test
     public void testEnum() throws Exception {
-        var conv = new C2FengConverter("c_test");
+        var conv = newTestConverter("c_test");
 
         conv.addEnum(new CEnumType("Color", List.of(
                 new CEnumConstant("RED", Optional.empty()),
@@ -86,7 +94,7 @@ public class C2FengConverterTest {
 
     @Test
     public void testFunction() throws Exception {
-        var conv = new C2FengConverter("c_test");
+        var conv = newTestConverter("c_test");
 
         conv.addFunction(new CFunction("open",
                 List.of(
@@ -113,7 +121,7 @@ public class C2FengConverterTest {
 
     @Test
     public void testVoidFunc() throws Exception {
-        var conv = new C2FengConverter("c_test");
+        var conv = newTestConverter("c_test");
 
         conv.addFunction(new CFunction("exit",
                 List.of(new CField("code", new CPrimitiveType("int"))),
@@ -134,22 +142,22 @@ public class C2FengConverterTest {
     }
 
     @Test
-    public void testVariadicFunc() throws Exception {
-        var conv = new C2FengConverter("c_test");
+    public void testVariadicFunc() {
+        var conv = newTestConverter("c_test");
 
         assertThrows(UnsupportedOperationException.class, () ->
-            conv.addFunction(new CFunction("printf",
-                    List.of(
-                            new CField("fmt", new CPointerType(new CPrimitiveType("char"), true))
-                    ),
-                    new CPrimitiveType("int"),
-                    true,
-                    CLinkage.DEFAULT)));
+                conv.addFunction(new CFunction("printf",
+                        List.of(
+                                new CField("fmt", new CPointerType(new CPrimitiveType("char"), true))
+                        ),
+                        new CPrimitiveType("int"),
+                        true,
+                        CLinkage.DEFAULT)));
     }
 
     @Test
     public void testGlobalVar() throws Exception {
-        var conv = new C2FengConverter("c_test");
+        var conv = newTestConverter("c_test");
 
         // Default global → export
         conv.addGlobalVar(new CGlobalVar("errno",
@@ -175,7 +183,7 @@ public class C2FengConverterTest {
 
     @Test
     public void testFixedArray() throws Exception {
-        var conv = new C2FengConverter("c_test");
+        var conv = newTestConverter("c_test");
 
         conv.addStruct(new CStructType("Buffer", List.of(
                 new CField("data", new CArrayType(new CPrimitiveType("char"), Optional.of(256))),
@@ -194,7 +202,7 @@ public class C2FengConverterTest {
 
     @Test
     public void testBitfield() throws Exception {
-        var conv = new C2FengConverter("c_test");
+        var conv = newTestConverter("c_test");
 
         conv.addStruct(new CStructType("Flags", List.of(
                 new CField("a", new CPrimitiveType("unsigned int"), Optional.of(1)),
@@ -213,7 +221,7 @@ public class C2FengConverterTest {
 
     @Test
     public void testStaticFuncSkipped() throws Exception {
-        var conv = new C2FengConverter("c_test");
+        var conv = newTestConverter("c_test");
 
         conv.addFunction(new CFunction("helper",
                 List.of(new CField("x", new CPrimitiveType("int"))),
@@ -234,7 +242,7 @@ public class C2FengConverterTest {
 
     @Test
     public void testCombinedHeader() throws Exception {
-        var conv = new C2FengConverter("c_my_lib");
+        var conv = newTestConverter("c_my_lib");
 
         // Simulate the full content of a simple C header
         conv.addStruct(new CStructType("Point", List.of(
@@ -277,7 +285,7 @@ public class C2FengConverterTest {
         assertTrue(result.contains("struct Point"));
         assertTrue(result.contains("const Color$RED int = 0;"));
         assertTrue(result.contains("func create_point("));
-        assertTrue(result.contains("Point;") || result.contains("Point\n") || result.contains("Point;"));
+        assertTrue(result.contains("Point;") || result.contains("Point\n"));
         assertTrue(result.contains("func destroy_point(p uint64)"));
         assertTrue(result.contains("export const version int"));
         assertFalse(result.contains("func main"));

@@ -173,7 +173,7 @@ public class AttributeParseTest extends BaseParseTest {
     private SymbolMap<Attribute> atParameter(CharSequence attr) {
         var code = "func test(%s a A){}".formatted(attr);
         var func = doParseFunc(code, "test");
-        var ps = func.procedure().prototype().parameterSet();
+        var ps = func.prototype().parameterSet();
         return ps.fixed(0).modifier().attributes();
     }
 

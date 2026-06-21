@@ -22,7 +22,6 @@ import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -35,16 +34,15 @@ import static org.cossbow.feng.ast.Position.ZERO;
  * writes the result as metadata via {@link MetaDataExtractor}.
  */
 public class C2FengConverter {
-
-    private final String moduleName;
+    private final ModulePath path;
     private final ParseSymbolTable table;
 
     private final Map<String, CType> typedefs = new HashMap<>();
 
-    public C2FengConverter(String moduleName) {
-        this.moduleName = moduleName;
+    public C2FengConverter(ModulePath path) {
+        this.path = path;
         this.table = new ParseSymbolTable(
-                Optional.empty(), new DedupCache<>());
+                Optional.of(path), new DedupCache<>());
     }
 
     // ========== Typedef registration ==========
@@ -60,7 +58,7 @@ public class C2FengConverter {
 
         var fields = new IdentifierMap<StructureField>();
         for (var cf : struct.fields()) {
-            var id = new Identifier(ZERO, cf.name());
+            var id = new Identifier(cf.name());
             fields.add(id, new StructureField(ZERO, id,
                     cf.bitfieldWidth().<Expression>map(w ->
                             new IntegerLiteral(ZERO, w).expr()),
@@ -69,10 +67,10 @@ public class C2FengConverter {
 
         table.add(new StructureDefinition(ZERO,
                 modifier(true),
-                new Symbol(new Identifier(ZERO, struct.tagName())),
+                symbol(new Identifier(struct.tagName())),
                 TypeParameters.empty(),
                 TypeDomain.STRUCT,
-                fields));
+                fields, true));
     }
 
     // ========== Union ==========
@@ -82,7 +80,7 @@ public class C2FengConverter {
 
         var fields = new IdentifierMap<StructureField>();
         for (var cf : union.fields()) {
-            var id = new Identifier(ZERO, cf.name());
+            var id = new Identifier(cf.name());
             fields.add(id, new StructureField(ZERO, id,
                     cf.bitfieldWidth().<Expression>map(w ->
                             new IntegerLiteral(ZERO, w).expr()),
@@ -91,10 +89,10 @@ public class C2FengConverter {
 
         table.add(new StructureDefinition(ZERO,
                 modifier(true),
-                new Symbol(new Identifier(ZERO, union.tagName())),
+                symbol(new Identifier(union.tagName())),
                 TypeParameters.empty(),
                 TypeDomain.UNION,
-                fields));
+                fields, true));
     }
 
     // ========== Enum → const int constants ==========
@@ -109,12 +107,12 @@ public class C2FengConverter {
             var v = new Variable(ZERO,
                     modifier(true),
                     Declare.CONST,
-                    new Identifier(ZERO, constName),
+                    new Identifier(constName),
                     Lazy.of(Primitive.INT.declarer()),
                     Lazy.of(new IntegerLiteral(ZERO, val).expr()));
-            table.variables.add(new Identifier(ZERO, constName),
+            table.variables.add(new Identifier(constName),
                     new GlobalVariable(true, v,
-                            new Symbol(new Identifier(ZERO, constName))));
+                            symbol(new Identifier(constName))));
         }
     }
 
@@ -128,7 +126,7 @@ public class C2FengConverter {
         for (var p : func.parameters()) {
             params.add(new FixedParameter(ZERO,
                     Modifier.empty(),
-                    new Identifier(ZERO, p.name()),
+                    new Identifier(p.name()),
                     convertType(p.type())));
         }
         if (func.variadic()) {
@@ -145,7 +143,7 @@ public class C2FengConverter {
 
         table.add(new FunctionDefinition(ZERO,
                 modifier(true),
-                new Symbol(new Identifier(ZERO, func.name())),
+                symbol(new Identifier(func.name())),
                 TypeParameters.empty(),
                 proto));
     }
@@ -159,12 +157,12 @@ public class C2FengConverter {
         var v = new Variable(ZERO,
                 modifier(export),
                 gv.isConst() ? Declare.CONST : Declare.VAR,
-                new Identifier(ZERO, gv.name()),
+                new Identifier(gv.name()),
                 Lazy.of(convertType(gv.type())),
                 Lazy.nil());
-        table.variables.add(new Identifier(ZERO, gv.name()),
+        table.variables.add(new Identifier(gv.name()),
                 new GlobalVariable(export, v,
-                        new Symbol(new Identifier(ZERO, gv.name()))));
+                        symbol(new Identifier(gv.name()))));
     }
 
     // ========== Core type conversion ==========
@@ -183,49 +181,27 @@ public class C2FengConverter {
 
     // ---------- Primitive type mapping ----------
 
+    private static final Map<String, Primitive> C_PRIMITIVE_MAP = Map.ofEntries(
+            Map.entry("void", Primitive.INT),
+            Map.entry("char", Primitive.INT8),
+            Map.entry("signed char", Primitive.INT8),
+            Map.entry("unsigned char", Primitive.UINT8),
+            Map.entry("short", Primitive.INT16),
+            Map.entry("unsigned short", Primitive.UINT16),
+            Map.entry("int", Primitive.INT),
+            Map.entry("unsigned int", Primitive.UINT),
+            Map.entry("long", Primitive.INT64),
+            Map.entry("unsigned long", Primitive.UINT64),
+            Map.entry("long long", Primitive.INT64),
+            Map.entry("float", Primitive.FLOAT32),
+            Map.entry("double", Primitive.FLOAT64),
+            Map.entry("_Bool", Primitive.BOOL),
+            Map.entry("size_t", Primitive.UINT64)
+    );
+
     private TypeDeclarer mapPrimitiveType(CPrimitiveType pt) {
-        if ("void".equals(pt.name())) {
-            return Primitive.INT.declarer();
-        }
-        if ("char".equals(pt.name()) || "signed char".equals(pt.name())) {
-            return Primitive.INT8.declarer();
-        }
-        if ("unsigned char".equals(pt.name())) {
-            return Primitive.UINT8.declarer();
-        }
-        if ("short".equals(pt.name())) {
-            return Primitive.INT16.declarer();
-        }
-        if ("unsigned short".equals(pt.name())) {
-            return Primitive.UINT16.declarer();
-        }
-        if ("int".equals(pt.name())) {
-            return Primitive.INT.declarer();
-        }
-        if ("unsigned int".equals(pt.name())) {
-            return Primitive.UINT.declarer();
-        }
-        if ("long".equals(pt.name())) {
-            return Primitive.INT64.declarer();
-        }
-        if ("unsigned long".equals(pt.name())) {
-            return Primitive.UINT64.declarer();
-        }
-        if ("long long".equals(pt.name())) {
-            return Primitive.INT64.declarer();
-        }
-        if ("float".equals(pt.name())) {
-            return Primitive.FLOAT32.declarer();
-        }
-        if ("double".equals(pt.name())) {
-            return Primitive.FLOAT64.declarer();
-        }
-        if ("_Bool".equals(pt.name())) {
-            return Primitive.BOOL.declarer();
-        }
-        if ("size_t".equals(pt.name())) {
-            return Primitive.UINT64.declarer();
-        }
+        var p = C_PRIMITIVE_MAP.get(pt.name());
+        if (p != null) return p.declarer();
         // Try typedef expansion
         var resolved = resolveTypedef(pt.name());
         if (resolved != null) return convertType(resolved);
@@ -252,14 +228,14 @@ public class C2FengConverter {
     private TypeDeclarer mapStructRef(CStructType st) {
         return new DerivedTypeDeclarer(ZERO,
                 new DerivedType(ZERO,
-                        new Symbol(new Identifier(ZERO, st.tagName())),
+                        symbol(new Identifier(st.tagName())),
                         TypeArguments.EMPTY));
     }
 
     private TypeDeclarer mapUnionRef(CUnionType ut) {
         return new DerivedTypeDeclarer(ZERO,
                 new DerivedType(ZERO,
-                        new Symbol(new Identifier(ZERO, ut.tagName())),
+                        symbol(new Identifier(ut.tagName())),
                         TypeArguments.EMPTY));
     }
 
@@ -275,11 +251,14 @@ public class C2FengConverter {
         return new Modifier(ZERO, export, new SymbolMap<>());
     }
 
+    private Symbol symbol(Identifier id) {
+        return new Symbol(ZERO, Optional.of(path), id);
+    }
+
     // ========== Output ==========
 
     public void write(Appendable out) throws IOException {
-        var mp = new ModulePath(new Identifier(ZERO, moduleName), Path.of(""));
-        var module = new FModule(mp, List.of(), table);
+        var module = new FModule(path, List.of(), table);
         new MetaDataExtractor(module, out).write();
     }
 

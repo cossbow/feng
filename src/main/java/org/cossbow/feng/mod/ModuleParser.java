@@ -4,6 +4,8 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.ast.mod.ModulePath;
+import org.cossbow.feng.c2feng.convert.C2FengConverter;
+import org.cossbow.feng.c2feng.parse.CHeaderParser;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.dag.DAGUtil;
 import org.cossbow.feng.parser.ParseSymbolTable;
@@ -25,6 +27,12 @@ public class ModuleParser {
     private final Charset charset;
     // dependencies of libs has been solved outside
     private final Map<Identifier, ModuleParser> libs;
+    // C source files from ALL scanned directories (including pure-C modules)
+    private final List<Path> allCSources = new ArrayList<>();
+
+    public List<Path> allCSources() {
+        return allCSources;
+    }
 
     public ModuleParser(String pkg, Path base, Charset charset,
                         Map<Identifier, ModuleParser> libs) {
@@ -98,16 +106,60 @@ public class ModuleParser {
         return new FModule(mp, paths.toList(), table);
     }
 
-    private FModule parseModuleFiles(Path module, List<Path> files) {
+    private void processHeaders(Path module, FModule fm) throws Exception {
+        var dir = absPath(module);
+        var headers = new ArrayList<Path>();
+        try (var ls = Files.list(dir)) {
+            for (var f : ls.toList()) {
+                var name = f.getFileName().toString();
+                if (!name.endsWith(".h")) continue;
+                // Skip generated runtime header and module output headers
+                if ("Header.h".equals(name)) continue;
+                if (name.startsWith(pkg.value() + "_") && name.endsWith(".h")) continue;
+                if (name.equals(pkg.value() + ".h")) continue;
+
+                var modulePath = new ModulePath(pkg, module);
+                var converter = new C2FengConverter(modulePath);
+                var parser = new CHeaderParser(f, modulePath.toString(), dir);
+                try {
+                    parser.runInto(converter);
+                    fm.table().merge(converter.table());
+                    headers.add(f.toAbsolutePath().normalize());
+                } catch (Exception e) {
+                    System.err.println("warning: failed to parse header "
+                            + f + ": " + e.getMessage());
+                }
+            }
+        }
+        if (!headers.isEmpty()) {
+            fm.headerFiles(headers);
+        }
+    }
+
+    private FModule parseModuleFiles(Path module, List<Path> files, List<Path> cSources) {
         var mp = new ModulePath(pkg, module);
-        var sources = parseFiles(mp, files);
-        return mergeFiles(mp, sources);
+        var fm = mergeFiles(mp, parseFiles(mp, files));
+
+        // Attach C source files belonging to this module
+        if (!cSources.isEmpty()) {
+            fm.cSources(cSources);
+        }
+
+        // Process .h files in the same directory and merge into the module
+        try {
+            processHeaders(module, fm);
+        } catch (Exception e) {
+            System.err.println("warning: failed to parse C headers in "
+                    + absPath(module) + ": " + e.getMessage());
+        }
+
+        return fm;
     }
 
     private FModule parseOneModule(Path module) throws IOException {
         try (var ls = Files.list(absPath(module))) {
             var files = ls.filter(Constants.srcTest()).toList();
-            return parseModuleFiles(module, files);
+            return parseModuleFiles(module, files, List.of());
         }
     }
 
@@ -127,7 +179,7 @@ public class ModuleParser {
         var list = scanModule();
         var modules = new ArrayList<FModule>(list.size());
         for (var g : list) {
-            var fm = parseModuleFiles(g.a(), g.b());
+            var fm = parseModuleFiles(g.a(), g.b(), g.c());
             modules.add(fm);
         }
         return makeGraph(modules);
@@ -159,9 +211,9 @@ public class ModuleParser {
         }
     }
 
-    private List<Groups.G2<Path, List<Path>>> scanModule()
+    private List<Groups.G3<Path, List<Path>, List<Path>>> scanModule()
             throws IOException {
-        var result = new ArrayList<Groups.G2<Path, List<Path>>>();
+        var result = new ArrayList<Groups.G3<Path, List<Path>, List<Path>>>();
         var q = new ArrayDeque<Path>();
         q.add(base);
         while (!q.isEmpty()) {
@@ -169,17 +221,31 @@ public class ModuleParser {
             try (var l = Files.list(dir)) {
                 var list = l.toList();
                 List<Path> files = new ArrayList<>();
+                List<Path> cFiles = new ArrayList<>();
+                boolean hasHeaders = false;
                 for (var it : list) {
                     if (Files.isDirectory(it)) {
                         q.add(it);
-                    } else if (Files.isRegularFile(it) &&
-                            Constants.isSource(it)) {
-                        files.add(it);
+                    } else if (Files.isRegularFile(it)) {
+                        var name = it.getFileName().toString();
+                        if (Constants.isSource(name)) {
+                            files.add(it);
+                        } else if (name.endsWith(".c")) {
+                            cFiles.add(it.toAbsolutePath().normalize());
+                        } else if (name.endsWith(".h")) {
+                            hasHeaders = true;
+                        }
                     }
                 }
-                if (files.isEmpty()) continue;
+                if (files.isEmpty() && !hasHeaders) {
+                    continue;
+                }
 
-                result.add(Groups.g2(base.relativize(dir), files));
+                // Collect .c files for compilation
+                allCSources.addAll(cFiles);
+
+                var relDir = base.relativize(dir);
+                result.add(Groups.g3(relDir, files, cFiles));
             }
         }
         return result;

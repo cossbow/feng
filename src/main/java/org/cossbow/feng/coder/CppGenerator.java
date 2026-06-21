@@ -81,9 +81,8 @@ public class CppGenerator {
 
     private void includeHeaders() {
         writeComment("base inner headers");
-        includeHeader("Header");
-
         table.module.use(fm -> {
+            includeHeader("Header");
             if (!header) {
                 includeHeader(fm.path().filename());
                 return;
@@ -92,6 +91,15 @@ public class CppGenerator {
             writeComment("import headers");
             for (var i : fm.imports()) {
                 includeHeader(i.filename());
+            }
+            // Include C headers from pure-C modules
+            if (!fm.headerFiles().isEmpty()) {
+                writeComment("C header files");
+                for (var h : fm.headerFiles()) {
+                    var fn = h.getFileName().toString();
+                    var dot = fn.lastIndexOf('.');
+                    includeHeader(dot > 0 ? fn.substring(0, dot) : fn);
+                }
             }
         });
     }
@@ -367,7 +375,7 @@ public class CppGenerator {
 
     void declareFunction(FunctionDefinition fd) {
         write(fd.generic());
-        write(fd.symbol(), fd.procedure().prototype());
+        write(fd.symbol(), fd.prototype());
         endStmt();
     }
 
@@ -468,7 +476,7 @@ public class CppGenerator {
                 return write(v);
 
             return write('{').write(v)
-                    .write(".values,").write(avt.len())
+                    .write(".$values,").write(avt.len())
                     .write('}');
         }
 
@@ -1021,6 +1029,8 @@ public class CppGenerator {
 
     private void implFunc(FunctionDefinition fd) {
         if (fd.builtin()) return;
+        var proc = fd.procedure();
+        if (proc.none()) return;
         if (table.module.has()) {
             if (header == fd.generic().isEmpty())
                 return;
@@ -1028,10 +1038,9 @@ public class CppGenerator {
         assert enterFunc == null;
         enterFunc = fd;
         write(fd.generic());
-        var proc = fd.procedure();
-        write(fd.symbol(), proc.prototype());
+        write(fd.symbol(), fd.prototype());
         write(' ');
-        write(proc);
+        write(proc.get());
         enterFunc = null;
     }
 
@@ -1395,12 +1404,12 @@ public class CppGenerator {
     private CppGenerator write(ReferEqualExpression e) {
         write(e.left());
         var lt = e.left().resultType.must();
-        if (lt instanceof ArrayTypeDeclarer) write(".start");
+        if (lt instanceof ArrayTypeDeclarer) write(".$values");
         else write(".t");
         write(e.same() ? "==" : "!=");
         write(e.right());
         var rt = e.right().resultType.must();
-        if (rt instanceof ArrayTypeDeclarer) write(".start");
+        if (rt instanceof ArrayTypeDeclarer) write(".$values");
         else write(".t");
         return this;
     }
@@ -1570,6 +1579,15 @@ public class CppGenerator {
             if (def instanceof EnumDefinition ed) {
                 return enumMember(e, ed);
             }
+            if (def instanceof StructureDefinition sd
+                    && sd.cType()) {
+                ofMember(e.subject());
+                // If it's a C struct, field has no prefix
+                return write(e.member().value());
+            }
+        }
+        if (td instanceof ArrayTypeDeclarer) {
+            write('(').write(e.resultType.must()).write(')');
         }
 
         ofMember(e.subject());
@@ -1688,7 +1706,10 @@ public class CppGenerator {
             if (o.has()) data.add(Groups.g2(f.name(), o.get()));
         }
         joinByComma(data, g -> {
-            write('.').write(g.a()).write('=').write(g.b());
+            write('.');
+            if (sd.cType()) write(g.a().value());
+            else write(g.a());
+            write('=').write(g.b());
         });
         return write('}');
     }

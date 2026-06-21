@@ -1259,10 +1259,11 @@ public class SemanticAnalysis {
     }
 
     private FunctionDefinition analyse(FunctionDefinition fd) {
-
+        var proc = fd.procedure();
+        if (proc.none()) return fd;
         assert enterFunc == null;
         enterFunc = fd;
-        analyse(fd.procedure());
+        analyse(proc.get());
         enterFunc = null;
         return fd;
     }

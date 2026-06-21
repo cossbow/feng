@@ -1,9 +1,12 @@
 package org.cossbow.feng.c2feng.parse;
 
+import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.c2feng.convert.C2FengConverter;
 import org.junit.jupiter.api.Test;
 
 import java.io.StringWriter;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -40,7 +43,7 @@ public class JsonAstParserTest {
                 }
                 """;
 
-        var converter = new C2FengConverter("c_test");
+        var converter = new C2FengConverter(new ModulePath(new Identifier("c_test"), Path.of("")));
         new JsonAstParser(converter).parse(json);
 
         var out = new StringWriter();
@@ -82,7 +85,7 @@ public class JsonAstParserTest {
                 }
                 """;
 
-        var converter = new C2FengConverter("c_test");
+        var converter = new C2FengConverter(new ModulePath(new Identifier("c_test"), Path.of("")));
         new JsonAstParser(converter).parse(json);
 
         var out = new StringWriter();
@@ -131,7 +134,7 @@ public class JsonAstParserTest {
                 }
                 """;
 
-        var converter = new C2FengConverter("c_test");
+        var converter = new C2FengConverter(new ModulePath(new Identifier("c_test"), Path.of("")));
         new JsonAstParser(converter).parse(json);
 
         var out = new StringWriter();
@@ -173,7 +176,7 @@ public class JsonAstParserTest {
                 }
                 """;
 
-        var converter = new C2FengConverter("c_test");
+        var converter = new C2FengConverter(new ModulePath(new Identifier("c_test"), Path.of("")));
         new JsonAstParser(converter).parse(json);
 
         var out = new StringWriter();
@@ -213,7 +216,7 @@ public class JsonAstParserTest {
                 }
                 """;
 
-        var converter = new C2FengConverter("c_test");
+        var converter = new C2FengConverter(new ModulePath(new Identifier("c_test"), Path.of("")));
         new JsonAstParser(converter).parse(json);
 
         var out = new StringWriter();
@@ -273,7 +276,7 @@ public class JsonAstParserTest {
                 }
                 """;
 
-        var converter = new C2FengConverter("c_my_lib");
+        var converter = new C2FengConverter(new ModulePath(new Identifier("c_my_lib"), Path.of("")));
         new JsonAstParser(converter).parse(json);
 
         var out = new StringWriter();

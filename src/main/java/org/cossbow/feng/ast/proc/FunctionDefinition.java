@@ -5,12 +5,9 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.attr.Modifier;
-import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
-import org.cossbow.feng.ast.dcl.Refer;
 import org.cossbow.feng.ast.dcl.ReferKind;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.lit.StringLiteral;
-import org.cossbow.feng.ast.oop.InterfaceDefinition;
 import org.cossbow.feng.util.Optional;
 
 import java.util.List;
@@ -60,12 +57,20 @@ public class FunctionDefinition extends Definition {
                 prototype, Optional.empty());
     }
 
-    public Procedure procedure() {
-        return procedure.must();
+    public Optional<Procedure> procedure() {
+        return procedure;
     }
 
     public Prototype prototype() {
         return prototype;
+    }
+
+    /**
+     * Returns true if this function has an executable body.
+     * Returns false for metadata-only declarations (from C headers).
+     */
+    public boolean hasProcedure() {
+        return procedure.has();
     }
 
 
@@ -82,7 +87,7 @@ public class FunctionDefinition extends Definition {
             TypeParameters.empty(), new Prototype(ZERO, new ParameterSet(ZERO, List.of(
             // Ignore parameter settings: Because they do not need to
             // be defined and can be called directly
-    )), StringLiteral.array(ZERO, ReferKind.STRONG)));
+    ))));
 
     //
     @Override
