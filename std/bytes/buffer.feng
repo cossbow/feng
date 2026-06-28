@@ -8,7 +8,7 @@ func newCapacity(cur, need int) int {
 
 
 export
-class BytesBuffer (Writer) {
+class BufferWriter (Writer) {
     var buf [*!]byte;
     var len int;
 
@@ -29,13 +29,14 @@ class BytesBuffer (Writer) {
     }
 
     export
-    func write(data [&!#]byte) {
+    func write(data [&!#]byte) int {
         growIfNeed(data.length);
         var i = len;
         for (b : data) {
             buf[i] = b;
             i += 1;
         }
+        return len;
     }
 
     export
@@ -49,5 +50,26 @@ class BytesBuffer (Writer) {
         var dst = new([len]byte);
         util$copy`byte`(src, dst, len);
         return src;
+    }
+
+    export
+    func reader() BufferReader {
+        return {buf=buf,len=len};
+    }
+}
+
+export
+class BufferReader (Reader) {
+    const buf [*!#]byte;
+    const len int;
+    var off int;
+
+    export
+    func read(b [&!]byte) int {
+        var old = off;
+        for (var i=0; off<len && i<b.length; off,i=off+1,i+1) {
+            b[i] = buf[off];
+        }
+        return off-old;
     }
 }

@@ -611,7 +611,7 @@ public class CppGenerator {
         return write(td.derivedType()).write('>');
     }
 
-    private static final Map<Primitive, String> PrimitiveName =
+    public static final Map<Primitive, String> PrimitiveName =
             Arrays.stream(Primitive.values())
                     .collect(Collectors.toMap(Function.identity(),
                             p -> CommonUtil.upperFirst(p.code)));

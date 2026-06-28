@@ -120,7 +120,8 @@ public class InterfaceDefinition extends ObjectDefinition {
         var write = new InterfaceMethod(ZERO, new Identifier("write"),
                 false, new Prototype(ZERO,
                 new ParameterSet(ZERO, List.of(new FixedParameter(ZERO,
-                        StringLiteral.array(ZERO, PHANTOM))))));
+                        StringLiteral.array(ZERO, PHANTOM)))),
+                Primitive.INT.declarer()));
         methods.add(write.name(), write);
         WriterType = new InterfaceDefinition(ZERO, Modifier.empty(),
                 new Symbol(new Identifier("Writer")),
@@ -141,13 +142,29 @@ public class InterfaceDefinition extends ObjectDefinition {
         var write = new InterfaceMethod(ZERO, new Identifier("write"),
                 true, new Prototype(ZERO,
                 new ParameterSet(ZERO, List.of(new FixedParameter(ZERO, td))),
-                Primitive.INT.declarer(ZERO)));
+                Primitive.INT.declarer()));
         methods.add(write.name(), write);
         WritableType = new InterfaceDefinition(ZERO, Modifier.empty(),
                 new Symbol(new Identifier("Writable")),
                 TypeParameters.empty(), methods, new SymbolMap<>(),
                 new MacroTable());
         WritableType.builtin(true);
+    }
+
+    public static final InterfaceDefinition ReaderType;
+
+    static {
+        var methods = new IdentifierMap<InterfaceMethod>(2);
+        var read = new InterfaceMethod(ZERO, new Identifier("read"),
+                true, new Prototype(ZERO,
+                new ParameterSet(ZERO, List.of(new FixedParameter(ZERO,
+                        StringLiteral.buffer(ZERO, PHANTOM, false)))),
+                Primitive.INT.declarer()));
+        ReaderType = new InterfaceDefinition(ZERO, Modifier.empty(),
+                new Symbol(new Identifier("Reader")),
+                TypeParameters.empty(), methods, new SymbolMap<>(),
+                new MacroTable());
+        ReaderType.builtin(true);
     }
 
 }

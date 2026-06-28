@@ -65,9 +65,15 @@ public class StringLiteral extends Literal {
         return array(pos(), kind.get());
     }
 
-    public static ArrayTypeDeclarer array(Position pos, ReferKind kind) {
+    public static ArrayTypeDeclarer array(
+            Position pos, ReferKind kind) {
+        return buffer(pos, kind, true);
+    }
+
+    public static ArrayTypeDeclarer buffer(
+            Position pos, ReferKind kind, boolean readonly) {
         var et = Primitive.BYTE.declarer(ZERO);
-        var r = new Refer(pos, kind, true, true);
+        var r = new Refer(pos, kind, true, readonly);
         return ArrayTypeDeclarer.make(et, Optional.of(r), ZERO);
     }
 

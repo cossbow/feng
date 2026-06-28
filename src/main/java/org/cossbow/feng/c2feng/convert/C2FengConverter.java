@@ -130,9 +130,7 @@ public class C2FengConverter {
                     convertType(p.type())));
         }
         if (func.variadic()) {
-            ErrorUtil.unsupported(
-                    "C variadic functions are not supported (incompatible with Fēng): %s",
-                    func.name());
+            return; // C variadic incompatible with Feng, skip silently
         }
 
         var paramSet = new ParameterSet(ZERO, params);
@@ -182,14 +180,14 @@ public class C2FengConverter {
     // ---------- Primitive type mapping ----------
 
     private static final Map<String, Primitive> C_PRIMITIVE_MAP = Map.ofEntries(
-            Map.entry("void", Primitive.INT),
+            Map.entry("void", Primitive.INT32),
             Map.entry("char", Primitive.INT8),
             Map.entry("signed char", Primitive.INT8),
             Map.entry("unsigned char", Primitive.UINT8),
             Map.entry("short", Primitive.INT16),
             Map.entry("unsigned short", Primitive.UINT16),
-            Map.entry("int", Primitive.INT),
-            Map.entry("unsigned int", Primitive.UINT),
+            Map.entry("int", Primitive.INT32),
+            Map.entry("unsigned int", Primitive.UINT32),
             Map.entry("long", Primitive.INT64),
             Map.entry("unsigned long", Primitive.UINT64),
             Map.entry("long long", Primitive.INT64),

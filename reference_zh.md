@@ -1120,10 +1120,10 @@ class User {
 
 ```feng
 interface Reader {
-   read(b [*]byte) (int, Error);
+   read(b [&!]byte) int;
 }
 interface Writer {
-   write(b [*#]byte, off, len int) (int, Error);
+   write(b [&!#]byte) int;
 }
 // 组合成的接口File包含read和write方法
 interface File {

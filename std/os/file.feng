@@ -1,0 +1,91 @@
+export
+enum OpenMode {
+    Read,
+    Write,
+    Append,
+    ReadWrite,
+    ReadBinary,
+    WriteBinary,
+    AppendBinary,
+    ReadWriteBinary,
+}
+
+export
+class File {
+    const fp uint64;
+
+    macro resource free() {
+        fclose(fp);
+    }
+
+    export
+    func read(buf [&!]byte) int {
+        var n = fread(buf.values, 1, buf.length, fp);
+        if (n <= 0) {
+            return -1;
+        }
+        return n;
+    }
+
+    export
+    func write(data [&!#]byte) int {
+        return fwrite(data.values, 1, data.length, fp);
+    }
+
+    export
+    func seek(offset int, whence int) int {
+        return fseek(fp, offset, whence);
+    }
+
+    export
+    func tell() int {
+        return ftell(fp);
+    }
+
+    export
+    func eof() bool {
+        return feof(fp) != 0;
+    }
+
+    export
+    func error() bool {
+        return ferror(fp) != 0;
+    }
+}
+
+//
+// C string helpers
+//
+
+func toCStr(s [&!#]byte) [*!]byte {
+    var buf = new([s.length + 1]byte);
+    for (var i = 0; i < s.length; i += 1) {
+        buf[i] = s[i];
+    }
+    buf[s.length] = 0;
+    return buf;
+}
+
+func openModeToStr(mode OpenMode) [4]byte {
+    var id = mode.id;
+    if (id == 0) { return "r"; }
+    if (id == 1) { return "w"; }
+    if (id == 2) { return "a"; }
+    if (id == 3) { return "r+"; }
+    if (id == 4) { return "rb"; }
+    if (id == 5) { return "wb"; }
+    if (id == 6) { return "ab"; }
+    return "wb+";
+}
+
+//
+// factory
+//
+
+export
+func open(path [&!#]byte, mode OpenMode) *File {
+    var cpath = toCStr(path);
+    var cmode = openModeToStr(mode);
+    var fp = fopen(cpath.values, cmode.values);
+    return new(File, {fp=fp});
+}

@@ -124,6 +124,7 @@ public class ParseSymbolTable {
         BUILTIN.add(ClassDefinition.ObjectClass);
         BUILTIN.add(InterfaceDefinition.WriterType);
         BUILTIN.add(InterfaceDefinition.WritableType);
+        BUILTIN.add(InterfaceDefinition.ReaderType);
         BUILTIN.add(FunctionDefinition.FORMAT_FUNC);
     }
 }

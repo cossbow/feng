@@ -4,6 +4,8 @@ import com.beust.jcommander.*;
 import com.beust.jcommander.converters.PathConverter;
 import org.cossbow.feng.analysis.AnalyseSymbolTable;
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.dcl.PrimitiveTypeDeclarer;
+import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.coder.CppGenerator;
 import org.cossbow.feng.dag.DAGGraph;
@@ -17,12 +19,14 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 public class CompilerMain {
     @Parameter(names = {"-p", "-pkg"},
@@ -110,6 +114,11 @@ public class CompilerMain {
                 genBridgeHeader(fm, output);
                 copyCSources(fm, output);
                 allCSources.addAll(fm.cSources());
+            } else if (!fm.headerFiles().isEmpty()) {
+                // C header-only module — generate .cpp first, then append bridge
+                generateCpp(fm.result.must(), output, mp.filename(), moduleNames);
+                copyCSources(fm, output);
+                genBridgeHeader(fm, output);
             } else {
                 generateCpp(fm.result.must(), output, mp.filename(), moduleNames);
             }
@@ -124,13 +133,14 @@ public class CompilerMain {
 
     private void genBridgeHeader(FModule fm, Path dir) throws IOException {
         var name = fm.path().filename();
-        try (var w = Files.newBufferedWriter(dir.resolve(name + ".h"), UTF_8)) {
-            w.write("// auto-generated bridge for pure C module: " + name + "\n");
-            w.write("#ifdef __cplusplus\nextern \"C\" {\n#endif\n");
-            for (var hf : fm.headerFiles()) {
-                w.write("#include \"" + hf.getFileName() + "\"\n");
-            }
-            w.write("#ifdef __cplusplus\n}\n#endif\n");
+        var bridgeFile = dir.resolve(name + "_bridge.h");
+        var hPath = dir.resolve(name + ".h");
+        var hasCppHeader = Files.exists(hPath);
+
+        // Write bridge header with extern "C" includes + inline wrappers
+        try (var w = Files.newBufferedWriter(bridgeFile, UTF_8)) {
+            w.write("// auto-generated bridge for C functions: " + name + "\n\n");
+            // C function declarations are provided by system headers via Header.h
             // Typedef for struct/union types
             var ast = fm.result.must();
             for (var sd : ast.dagStructures) {
@@ -144,7 +154,8 @@ public class CompilerMain {
             for (var fd : ast.functionList) {
                 if (fd.builtin() || fd.hasProcedure()) continue;
                 var prefix = fm.path().toString() + "$";
-                w.write("inline int ");
+                var retType = cTypeOf(fd.prototype().returnType());
+                w.write("inline " + retType + " ");
                 w.write(prefix);
                 w.write(fd.symbol().name().value());
                 w.write("(");
@@ -152,23 +163,53 @@ public class CompilerMain {
                 for (var p : fd.prototype().parameterSet()) {
                     if (!first) w.write(", ");
                     first = false;
-                    w.write("int ");
-                    w.write(((org.cossbow.feng.ast.proc.FixedParameter) p).name()
-                            .get().value());
+                    var fp = (org.cossbow.feng.ast.proc.FixedParameter) p;
+                    w.write(cTypeOf(fp.type()));
+                    w.write(' ');
+                    w.write(fp.name().get().value());
                 }
-                w.write(") { return ");
-                w.write(fd.symbol().name().value());
-                w.write("(");
+                w.write(") {\n\tusing F = ");
+                w.write(retType);
+                w.write("(*)(");
                 first = true;
                 for (var p : fd.prototype().parameterSet()) {
                     if (!first) w.write(", ");
                     first = false;
-                    w.write(((org.cossbow.feng.ast.proc.FixedParameter) p).name()
-                            .get().value());
+                    var fp = (org.cossbow.feng.ast.proc.FixedParameter) p;
+                    w.write(cTypeOf(fp.type()));
                 }
-                w.write("); }\n");
+                w.write(");\n\treturn reinterpret_cast<F>(");
+                w.write(fd.symbol().name().value());
+                w.write(")(");
+                first = true;
+                for (var p : fd.prototype().parameterSet()) {
+                    if (!first) w.write(", ");
+                    first = false;
+                    var fp = (org.cossbow.feng.ast.proc.FixedParameter) p;
+                    w.write(fp.name().get().value());
+                }
+                w.write(");\n}\n");
             }
         }
+
+        // For header-only modules (has Cpp header), add include of bridge
+        if (hasCppHeader) {
+            try (var w = Files.newBufferedWriter(hPath, UTF_8,
+                    java.nio.file.StandardOpenOption.APPEND)) {
+                w.write("\n#include \"" + name + "_bridge.h\"\n");
+            }
+        } else {
+            // Pure-C module: rename bridge file to the module header
+            Files.move(bridgeFile, hPath,
+                    REPLACE_EXISTING);
+        }
+    }
+
+    private static String cTypeOf(TypeDeclarer td) {
+        if (td instanceof PrimitiveTypeDeclarer ptd) {
+            return CppGenerator.PrimitiveName.get(ptd.primitive());
+        }
+        return "Uint64";
     }
 
     private void runBuild(Path dir) throws IOException {
@@ -271,13 +312,11 @@ public class CompilerMain {
     private void copyCSources(FModule fm, Path dir) throws IOException {
         for (var src : fm.cSources()) {
             var target = dir.resolve(src.getFileName());
-            Files.copy(src, target,
-                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(src, target, REPLACE_EXISTING);
         }
         for (var hdr : fm.headerFiles()) {
             var target = dir.resolve(hdr.getFileName());
-            Files.copy(hdr, target,
-                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(hdr, target, REPLACE_EXISTING);
         }
     }
 

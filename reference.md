@@ -1190,10 +1190,10 @@ For example, a file can be read and written; interfaces can be designed as follo
 
 ```feng
 interface Reader {
-   read(b [*]byte) (int, Error);
+   read(b [&!]byte) int;
 }
 interface Writer {
-   write(b [*#]byte, off, len int) (int, Error);
+   write(b [&!#]byte) int;
 }
 // Composed interface File includes both read and write methods
 interface File {

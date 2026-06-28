@@ -142,17 +142,23 @@ public class C2FengConverterTest {
     }
 
     @Test
-    public void testVariadicFunc() {
+    public void testVariadicFunc() throws Exception {
         var conv = newTestConverter("c_test");
 
-        assertThrows(UnsupportedOperationException.class, () ->
-                conv.addFunction(new CFunction("printf",
-                        List.of(
-                                new CField("fmt", new CPointerType(new CPrimitiveType("char"), true))
-                        ),
-                        new CPrimitiveType("int"),
-                        true,
-                        CLinkage.DEFAULT)));
+        // Variadic C functions are silently skipped
+        conv.addFunction(new CFunction("printf",
+                List.of(
+                        new CField("fmt", new CPointerType(new CPrimitiveType("char"), true))
+                ),
+                new CPrimitiveType("int"),
+                true,
+                CLinkage.DEFAULT));
+
+        var out = new StringWriter();
+        conv.write(out);
+        var result = out.toString();
+        // printf should NOT appear in metadata (variadic skipped)
+        assertFalse(result.contains("printf"));
     }
 
     @Test
