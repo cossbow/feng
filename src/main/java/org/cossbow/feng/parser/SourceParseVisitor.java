@@ -1032,7 +1032,9 @@ final class SourceParseVisitor
                 }
             }
         }
-        return new CallExpression(posOf(asc), callee, args);
+        var variadic = asc.variadic != null;
+        return new CallExpression(posOf(asc), callee, args,
+                variadic);
     }
 
     @Override
@@ -1303,8 +1305,11 @@ final class SourceParseVisitor
     @Override
     public Entity visitCallStatement(FengParser.CallStatementContext ctx) {
         var callee = (PrimaryExpression) visit(ctx.primaryExpr());
-        var argSet = parseExpressions(ctx.argumentSet().args);
-        var call = new CallExpression(posOf(ctx), callee, argSet);
+        var asc = ctx.argumentSet();
+        var argSet = parseExpressions(asc.args);
+        var variadic = asc.variadic != null;
+        var call = new CallExpression(posOf(ctx), callee, argSet,
+                variadic);
         return new CallStatement(call.pos(), call);
     }
 
@@ -1477,9 +1482,6 @@ final class SourceParseVisitor
             FengParser.ParametersSetContext ctx) {
         if (ctx == null) return new ParameterSet(pos);
 
-        var vpc = ctx.variadicParameter();
-        var variadic = vpc == null ? null :
-                new VariadicParameter(posOf(vpc.name), identifier(vpc.name));
 
         var ps = ctx.parameters();
         if (ps == null) {
@@ -1488,7 +1490,6 @@ final class SourceParseVisitor
             for (var td : types) {
                 params.add(new FixedParameter(td.pos(), td));
             }
-            if (variadic != null) params.add(variadic);
             return new ParameterSet(posOf(ctx), params);
         }
 
@@ -1504,8 +1505,8 @@ final class SourceParseVisitor
                 params.add(p);
             }
         }
-        if (variadic != null) params.add(variadic);
-        return new ParameterSet(pos, params);
+        var variadic = ctx.variadic != null;
+        return new ParameterSet(pos, params, variadic);
     }
 
     private Optional<TypeDeclarer> parseReturnSet(FengParser.ReturnSetContext ctx) {

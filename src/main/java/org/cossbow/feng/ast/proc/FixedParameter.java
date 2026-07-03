@@ -38,6 +38,12 @@ public class FixedParameter extends Parameter {
     }
 
     public FixedParameter(Position pos,
+                          Identifier name,
+                          TypeDeclarer type) {
+        this(pos, Modifier.empty(), name, type);
+    }
+
+    public FixedParameter(Position pos,
                           TypeDeclarer type) {
         this(pos, Modifier.empty(), Optional.empty(), type);
     }

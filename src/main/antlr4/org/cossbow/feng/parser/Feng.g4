@@ -231,18 +231,14 @@ prototype
     : '(' parametersSet? ')' returnSet?
     ;
 parametersSet
-    : parameters COMMA? variadicParameter?
+    : parameters (COMMA variadic=DOT_X3?)?
     | typeDeclarerList COMMA?
-    | variadicParameter
     ;
 parameters
     : parameter (COMMA parameter)*
     ;
 parameter
     : modifier identifierList typeDeclarer
-    ;
-variadicParameter
-    : name=Identifier DOT_X3
     ;
 returnSet
     : typeDeclarer
@@ -586,7 +582,7 @@ operandExpr
 
 
 argumentSet
-    : '(' args=expressionList? COMMA? ')'
+    : '(' args=expressionList? (COMMA variadic=DOT_X3?)? ')'
     ;
 
 // closure

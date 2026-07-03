@@ -72,6 +72,11 @@ public class Variable extends Entity
         return value;
     }
 
+    public Variable mirror() {
+        return new Variable(pos(), modifier, declare, name,
+                type.clone(), value.clone());
+    }
+
     //
 
     /**

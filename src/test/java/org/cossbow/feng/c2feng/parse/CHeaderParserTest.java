@@ -58,6 +58,6 @@ public class CHeaderParserTest {
         assertTrue(content.contains("Color$BLUE")); // exact value depends on clang
         assertTrue(content.contains("func open("));
         assertTrue(content.contains("uint64")); // const char* → uint64
-        assertTrue(content.contains("func close(fd int)"));
+        assertTrue(content.contains("func close(fd int32)"));
     }
 }

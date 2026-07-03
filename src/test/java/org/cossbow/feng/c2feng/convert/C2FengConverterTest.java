@@ -137,7 +137,7 @@ public class C2FengConverterTest {
         System.out.println(result);
 
         // void return → no return type in output
-        assertTrue(result.contains("func exit(code int);"));
+        assertTrue(result.contains("func exit(code int32);"));
         assertFalse(result.contains("void"));
     }
 
@@ -182,8 +182,8 @@ public class C2FengConverterTest {
         System.out.println("=== testGlobalVar ===");
         System.out.println(result);
 
-        assertTrue(result.contains("export var errno int;"));
-        assertTrue(result.contains("var internal int;"));   // no export
+        assertTrue(result.contains("export var errno int32;"));
+        assertTrue(result.contains("var internal int32;"));   // no export
         assertFalse(result.contains("external_var"));       // extern skipped
     }
 

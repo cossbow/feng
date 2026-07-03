@@ -178,7 +178,7 @@ public class CppGeneratorTest {
             }
             // Generate inline wrappers with $ prefix for each C function
             for (var fd : fm.result.must().functionList) {
-                if (fd.builtin() || fd.hasProcedure()) continue;
+                if (fd.builtin() || fd.procedure().has()) continue;
                 var prefix = fm.path().toString() + "$";
                 w.write("inline ");
                 writeCSignature(w, fd, prefix);
@@ -209,7 +209,7 @@ public class CppGeneratorTest {
             }
             // Generate C++ wrapper for each C function
             for (var fd : fm.result.must().functionList) {
-                if (fd.builtin() || fd.hasProcedure()) continue;
+                if (fd.builtin() || fd.procedure().has()) continue;
                 w.write("\n");
                 // Write function signature with module-prefixed name
                 writeCSignature(w, fd, name + "$");

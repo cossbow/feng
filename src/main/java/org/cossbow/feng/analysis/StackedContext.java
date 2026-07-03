@@ -3,6 +3,7 @@ package org.cossbow.feng.analysis;
 import org.cossbow.feng.ast.Scope;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
+import org.cossbow.feng.ast.VariadicArgument;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.util.Optional;
@@ -62,6 +63,16 @@ public class StackedContext implements SymbolContext {
     @Override
     public void putVar(Variable variable) {
         getScope().putVar(variable);
+    }
+
+    @Override
+    public void variadic(VariadicArgument va) {
+        getScope().variadic(va);
+    }
+
+    @Override
+    public Optional<VariadicArgument> variadic() {
+        return getScope().variadic();
     }
 
     @Override

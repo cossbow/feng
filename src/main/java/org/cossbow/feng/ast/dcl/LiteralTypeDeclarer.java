@@ -60,6 +60,6 @@ public class LiteralTypeDeclarer extends TypeDeclarer {
 
     @Override
     public String toString() {
-        return literal.getClass().getSimpleName() + ":" + literal;
+        return literal.toString();
     }
 }

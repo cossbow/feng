@@ -1,5 +1,6 @@
 package org.cossbow.feng.ast.proc;
 
+import org.cossbow.feng.analysis.fmt.Formatter;
 import org.cossbow.feng.ast.Definition;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
@@ -65,12 +66,8 @@ public class FunctionDefinition extends Definition {
         return prototype;
     }
 
-    /**
-     * Returns true if this function has an executable body.
-     * Returns false for metadata-only declarations (from C headers).
-     */
-    public boolean hasProcedure() {
-        return procedure.has();
+    public boolean variadic() {
+        return prototype.variadic();
     }
 
 
@@ -85,9 +82,11 @@ public class FunctionDefinition extends Definition {
     public static final FunctionDefinition FORMAT_FUNC = new FunctionDefinition(ZERO,
             Modifier.empty(), new Symbol(new Identifier("format")),
             TypeParameters.empty(), new Prototype(ZERO, new ParameterSet(ZERO, List.of(
-            // Ignore parameter settings: Because they do not need to
-            // be defined and can be called directly
-    ))));
+            new FixedParameter(ZERO, new Identifier("out"),
+                    Formatter.FORMAT_OUT),
+            new FixedParameter(ZERO, new Identifier("fmt"),
+                    StringLiteral.array(ZERO, ReferKind.PHANTOM))
+            ))));
 
     //
     @Override

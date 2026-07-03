@@ -28,8 +28,14 @@ public class AttributeDefinition extends TypeDefinition {
             Modifier.empty(),
             new Symbol(new Identifier("Inherit")),
             new IdentifierMap<>());
+    public static final
+    AttributeDefinition InlineDef = new AttributeDefinition(ZERO,
+            Modifier.empty(),
+            new Symbol(new Identifier("Inline")),
+            new IdentifierMap<>());
 
     static {
         InheritDef.builtin(true);
+        InlineDef.builtin(true);
     }
 }

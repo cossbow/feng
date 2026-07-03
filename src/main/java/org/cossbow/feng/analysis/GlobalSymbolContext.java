@@ -3,6 +3,7 @@ package org.cossbow.feng.analysis;
 import org.cossbow.feng.ast.Exportable;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
+import org.cossbow.feng.ast.VariadicArgument;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
@@ -79,6 +80,16 @@ public class GlobalSymbolContext implements SymbolContext {
     @Override
     public void putVar(Variable variable) {
         ErrorUtil.unreachable();
+    }
+
+    @Override
+    public void variadic(VariadicArgument va) {
+        ErrorUtil.unreachable();
+    }
+
+    @Override
+    public Optional<VariadicArgument> variadic() {
+        return Optional.empty();
     }
 
     @Override

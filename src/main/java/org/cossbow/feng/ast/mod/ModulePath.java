@@ -44,7 +44,7 @@ public class ModulePath extends Entity {
             } else {
                 var more = new String[values.length - 1];
                 for (int i = 1; i < values.length; i++) {
-                    more[i] = values[i].value();
+                    more[i - 1] = values[i].value();
                 }
                 path = Path.of(values[0].value(), more);
             }

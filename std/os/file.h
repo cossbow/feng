@@ -6,3 +6,4 @@ int fseek(void *stream, int offset, int whence);
 int ftell(void *stream);
 int feof(void *stream);
 int ferror(void *stream);
+void *__acrt_iob_func(unsigned int index);

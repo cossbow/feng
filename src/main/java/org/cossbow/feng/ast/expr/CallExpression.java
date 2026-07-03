@@ -1,5 +1,6 @@
 package org.cossbow.feng.ast.expr;
 
+import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.ast.stmt.CallStatement;
@@ -21,9 +22,13 @@ public class CallExpression extends PrimaryExpression {
      */
     private final PrimaryExpression callee;
     /**
-     * The atgument passed to the procedure
+     * The argument passed to the procedure
      */
     private final List<Expression> arguments;
+    /**
+     * Variadic argument need to expand
+     */
+    private final boolean variadic;
     /**
      * The call expression created during the analysis phase
      * will be set as the actual procedure prototype
@@ -33,10 +38,12 @@ public class CallExpression extends PrimaryExpression {
     private CallExpression(Position pos,
                            PrimaryExpression callee,
                            List<Expression> arguments,
+                           boolean variadic,
                            Optional<Prototype> prototype) {
         super(pos);
         this.callee = callee;
         this.arguments = arguments;
+        this.variadic = variadic;
         this.prototype = prototype;
     }
 
@@ -47,7 +54,20 @@ public class CallExpression extends PrimaryExpression {
                           PrimaryExpression callee,
                           List<Expression> arguments,
                           Prototype prototype) {
-        this(pos, callee, arguments, Optional.of(prototype));
+        this(pos, callee, arguments, false,
+                Optional.of(prototype));
+    }
+
+    /**
+     * Created in the analysis stage, preserving variadic info
+     */
+    public CallExpression(Position pos,
+                          PrimaryExpression callee,
+                          List<Expression> arguments,
+                          boolean variadic,
+                          Prototype prototype) {
+        this(pos, callee, arguments, variadic,
+                Optional.of(prototype));
     }
 
     /**
@@ -55,8 +75,9 @@ public class CallExpression extends PrimaryExpression {
      */
     public CallExpression(Position pos,
                           PrimaryExpression callee,
-                          List<Expression> arguments) {
-        this(pos, callee, arguments, Optional.empty());
+                          List<Expression> arguments,
+                          boolean variadic) {
+        this(pos, callee, arguments, variadic, Optional.empty());
     }
 
     public PrimaryExpression callee() {
@@ -69,6 +90,10 @@ public class CallExpression extends PrimaryExpression {
 
     public Optional<Prototype> prototype() {
         return prototype;
+    }
+
+    public boolean variadic() {
+        return variadic;
     }
 
     //

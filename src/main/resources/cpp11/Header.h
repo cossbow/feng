@@ -880,7 +880,7 @@ public:
 // builtin definitions
 class $Writer {
 public:
-    virtual void $write(Feng$ArrayPRefer<Byte> $buf_8) = 0;
+    virtual Int $write(Feng$ArrayPRefer<Byte> $buf_8) = 0;
 
     virtual ~$Writer() = default;
 
@@ -894,6 +894,13 @@ public:
 
     auto operator<=>(const $Writable &) const = default;
 };
+class $Reader {
+public:
+    virtual Int $read(Feng$ArrayPRefer<Byte> $buf_8) = 0;
 
+    virtual ~$Reader() = default;
+
+    auto operator<=>(const $Reader &) const = default;
+};
 
 #endif //FENG_HEADER_H

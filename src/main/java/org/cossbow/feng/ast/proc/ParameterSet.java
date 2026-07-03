@@ -1,9 +1,11 @@
 package org.cossbow.feng.ast.proc;
 
 import org.cossbow.feng.ast.Entity;
+import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.Optional;
 
 import java.util.AbstractList;
 import java.util.ArrayList;
@@ -17,15 +19,20 @@ public class ParameterSet extends Entity
     private final boolean variadic;
 
     public ParameterSet(Position pos,
-                        List<Parameter> params) {
+                        List<Parameter> params,
+                        boolean variadic) {
         super(pos);
         this.params = params;
-        variadic = !params.isEmpty() &&
-                params.getLast() instanceof VariadicParameter;
+        this.variadic = variadic;
+    }
+
+    public ParameterSet(Position pos,
+                        List<Parameter> params) {
+        this(pos, params, false);
     }
 
     public ParameterSet(Position pos) {
-        this(pos, List.of());
+        this(pos, List.of(), false);
     }
 
     public static ParameterSet anon(List<TypeDeclarer> types) {

@@ -3,11 +3,16 @@ package org.cossbow.feng.analysis;
 import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
+import org.cossbow.feng.ast.VariadicArgument;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 public class LocalSymbolContext implements SymbolContext {
@@ -20,6 +25,7 @@ public class LocalSymbolContext implements SymbolContext {
     private final IdentifierMap<Variable> variables = new IdentifierMap<>();
     private final Set<Variable> lockedVars = new HashSet<>();
     private final Set<Variable> varNotNil = new HashSet<>();
+    private Lazy<VariadicArgument> variadic = Lazy.nil();
 
     @Override
     public boolean isLocal(Symbol s) {
@@ -48,6 +54,18 @@ public class LocalSymbolContext implements SymbolContext {
     @Override
     public void putVar(Variable variable) {
         variables.add(variable.name(), variable);
+    }
+
+    @Override
+    public void variadic(VariadicArgument values) {
+        variadic.set(values);
+    }
+
+    @Override
+    public Optional<VariadicArgument> variadic() {
+        var v = variadic.get();
+        if (v.has()) return v;
+        return parent.variadic();
     }
 
     public List<Variable> scope() {

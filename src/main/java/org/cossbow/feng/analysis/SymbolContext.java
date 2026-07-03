@@ -2,6 +2,7 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
+import org.cossbow.feng.ast.VariadicArgument;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.util.Optional;
@@ -20,6 +21,10 @@ public interface SymbolContext {
     Optional<Variable> findVar(Symbol symbol);
 
     void putVar(Variable variable);
+
+    void variadic(VariadicArgument values);
+
+    Optional<VariadicArgument> variadic();
 
     List<Variable> scope();
 

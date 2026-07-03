@@ -7,6 +7,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.dcl.PrimitiveTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.mod.FModule;
+import org.cossbow.feng.ast.proc.FixedParameter;
 import org.cossbow.feng.coder.CppGenerator;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.mod.ModuleAnalysis;
@@ -152,7 +153,7 @@ public class CompilerMain {
                 w.write(";\n");
             }
             for (var fd : ast.functionList) {
-                if (fd.builtin() || fd.hasProcedure()) continue;
+                if (fd.builtin() || fd.procedure().has()) continue;
                 var prefix = fm.path().toString() + "$";
                 var retType = cTypeOf(fd.prototype().returnType());
                 w.write("inline " + retType + " ");
@@ -163,7 +164,7 @@ public class CompilerMain {
                 for (var p : fd.prototype().parameterSet()) {
                     if (!first) w.write(", ");
                     first = false;
-                    var fp = (org.cossbow.feng.ast.proc.FixedParameter) p;
+                    var fp = (FixedParameter) p;
                     w.write(cTypeOf(fp.type()));
                     w.write(' ');
                     w.write(fp.name().get().value());
@@ -175,7 +176,7 @@ public class CompilerMain {
                 for (var p : fd.prototype().parameterSet()) {
                     if (!first) w.write(", ");
                     first = false;
-                    var fp = (org.cossbow.feng.ast.proc.FixedParameter) p;
+                    var fp = (FixedParameter) p;
                     w.write(cTypeOf(fp.type()));
                 }
                 w.write(");\n\treturn reinterpret_cast<F>(");
@@ -185,7 +186,7 @@ public class CompilerMain {
                 for (var p : fd.prototype().parameterSet()) {
                     if (!first) w.write(", ");
                     first = false;
-                    var fp = (org.cossbow.feng.ast.proc.FixedParameter) p;
+                    var fp = (FixedParameter) p;
                     w.write(fp.name().get().value());
                 }
                 w.write(");\n}\n");
