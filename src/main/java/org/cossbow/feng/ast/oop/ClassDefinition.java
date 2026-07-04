@@ -125,6 +125,10 @@ public class ClassDefinition extends ObjectDefinition {
      */
     private final Lazy<ClassDefinition> parent = Lazy.nil();
     /**
+     * times of inherited by other classes
+     */
+    private int inherited = 0;
+    /**
      * Cache all ancestors when analyzing inheritance
      */
     private final Set<ClassDefinition> ancestors = new HashSet<>();
@@ -183,6 +187,14 @@ public class ClassDefinition extends ObjectDefinition {
 
     public Lazy<ClassDefinition> parent() {
         return parent;
+    }
+
+    public int inherited() {
+        return inherited;
+    }
+
+    public void markInherited() {
+        this.inherited++;
     }
 
     public Set<ClassDefinition> ancestors() {

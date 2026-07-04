@@ -6,6 +6,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.attr.Modifier;
+import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.ast.dcl.ReferKind;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.lit.StringLiteral;
@@ -86,7 +87,29 @@ public class FunctionDefinition extends Definition {
                     Formatter.FORMAT_OUT),
             new FixedParameter(ZERO, new Identifier("fmt"),
                     StringLiteral.array(ZERO, ReferKind.PHANTOM))
-            ))));
+    ))));
+
+    /**
+     * func intToStr(n Int, buf [*!]byte) Int
+     */
+    public static final FunctionDefinition INT_TO_STR_FUNC = new FunctionDefinition(ZERO,
+            Modifier.empty(), new Symbol(new Identifier("intToStr")),
+            TypeParameters.empty(), new Prototype(ZERO, new ParameterSet(ZERO, List.of(
+            FixedParameter.create("n", Primitive.INT),
+            new FixedParameter(ZERO, new Identifier("buf"),
+                    StringLiteral.array(ZERO, ReferKind.PHANTOM))
+    )), Primitive.INT.declarer()));
+
+    /**
+     * func floatToStr(n Float, buf [*!]byte) Int
+     */
+    public static final FunctionDefinition FLOAT_TO_STR_FUNC = new FunctionDefinition(ZERO,
+            Modifier.empty(), new Symbol(new Identifier("floatToStr")),
+            TypeParameters.empty(), new Prototype(ZERO, new ParameterSet(ZERO, List.of(
+            FixedParameter.create("n", Primitive.INT),
+            new FixedParameter(ZERO, new Identifier("buf"),
+                    StringLiteral.array(ZERO, ReferKind.PHANTOM))
+    )), Primitive.INT.declarer()));
 
     //
     @Override

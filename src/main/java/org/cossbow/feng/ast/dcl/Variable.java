@@ -93,7 +93,7 @@ public class Variable extends Entity
     //
 
     @Override
-    public Entity clone() {
+    public Variable clone() {
         var r = (Variable) super.clone();
         // Sharing Lazy<T>may result in unexpected modifications
         r.type = type.clone();

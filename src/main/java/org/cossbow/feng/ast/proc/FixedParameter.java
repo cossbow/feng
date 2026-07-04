@@ -4,6 +4,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.Declare;
+import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.util.Lazy;
@@ -87,6 +88,14 @@ public class FixedParameter extends Parameter {
         return Optional.of(v);
     }
 
+    // creator
+
+    public static FixedParameter create(
+            String name, Primitive primitive) {
+        return new FixedParameter(Position.ZERO,
+                new Identifier(name),
+                primitive.declarer());
+    }
 
     //
     @Override

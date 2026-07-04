@@ -29,14 +29,13 @@ class BufferWriter (Writer) {
     }
 
     export
-    func write(data [&!#]byte) int {
-        growIfNeed(data.length);
-        var i = len;
-        for (b : data) {
-            buf[i] = b;
-            i += 1;
+    func write(data [&!#]byte, offset int, length int) int {
+        growIfNeed(length);
+        for (var i = 0; i < length; i += 1) {
+            buf[len] = data[offset + i];
+            len += 1;
         }
-        return len;
+        return length;
     }
 
     export

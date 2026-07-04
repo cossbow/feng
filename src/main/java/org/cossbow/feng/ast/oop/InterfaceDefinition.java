@@ -119,9 +119,12 @@ public class InterfaceDefinition extends ObjectDefinition {
         var methods = new IdentifierMap<InterfaceMethod>(2);
         var write = new InterfaceMethod(ZERO, new Identifier("write"),
                 false, new Prototype(ZERO,
-                new ParameterSet(ZERO, List.of(new FixedParameter(ZERO,
-                        StringLiteral.array(ZERO, PHANTOM)))),
-                Primitive.INT.declarer()));
+                new ParameterSet(ZERO, List.of(
+                        new FixedParameter(ZERO,
+                                StringLiteral.array(ZERO, PHANTOM)),
+                        FixedParameter.create("offset", Primitive.INT),
+                        FixedParameter.create("length", Primitive.INT)
+                )), Primitive.INT.declarer()));
         methods.add(write.name(), write);
         WriterType = new InterfaceDefinition(ZERO, Modifier.empty(),
                 new Symbol(new Identifier("Writer")),

@@ -372,9 +372,7 @@ public class SemanticAnalysis {
         result.dagClasses = visitClasses(table.types);
         // A function may also depend on all types, so its
         // prototype should also be analyzed first
-        result.functionList = table.functions.stream()
-                .filter(Predicate.not(FunctionDefinition::variadic))
-                .map(this::declareFunc).toList();
+        table.functions.forEach(this::declareFunc);
 
         // Then analyze the remaining global variables
         var rest = subtract(table.variables.values(),
@@ -388,11 +386,14 @@ public class SemanticAnalysis {
         visitAttribute(table.types);
 
         // Finally, analyze the statements within the function
-        result.functionList.forEach(this::analyse);
+        table.functions.forEach(this::analyse);
         table.main.use(this::checkMain);
         result.main.set(table.main);
 
         result.typeList = table.types.stream().toList();
+        result.functionList = table.functions.stream()
+                .filter(Predicate.not(FunctionDefinition::variadic))
+                .toList();
 
         result.stringCache = stringCache;
         return result;
@@ -975,7 +976,10 @@ public class SemanticAnalysis {
 
     private List<ClassDefinition> findInitDeps(ClassDefinition cd) {
         var inherit = cd.inherit().stream().map(this::findParentClass)
-                .peek(p -> cd.parent().setIfNone(p));
+                .peek(p -> {
+                    cd.parent().setIfNone(p);
+                    p.markInherited();
+                });
         var fields = cd.fields().stream().map(ClassField::type)
                 .map(this::getClassTypeField).flatMap(Optional::stream);
         return Stream.concat(inherit, fields)
@@ -3969,7 +3973,8 @@ public class SemanticAnalysis {
             var v = ov.get();
             if (v.type().must() instanceof FuncTypeDeclarer ftd) {
                 invalid(re.generic());
-                var n = new VariableExpression(re.pos(), ov.get());
+                var n = new VariableExpression(
+                        re.pos(), ov.get(), s);
                 return Groups.g2(n, ftd);
             }
         }
@@ -4032,7 +4037,7 @@ public class SemanticAnalysis {
             if (v.isConst() && v.value().match(e ->
                     e instanceof LiteralExpression))
                 return Groups.g2(v.value().must(), v.type().must());
-            var n = new VariableExpression(re.pos(), v);
+            var n = new VariableExpression(re.pos(), v, s);
             return Groups.g2(n, v.type().must());
         }
 
@@ -4431,7 +4436,11 @@ public class SemanticAnalysis {
     private Expression wrapRelayExpr(
             Expression s, TypeDeclarer t,
             Function<? super Expression, ? extends Expression> c) {
-        if (!needRelay(s)) return c.apply(s);
+        if (!needRelay(s)) {
+            var n = c.apply(s);
+            n.resultType.set(t);
+            return n;
+        }
         return wrapRelay(s, t, c);
     }
 
@@ -4665,6 +4674,9 @@ public class SemanticAnalysis {
 
     private Optional<Groups.G2<Expression, TypeDeclarer>>
     expand(CallExpression ce) {
+        // During variadic body analysis, skip expansion
+        if (enterFunc == null || enterFunc.variadic())
+            return Optional.empty();
         // Check if the target of the call is the format function
         if (!(ce.callee() instanceof SymbolExpression se))
             return Optional.empty();
@@ -4709,13 +4721,12 @@ public class SemanticAnalysis {
         // Check if the parameters match and build sub statements
         var block = new ArrayList<Statement>(fmt.segments().size());
         for (var seg : fmt.segments()) {
-            CallExpression ne = switch (seg) {
+            Statement stmt = switch (seg) {
                 case ArgumentSegment s -> format(ags.get(s.index()), out);
                 case TextSegment s -> format(s, out);
                 case null, default -> unreachable();
             };
-            var stmt = new CallStatement(ne.pos(), ne);
-            block.add(stmt);
+            block.add(analyse(stmt));
         }
         // Build block statement with sub statements, but we need to return
         // an expression, so we use a block expression instead
@@ -4732,7 +4743,7 @@ public class SemanticAnalysis {
      * (e.g. after variadic inline expansion), trace back to the variable's
      * initial value to find the original string literal.
      */
-    private static StringLiteral resolveFormatString(
+    private StringLiteral resolveFormatString(
             Groups.G2<Expression, TypeDeclarer> fg) {
         // Direct literal check
         if (fg.b() instanceof LiteralTypeDeclarer ltd &&
@@ -4746,7 +4757,14 @@ public class SemanticAnalysis {
         // Trace back through a const variable reference
         if (fg.a() instanceof VariableExpression ve) {
             var v = ve.variable();
-            if (v.isConst() && v.value().has()) {
+            if (v.isConst()) {
+                if (v.value().none() && ve.symbol().has()) {
+                    var o = context.findVar(ve.symbol().get());
+                    if (o.none()) return semantic(
+                            "requires format string: %s",
+                            fg.a().pos());
+                    v = o.get();
+                }
                 var val = v.value().must();
                 if (val instanceof LiteralExpression le &&
                         le.literal() instanceof StringLiteral sl) {
@@ -4754,34 +4772,85 @@ public class SemanticAnalysis {
                 }
             }
         }
-        return null;
+        return semantic("requires format string: %s",
+                fg.a().pos());
     }
 
-    private CallExpression format(
+    private Statement format(
             Groups.G2<Expression, TypeDeclarer> ag,
             PrimaryExpression out) {
-        if (ag.a() instanceof LiteralExpression le) {
-            return unsupported("write literal");
-        }
+        // Literal and Primitive: create buffer + Feng$XxxToStr conversion + out.write
         if (ag.b() instanceof PrimitiveTypeDeclarer ptd) {
-            return unsupported("write primitive");
+            return formatPrimitive(ptd.primitive(), (PrimaryExpression) ag.a(), out);
         }
-        if (ag.b() instanceof ArrayTypeDeclarer td &&
-                isByteArray(td)) {
-            return unsupported("write byte array");
+        // Byte array: out.write(data, 0, data.length)
+        if (ag.b() instanceof ArrayTypeDeclarer td && isByteArray(td)) {
+            var name = new Identifier("write");
+            var me = new MemberOfExpression(ZERO, out, name, TypeArguments.EMPTY);
+            var zero = new LiteralExpression(ZERO, new IntegerLiteral(ZERO, 0));
+            zero.resultType.set(Primitive.INT.declarer());
+            var lenExpr = new MemberOfExpression(ZERO, (PrimaryExpression) ag.a(),
+                    new Identifier("length"), TypeArguments.EMPTY);
+            var ce = new CallExpression(ZERO, me, List.of(ag.a(), zero, lenExpr),
+                    InterfaceDefinition.WriterType.method(name)
+                            .get().prototype());
+            return new CallStatement(ce.pos(), ce);
         }
-        // To call the write method of arguments
+        // Writable: arg.write(out)
         assignable(Formatter.FORMAT_DATA, ag.b(),
                 Optional.of(ag.a()), ag.a()).valid();
         var name = new Identifier("write");
         var me = new MemberOfExpression(ZERO, (PrimaryExpression) ag.a(),
                 name, TypeArguments.EMPTY);
-        return new CallExpression(ZERO, me, List.of(out),
+        var ce = new CallExpression(ZERO, me, List.of(out),
                 InterfaceDefinition.WritableType.method(name)
                         .get().prototype());
+        return new CallStatement(ce.pos(), ce);
     }
 
-    private CallExpression format(
+    /**
+     * Format a primitive argument by creating a temp buffer, converting
+     * the value to bytes via Feng$xxxToStr, and writing to the output.
+     * Returns a BlockStatement containing the buffer declaration + conversion
+     * call + write call.
+     */
+    private Statement formatPrimitive(
+            Primitive prim, PrimaryExpression arg,
+            PrimaryExpression out) {
+        var pos = arg.pos();
+        // 1. Buffer: var __fb [32]byte
+        var bufType = ArrayTypeDeclarer.make(Primitive.BYTE.declarer(), 32, pos);
+        var bufVar = new Variable(pos, Modifier.empty(), Declare.VAR,
+                new Identifier(pos, "_fb", true),
+                Lazy.of(bufType), Lazy.nil());
+        var bufExpr = new VariableExpression(pos, bufVar);
+
+        // 2. Conversion: Feng$xxxToStr(arg, buf)
+        var convName = prim.isFloat() ? "floatToStr" : "intToStr";
+        var convSym = new SymbolExpression(ZERO,
+                new Symbol(new Identifier(convName)),
+                TypeArguments.EMPTY);
+        // The convert result variable holds the returned length
+        var convCall = new CallExpression(pos, convSym, List.of(arg, bufExpr), false);
+        convCall.resultType.set(Primitive.INT.declarer());
+        var lenVar = makeTmpVar("_len", convCall);
+        var lenExpr = new VariableExpression(pos, lenVar);
+
+        // 3. Write: out.write(buf, 0, len)
+        var writeName = new Identifier("write");
+        var writeMe = new MemberOfExpression(ZERO, out, writeName, TypeArguments.EMPTY);
+        var writeCe = new CallExpression(ZERO, writeMe, List.of(bufExpr,
+                new LiteralExpression(ZERO, new IntegerLiteral(ZERO, 0)), lenExpr),
+                InterfaceDefinition.WriterType.method(writeName)
+                        .get().prototype());
+
+        return new BlockStatement(pos, List.of(
+                new DeclarationStatement(pos, List.of(bufVar)),
+                new DeclarationStatement(pos, List.of(lenVar)),
+                new CallStatement(pos, writeCe)), false);
+    }
+
+    private Statement format(
             TextSegment seg,
             PrimaryExpression out) {
         // To call the write method of output
@@ -4789,13 +4858,19 @@ public class SemanticAnalysis {
         var me = new MemberOfExpression(ZERO, out,
                 name, TypeArguments.EMPTY);
         var text = stringCache.dedup(seg.text());
-        return new CallExpression(ZERO, me, List.of(text.expr()),
+        var offset = new IntegerLiteral(ZERO, 0);
+        var length = new IntegerLiteral(ZERO, text.length());
+        var ce = new CallExpression(ZERO, me, List.of(
+                text.expr(), offset.expr(), length.expr()),
                 InterfaceDefinition.WriterType.method(name)
                         .get().prototype());
+        return new CallStatement(ce.pos(), ce);
     }
 
     private Optional<Groups.G2<Expression, TypeDeclarer>>
     expandVariadic(CallExpression ce) {
+        if (enterFunc == null || enterFunc.variadic())
+            return Optional.empty();
         if (!(ce.callee() instanceof SymbolExpression se))
             return Optional.empty();
         // Look up the function definition by name (local module + builtins)
@@ -4855,13 +4930,13 @@ public class SemanticAnalysis {
 
         // Build inlined block: declarations + body statements
         var body = fd.procedure().get().body();
-        var inlinedBody = new ArrayList<Statement>(body.size() + 2);
+        var inline = new ArrayList<Statement>(body.size() + 2);
         if (!dclVars.isEmpty()) {
-            inlinedBody.add(new DeclarationStatement(pos, dclVars));
+            inline.add(new DeclarationStatement(pos, dclVars));
         }
-        inlinedBody.addAll(body.list());
+        inline.addAll(body.list());
 
-        return new BlockExpression(pos, inlinedBody,
+        return new BlockExpression(pos, inline,
                 new NilLiteral(pos).expr());
     }
 

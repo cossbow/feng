@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
+#include <charconv>
 #include <cstring>
 #include <list>
 #include <vector>
@@ -880,7 +881,7 @@ public:
 // builtin definitions
 class $Writer {
 public:
-    virtual Int $write(Feng$ArrayPRefer<Byte> $buf_8) = 0;
+    virtual Int $write(Feng$ArrayPRefer<Byte>, Int, Int) = 0;
 
     virtual ~$Writer() = default;
 
@@ -888,7 +889,7 @@ public:
 };
 class $Writable {
 public:
-    virtual Int $write(Feng$PRefer<$Writer> $w_9) = 0;
+    virtual Int $write(Feng$PRefer<$Writer>) = 0;
 
     virtual ~$Writable() = default;
 
@@ -896,11 +897,26 @@ public:
 };
 class $Reader {
 public:
-    virtual Int $read(Feng$ArrayPRefer<Byte> $buf_8) = 0;
+    virtual Int $read(Feng$ArrayPRefer<Byte>) = 0;
 
     virtual ~$Reader() = default;
 
     auto operator<=>(const $Reader &) const = default;
 };
+
+// Format conversion: write integer n as string bytes into dst buffer, return byte count
+static Int $intToStr(Int64 n, Feng$ArrayPRefer<Byte> buf) {
+    auto dst = buf.$values;
+	auto [ptr, ec] = std::to_chars((char*)dst, (char*)dst + 32, n);
+	return (Int)(ptr - (char*)dst);
+}
+
+// Format conversion: write float n as string bytes into dst buffer, return byte count
+static Int $floatToStr(Float64 n, Feng$ArrayPRefer<Byte> buf) {
+    auto dst = buf.$values;
+	auto [ptr, ec] = std::to_chars((char*)dst, (char*)dst + 32, n);
+	return (Int)(ptr - (char*)dst);
+}
+
 
 #endif //FENG_HEADER_H

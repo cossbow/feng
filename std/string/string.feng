@@ -20,7 +20,7 @@ class String (Writable) {
     func write#(w &!Writer) int {
         const v [&#]byte = value;
         if (v==nil) return 0;
-        w.write(v);
+        w.write(v, 0, v.length);
         return v.length;
     }
 

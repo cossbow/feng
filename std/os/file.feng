@@ -28,8 +28,11 @@ class File (Writer,Reader) {
     }
 
     export
-    func write(data [&!#]byte) int {
-        var n = fwrite(data.values, 1, int32(data.length), fp);
+    func write(data [&!#]byte, offset, length int) int {
+        if (offset>=data.length) return 0;
+        var pos = data.values+uint64(offset);
+        var len = length<data.length ? length : data.length;
+        var n = fwrite(pos, 1, int32(len), fp);
         return int(n);
     }
 
