@@ -1164,6 +1164,21 @@ public class SemanticAnalysisTest {
     }
 
     @Test
+    public void testNewExpression5() {
+        var d = "class A{var id int;} struct B{id int;} ";
+        checkSucc(d + "func f(){var b *A=new(A);}");
+        checkFail(d + "func f(){var b *int=new(A);}");
+        checkFail(d + "func f(){var b *A=new(B);}");
+        checkSucc(d + "func f(){var b *B=new(B);}");
+        checkFail(d + "func f(){var b *B=new(A);}");
+        checkSucc(d + "func f(){var b *int=new(B);}");
+
+        checkFail(d + "func f(){var b =new(A`int`);}");
+        checkFail(d + "func f(){var b =new(B`int`);}");
+
+    }
+
+    @Test
     public void testDereferExpression1() {
         var d = "struct A{} class B{} interface C{}";
         checkSucc(d + "func f(a*int){var v int = *a;}");
@@ -3359,6 +3374,97 @@ public class SemanticAnalysisTest {
         checkFail(d + "class BB`V1,V2` : B`V1` (I1`V2`) {}");
         checkSucc(d + "class BB`V1,V2` : B`V1` (I2`V1`) {}");
         checkFail(d + "class BB`V1,V2` : B`V1` (I2`V2`) {}");
+    }
+
+    @Test
+    public void testGenericInfer1() {
+        var d = "func c`T`(t T){} ";
+        checkSucc(d + "func f(n int){ c`int`(n); }");
+        checkSucc(d + "func f(n int){ c(n); }");
+
+        d = "func c`T1,T2`(t1 T1, t2 T2){} ";
+        checkSucc(d + "func f(n int){ c`int,bool`(n,false); }");
+        checkSucc(d + "func f(n int){ c(n,false); }");
+
+        d = "func c`T1,T2`(a A`T1,T2`){} class A`E1,E2`{} ";
+        checkSucc(d + "func f(n int){ c`int,bool`(A`int,bool`{}); }");
+        checkSucc(d + "func f(n int){ c(A`int,bool`{}); }");
+
+        d = "class A{func c`T1,T2`(t1 T1, t2 T2){}} ";
+        checkSucc(d + "func f(n int, a *A){ a.c`int,bool`(n,false); }");
+        checkSucc(d + "func f(n int, a *A){ a.c(n,false); }");
+    }
+
+    @Test
+    public void testGenericInfer2() {
+        var d = "func c`T`(t T)T{return t;} ";
+        checkSucc(d + "func f(n int){ var r = c(n); var x int = r; }");
+        checkFail(d + "func f(n int){ var r = c(n); var x bool = r; }");
+
+        d = "func c`T1,T2`(t1 T1, t2 T2)T1{return t1;} ";
+        checkSucc(d + "func f(n int){ var r = c(n,false); var x int = r; }");
+        checkFail(d + "func f(n int){ var r = c(n,false); var x bool = r; }");
+
+        d = "func c`T1,T2`(t1 T1, t2 T2)(T1,T2){return (t1,t2);} ";
+        checkSucc(d + "func f(n int){ var r = c(n,false); var x (int,bool) = r; }");
+        checkFail(d + "func f(n int){ var r = c(n,false); var x (int,int) = r; }");
+
+        d = "func c`T1,T2`(a A`T1,T2`)A`T1,T2`{return a;} class A`E1,E2`{} ";
+        checkSucc(d + "func f(n int){ var r = c(A`int,bool`{}); var x A`int,bool` = r; }");
+        checkFail(d + "func f(n int){ var r = c(A`int,bool`{}); var x A`int,int` = r; }");
+
+    }
+
+    @Test
+    public void testGenericInfer3() {
+        var d = "func c`T`()T{var t T; return t;} ";
+        checkSucc(d + "func f() int { return c(); }");
+
+        d = "func c`T,S`()(T,S){var t T; var s S; return (t,s);} ";
+        checkSucc(d + "func f() (int,bool) { return c(); }");
+
+        d = "func c`T1,T2`()A`T1,T2`{var a A`T1,T2`; return a;} class A`E1,E2`{} ";
+        checkSucc(d + "func f(n int){ var r A`int,bool` = c(); }");
+
+    }
+
+    @Test
+    public void testGenericInfer4() {
+        var d = "class Box`T`{var t T;} class BigBox`T`:Box`T` {} ";
+        checkSucc(d + "func f() { var b *Box`int` = new(Box); }");
+        checkSucc(d + "func f() { var b *Box`int` = new(BigBox); }");
+
+        checkSucc("""
+                class A`T` {}
+                class B`E`:A`E`{}
+                class C`R`:B`R`{}
+                func empty`Q`() {
+                    var r *A`Q` = new(C);
+                }
+                """);
+
+        checkSucc("""
+                class List`E`{}
+                class A`T` {}
+                class B`E`: A`List`E`` {}    // B 的 E 被包装在 List 中传给 A
+                class C`R`: B`R` {}           // C 的 R 直接传给 B
+                func empty`Q`() *A`List`Q`` {
+                    return new(C);  // 需要推断 C 的泛型参数
+                }
+                """);
+
+        checkSucc("""
+                class A`T, U` {}
+                class B`E`: A`E, int` {}      // B 的 E 传给 A 的 T，A 的 U 被固定为 int
+                class C`R`: B`R` {}            // C 的 R 传给 B
+                func empty`Q`() *A`Q, int` {
+                    return new(C);
+                }
+                """);
+
+        d = "class A`T` {} class B`T` {} ";
+        checkSucc(d + "func f(){var r *A`int` = new(A);}");
+        checkFail(d + "func f(){var r *B`int` = new(A);}");
     }
 
     //

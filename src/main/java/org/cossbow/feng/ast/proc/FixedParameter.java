@@ -100,6 +100,8 @@ public class FixedParameter extends Parameter {
     //
     @Override
     public String toString() {
+        if (name.none())
+            return "_ " + type();
         return name + " " + type();
     }
 }

@@ -1,5 +1,6 @@
 package org.cossbow.feng.util;
 
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -87,6 +88,10 @@ public class Lazy<T> implements Cloneable {
     public Stream<T> stream() {
         var v = value;
         return Stream.ofNullable(v);
+    }
+
+    public List<T> list() {
+        return has() ? List.of(value) : List.of();
     }
 
     @SuppressWarnings("unchecked")

@@ -432,6 +432,9 @@ public class SemanticAnalysis {
         if (o.has()) {
             dt.def(o.get());
             analyse(dt.generic());
+            if (dt.generic().isEmpty()) return o.get();
+            if (dt.def().generic().isEmpty()) return
+                    semantic("'%s' is not generic type: %s", dt.def(), dt.pos());
             var gm = GenericMap.make(dt, o.get().generic(), dt.generic());
             dt.gm(gm);
             return o.get();
@@ -1470,24 +1473,46 @@ public class SemanticAnalysis {
     }
 
     private boolean assignable(
-            DerivedType lt, InterfaceDefinition ld,
+            DerivedType lt,
             ObjectDefinition rd, GenericMap next) {
         for (var st : rd.supers()) {
             var sd = (ObjectDefinition) st.def();
             var gm = st.gm().overlay(next);
             var tas = gm.mapAll(sd.generic());
-            if (ld.equals(sd))
+            if (lt.symbol().equals(sd.symbol()))
                 return lt.generic().equals(tas);
-            if (assignable(lt, ld, sd, gm))
+            if (assignable(lt, sd, gm))
                 return true;
         }
         return false;
     }
 
     private boolean assignable(
-            DerivedType lt, InterfaceDefinition ld,
+            DerivedType lt,
             DerivedType rt, ObjectDefinition rd) {
-        return assignable(lt, ld, rd, rt.gm());
+        return assignable(lt, rd, rt.gm());
+    }
+
+    private Optional<TypeArguments> checkInherited(
+            DerivedType lt,
+            ObjectDefinition rd, GenericMap next) {
+        for (var st : rd.supers()) {
+            var sd = (ObjectDefinition) st.def();
+            var gm = st.gm().overlay(next);
+            var tas = gm.mapAll(sd.generic());
+            if (lt.symbol().equals(sd.symbol()))
+                return Optional.of(tas);
+            var o = checkInherited(lt, sd, gm);
+            if (o.has())
+                return o;
+        }
+        return Optional.empty();
+    }
+
+    private Optional<TypeArguments> checkInherited(
+            DerivedType lt,
+            DerivedType rt, ObjectDefinition rd) {
+        return checkInherited(lt, rd, rt.gm());
     }
 
     // 协变分析
@@ -1522,8 +1547,9 @@ public class SemanticAnalysis {
                         rd.pos());
             }
             if (rd instanceof ClassDefinition rc) {
-                var ok = assignable(lt.derivedType(),
-                        lc, rt.derivedType(), rc);
+                var ok = checkInherited(lt.derivedType(),
+                        rt.derivedType(), rc)
+                        .match(a -> lt.generic().equals(a));
                 if (ok) return TypeValid.ok();
                 return TypeValid.err("'%s' doesn't inherit '%s': %s",
                         rc, lc, rc.pos());
@@ -1532,8 +1558,9 @@ public class SemanticAnalysis {
         }
 
         var li = (InterfaceDefinition) ld;
-        var ok = assignable(lt.derivedType(),
-                li, rt.derivedType(), rd);
+        var ok = checkInherited(lt.derivedType(),
+                rt.derivedType(), rd)
+                .match(a -> lt.generic().equals(a));
         if (ok) return TypeValid.ok();
         return TypeValid.err("'%s' doesn't implement '%s': %s",
                 rd, ld, rd.pos());
@@ -3363,52 +3390,170 @@ public class SemanticAnalysis {
         return Groups.g2(n, Primitive.INT.declarer(se.pos()));
     }
 
+    private void genericCollect(
+            Entity e,
+            TypeDeclarer p, TypeDeclarer a,
+            List<TypeParameter> tParams,
+            List<TypeDeclarer> tArgs) {
+        if (p instanceof GenericTypeDeclarer gtd) {
+            tParams.add(gtd.param());
+            tArgs.add(fromLiteral(a));
+            return;
+        }
+        if (p instanceof TupleTypeDeclarer ptd &&
+                a instanceof TupleTypeDeclarer atd) {
+            if (ptd.elements().size() != atd.elements().size()) {
+                ErrorUtil.semantic("tuple '%s' and '%s' size not equal: '%s'",
+                        p, a, e.pos());
+                return;
+            }
+            genericCollect(e, ptd.elements(), atd.elements(),
+                    tParams, tArgs);
+            return;
+        }
+        if (p instanceof ArrayTypeDeclarer ptd &&
+                a instanceof ArrayTypeDeclarer atd) {
+            genericCollect(e, ptd.element(), atd.element(),
+                    tParams, tArgs);
+            return;
+        }
+        if (p instanceof DerivedTypeDeclarer ptd &&
+                a instanceof DerivedTypeDeclarer atd) {
+            genericCollect(e, ptd.generic().arguments(),
+                    atd.generic().arguments(), tParams, tArgs);
+            return;
+        }
+        if (p instanceof FuncTypeDeclarer ptd &&
+                a instanceof FuncTypeDeclarer atd) {
+            var pf = ptd.prototype();
+            var af = atd.prototype();
+            genericCollect(e, pf.parameterSet().types(),
+                    af.parameterSet().types(),
+                    tParams, tArgs);
+            if (pf.returnSet().has() && af.returnSet().has()) {
+                genericCollect(e, pf.returnSet().list(),
+                        af.returnSet().list(),
+                        tParams, tArgs);
+            }
+        }
+    }
+
+    private void genericCollect(
+            Entity e,
+            List<TypeDeclarer> p,
+            List<TypeDeclarer> a,
+            List<TypeParameter> tParams,
+            List<TypeDeclarer> tArgs) {
+        assert p.size() == a.size();
+        for (int i = 0; i < p.size(); i++) {
+            genericCollect(e, p.get(i), a.get(i),
+                    tParams, tArgs);
+        }
+    }
+
+    private GenericMap genericInfer(
+            Entity e,
+            List<TypeDeclarer> params,
+            List<TypeDeclarer> args) {
+        if (params.isEmpty()) return GenericMap.EMPTY;
+
+        var tParams = new ArrayList<TypeParameter>();
+        var tArgs = new ArrayList<TypeDeclarer>();
+
+        for (int i = 0; i < params.size(); i++) {
+            var p = params.get(i);
+            var a = args.get(i);
+            genericCollect(e, p, a, tParams, tArgs);
+        }
+
+        if (tParams.isEmpty()) return GenericMap.EMPTY;
+
+        return GenericMap.make(e, tParams, tArgs);
+    }
+
+    private GenericMap genericInfer(
+            Entity e,
+            TypeArguments params,
+            TypeArguments args) {
+        return genericInfer(e, params.arguments(), args.arguments());
+    }
+
+    private void genericReplace(
+            PrimaryExpression pe, GenericMap gm) {
+        if (pe instanceof SymbolExpression se) {
+           var fd= context.findFunc(se.symbol()).must();
+            se.generic(gm.mapAll(fd.generic()));
+        } else if (pe instanceof MethodExpression me) {
+            me.generic(gm.mapAll(me.method().generic()));
+        }
+    }
+
     private boolean passingParameters = false;
 
     private Groups.G2<Expression, TypeDeclarer> optimize(CallExpression e) {
         var rg = expand(e);
         if (rg.has()) return rg.get();
-
-        // Try variadic inline expansion for wrapper functions (e.g. printf → format)
         rg = expandVariadic(e);
         if (rg.has()) return rg.get();
 
-        var call = e.callee();
-        var args = e.arguments();
-
-        call.expectCallable(true);
-        var g = optimize(call);
+        e.callee().expectCallable(true);
+        var g = optimize(e.callee());
         if (!(g.b() instanceof FuncTypeDeclarer td))
-            return semantic("%s not callable: %s", call, e.pos());
+            return semantic("%s not callable: %s",
+                    e.callee(), e.pos());
 
         var p = td.prototype();
+        var gm = GenericMap.EMPTY;
+        if (e.expectType.has()) {
+            gm = genericInfer(e,
+                    p.returnSet().list(),
+                    e.expectType.list());
+            p = gm.instantiate(p);
+        }
+
         var left = p.parameterSet().types();
-        if (left.size() > args.size()) {
-            var pos = args.isEmpty() ? e.pos() : args.getLast().pos();
+        if (left.size() > e.arguments().size()) {
+            var pos = e.arguments().isEmpty() ? e.pos()
+                    : e.arguments().getLast().pos();
             return semantic("missing arguments: %s", pos);
-        } else if (left.size() < args.size()) {
-            var more = args.get(left.size());
+        } else if (left.size() < e.arguments().size()) {
+            var more = e.arguments().get(left.size());
             return semantic("redundant arguments: %s", more.pos());
         }
 
-        context.enterScope(); // enter a new scope for check arguments
-        var nArgs = new ArrayList<Expression>(args.size());
+        var ags = new ArrayList<Groups.G2<Expression, TypeDeclarer>>(
+                left.size());
+        var ats = new ArrayList<TypeDeclarer>(left.size());
         for (int i = 0; i < left.size(); i++) {
             var l = left.get(i);
-            var a = args.get(i);
+            var a = e.arguments().get(i);
             a.expectType.set(l);
             var ag = optimize(a);
+            ags.add(ag);
+            ats.add(ag.b());
+        }
+        gm = genericInfer(e, left, ats).merge(gm);
+        p = gm.instantiate(p);
+        left = p.parameterSet().types();
+
+        context.enterScope(); // enter a new scope for check arguments
+        var nArgs = new ArrayList<Expression>(ags.size());
+        for (int i = 0; i < left.size(); i++) {
+            var l = left.get(i);
+            var ag = ags.get(i);
             passingParameters = true;
-            assignable(l, ag.b(), Optional.of(ag.a()), a).valid();
+            assignable(l, ag.b(), Optional.of(ag.a()), ag.a()).valid();
             passingParameters = false;
+            ag.a().expectType.set(l);
             nArgs.add(ag.a());
         }
         context.exitScope();
 
-        call = (PrimaryExpression) g.a();
-        if (!(call instanceof BlockExpression be
+        var callee = (PrimaryExpression) g.a();
+        genericReplace(callee, gm);
+        if (!(callee instanceof BlockExpression be
                 && be.origin().has())) {
-            var n = new CallExpression(e.pos(), call,
+            var n = new CallExpression(e.pos(), callee,
                     nArgs, e.variadic(), p);
             var rt = p.returnType();
             return Groups.g2(n, rt);
@@ -3735,7 +3880,8 @@ public class SemanticAnalysis {
             var m = checkExport(om.get(), cd, name);
             checkEscaped(st, m, name);
             checkUnmodifiable(s, m, name);
-            var gm = GenericMap.make(name, st.gm(), m.generic(), generic);
+            var gm = GenericMap.make(name, false, st.gm(),
+                    m.generic(), generic);
             var prot = gm.instantiate(m.prototype());
             var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
             var n = wrapRelayExpr(s, t, _s -> {
@@ -3879,12 +4025,37 @@ public class SemanticAnalysis {
         return Groups.g2(n, td);
     }
 
+    private Void inferNewType(NewExpression e, DerivedType dt) {
+        var def = findDef(dt);
+        if (!def.newable()) return semantic("can't new type %s: %s",
+                e.type(), e.type().pos());
+
+        if (e.expectType.none()) return null;
+        var et = e.expectType.must();
+        if (!(et instanceof DerivedTypeDeclarer etd)) return null;
+        if (!dt.generic().isEmpty()) return null;
+
+        if (def.equals(etd.def()) ||
+                !(def instanceof ObjectDefinition od)) {
+            dt.generic(etd.generic());
+            dt.gm(etd.gm());
+            return null;
+        }
+
+        if (od.generic().isEmpty()) return null;
+
+        var o = checkInherited(etd.derivedType(), dt, od);
+        if (o.none()) return semantic("'%s' don't inherit '%s': %s",
+                def, etd.def(), dt.pos());
+        var gm = genericInfer(e, o.get(), etd.generic());
+        dt.generic(gm.mapAll(od.generic()));
+        dt.gm(gm);
+        return null;
+    }
+
     private Groups.G2<Expression, TypeDeclarer>
     analyseNewType(NewExpression e, DerivedType dt) {
-        var def = findDef(dt);
-        if (!def.newable()) {
-            return semantic("can't new type %s: %s", e.type(), e.type().pos());
-        }
+        inferNewType(e, dt);
 
         var ref = Optional.of(new Refer(
                 e.pos(), STRONG, true, false));
@@ -3981,7 +4152,8 @@ public class SemanticAnalysis {
 
         var od = context.findFunc(s);
         if (od.has()) {
-            var gm = GenericMap.make(re, od.get().generic(), re.generic());
+            var gm = GenericMap.make(re, false,
+                    od.get().generic(), re.generic());
             var prot = gm.instantiate(od.get().prototype());
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
             re.symbol(od.get().symbol());
@@ -4003,7 +4175,8 @@ public class SemanticAnalysis {
                 // 叠加上继承的泛型替换
                 var gm = enterClass.inherit().map(DerivedType::gm)
                         .getOrElse(GenericMap.EMPTY);
-                gm = GenericMap.make(re, gm, m.generic(), re.generic());
+                gm = GenericMap.make(re, false, gm,
+                        m.generic(), re.generic());
                 var prot = gm.instantiate(m.prototype());
                 // 函数调用加上`this.`前缀，方便后续处理
                 var n = wrapThis(re, m);
@@ -4043,7 +4216,8 @@ public class SemanticAnalysis {
 
         var f = context.findFunc(s);
         if (f.has()) {
-            var gm = GenericMap.make(re, f.get().generic(), re.generic());
+            var gm = GenericMap.make(re, false,
+                    f.get().generic(), re.generic());
             var prot = gm.instantiate(f.get().prototype());
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
             re.symbol(f.get().symbol());

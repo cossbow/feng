@@ -41,6 +41,9 @@ public class MethodExpression extends PrimaryExpression {
         return generic;
     }
 
+    public void generic(TypeArguments generic) {
+        this.generic = generic;
+    }
 
     //
 

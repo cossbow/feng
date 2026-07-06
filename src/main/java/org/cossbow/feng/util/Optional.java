@@ -1,5 +1,6 @@
 package org.cossbow.feng.util;
 
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.*;
@@ -67,6 +68,9 @@ public class Optional<T> {
         return has() ? Stream.of(value) : Stream.empty();
     }
 
+    public List<T> list() {
+        return has() ? List.of(value) : List.of();
+    }
 
     //
 

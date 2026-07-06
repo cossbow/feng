@@ -3,7 +3,6 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.gen.GenericType;
 import org.cossbow.feng.ast.gen.TypeParameter;
-import org.cossbow.feng.util.Lazy;
 
 /**
  * Use type variant as type

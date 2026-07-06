@@ -6,10 +6,12 @@ import org.cossbow.feng.ast.proc.FixedParameter;
 import org.cossbow.feng.ast.proc.Parameter;
 import org.cossbow.feng.ast.proc.ParameterSet;
 import org.cossbow.feng.ast.proc.Prototype;
+import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.ErrorUtil;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -20,23 +22,10 @@ import static org.cossbow.feng.util.ErrorUtil.semantic;
  * GenericMap: used for replace type-varieble to specific type.
  */
 public class GenericMap {
-    /**
-     * The GenericMap of master type.
-     * <p>
-     * Class method can define type-parameters, then the
-     * type-parameters of the class should be replaced too.
-     */
-    private final GenericMap parent;
     private final Map<TypeParameter, TypeDeclarer> map;
 
-    public GenericMap(GenericMap parent,
-                      Map<TypeParameter, TypeDeclarer> map) {
-        this.parent = parent;
-        this.map = Map.copyOf(map);
-    }
-
     public GenericMap(Map<TypeParameter, TypeDeclarer> map) {
-        this(null, map);
+        this.map = Map.copyOf(map);
     }
 
     /**
@@ -55,16 +44,20 @@ public class GenericMap {
      */
     public GenericMap overlay(GenericMap next) {
         if (isEmpty()) return next;
-        var n = new GenericMap(parent, map);
+        var n = new GenericMap(map);
         n.next = next;
         return n;
     }
 
+    public GenericMap merge(GenericMap o) {
+        if (next != null || o.next != null) {
+            return ErrorUtil.unsupported("can't merge with overlay");
+        }
+        return new GenericMap(CommonUtil.merge(map, o.map));
+    }
+
     private TypeDeclarer find(TypeParameter p) {
-        var t = map.get(p);
-        if (t != null) return t;
-        if (parent == null) return null;
-        return parent.find(p);
+        return map.get(p);
     }
 
     public TypeDeclarer mapIf(TypeParameter tp) {
@@ -84,11 +77,16 @@ public class GenericMap {
         return next.mapIf(t);
     }
 
+    public DerivedType mapIf(DerivedType dt) {
+        var ndt = dt.clone();
+        var nArgs = ndt.generic().map(mapper());
+        ndt.generic(nArgs);
+        ndt.gm(ndt.gm().overlay(this));
+        return ndt;
+    }
+
     public DerivedTypeDeclarer mapIf(DerivedTypeDeclarer dtd) {
-        var dt = dtd.derivedType().clone();
-        var nArgs = dt.generic().map(mapper());
-        dt.generic(nArgs);
-        dt.gm(dt.gm().overlay(this));
+        var dt = mapIf(dtd.derivedType());
         return new DerivedTypeDeclarer(dtd.pos(), dt, dtd.refer());
     }
 
@@ -148,8 +146,7 @@ public class GenericMap {
     }
 
     public boolean isEmpty() {
-        return map.isEmpty() &&
-                (parent == null || parent.isEmpty());
+        return map.isEmpty();
     }
 
     public Function<TypeDeclarer, TypeDeclarer> mapper() {
@@ -158,7 +155,8 @@ public class GenericMap {
 
     //
 
-    public static final GenericMap EMPTY = new GenericMap(Map.of());
+    public static final GenericMap EMPTY = new GenericMap(
+            Map.of());
 
     public static GenericMap make(
             Entity e, TypeParameters params, TypeArguments args) {
@@ -166,28 +164,60 @@ public class GenericMap {
     }
 
     public static GenericMap make(
+            Entity e, boolean checkMiss,
+            TypeParameters params, TypeArguments args) {
+        return make(e, checkMiss, GenericMap.EMPTY, params, args);
+    }
+
+    public static GenericMap make(
             Entity e, GenericMap parent,
             TypeParameters params, TypeArguments args) {
-        var size = params.size();
-        if (size > args.size()) {
-            return semantic("mismatch type arguments: %s", e.pos());
-        }
-        if (size < args.size()) {
-            return semantic("too much type arguments: %s", e.pos());
-        }
-        if (size == 0) return parent;
+        return make(e, true, parent, params, args);
+    }
 
-        var gm = new HashMap<TypeParameter, TypeDeclarer>(size);
-        for (int i = 0; i < size; i++) {
+    public static GenericMap make(
+            Entity e, boolean checkMiss,
+            GenericMap parent,
+            TypeParameters params, TypeArguments args) {
+        return make(e, checkMiss, parent,
+                params.params().values(), args.arguments());
+    }
+
+    public static GenericMap make(
+            Entity e,
+            List<TypeParameter> params,
+            List<TypeDeclarer> args) {
+        return make(e, true, GenericMap.EMPTY, params, args);
+    }
+
+    public static GenericMap make(
+            Entity e, boolean checkMiss,
+            GenericMap parent,
+            List<TypeParameter> params,
+            List<TypeDeclarer> args) {
+        if (checkMiss && params.size() > args.size())
+            return semantic("mismatch type arguments: %s", e.pos());
+        if (params.size() < args.size())
+            return semantic("too much type arguments: %s", e.pos());
+        if (params.isEmpty()) return parent;
+
+        var gm = new HashMap<TypeParameter, TypeDeclarer>(args.size());
+        for (int i = 0; i < args.size(); i++) {
             var p = params.get(i);
             var t = args.get(i);
             if (t.maybeRefer().match(r -> r.isKind(PHANTOM))) {
                 return semantic("can't use phantom-refer as type argument: %s",
                         t.pos());
             }
-            gm.put(p, parent.mapIf(t));
+            var nt = parent.mapIf(t);
+            var ot = gm.putIfAbsent(p, nt);
+            if (ot != null && !nt.equals(ot)) {
+                return semantic("'%s' cannot be deduced as both '%s' and '%s' " +
+                        "at the same time", p, ot, nt);
+            }
         }
-        return new GenericMap(parent, gm);
+
+        return new GenericMap(gm);
     }
 
 
