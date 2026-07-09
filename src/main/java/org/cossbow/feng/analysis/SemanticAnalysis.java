@@ -1663,10 +1663,15 @@ public class SemanticAnalysis {
         }
         if (re.literal() instanceof StringLiteral) {
             // 字符串字面量可以传递给数组引用，当然必须是不可修改的
-            if (l instanceof ArrayTypeDeclarer la && isByteArray(la))
-                return TypeValid.ok();
-            return TypeValid.err(
-                    "string literal only can assign to byte-array: %s", re.pos());
+            if (l instanceof ArrayTypeDeclarer la && isByteArray(la)) {
+                if (la.refer().none()) return TypeValid.ok();
+                var r = la.refer().get();
+                if (r.unmodifiable()) return TypeValid.ok();
+                return TypeValid.err("string literal is immutable: %s",
+                        re.pos());
+            }
+            return TypeValid.err("string literal only can" +
+                    " assign to byte-array: %s", re.pos());
         }
         return TypeValid.err("can't assign '%s' to refer '%s': %s",
                 re, l, re.pos());
