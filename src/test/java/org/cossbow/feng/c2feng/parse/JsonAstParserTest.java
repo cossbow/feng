@@ -291,4 +291,82 @@ public class JsonAstParserTest {
         assertTrue(result.contains("func create_point("));
         assertTrue(result.contains("func destroy_point(p uint64)"));
     }
+
+    @Test
+    public void testTrailingConstPointer() throws Exception {
+        var json = """
+                {
+                  "kind": "TranslationUnitDecl",
+                  "inner": [
+                    {
+                      "kind": "FunctionDecl",
+                      "name": "register_cb",
+                      "type": { "qualType": "void (char *const, int)" },
+                      "inner": [
+                        {
+                          "kind": "ParmVarDecl",
+                          "name": "name",
+                          "type": { "qualType": "char *const" }
+                        },
+                        {
+                          "kind": "ParmVarDecl",
+                          "name": "flag",
+                          "type": { "qualType": "int" }
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """;
+
+        var converter = new C2FengConverter(new ModulePath(new Identifier("c_test"), Path.of("")));
+        new JsonAstParser(converter).parse(json);
+
+        var out = new StringWriter();
+        converter.write(out);
+        var result = out.toString();
+
+        System.out.println("=== testTrailingConstPointer ===");
+        System.out.println(result);
+
+        // char *const should be recognized as a pointer → uint64, not degraded to int
+        assertTrue(result.contains("name uint64"), "char *const should map to uint64");
+        assertTrue(result.contains("func register_cb("));
+    }
+
+    @Test
+    public void testConstCharConstPointer() throws Exception {
+        var json = """
+                {
+                  "kind": "TranslationUnitDecl",
+                  "inner": [
+                    {
+                      "kind": "FunctionDecl",
+                      "name": "foo",
+                      "type": { "qualType": "int (const char *const)" },
+                      "inner": [
+                        {
+                          "kind": "ParmVarDecl",
+                          "name": "s",
+                          "type": { "qualType": "const char *const" }
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """;
+
+        var converter = new C2FengConverter(new ModulePath(new Identifier("c_test"), Path.of("")));
+        new JsonAstParser(converter).parse(json);
+
+        var out = new StringWriter();
+        converter.write(out);
+        var result = out.toString();
+
+        System.out.println("=== testConstCharConstPointer ===");
+        System.out.println(result);
+
+        // const char *const → strip leading const, then strip trailing const → char * → pointer → uint64
+        assertTrue(result.contains("s uint64"), "const char *const should map to uint64");
+    }
 }

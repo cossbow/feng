@@ -6,8 +6,6 @@ import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.json.JsonNode;
 import org.cossbow.feng.util.json.JsonParser;
 
-import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -380,6 +378,12 @@ public class JsonAstParser {
         while (result.startsWith("const ")) result = result.substring(6).trim();
         while (result.startsWith("volatile ")) result = result.substring(9).trim();
         while (result.startsWith("restrict ")) result = result.substring(9).trim();
+        // Handle trailing qualifiers after *, e.g. "char *const" → "char *"
+        while (result.endsWith("const") || result.endsWith("volatile") || result.endsWith("restrict")) {
+            if (result.endsWith("const")) result = result.substring(0, result.length() - 5).trim();
+            else if (result.endsWith("volatile")) result = result.substring(0, result.length() - 8).trim();
+            else result = result.substring(0, result.length() - 8).trim(); // restrict
+        }
         return result;
     }
 
