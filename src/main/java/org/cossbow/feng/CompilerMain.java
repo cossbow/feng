@@ -55,6 +55,12 @@ public class CompilerMain {
 
     //
 
+    static boolean debug;
+
+    static {
+        debug = Boolean.parseBoolean(System.getProperty("feng.memchk"));
+    }
+
     private static Path toPath(String value) {
         try {
             return Paths.get(value);
@@ -92,11 +98,11 @@ public class CompilerMain {
             throws IOException {
         var cpp = dir.resolve(name + ".cpp");
         try (var w = Files.newBufferedWriter(cpp, UTF_8)) {
-            new CppGenerator(ast, w, true).write();
+            new CppGenerator(ast, w, false, debug).write();
         }
         var header = dir.resolve(name + ".h");
         try (var w = Files.newBufferedWriter(header, UTF_8)) {
-            new CppGenerator(ast, w, true, false).write();
+            new CppGenerator(ast, w, true, debug).write();
         }
         moduleNames.add(name);
     }

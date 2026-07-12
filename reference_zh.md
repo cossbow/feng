@@ -89,8 +89,10 @@ main函数是可执行程序的入口函数，这个和其他语言一致。
 入口函数没有返回值，只有一个参数且参数类型必须是`[&!#][*!#]byte`；
 
 ```feng
+import std$os;
+
 func main(args [&!#][*!#]byte) {
-	hello();
+	os$printf("Welcome to programming with Feng language");
 }
 ```
 
@@ -1119,21 +1121,21 @@ class User {
 比如文件可以读和写，那可以这样设计接口：
 
 ```feng
-interface Reader {
+interface Input {
    read(b [&!]byte) int;
 }
-interface Writer {
+interface Output {
    write(b [&!#]byte) int;
 }
-// 组合成的接口File包含read和write方法
-interface File {
-   Reader;
-   Writer;
-   query() *FileInfo;
+// 组合成的接口DataStorage包含read和write方法
+interface DataStorage {
+   Input;
+   Output;
+   query() [*!#]byte;
 }
 // 实现File接口的实例自然也实现了Write接口
-func use(file *File) Write {
-   return file;
+func use(ds *DataStorage) Output {
+   return ds;
 }
 ```
 
@@ -1622,6 +1624,30 @@ func use1(a !func()) {
    if (c1 != nil) {
       var c3 !func() = c1; // 显示判断空之后才能反传
    }
+}
+```
+
+## 可变参数函数
+
+可变参数函数是一种特殊函数，尾部参数数量和类型均不固定，且在编译时会自动展开。
+目前的作用仅用于格式化和封装格式化。
+
+### format函数
+
+内置的字符串格式化函数，是一个可变参数函数：
+
+1. 第一个参数是传入的`&!Writer`，也就是实现了内置的`Writer`接口的对象。
+2. 格式化字符串字面量：`"This is for {}!"`，其中`{}`是占位符，用于格式化后面的参数。
+3. 要输出的参数实例，数量与占位符必须相同，类型可以是基本类型和类、接口。
+
+用法：
+
+```feng
+import std$bytes;
+
+func test() {
+   var buf bytes$BufferWriter;
+   format(buf, "This is first line.");
 }
 ```
 
