@@ -558,17 +558,17 @@ func test() {
 
 | 运算符 | 宏名称 | 右操作数类型 | 结果类型  |
 |-----|-----|--------|-------|
-| *   | mul | 同左操作数  | 同左操作数 |   
-| /   | div | 同左操作数  | 同左操作数 |   
-| %   | mod | 同左操作数  | 同左操作数 |   
-| +   | add | 同左操作数  | 同左操作数 |   
-| -   | sub | 同左操作数  | 同左操作数 |   
-| <   | lt  | 同左操作数  | 布尔类型  |   
-| <=  | le  | 同左操作数  | 布尔类型  |   
-| ==  | eq  | 同左操作数  | 布尔类型  |   
-| !=  | ne  | 同左操作数  | 布尔类型  |   
-| \>  | gt  | 同左操作数  | 布尔类型  |   
-| \>= | ge  | 同左操作数  | 布尔类型  |   
+| *   | mul | 同左操作数  | 同左操作数 |
+| /   | div | 同左操作数  | 同左操作数 |
+| %   | mod | 同左操作数  | 同左操作数 |
+| +   | add | 同左操作数  | 同左操作数 |
+| -   | sub | 同左操作数  | 同左操作数 |
+| <   | lt  | 同左操作数  | 布尔类型  |
+| <=  | le  | 同左操作数  | 布尔类型  |
+| ==  | eq  | 同左操作数  | 布尔类型  |
+| !=  | ne  | 同左操作数  | 布尔类型  |
+| \>  | gt  | 同左操作数  | 布尔类型  |
+| \>= | ge  | 同左操作数  | 布尔类型  |
 
 举个复数的例子：
 
@@ -1062,18 +1062,18 @@ class CBuffer {
 ```feng
 class User {
    var id int;
-   
+
    func get#() int {
       // this.id = 0;            // ✖：不能修改字段
       // id = 0;                 // ✖：不能修改字段
       // *this = {};             // ✖：不能解引用赋值
       // const r &User = this;   // ✖：不能传递给可修改引用
-      
+
       // this.set(0);            // ✖：不能调用可修改方法
       // set(0);                 // ✖：不能调用可修改方法
       return id;
    }
-   
+
    func set(id int) {
       this.id = id;
    }
@@ -1088,13 +1088,13 @@ class User {
 
 ```feng
 class User {
-   
+
    func foo*() {
       const r &User = this;      // ✔：默认可以作为虚引用
       const r *User = this;      // ✔：可以作为强引用
       gar();                     // ✔：可以调用非逃逸方法
    }
-   
+
    func gar() {
       const r &User = this;      // ✔：默认可以作为虚引用
       // const r *User = this;   // ✖：不能作为强引用
@@ -1468,7 +1468,7 @@ func test() {
    var a1 [*]int; // 可映射
    var a2 [*][2]int; // 可映射
    var a3 [*][3][4]int; // 可映射
-   
+
    var a4 [*]*int; // 不可映射
    var a4 [*][*]int; // 不可映射
    var a4 [*][5]*int; // 不可映射
@@ -1902,7 +1902,7 @@ func test() {
 
 声明一个或一组[变量](#变量)使用关键词`var`或`const`开头，后面紧跟变量的名称，然后是变量类型。
 
-1. `var`声明一个普通变量。后面可以有初始化值。TODO：允许未初始化并置默认值？还是强制使用前必须赋值？
+1. `var`声明一个普通变量。后面可以有初始化值，没有则是默认值——即零值（引用对于的是`nil`）。
 2. `const`用于定义不变的量，不能重新赋值，且必须在声明时初始化值。
 
 ```feng
@@ -1926,6 +1926,7 @@ func test() {
 func test() {
    var a,b int = 1,2;
    // var a,b int = 1, "ggyy"; // 错误✖，必须拆成两个语句
+   var x,y = 1,false; // x是int类型，y则是bool类型
 }
 ```
 
@@ -2078,7 +2079,7 @@ func readTxt() String {
    var b [4]Vector;
    b = a; // 就是把a的数据复制给b
    // 也等效于循环赋值
-   for (var i = 0; i < a.size; i++) 
+   for (var i = 0; i < a.size; i++)
        b[i] = a[i]; // 这里的赋值参考第2点
    b[0].x += 5.0; // 同样修改b[0].x不会影响a，a[0].x的值还是'1.0'
    ```
@@ -2314,7 +2315,7 @@ func test() {
    // vec.x = 4.0; // 错误✖
    const vecs [4]Vector = [{x=1.0,y=2.0,z=3.0}];
    // vecs[1].x = 4.0; // 错误✖
-   const data Data = {v={x=1.0,y=2.0,z=3.0}}; 
+   const data Data = {v={x=1.0,y=2.0,z=3.0}};
    // data.ve.x = 4.0; // 错误✖
 }
 ```
@@ -2618,6 +2619,120 @@ class MyBox`E` (Box`E`) {
    func get() E {
       return value;
    }
+}
+```
+
+### 泛型推断
+
+当前已支持泛型推断，就是根据接受者的类型参数来推断提供者的类型参数。
+
+下面列举支持的推断场景。
+
+泛型函数可根据实际调用时传参类型进行推断：
+
+```feng
+func gen`T`(t T) T {
+    return t;
+}
+func use(n int) {
+    var v int = gen(n); // 传参是int，因此T被推断为int，所以返回是int
+}
+```
+
+也可以根据返回值推断：
+
+```feng
+func empty`T`() T {
+    var t T;
+    return t;
+}
+func use(n int) {
+    var v int = empty(); // 左边类型是int，因此T被推断为int
+}
+```
+
+类型推断支持复合类型上的推断，比如元组、数组、泛型类等等：
+
+```feng
+func gen1`T1,T2`(a (T1,T2)) T1 {
+    return a.0;
+}
+class A`T1,T2` {
+    var t1 T1;
+    var t2 T2;
+}
+func gen2`T1,T2`(a &A`T1,T2`) T1 {
+    return a.t1;
+}
+func gen3`T`(a [&]T) T {
+    return a[0];
+}
+func use() {
+    {
+        var a (int, bool) = (11,true);
+        var v int = gen1(a);
+    }
+    {
+        var a A`int,bool` = {};
+        var v int = gen2(a);
+    }
+    {
+        var a [4]int;
+        var v int = gen3(a);
+    }
+}
+```
+
+但是对初始化表达式，必须要标记上类型的才能推断：
+
+```feng
+func use() {
+    {
+        // var v int = gen1((11,true));         // ✖ 不能推断
+        var v int = gen1((11:int,true:bool));
+    }
+    {
+        // var v int = gen2({t1=1,t2=false});   // ✖ 不能推断
+        var v int = gen2(A`int,bool`{});
+    }
+    {
+        // var v int = gen3([2]);               // ✖ 不能推断
+        var v int = gen3([]int[2]);
+    }
+}
+```
+
+类的方法支持泛型参数，推断用法与函数相同。
+
+在`new`一个泛型对象时，如果左边有对于类型参数，也可以推断出来：
+
+```feng
+class Box`T` {
+    var v T;
+}
+class BigBox`S`:Box`S`{}
+func makeInt() *Box`int` {
+    return new(Box);
+}
+func makeBigInt() *Box`int` {
+    return new(BigBox);
+}
+func make`E`() *Box`E` {
+    return new(Box);
+}
+func makeBig`E`() *Box`E` {
+    return new(BigBox);
+}
+```
+
+当[函数原型](#函数原型)指向一泛型函数时，也可以推断类型：
+
+```feng
+func filter`T`(t T) T {
+    return t;
+}
+func test() {
+    var f func(int)int = filter;
 }
 ```
 

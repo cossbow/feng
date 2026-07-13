@@ -94,8 +94,10 @@ The `main` function is the entry point of an executable program, consistent with
 The entry function has no return value and only one parameter, whose type must be `[&!#][*!#]byte`:
 
 ```feng
+import std$os;
+
 func main(args [&!#][*!#]byte) {
-    hello();
+    os$printf("Welcome to programming with Feng language");
 }
 ```
 
@@ -608,22 +610,16 @@ Example with complex numbers:
 class Complex {
    var real,imag float64;
    // Implement + operation
-   // result holds the result and is returned after computation
-   macro operator add(lhs, rhs, result) {
-      result.real = lhs.real + rhs.real;
-      result.imag = lhs.imag + rhs.imag;
-   }
-   // Implement * operation
-   macro operator mul(lhs, rhs, result) {
-      result.real = lhs.real * rhs.real + lhs.imag * rhs.imag;
-      result.imag = lhs.real * rhs.imag + lhs.imag * rhs.real;
+   // result is returned after computation
+   macro operator add(rhs) {
+      {
+        real = real + rhs.real,
+        imag = imag + rhs.imag
+      }
    }
 }
 func testAdd(a,b Complex) Complex {
     return a + b;
-}
-func testMul(a,b *Complex) *Complex {
-    return a * b;
 }
 ```
 
@@ -1189,21 +1185,21 @@ Interfaces can be composed:
 For example, a file can be read and written; interfaces can be designed as follows:
 
 ```feng
-interface Reader {
+interface Input {
    read(b [&!]byte) int;
 }
-interface Writer {
+interface Output {
    write(b [&!#]byte) int;
 }
-// Composed interface File includes both read and write methods
-interface File {
-   Reader;
-   Writer;
-   query() *FileInfo;
+// Composed interface DataStorage includes both read and write methods
+interface DataStorage {
+   Input;
+   Output;
+   query() [*!#]byte;
 }
-// An instance implementing the File interface naturally implements the Writer interface
-func use(file *File) Write {
-   return file;
+// An instance implementing the DataStorage interface naturally implements the Output interface
+func use(ds *DataStorage) Output {
+   return ds;
 }
 ```
 
@@ -1722,6 +1718,30 @@ func use1(a !func()) {
 }
 ```
 
+## Variadic Functions
+
+Variadic functions are special functions where the number and types of trailing parameters are not fixed and are automatically expanded at compile time.
+Their current use is limited to formatting and wrapping formatting.
+
+### format Function
+
+The built-in string formatting function is a variadic function:
+
+1. The first parameter is an `&!Writer`, i.e., an object implementing the built-in `Writer` interface.
+2. Format string literal: `"This is for {}!"`, where `{}` is a placeholder for formatting subsequent parameters.
+3. Parameter instances to output; their count must match the number of placeholders. Types can be basic types, classes, and interfaces.
+
+Usage:
+
+```feng
+import std$bytes;
+
+func test() {
+   var buf bytes$BufferWriter;
+   format(buf, "This is first line.");
+}
+```
+
 ## Statements
 
 ### Block Statement
@@ -2011,6 +2031,7 @@ Since the type can be omitted, two cases arise:
 func test() {
    var a,b int = 1,2;
    // var a,b int = 1, "ggyy"; // Error: must be split into two statements
+   var x,y = 1,false; // x is int, y is bool
 }
 ```
 
@@ -2729,6 +2750,120 @@ class MyBox`E` (Box`E`) {
    func get() E {
       return value;
    }
+}
+```
+
+### Generic Inference
+
+Generic inference is now supported, where the type parameters of the provider are inferred based on the receiver's type parameters.
+
+The supported inference scenarios are listed below.
+
+Generic functions can infer type parameters based on the actual argument types at the call site:
+
+```feng
+func gen`T`(t T) T {
+    return t;
+}
+func use(n int) {
+    var v int = gen(n); // Argument is int, so T is inferred as int, return type is int
+}
+```
+
+Inference can also be based on the return type:
+
+```feng
+func empty`T`() T {
+    var t T;
+    return t;
+}
+func use(n int) {
+    var v int = empty(); // Left-hand type is int, so T is inferred as int
+}
+```
+
+Type inference supports composite types such as tuples, arrays, generic classes, etc.:
+
+```feng
+func gen1`T1,T2`(a (T1,T2)) T1 {
+    return a.0;
+}
+class A`T1,T2` {
+    var t1 T1;
+    var t2 T2;
+}
+func gen2`T1,T2`(a &A`T1,T2`) T1 {
+    return a.t1;
+}
+func gen3`T`(a [&]T) T {
+    return a[0];
+}
+func use() {
+    {
+        var a (int, bool) = (11,true);
+        var v int = gen1(a);
+    }
+    {
+        var a A`int,bool` = {};
+        var v int = gen2(a);
+    }
+    {
+        var a [4]int;
+        var v int = gen3(a);
+    }
+}
+```
+
+However, for initialization expressions, type annotations must be present for inference to work:
+
+```feng
+func use() {
+    {
+        // var v int = gen1((11,true));         // ✖ Cannot infer
+        var v int = gen1((11:int,true:bool));
+    }
+    {
+        // var v int = gen2({t1=1,t2=false});   // ✖ Cannot infer
+        var v int = gen2(A`int,bool`{});
+    }
+    {
+        // var v int = gen3([2]);               // ✖ Cannot infer
+        var v int = gen3([]int[2]);
+    }
+}
+```
+
+Class methods support generic parameters; inference works the same as for functions.
+
+When `new` is used with a generic class, type parameters can be inferred from the left-hand side:
+
+```feng
+class Box`T` {
+    var v T;
+}
+class BigBox`S`:Box`S`{}
+func makeInt() *Box`int` {
+    return new(Box);
+}
+func makeBigInt() *Box`int` {
+    return new(BigBox);
+}
+func make`E`() *Box`E` {
+    return new(Box);
+}
+func makeBig`E`() *Box`E` {
+    return new(BigBox);
+}
+```
+
+When a [function prototype](#function-prototype) points to a generic function, type parameters can also be inferred:
+
+```feng
+func filter`T`(t T) T {
+    return t;
+}
+func test() {
+    var f func(int)int = filter;
 }
 ```
 
