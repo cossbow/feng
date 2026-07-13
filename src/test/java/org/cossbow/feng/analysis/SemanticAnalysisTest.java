@@ -3467,6 +3467,14 @@ public class SemanticAnalysisTest {
         checkFail(d + "func f(){var r *B`int` = new(A);}");
     }
 
+    @Test
+    public void testGenericInfer5() {
+        checkSucc("func g`T`(t T) T { return t; } func f`S`(s S) S { return g`S`(s); }");
+        checkSucc("func g`T`(t T) T { return t; } func f`S`(s S) S { return g(s); }");
+        checkSucc("func g`T`(t T) T { return t; } func f() { var f func(int)int = g; }");
+        checkSucc("func g`T`(t T) T { return t; } func u(f func(int)int) {} func f() { u(g); }");
+    }
+
     //
 
     @Test

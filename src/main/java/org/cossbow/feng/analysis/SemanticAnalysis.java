@@ -3392,6 +3392,21 @@ public class SemanticAnalysis {
 
     private void genericCollect(
             Entity e,
+            Prototype pf, Prototype af,
+            List<TypeParameter> tParams,
+            List<TypeDeclarer> tArgs) {
+        genericCollect(e, pf.parameterSet().types(),
+                af.parameterSet().types(),
+                tParams, tArgs);
+        if (pf.returnSet().has() && af.returnSet().has()) {
+            genericCollect(e, pf.returnSet().list(),
+                    af.returnSet().list(),
+                    tParams, tArgs);
+        }
+    }
+
+    private void genericCollect(
+            Entity e,
             TypeDeclarer p, TypeDeclarer a,
             List<TypeParameter> tParams,
             List<TypeDeclarer> tArgs) {
@@ -3425,16 +3440,8 @@ public class SemanticAnalysis {
         }
         if (p instanceof FuncTypeDeclarer ptd &&
                 a instanceof FuncTypeDeclarer atd) {
-            var pf = ptd.prototype();
-            var af = atd.prototype();
-            genericCollect(e, pf.parameterSet().types(),
-                    af.parameterSet().types(),
-                    tParams, tArgs);
-            if (pf.returnSet().has() && af.returnSet().has()) {
-                genericCollect(e, pf.returnSet().list(),
-                        af.returnSet().list(),
-                        tParams, tArgs);
-            }
+            genericCollect(e, ptd.prototype(),
+                    atd.prototype(), tParams, tArgs);
         }
     }
 
@@ -3480,10 +3487,13 @@ public class SemanticAnalysis {
 
     private void genericReplace(
             PrimaryExpression pe, GenericMap gm) {
+        if (gm.isEmpty()) return;
         if (pe instanceof SymbolExpression se) {
-           var fd= context.findFunc(se.symbol()).must();
+            if (!se.generic().isEmpty()) return;
+            var fd = context.findFunc(se.symbol()).must();
             se.generic(gm.mapAll(fd.generic()));
         } else if (pe instanceof MethodExpression me) {
+            if (!me.generic().isEmpty()) return;
             me.generic(gm.mapAll(me.method().generic()));
         }
     }
@@ -4216,11 +4226,33 @@ public class SemanticAnalysis {
 
         var f = context.findFunc(s);
         if (f.has()) {
-            var gm = GenericMap.make(re, false,
-                    f.get().generic(), re.generic());
-            var prot = gm.instantiate(f.get().prototype());
+            var fd = f.get();
+            var prot = fd.prototype();
+            if (!fd.generic().isEmpty()) {
+                // This a generic function, need replace types
+                GenericMap gm;
+                if (re.generic().isEmpty()) {
+                    // Infer type parameters if not give type arguments,
+                    // so let's make the type-map from expectType
+                    var et = re.expectType.get();
+                    if (et.none()) return semantic(
+                            "generic function need type arguments: %s",
+                            re.pos());
+                    if (!(et.get() instanceof FuncTypeDeclarer ftd))
+                        return semantic("can't use '%s' as type '%s': %s",
+                                fd, et.get(), re.pos());
+                    var tt = new AnonFuncTypeDeclarer(re.pos(),
+                            true, prot);
+                    gm = genericInfer(re, List.of(tt), List.of(ftd));
+                } else {
+                    // Directly make type-map
+                    gm = GenericMap.make(re, false,
+                            fd.generic(), re.generic());
+                }
+                prot = gm.instantiate(prot);
+            }
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
-            re.symbol(f.get().symbol());
+            re.symbol(fd.symbol());
             return Groups.g2(re, td);
         }
 

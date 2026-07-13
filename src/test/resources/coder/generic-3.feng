@@ -33,6 +33,13 @@ class SealedBox`X`:BigBox`X`{
     }
 }
 
+class IntBox:Box`int`{
+    func test(n int) {
+        var x = map`float`(3.3);
+        var y = map(3.3);
+    }
+}
+
 class Pair`L, R` final {
     var l L;
     var r R;
@@ -94,6 +101,10 @@ func test(n int) {
     {
         var a = new([2]SealedBox`Box`int``, [{v={v=1}}]);
         var f = a[0].map`float`(7.00001);
+    }
+    {
+        var a = new([2]SealedBox`Box`int``, [{v={v=1}}]);
+        var f = a[0].map(7.00001);
     }
     {
         var a = new([2]*SealedBox`Box`int``, [nil]);

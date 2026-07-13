@@ -217,7 +217,7 @@ public class GenericMap {
             }
         }
 
-        return new GenericMap(gm);
+        return new GenericMap(gm).merge(parent);
     }
 
 
