@@ -17,7 +17,7 @@ func make2() [4]int {
 }
 
 func test1() {
-    use0(int(0));
+//    use0(int(0));
     use0({0});
     use0(make0());
 

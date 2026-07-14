@@ -33,7 +33,7 @@ class SealedBox`X`:BigBox`X`{
     }
 }
 
-class IntBox:Box`int`{
+class IntBox:SealedBox`int`{
     func test(n int) {
         var x = map`float`(3.3);
         var y = map(3.3);
