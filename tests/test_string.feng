@@ -1,0 +1,66 @@
+import std$string;
+
+func testBasic() {
+    var s = string$fromUtf8("Hello");
+    var bl = s.byteLength();
+    var rc = s.runeCount();
+    var ie = s.isEmpty();
+}
+
+func testCompare() {
+    var a = string$fromUtf8("abc");
+    var b = string$fromUtf8("abc");
+    var c = string$fromUtf8("abd");
+    var cmp1 = a.compare(b);
+    var cmp2 = a.compare(c);
+    var eq1 = a.equals(b);
+    var eq2 = a.equals(c);
+}
+
+func testConcat() {
+    var a = string$fromUtf8("Hello");
+    var b = string$fromUtf8(" World");
+    var c = a.concat(b);
+    var bl = c.byteLength();
+}
+
+func testIndexOf() {
+    var s = string$fromUtf8("Hello, World!");
+    var i1 = s.indexOf(87);  // 'W' = 87
+    var i2 = s.indexOfStr(string$fromUtf8("World"));
+    var c = s.contains(string$fromUtf8("World"));
+}
+
+func testPrefixSuffix() {
+    var s = string$fromUtf8("Hello, World!");
+    var sw = s.startsWith(string$fromUtf8("Hello"));
+    var ew = s.endsWith(string$fromUtf8("World!"));
+}
+
+func testSubstring() {
+    var s = string$fromUtf8("Hello, World!");
+    var sub = s.substring(7, 12);
+    var bl = sub.byteLength();
+}
+
+func testRune() {
+    var s = string$fromUtf8("你好世界");
+    var r0 = s.rune(0);
+    var rc = s.runeCount();
+}
+
+func testEmpty() {
+    var e = string$EMPTY;
+    var ie = e.isEmpty();
+}
+
+func main(args [&!#][*!#]byte) {
+    testBasic();
+    testCompare();
+    testConcat();
+    testIndexOf();
+    testPrefixSuffix();
+    testSubstring();
+    testRune();
+    testEmpty();
+}

@@ -1,62 +1,197 @@
-
-export
-enum CharEncoding {
-    ASCII,
-    UTF16,
-    UTF32,
-}
+import std$encoding$utf8;
 
 export
 class String (Writable) {
     const value [*#]byte;
-    const enc CharEncoding;
 
     export
-    func bytes() [*#]byte {
+    func bytes#() [*#]byte {
         return value;
     }
 
     export
-    func write#(w &!Writer) int {
+    func byteLength() int {
+        if (value == nil) return 0;
+        return value.length;
+    }
+
+    export
+    func runeCount() int {
+        if (value == nil) return 0;
         const v [&#]byte = value;
-        if (v==nil) return 0;
-        w.write(v, 0, v.length);
-        return v.length;
-    }
-
-    export
-    func char(index int) int32 {
-        if (CharEncoding.ASCII == enc) {
-            const s [&#]uint8 = value;
-            return int32(s[index]);
-        }
-
-        if (CharEncoding.UTF16 == enc) {
-            const s [&#]uint16 = value;
-            return int32(s[index]);
-        }
-
-        const s [&#]uint32 = value;
-        return int32(s[index]);
-    }
-
-    export
-    func length() int {
-        return value.length << enc.id;
+        return utf8$runeLen(v);
     }
 
     export
     func isEmpty() bool {
-        return value.length == 0;
+        return value == nil || value.length == 0;
     }
 
+    // Lexicographic comparison by byte values.
+    // Returns negative if this < rhs, 0 if equal, positive if this > rhs.
+    export
+    func compare(rhs String) int {
+        if (value == nil) {
+            if (rhs.value == nil) { return 0; }
+            return -1;
+        }
+        if (rhs.value == nil) { return 1; }
+        var len = value.length < rhs.value.length ? value.length : rhs.value.length;
+        for (var i = 0; i < len; i += 1) {
+            if (value[i] != rhs.value[i]) {
+                return int(value[i]) - int(rhs.value[i]);
+            }
+        }
+        return value.length - rhs.value.length;
+    }
+
+    export
+    func equals(other String) bool {
+        return compare(other) == 0;
+    }
+
+    export
+    func concat(other String) String {
+        if (value == nil) { return other; }
+        if (other.value == nil) {
+            var n = value.length;
+            var buf = new([n]byte);
+            for (var i = 0; i < n; i += 1) { buf[i] = value[i]; }
+            return {value=buf};
+        }
+        var n = value.length + other.value.length;
+        var buf = new([n]byte);
+        for (var i = 0; i < value.length; i += 1) {
+            buf[i] = value[i];
+        }
+        for (var i = 0; i < other.value.length; i += 1) {
+            buf[value.length + i] = other.value[i];
+        }
+        return {value=buf};
+    }
+
+    // Find the byte offset of the first occurrence of rune ch.
+    // Returns -1 if not found.
+    export
+    func indexOf(ch int32) int {
+        if (value == nil) { return -1; }
+        const v [&#]byte = value;
+        var i = 0;
+        var len = v.length;
+        for (i < len) {
+            var dec = utf8$decodeRune(v, i);
+            if (int32(dec.0) == ch) { return i; }
+            i += dec.1;
+        }
+        return -1;
+    }
+
+    // Find the byte offset of the first occurrence of substring sub.
+    // Returns -1 if not found.
+    export
+    func indexOfStr(sub String) int {
+        if (value == nil || sub.value == nil) { return -1; }
+        var subLen = sub.value.length;
+        if (subLen == 0) { return 0; }
+        var end = value.length - subLen;
+        for (var i = 0; i <= end; i += 1) {
+            var match = true;
+            for (var j = 0; j < subLen; j += 1) {
+                if (value[i + j] != sub.value[j]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) { return i; }
+        }
+        return -1;
+    }
+
+    export
+    func contains(sub String) bool {
+        return indexOfStr(sub) >= 0;
+    }
+
+    export
+    func startsWith(prefix String) bool {
+        if (value == nil || prefix.value == nil) { return prefix.value == nil; }
+        if (prefix.value.length > value.length) { return false; }
+        for (var i = 0; i < prefix.value.length; i += 1) {
+            if (value[i] != prefix.value[i]) { return false; }
+        }
+        return true;
+    }
+
+    export
+    func endsWith(suffix String) bool {
+        if (value == nil || suffix.value == nil) { return suffix.value == nil; }
+        if (suffix.value.length > value.length) { return false; }
+        var start = value.length - suffix.value.length;
+        for (var i = 0; i < suffix.value.length; i += 1) {
+            if (value[start + i] != suffix.value[i]) { return false; }
+        }
+        return true;
+    }
+
+    // Substring by byte offsets [start, end).
+    export
+    func substring(start, end int) String {
+        if (value == nil) { return EMPTY; }
+        var s = start;
+        var e = end;
+        if (s < 0) { s = 0; }
+        if (e > value.length) { e = value.length; }
+        if (s >= e) { return EMPTY; }
+        var n = e - s;
+        var buf = new([n]byte);
+        for (var i = 0; i < n; i += 1) {
+            buf[i] = value[s + i];
+        }
+        return {value=buf};
+    }
+
+    // Get the rune at character index (not byte index).
+    // Returns -1 if index out of range.
+    export
+    func rune(index int) int32 {
+        if (value == nil) { return int32(-1); }
+        const v [&#]byte = value;
+        var i = 0;
+        var count = 0;
+        var len = v.length;
+        for (i < len) {
+            if (count == index) {
+                var dec = utf8$decodeRune(v, i);
+                return dec.0;
+            }
+            var dec = utf8$decodeRune(v, i);
+            i += dec.1;
+            count += 1;
+        }
+        return int32(-1);
+    }
+
+    // Writable implementation
+    export
+    func write#(w &!Writer) int {
+        const v [&#]byte = value;
+        if (v == nil) return 0;
+        w.write(v, 0, v.length);
+        return v.length;
+    }
+}
+
+// Factory functions
+
+export
+func fromUtf8(data [*#]byte) String {
+    return {value=data};
 }
 
 export
-func make(value [*#]byte, enc CharEncoding) String {
-    return {value=value, enc=enc};
+func fromBytes(data [*#]byte) String {
+    return {value=data};
 }
+
 export
-func makeUtf16(value [*#]byte) String {
-    return make(value, CharEncoding.UTF16);
-}
+const EMPTY String = {value=nil};

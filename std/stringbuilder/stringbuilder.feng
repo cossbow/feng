@@ -1,0 +1,107 @@
+import std$encoding$utf8;
+import std$strconv;
+import std$string Str;
+
+export
+class StringBuilder (Writer) {
+    var buf [*!]byte;
+    var len int;
+
+    func ensureCapacity(need int) {
+        if (buf == nil) {
+            var cap = need < 16 ? 16 : need;
+            buf = new([cap]byte);
+            return;
+        }
+        if (len + need <= buf.length) { return; }
+        var cap = buf.length;
+        var grow = cap < 1024 ? cap * 2 : cap + 1024;
+        if (len + need > grow) { grow = len + need; }
+        var nb = new([grow]byte);
+        for (var i = 0; i < len; i += 1) {
+            nb[i] = buf[i];
+        }
+        buf = nb;
+    }
+
+    export
+    func append(s Str$String) {
+        var b = s.bytes();
+        if (b == nil) { return; }
+        ensureCapacity(b.length);
+        for (var i = 0; i < b.length; i += 1) {
+            buf[len] = b[i];
+            len += 1;
+        }
+    }
+
+    export
+    func appendByte(b byte) {
+        ensureCapacity(1);
+        buf[len] = b;
+        len += 1;
+    }
+
+    export
+    func appendRune(r int32) {
+        ensureCapacity(4);
+        var tmp = new([4]uint8);
+        var n = utf8$encodeRune(tmp, 0, r);
+        for (var i = 0; i < n; i += 1) {
+            buf[len] = byte(tmp[i]);
+            len += 1;
+        }
+    }
+
+    export
+    func appendInt(v int) {
+        var s = strconv$formatInt(v);
+        append(Str$fromUtf8(s));
+    }
+
+    export
+    func appendFloat(v float64) {
+        var s = strconv$formatFloat(v);
+        append(Str$fromUtf8(s));
+    }
+
+    export
+    func length() int {
+        return len;
+    }
+
+    export
+    func isEmpty() bool {
+        return len == 0;
+    }
+
+    export
+    func build() Str$String {
+        var b = new([len]byte);
+        for (var i = 0; i < len; i += 1) {
+            b[i] = buf[i];
+        }
+        return Str$fromUtf8(b);
+    }
+
+    // Writable - enables: format(sb, "count: {}", n)
+    export
+    func write(data [&!#]byte, offset, length int) int {
+        ensureCapacity(length);
+        for (var i = 0; i < length; i += 1) {
+            buf[len] = data[offset + i];
+            len += 1;
+        }
+        return length;
+    }
+}
+
+export
+func newBuilder() StringBuilder {
+    return {};
+}
+
+export
+func newBuilderCapacity(cap int) StringBuilder {
+    return {buf=new([cap]byte)};
+}

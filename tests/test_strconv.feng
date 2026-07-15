@@ -1,0 +1,21 @@
+import std$strconv;
+
+func testParseInt() {
+    var r1 = strconv$parseInt("12345");
+    var v1 = r1.0;
+    var ok1 = r1.1;
+
+    var r2 = strconv$parseInt("-99");
+    var v2 = r2.0;
+    var ok2 = r2.1;
+}
+
+func testFormatInt() {
+    var s = strconv$formatInt(42);
+    var s2 = strconv$formatInt(-7);
+}
+
+func main(args [&!#][*!#]byte) {
+    testParseInt();
+    testFormatInt();
+}

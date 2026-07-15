@@ -1,0 +1,40 @@
+import std$encoding$utf8;
+
+func testRuneLenAscii() {
+    var s = "Hello";
+    var n = utf8$runeLen(s);
+}
+
+func testRuneLenUtf8() {
+    var s = "你好";
+    var n = utf8$runeLen(s);
+}
+
+func testDecodeRuneAscii() {
+    var s = "ABC";
+    var dec = utf8$decodeRune(s, 0);
+}
+
+func testDecodeRuneUtf8() {
+    var s = "你";
+    var dec = utf8$decodeRune(s, 0);
+}
+
+func testEncodeRune() {
+    var buf = new([4]uint8);
+    var n = utf8$encodeRune(buf, 0, int32(20320));
+}
+
+func testValid() {
+    var s1 = "Hello";
+    var v = utf8$valid(s1);
+}
+
+func main(args [&!#][*!#]byte) {
+    testRuneLenAscii();
+    testRuneLenUtf8();
+    testDecodeRuneAscii();
+    testDecodeRuneUtf8();
+    testEncodeRune();
+    testValid();
+}

@@ -1,0 +1,25 @@
+import std$stringbuilder;
+import std$string;
+
+func testBasic() {
+    var sb = stringbuilder$newBuilder();
+    sb.append(string$fromUtf8("Hello"));
+    sb.append(string$fromUtf8(" "));
+    sb.append(string$fromUtf8("World"));
+    var s = sb.build();
+    var bl = s.byteLength();
+}
+
+func testAppendInt() {
+    var sb = stringbuilder$newBuilder();
+    sb.appendInt(42);
+    sb.append(string$fromUtf8(" "));
+    sb.appendInt(-100);
+    var s = sb.build();
+    var bl = s.byteLength();
+}
+
+func main(args [&!#][*!#]byte) {
+    testBasic();
+    testAppendInt();
+}

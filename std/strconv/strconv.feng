@@ -1,0 +1,114 @@
+
+// Parse a signed integer from byte sequence.
+// Returns (value, ok). ok is false if parsing fails.
+export func parseInt(s [&!#]byte) (int, bool) {
+    if (s.length == 0) { return (0, false); }
+    var i = 0;
+    var neg = false;
+    var v = s[0];
+    if (v == 45) {         // '-'
+        neg = true;
+        i = 1;
+    } else if (v == 43) {  // '+'
+        i = 1;
+    }
+    if (i >= s.length) { return (0, false); }
+
+    var result = 0;
+    for (i < s.length) {
+        var c = int(s[i]);
+        if (c < 48 || c > 57) { return (0, false); }  // '0'=48, '9'=57
+        result = result * 10 + (c - 48);
+        i += 1;
+    }
+    if (neg) { result = -result; }
+    return (result, true);
+}
+
+// Parse a 64-bit signed integer from byte sequence.
+export func parseInt64(s [&!#]byte) (int64, bool) {
+    if (s.length == 0) { return (0, false); }
+    var i = 0;
+    var neg = false;
+    var v = s[0];
+    if (v == 45) {
+        neg = true;
+        i = 1;
+    } else if (v == 43) {
+        i = 1;
+    }
+    if (i >= s.length) { return (0, false); }
+
+    var result int64 = 0;
+    for (i < s.length) {
+        var c = int(s[i]);
+        if (c < 48 || c > 57) { return (0, false); }
+        result = result * 10 + int64(c - 48);
+        i += 1;
+    }
+    if (neg) { result = -result; }
+    return (result, true);
+}
+
+// Format an int as a decimal byte sequence.
+export func formatInt(v int) [*#]byte {
+    if (v == 0) { return "0"; }
+    var neg = false;
+    var val = v;
+    if (val < 0) {
+        neg = true;
+        val = -val;
+    }
+    var buf = new([20]byte);
+    var i = 0;
+    for (val > 0) {
+        buf[i] = byte(val % 10 + 48);
+        val = val / 10;
+        i += 1;
+    }
+    if (neg) {
+        buf[i] = 45;  // '-'
+        i += 1;
+    }
+    // Reverse
+    var result = new([i]byte);
+    for (var j = 0; j < i; j += 1) {
+        result[j] = buf[i - 1 - j];
+    }
+    return result;
+}
+
+// Format an int64 as a decimal byte sequence.
+export func formatInt64(v int64) [*#]byte {
+    if (v == 0) { return "0"; }
+    var neg = false;
+    var val = v;
+    if (val < 0) {
+        neg = true;
+        val = -val;
+    }
+    var buf = new([20]byte);
+    var i = 0;
+    for (val > 0) {
+        buf[i] = byte(int(val % 10) + 48);
+        val = val / 10;
+        i += 1;
+    }
+    if (neg) {
+        buf[i] = 45;
+        i += 1;
+    }
+    // Reverse
+    var result = new([i]byte);
+    for (var j = 0; j < i; j += 1) {
+        result[j] = buf[i - 1 - j];
+    }
+    return result;
+}
+
+// Format a float64 as a decimal byte sequence.
+// TODO: needs floatToStr builtin to accept float64, currently only accepts int
+export func formatFloat(v float64) [*#]byte {
+    // Placeholder: uses intToStr which only handles integer values
+    return formatInt(int(v));
+}

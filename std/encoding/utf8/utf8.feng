@@ -1,0 +1,123 @@
+
+const mask1 = 128;    // 0x80
+const mask2 = 224;    // 0xE0
+const mask3 = 240;    // 0xF0
+const mask4 = 248;    // 0xF8
+
+const val2 = 192;    // 0xC0
+const val3 = 224;    // 0xE0
+const val4 = 240;    // 0xF0
+
+// Return the number of UTF-8 code points (runes) in the byte sequence.
+export func runeLen(s [&#]byte) int {
+    var n = 0;
+    var i = 0;
+    var len = s.length;
+    for (i < len) {
+        var b = uint8(s[i]);
+        if (b < mask1) {
+            i += 1;
+        } else if (b < val3) {
+            i += 2;
+        } else if (b < val4) {
+            i += 3;
+        } else {
+            i += 4;
+        }
+        n += 1;
+    }
+    return n;
+}
+
+// Decode one rune starting at offset.
+// Returns a tuple (int32, int) where .0 is the rune and .1 is the byte width.
+// If the encoding is invalid, .0 is -1 and .1 is 1.
+export func decodeRune(s [&#]byte, offset int) (int32, int) {
+    if (offset >= s.length) {
+        return (int32(-1), 0);
+    }
+    var b0 = uint8(s[offset]);
+    if (b0 < mask1) {
+        return (int32(b0), 1);
+    }
+    if (b0 < val3) {
+        // 2-byte: 110xxxxx 10xxxxxx
+        if (offset + 1 >= s.length) { return (int32(-1), 1); }
+        var b1 = uint8(s[offset + 1]);
+        if ((b1 & mask1) == 0) { return (int32(-1), 1); }
+        var r = (int32(b0 & 31) << 6) | int32(b1 & 63);
+        return (r, 2);
+    }
+    if (b0 < val4) {
+        // 3-byte: 1110xxxx 10xxxxxx 10xxxxxx
+        if (offset + 2 >= s.length) { return (int32(-1), 1); }
+        var b1 = uint8(s[offset + 1]);
+        var b2 = uint8(s[offset + 2]);
+        if ((b1 & mask1) == 0 || (b2 & mask1) == 0) { return (int32(-1), 1); }
+        var r = (int32(b0 & 15) << 12) | (int32(b1 & 63) << 6) | int32(b2 & 63);
+        return (r, 3);
+    }
+    // 4-byte: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+    if (offset + 3 >= s.length) { return (int32(-1), 1); }
+    var b1 = uint8(s[offset + 1]);
+    var b2 = uint8(s[offset + 2]);
+    var b3 = uint8(s[offset + 3]);
+    if ((b1 & mask1) == 0 || (b2 & mask1) == 0 || (b3 & mask1) == 0) { return (int32(-1), 1); }
+    var r = (int32(b0 & 7) << 18) | (int32(b1 & 63) << 12) | (int32(b2 & 63) << 6) | int32(b3 & 63);
+    return (r, 4);
+}
+
+// Encode a rune into the buffer starting at offset.
+// Returns the number of bytes written.
+// Caller must ensure the buffer has enough space (max 4 bytes).
+export func encodeRune(buf [&!]uint8, offset int, r int32) int {
+    if (r < 128) {
+        buf[offset] = uint8(r);
+        return 1;
+    }
+    if (r < 2048) {
+        buf[offset] = uint8(val2 | (r >> 6));
+        buf[offset + 1] = uint8(mask1 | (r & 63));
+        return 2;
+    }
+    if (r < 65536) {
+        buf[offset] = uint8(val3 | (r >> 12));
+        buf[offset + 1] = uint8(mask1 | ((r >> 6) & 63));
+        buf[offset + 2] = uint8(mask1 | (r & 63));
+        return 3;
+    }
+    buf[offset] = uint8(val4 | (r >> 18));
+    buf[offset + 1] = uint8(mask1 | ((r >> 12) & 63));
+    buf[offset + 2] = uint8(mask1 | ((r >> 6) & 63));
+    buf[offset + 3] = uint8(mask1 | (r & 63));
+    return 4;
+}
+
+// Check whether the byte sequence is valid UTF-8.
+export func valid(s [&#]byte) bool {
+    var i = 0;
+    var len = s.length;
+    for (i < len) {
+        var b0 = uint8(s[i]);
+        if (b0 < mask1) {
+            i += 1;
+            continue;
+        }
+        var expect = 0;
+        if (b0 < val3) {
+            expect = 2;
+        } else if (b0 < val4) {
+            expect = 3;
+        } else if (b0 < mask4) {
+            expect = 4;
+        } else {
+            return false;
+        }
+        if (i + expect > len) { return false; }
+        for (var j = 1; j < expect; j += 1) {
+            if ((uint8(s[i + j]) & mask1) == 0) { return false; }
+        }
+        i += expect;
+    }
+    return true;
+}
