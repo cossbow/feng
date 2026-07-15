@@ -20,7 +20,6 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -58,7 +57,8 @@ public class CompilerMain {
     static boolean debug;
 
     static {
-        debug = Boolean.parseBoolean(System.getProperty("feng.memchk"));
+        debug = Boolean.parseBoolean(System.getProperty("feng.debug"));
+        ErrorUtil.setTraceError(debug);
     }
 
     private static Path toPath(String value) {

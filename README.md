@@ -126,3 +126,18 @@ it to be compiled into an executable:
 ```shell
 c++ --std=c++20 jjj.cpp -o jjj.o
 ```
+
+# Editor Support
+
+The project includes a built-in LSP Server for syntax highlighting and language services, packaged in the same JAR as the compiler. Launch command:
+
+```shell
+java -cp feng-0.0.1-dev.jar org.cossbow.feng.lsp.FengLspMain
+```
+
+Supported LSP features: diagnostics, document symbol, hover, go-to-definition, completion.
+
+## VS Code Extension
+
+The VS Code extension is maintained in a separate repository: [feng-vscode](https://github.com/cossbow/feng-vscode).
+It auto-downloads the LSP server JAR from GitHub Releases on first activation.

@@ -37,6 +37,7 @@ import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
 import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
+public
 final class SourceParseVisitor
         extends FengBaseVisitor<Entity>
         implements FengVisitor<Entity> {

@@ -4,8 +4,8 @@ import org.antlr.v4.runtime.*;
 import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.mod.ModulePath;
-import org.cossbow.feng.err.SyntaxException;
 import org.cossbow.feng.util.DedupCache;
+import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
 
 import java.io.IOException;
@@ -77,8 +77,8 @@ public class SourceParser {
                                 Object offendingSymbol, int line,
                                 int charPositionInLine, String msg,
                                 RecognitionException e) {
-            throw new SyntaxException("parse error at %s(%d:%d): \n%s"
-                    .formatted(file, line, charPositionInLine, msg));
+            ErrorUtil.syntax("parse error at %s(%d:%d): \n%s",
+                    file, line, charPositionInLine, msg);
         }
     }
 }

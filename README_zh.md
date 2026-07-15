@@ -113,3 +113,18 @@ c++ --std=c++20 -c jjj.cpp -o jjj.o
 c++ --std=c++20 jjj.cpp -o jjj.o
 ```
 
+# 编辑器支持
+
+项目内置了LSP Server提供语法高亮和语言服务，与编译器打包在同一个jar中，启动命令：
+
+```shell
+java -cp feng-0.0.1-dev.jar org.cossbow.feng.lsp.FengLspMain
+```
+
+已支持的LSP功能：诊断、文档符号、悬停提示、跳转定义、补全。
+
+## VS Code 扩展
+
+VS Code 扩展由独立仓库维护：[feng-vscode](https://github.com/cossbow/feng-vscode)。
+首次激活时会自动从 GitHub Releases 下载 LSP Server JAR。
+

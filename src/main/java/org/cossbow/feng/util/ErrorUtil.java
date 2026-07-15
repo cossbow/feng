@@ -12,7 +12,12 @@ public class ErrorUtil {
     private ErrorUtil() {
     }
 
+    static volatile boolean traceError;
     static volatile boolean printWarn;
+
+    public static void setTraceError(boolean t) {
+        traceError = t;
+    }
 
     public static void setPrintWarn(boolean w) {
         printWarn = w;
@@ -41,11 +46,11 @@ public class ErrorUtil {
     }
 
     public static <T> T syntax(String fmt, Object... args) throws SyntaxException {
-        throw new SyntaxException(fmt.formatted(args));
+        throw new SyntaxException(fmt.formatted(args), traceError);
     }
 
     public static <T> T semantic(String fmt, Object... arg) throws SemanticException {
-        throw new SemanticException(fmt.formatted(arg));
+        throw new SemanticException(fmt.formatted(arg), traceError);
     }
 
     public static <T> T modFail(String fmt, Object... arg) {
@@ -57,13 +62,8 @@ public class ErrorUtil {
     }
 
     public static <T> T duplicate(Entity entity, Entity old) throws SemanticException {
-        throw new SemanticException("duplicate '%s' at %s, prev at %s"
-                .formatted(entity, entity.pos(), old.pos()));
-    }
-
-    public static <T> T align(Position a, Position b) throws SemanticException {
-        throw new SemanticException("The number required same: @%s <- -> @%s"
-                .formatted(a, b));
+        return semantic("duplicate '%s' at %s, prev at %s",
+                entity, entity.pos(), old.pos());
     }
 
     public static class UnreachableException extends RuntimeException {
