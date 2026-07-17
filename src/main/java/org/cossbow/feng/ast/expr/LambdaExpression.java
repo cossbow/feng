@@ -19,4 +19,9 @@ public class LambdaExpression extends PrimaryExpression {
         return procedure;
     }
 
+    @Override
+    public LambdaExpression mirror() {
+        return this;
+    }
+
 }

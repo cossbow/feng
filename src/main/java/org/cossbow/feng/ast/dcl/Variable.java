@@ -72,9 +72,15 @@ public class Variable extends Entity
         return value;
     }
 
+    /**
+     * Deep copy for variadic inline expansion.
+     * Type and value are reset to nil so semantic analysis
+     * re-derives them in the new expansion context.
+     */
     public Variable mirror() {
+        var mv = value.has() ? value.must().mirror() : null;
         return new Variable(pos(), modifier, declare, name,
-                type.clone(), value.clone());
+                type.clone(), Lazy.of(mv));
     }
 
     //

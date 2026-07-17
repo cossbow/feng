@@ -59,6 +59,13 @@ public class IsExpression extends PrimaryExpression {
         this.needCheck = needCheck;
     }
 
+    @Override
+    public IsExpression mirror() {
+        var n = new IsExpression(pos(), subject.mirror(), type);
+        n.needCheck = false;
+        return n;
+    }
+
     //
 
     @Override

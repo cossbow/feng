@@ -23,6 +23,11 @@ public class ParenExpression extends PrimaryExpression {
         return child.unbound();
     }
 
+    @Override
+    public ParenExpression mirror() {
+        return new ParenExpression(pos(), child.mirror());
+    }
+
     //
 
     @Override

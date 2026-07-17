@@ -1,0 +1,12 @@
+import std$os;
+
+func main(args [&!#][*!#]byte) {
+    {
+        var i = 100;
+        os$printf("{}", i);
+    }
+    {
+        var i = 100;
+        os$printf("{}", i);
+    }
+}

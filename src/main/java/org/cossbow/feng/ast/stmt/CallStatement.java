@@ -31,4 +31,10 @@ public class CallStatement extends Statement {
         return replace;
     }
 
+    @Override
+    public CallStatement mirror() {
+        // replace reset to nil via new construction
+        return new CallStatement(pos(), call.mirror());
+    }
+
 }

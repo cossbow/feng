@@ -45,6 +45,11 @@ public class MethodExpression extends PrimaryExpression {
         this.generic = generic;
     }
 
+    @Override
+    public MethodExpression mirror() {
+        return new MethodExpression(pos(), subject.mirror(), method, generic);
+    }
+
     //
 
     @Override

@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.stmt;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Variable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class DeclarationStatement extends Statement {
@@ -20,5 +21,12 @@ public class DeclarationStatement extends Statement {
 
     public int size() {
         return variables.size();
+    }
+
+    @Override
+    public DeclarationStatement mirror() {
+        var vars = new ArrayList<Variable>(variables.size());
+        for (var v : variables) vars.add(v.mirror());
+        return new DeclarationStatement(pos(), vars);
     }
 }

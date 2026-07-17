@@ -48,4 +48,9 @@ public class ConditionalExpression extends Expression {
     public String toString() {
         return condition + "?" + yes + ":" + not;
     }
+
+    @Override
+    public ConditionalExpression mirror() {
+        return new ConditionalExpression(pos(), condition.mirror(), yes.mirror(), not.mirror());
+    }
 }

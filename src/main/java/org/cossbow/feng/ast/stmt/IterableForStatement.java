@@ -36,4 +36,9 @@ public class IterableForStatement extends ForStatement {
 
     public final Lazy<ConditionalForStatement> replace = Lazy.nil();
 
+    @Override
+    public IterableForStatement mirror() {
+        return new IterableForStatement(pos(), body().mirror(),
+                arguments, iterable.mirror());
+    }
 }

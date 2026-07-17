@@ -26,6 +26,11 @@ public class CheckNilExpression extends PrimaryExpression {
         return nil;
     }
 
+    @Override
+    public CheckNilExpression mirror() {
+        return new CheckNilExpression(pos(), subject.mirror(), nil);
+    }
+
     //
     @Override
     public String toString() {

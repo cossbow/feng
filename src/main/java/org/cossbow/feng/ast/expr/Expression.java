@@ -49,4 +49,11 @@ public class Expression extends Entity {
         this.expectCallable = expectCallable;
     }
 
+    /**
+     * Deep copy for variadic inline expansion.
+     * Each expansion gets independent mutable state
+     * (expectType, resultType, expectCallable).
+     */
+    public abstract Expression mirror();
+
 }

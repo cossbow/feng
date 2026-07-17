@@ -12,6 +12,10 @@ public class Statement extends Entity {
         super(pos);
     }
 
-    //
+    /**
+     * Deep copy for variadic inline expansion.
+     * Each expansion gets independent mutable state.
+     */
+    public abstract Statement mirror();
 
 }

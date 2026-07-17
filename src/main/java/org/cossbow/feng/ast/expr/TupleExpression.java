@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.dcl.TupleTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.util.Optional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -47,6 +48,13 @@ public class TupleExpression extends PrimaryExpression {
         return types;
     }
 
+
+    @Override
+    public TupleExpression mirror() {
+        var e = new ArrayList<Expression>(elements.size());
+        for (var el : elements) e.add(el.mirror());
+        return new TupleExpression(pos(), e, types);
+    }
 
     //
     @Override

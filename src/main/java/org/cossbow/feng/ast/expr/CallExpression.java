@@ -1,10 +1,10 @@
 package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.util.Optional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -118,6 +118,16 @@ public class CallExpression extends PrimaryExpression {
 
     public void asExpr(boolean asExpr) {
         this.asExpr = asExpr;
+    }
+
+    @Override
+    public CallExpression mirror() {
+        var c = callee.mirror();
+        var a = new ArrayList<Expression>(arguments.size());
+        for (var arg : arguments) a.add(arg.mirror());
+        var n = new CallExpression(pos(), c, a, variadic);
+        n.asExpr = false;
+        return n;
     }
 
     //

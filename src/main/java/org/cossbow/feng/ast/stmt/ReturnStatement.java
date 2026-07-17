@@ -49,6 +49,14 @@ public class ReturnStatement extends Statement {
     }
 
     //
+
+    @Override
+    public ReturnStatement mirror() {
+        var r = result.map(Expression::mirror);
+        return new ReturnStatement(pos(), r);
+    }
+
+    //
     @Override
     public String toString() {
         return "return " + result + ';';

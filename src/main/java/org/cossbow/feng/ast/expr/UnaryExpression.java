@@ -36,4 +36,9 @@ public class UnaryExpression extends Expression {
     public String toString() {
         return operator.toString() + operand;
     }
+
+    @Override
+    public UnaryExpression mirror() {
+        return new UnaryExpression(pos(), operator, operand.mirror());
+    }
 }

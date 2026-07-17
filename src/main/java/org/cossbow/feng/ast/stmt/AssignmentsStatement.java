@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.var.Assignment;
 import org.cossbow.feng.ast.var.Operand;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class AssignmentsStatement extends Statement {
@@ -34,6 +35,13 @@ public class AssignmentsStatement extends Statement {
 
     public Expression value(int i) {
         return list.get(i).value();
+    }
+
+    @Override
+    public AssignmentsStatement mirror() {
+        var l = new ArrayList<Assignment>(list.size());
+        for (var a : list) l.add(a.mirror());
+        return new AssignmentsStatement(pos(), l);
     }
 
 }

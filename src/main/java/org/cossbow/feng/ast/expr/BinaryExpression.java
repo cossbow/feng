@@ -52,4 +52,9 @@ public class BinaryExpression extends Expression {
     public String toString() {
         return left + operator.code + right;
     }
+
+    @Override
+    public BinaryExpression mirror() {
+        return new BinaryExpression(pos(), operator, left.mirror(), right.mirror());
+    }
 }

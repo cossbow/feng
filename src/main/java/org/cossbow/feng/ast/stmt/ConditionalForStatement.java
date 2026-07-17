@@ -45,4 +45,12 @@ public class ConditionalForStatement extends ForStatement {
     public Lazy<BoolLiteral> cond() {
         return cond;
     }
+
+    @Override
+    public ConditionalForStatement mirror() {
+        var init = initializer.map(Statement::mirror);
+        var cond = condition.mirror();
+        var upd = updater.map(Statement::mirror);
+        return new ConditionalForStatement(pos(), body().mirror(), init, cond, upd);
+    }
 }

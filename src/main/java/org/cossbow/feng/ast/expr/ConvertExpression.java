@@ -30,6 +30,11 @@ public class ConvertExpression extends PrimaryExpression {
         return operand;
     }
 
+    @Override
+    public ConvertExpression mirror() {
+        return new ConvertExpression(pos(), primitive, operand.mirror());
+    }
+
     //
 
     @Override

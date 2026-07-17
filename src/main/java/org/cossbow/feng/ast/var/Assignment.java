@@ -58,4 +58,8 @@ public class Assignment extends Entity {
     public String toString() {
         return operand + " = " + value;
     }
+
+    public Assignment mirror() {
+        return new Assignment(pos(), operand.mirror(), value.mirror());
+    }
 }

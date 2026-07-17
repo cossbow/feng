@@ -57,4 +57,9 @@ public class FieldOperand extends Operand {
     public String toString() {
         return subject + "." + field;
     }
+
+    @Override
+    public FieldOperand mirror() {
+        return new FieldOperand(pos(), (PrimaryExpression) subject.mirror(), field);
+    }
 }

@@ -6,6 +6,7 @@ import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.stmt.Statement;
 import org.cossbow.feng.util.Lazy;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -90,6 +91,16 @@ public class BlockExpression extends PrimaryExpression
 
     public Lazy<Expression> origin() {
         return origin;
+    }
+
+    @Override
+    public BlockExpression mirror() {
+        var block = new ArrayList<Statement>(this.block.size());
+        for (var s : this.block) block.add(s.mirror());
+        var n = new BlockExpression(pos(), block, result.mirror());
+        n.stack = List.of();
+        n.origin.set(Lazy.nil());
+        return n;
     }
 
     //

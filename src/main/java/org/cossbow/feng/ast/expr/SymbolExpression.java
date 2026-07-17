@@ -35,6 +35,11 @@ public class SymbolExpression extends PrimaryExpression {
         this.generic = generic;
     }
 
+    @Override
+    public SymbolExpression mirror() {
+        return this;
+    }
+
     //
 
 

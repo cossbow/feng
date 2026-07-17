@@ -45,4 +45,9 @@ public class DereferOperand extends Operand {
     public String toString() {
         return '*' + subject.toString();
     }
+
+    @Override
+    public DereferOperand mirror() {
+        return new DereferOperand(pos(), (PrimaryExpression) subject.mirror());
+    }
 }

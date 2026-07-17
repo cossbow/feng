@@ -35,6 +35,13 @@ public class SizeofExpression extends PrimaryExpression {
         return size;
     }
 
+    @Override
+    public SizeofExpression mirror() {
+        var n = new SizeofExpression(pos(), type);
+        n.size = -1;
+        return n;
+    }
+
     //
 
     @Override

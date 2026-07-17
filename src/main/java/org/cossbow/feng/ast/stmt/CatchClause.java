@@ -5,7 +5,6 @@ import org.cossbow.feng.ast.Scope;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.dcl.Variable;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class CatchClause extends Statement implements Scope {
@@ -45,5 +44,10 @@ public class CatchClause extends Statement implements Scope {
 
     public void stack(List<Variable> variables) {
         stack = variables;
+    }
+
+    @Override
+    public CatchClause mirror() {
+        return new CatchClause(pos(), argument.mirror(), typeSet, body.mirror());
     }
 }

@@ -3,7 +3,6 @@ package org.cossbow.feng.ast.stmt;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Scope;
 import org.cossbow.feng.ast.dcl.Variable;
-import org.cossbow.feng.util.Stack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,5 +58,14 @@ public class BlockStatement extends Statement implements Scope {
 
     public void stack(List<Variable> variables) {
         stack = variables;
+    }
+
+    @Override
+    public BlockStatement mirror() {
+        var list = new ArrayList<Statement>(this.list.size());
+        for (var s : this.list) list.add(s.mirror());
+        var n = new BlockStatement(pos(), list, newScope);
+        n.stack = List.of();
+        return n;
     }
 }

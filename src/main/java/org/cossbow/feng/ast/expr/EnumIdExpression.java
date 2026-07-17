@@ -25,6 +25,11 @@ public class EnumIdExpression extends EnumExpression {
         return index;
     }
 
+    @Override
+    public EnumIdExpression mirror() {
+        return new EnumIdExpression(pos(), def(), index.mirror());
+    }
+
     //
 
     @Override

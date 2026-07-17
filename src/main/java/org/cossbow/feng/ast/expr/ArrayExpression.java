@@ -2,10 +2,9 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.ArrayTypeDeclarer;
-import org.cossbow.feng.ast.dcl.TypeDeclarer;
-import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -59,8 +58,14 @@ public class ArrayExpression extends PrimaryExpression {
         return true;
     }
 
-    //
+    @Override
+    public ArrayExpression mirror() {
+        var e = new ArrayList<Expression>(elements.size());
+        for (var el : elements) e.add(el.mirror());
+        return new ArrayExpression(pos(), e, type);
+    }
 
+    //
     @Override
     public String toString() {
         return elements.toString();

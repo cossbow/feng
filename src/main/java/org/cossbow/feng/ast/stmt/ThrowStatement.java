@@ -41,4 +41,9 @@ public class ThrowStatement extends Statement {
     public void local(List<Variable> local) {
         this.local = local;
     }
+
+    @Override
+    public ThrowStatement mirror() {
+        return new ThrowStatement(pos(), exception.mirror());
+    }
 }

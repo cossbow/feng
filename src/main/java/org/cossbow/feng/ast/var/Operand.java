@@ -40,4 +40,10 @@ public class Operand extends Entity {
     public List<Variable> relay() {
         return relay;
     }
+
+    /**
+     * Deep copy for variadic inline expansion.
+     * Resets mutable state: type, relay.
+     */
+    public abstract Operand mirror();
 }

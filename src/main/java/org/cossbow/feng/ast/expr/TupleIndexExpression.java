@@ -39,6 +39,11 @@ public class TupleIndexExpression extends PrimaryExpression {
         return index;
     }
 
+    @Override
+    public TupleIndexExpression mirror() {
+        return new TupleIndexExpression(pos(), subject.mirror(), index);
+    }
+
     //
     @Override
     public String toString() {

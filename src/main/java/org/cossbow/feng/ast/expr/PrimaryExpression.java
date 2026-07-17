@@ -7,4 +7,7 @@ public class PrimaryExpression extends Expression {
     public PrimaryExpression(Position pos) {
         super(pos);
     }
+
+    abstract
+    public PrimaryExpression mirror();
 }

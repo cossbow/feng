@@ -26,6 +26,11 @@ public class DereferExpression extends PrimaryExpression {
         return subject;
     }
 
+    @Override
+    public DereferExpression mirror() {
+        return new DereferExpression(pos(), subject.mirror());
+    }
+
     //
     @Override
     public String toString() {

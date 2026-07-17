@@ -4,7 +4,6 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Scope;
 import org.cossbow.feng.ast.dcl.Variable;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class Branch extends Statement implements Scope {
@@ -30,5 +29,12 @@ public class Branch extends Statement implements Scope {
 
     public void stack(List<Variable> variables) {
         stack = variables;
+    }
+
+    @Override
+    public Branch mirror() {
+        var n = new Branch(pos(), body.mirror());
+        n.stack = List.of();
+        return n;
     }
 }

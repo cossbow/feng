@@ -25,6 +25,11 @@ public class EnumValueExpression extends EnumExpression {
         return value;
     }
 
+    @Override
+    public EnumValueExpression mirror() {
+        return new EnumValueExpression(pos(), def(), value);
+    }
+
     //
 
     @Override

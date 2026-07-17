@@ -63,6 +63,12 @@ public class MemberOfExpression extends PrimaryExpression {
         return field;
     }
 
+    @Override
+    public MemberOfExpression mirror() {
+        return new MemberOfExpression(pos(), subject.mirror(),
+                member, generic, field);
+    }
+
     //
 
     @Override

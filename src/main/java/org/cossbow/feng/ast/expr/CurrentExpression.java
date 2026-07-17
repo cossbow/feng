@@ -48,6 +48,11 @@ public class CurrentExpression extends PrimaryExpression {
         return result;
     }
 
+    @Override
+    public CurrentExpression mirror() {
+        return this;
+    }
+
     //
 
     @Override

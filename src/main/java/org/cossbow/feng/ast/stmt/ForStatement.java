@@ -30,4 +30,7 @@ public class ForStatement extends Statement implements Scope {
     public void stack(List<Variable> variables) {
         stack = variables;
     }
+
+    abstract
+    public ForStatement mirror();
 }

@@ -34,6 +34,11 @@ public class LiteralExpression extends PrimaryExpression {
         return true;
     }
 
+    @Override
+    public LiteralExpression mirror() {
+        return this;
+    }
+
     //
     @Override
     public String toString() {

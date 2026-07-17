@@ -46,4 +46,9 @@ public class VariableOperand extends Operand {
     public String toString() {
         return symbol.toString();
     }
+
+    @Override
+    public VariableOperand mirror() {
+        return new VariableOperand(pos(), symbol);
+    }
 }

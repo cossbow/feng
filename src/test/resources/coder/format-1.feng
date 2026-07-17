@@ -3,7 +3,7 @@ import std$string;
 
 func test(n int) {
     var b bytes$BufferWriter;
-    var s = string$makeUtf16("feng");
+    var s = string$fromBytes("feng");
     format(b, "Hello {}!\n", s);
     var r = b.copy();
 }

@@ -33,6 +33,12 @@ public class ReferEqualExpression extends PrimaryExpression {
         return same;
     }
 
+    @Override
+    public ReferEqualExpression mirror() {
+        return new ReferEqualExpression(pos(),
+                left.mirror(), right.mirror(), same);
+    }
+
     //
     @Override
     public String toString() {

@@ -19,4 +19,9 @@ public class BreakStatement extends Statement {
     }
 
     public final Lazy<ForStatement> target = Lazy.nil();
+
+    @Override
+    public BreakStatement mirror() {
+        return this;
+    }
 }

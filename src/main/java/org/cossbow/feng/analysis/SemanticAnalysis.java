@@ -5087,6 +5087,10 @@ public class SemanticAnalysis {
             return Optional.empty();
         if (fd.procedure().none())
             return Optional.empty();
+        // Labels in variadic functions cannot be expanded (break/continue targets)
+        if (!fd.procedure().get().labels().isEmpty()) {
+            return semantic("variadic function with labels cannot be inlined: %s", fd.symbol());
+        }
 
         var be = expandInlined(fd, ce, ce.pos());
         return Optional.of(optimize(be));
@@ -5134,13 +5138,15 @@ public class SemanticAnalysis {
             context.variadic(new VariadicArgument(varArgs));
         }
 
-        // Build inlined block: declarations + body statements
+        // Build inlined block: declarations + body statements (mirrored)
         var body = fd.procedure().get().body();
         var inline = new ArrayList<Statement>(body.size() + 2);
         if (!dclVars.isEmpty()) {
             inline.add(new DeclarationStatement(pos, dclVars));
         }
-        inline.addAll(body.list());
+        for (var s : body.list()) {
+            inline.add(s.mirror());
+        }
 
         return new BlockExpression(pos, inline,
                 new NilLiteral(pos).expr());

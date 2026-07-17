@@ -42,6 +42,11 @@ public class NewExpression extends PrimaryExpression {
         return true;
     }
 
+    @Override
+    public NewExpression mirror() {
+        return new NewExpression(pos(), type, arg.map(Expression::mirror));
+    }
+
     //
 
     @Override

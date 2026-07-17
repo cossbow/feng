@@ -19,4 +19,9 @@ public class ContinueStatement extends Statement {
     }
 
     public final Lazy<ForStatement> target = Lazy.nil();
+
+    @Override
+    public ContinueStatement mirror() {
+        return this;
+    }
 }

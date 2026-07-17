@@ -67,4 +67,13 @@ public class IfStatement extends Statement implements Scope {
         stack = variables;
     }
 
+    @Override
+    public IfStatement mirror() {
+        var init = this.init.map(Statement::mirror);
+        var cond = this.condition.mirror();
+        var yes = this.yes.mirror();
+        var not = this.not.map(Statement::mirror);
+        return new IfStatement(pos(), init, cond, yes, not);
+    }
+
 }

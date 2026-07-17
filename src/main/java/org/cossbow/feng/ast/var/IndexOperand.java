@@ -64,4 +64,9 @@ public class IndexOperand extends Operand {
     public String toString() {
         return subject + "[" + index + "]";
     }
+
+    @Override
+    public IndexOperand mirror() {
+        return new IndexOperand(pos(), (PrimaryExpression) subject.mirror(), index.mirror());
+    }
 }

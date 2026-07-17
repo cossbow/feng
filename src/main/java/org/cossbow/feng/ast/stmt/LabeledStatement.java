@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.util.ErrorUtil;
 
 public class LabeledStatement extends Statement {
     private final Label label;
@@ -20,5 +21,10 @@ public class LabeledStatement extends Statement {
 
     public Statement target() {
         return target;
+    }
+
+    @Override
+    public LabeledStatement mirror() {
+        return ErrorUtil.unsupported("mirror not support label");
     }
 }

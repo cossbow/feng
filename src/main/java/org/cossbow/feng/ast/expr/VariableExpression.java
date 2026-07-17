@@ -40,6 +40,28 @@ public class VariableExpression extends PrimaryExpression {
         return symbol;
     }
 
+    /**
+     * Mirror by creating a new VariableExpression node.
+     * <p>
+     * The variable and symbol references are kept as-is (shared).
+     * This works because:
+     * <ul>
+     *   <li>Global variables (like stdout) — the Variable object is globally
+     *       shared and its type/value are already fully analyzed.</li>
+     *   <li>Parameter variables (like fmt) — the original Variable has
+     *       value=nil, so resolveFormatString falls through to
+     *       context.findVar(symbol) which finds the mirror variable
+     *       created by expandInlined in the current scope.</li>
+     * </ul>
+     * The key benefit: a new Expression node gets fresh
+     * expectType/resultType/expectCallable state, independent
+     * from other expansion copies.
+     */
+    @Override
+    public VariableExpression mirror() {
+        return this;
+    }
+
     //
 
     @Override

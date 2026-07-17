@@ -50,4 +50,9 @@ public class TupleOperand extends Operand {
     public String toString() {
         return subject + "." + index;
     }
+
+    @Override
+    public TupleOperand mirror() {
+        return new TupleOperand(pos(), (PrimaryExpression) subject.mirror(), index);
+    }
 }

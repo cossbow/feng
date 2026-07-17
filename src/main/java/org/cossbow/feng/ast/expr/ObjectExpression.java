@@ -56,6 +56,13 @@ public class ObjectExpression extends PrimaryExpression {
     }
 
 
+    @Override
+    public ObjectExpression mirror() {
+        var m = new IdentifierMap<Expression>(entries.size());
+        for (var n : entries.nodes()) m.add(n.key(), n.value().mirror());
+        return new ObjectExpression(pos(), m, type);
+    }
+
     //
 
     @Override

@@ -1,10 +1,10 @@
 package org.cossbow.feng.ast.stmt;
 
+import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Scope;
 import org.cossbow.feng.ast.dcl.Variable;
-import org.cossbow.feng.util.Optional;
-import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.util.Optional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +57,15 @@ public class SwitchStatement extends Statement implements Scope {
 
     public void stack(List<Variable> variables) {
         stack = variables;
+    }
+
+    @Override
+    public SwitchStatement mirror() {
+        var init = this.init.map(Statement::mirror);
+        var branches = new ArrayList<SwitchBranch>(this.branches.size());
+        for (var b : this.branches) branches.add(b.mirror());
+        var def = this.defaultBranch.map(Branch::mirror);
+        return new SwitchStatement(pos(), init, value.mirror(), branches, def);
     }
 
 }
