@@ -24,6 +24,7 @@ import java.util.function.Consumer;
 import static org.cossbow.feng.ast.Position.ZERO;
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
 
+final
 public class InterfaceDefinition extends ObjectDefinition {
     /**
      * Methods declaration
@@ -35,7 +36,7 @@ public class InterfaceDefinition extends ObjectDefinition {
      */
     private final SymbolMap<DerivedType> parts;
     /**
-     * [imcompleted]
+     * The macros defined in this type
      */
     private final MacroTable macros;
 

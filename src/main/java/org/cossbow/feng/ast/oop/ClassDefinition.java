@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
+final
 public class ClassDefinition extends ObjectDefinition {
     // The following are the properties defined in the syntax:
     /**
@@ -174,6 +175,12 @@ public class ClassDefinition extends ObjectDefinition {
      * {@code a[i] = v;}
      */
     private final Lazy<IndexOperator> indexOperator = Lazy.nil();
+    /**
+     * Error class analysis callback:
+     * <p>
+     * {@code macro error trace(fn uint64, line uint32) { ... }}
+     */
+    private final Lazy<ClassMethod> errorTrace = Lazy.nil();
 
     public int id() {
         return id;
@@ -231,6 +238,21 @@ public class ClassDefinition extends ObjectDefinition {
 
     public Lazy<ClassMethod> resourceFree() {
         return resourceFree;
+    }
+
+    public boolean isErrorClass() {
+        if (errorTrace.has()) return true;
+        // 沿 parent 链向上查找 error macro
+        var p = parent();
+        while (p.has()) {
+            if (p.get().get().errorTrace.has()) return true;
+            p = p.get().get().parent();
+        }
+        return false;
+    }
+
+    public Lazy<ClassMethod> errorTrace() {
+        return errorTrace;
     }
 
     public Map<BinaryOperator, ClassMethod> binaryOperators() {

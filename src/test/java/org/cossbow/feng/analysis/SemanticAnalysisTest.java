@@ -7,7 +7,9 @@ import org.cossbow.feng.err.SemanticException;
 import org.cossbow.feng.parser.BaseParseTest;
 import org.cossbow.feng.parser.SourceParser;
 import org.cossbow.feng.util.Constants;
+import org.cossbow.feng.util.ErrorUtil;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -18,6 +20,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.cossbow.feng.util.CommonUtil.required;
 
 public class SemanticAnalysisTest {
+
+    @BeforeAll
+    static void init() {
+        ErrorUtil.setTraceError(true);
+    }
 
     void checkSucc(String code) {
         System.out.print("[check]>>> ");
@@ -3036,9 +3043,16 @@ public class SemanticAnalysisTest {
     @Test
     public void testStatementThrow1() {
         var d = "func a(){} enum E{U,V,W,} const S1K = 1<<10; var S1M = 1<<20;";
-        checkSucc(d + "func f(v E){ throw a; }");
-        checkSucc(d + "func f(v E){ throw v; }");
-        checkSucc(d + "func f(v E){ throw v; }");
+        // throw non-class type — error
+        checkFail(d + "func f(v E){ throw a; }");
+        checkFail(d + "func f(v E){ throw v; }");
+
+        // throw requires an error class
+        var err = "class Err{var fn uint64;var line uint32; "
+                + "func trace(f uint64,l uint32){fn=f;line=l;} "
+                + "macro error trace(f uint64,l uint32){trace(f,l);}} ";
+        checkSucc(err + "func f(){ throw new(Err); }");
+        checkSucc(err + "func f(){ try{}catch(e *!#Err){} }");
     }
 
     @Test
@@ -3047,9 +3061,8 @@ public class SemanticAnalysisTest {
         checkSucc(d + "func f(v E){ try{}final{} }");
         checkSucc(d + "func f(v E){ try{var v E;}final{} }");
         checkSucc(d + "func f(v E){ try{}final{var v E;} }");
-        checkSucc(d + "func f(v E){ try{}catch(v E){} }");
-        checkSucc(d + "func f(v E){ try{var v E;}catch(v E){} }");
-        checkSucc(d + "func f(v E){ try{}catch(v E){var v E;} }");
+        // catch requires reference type + error class or interface
+        checkFail(d + "func f(v E){ try{}catch(v E){} }");
     }
 
     @Test
@@ -3074,7 +3087,7 @@ public class SemanticAnalysisTest {
 
         checkSucc("func f()int{jjj:return 1;}");
 
-        checkSucc("func f(v int)int{throw v;}");
+        checkFail("func f(v int)int{throw v;}");
     }
 
     @Test
@@ -3165,11 +3178,11 @@ public class SemanticAnalysisTest {
         checkFail("func f()int{try{}final{}}");
         checkSucc("func f()int{try{}final{return 1;}}");
 
-        checkSucc("func f()int{try{return 1;}catch(e int){return 1;}}");
-        checkFail("func f()int{try{return 1;}catch(e int){}}");
-        checkFail("func f()int{try{}catch(e int){return 1;}}");
-        checkSucc("func f()int{try{return 1;}catch(e int){}final{return 1;}}");
-        checkSucc("func f()int{try{}catch(e int){return 1;}final{return 1;}}");
+        checkSucc(ERROR_CLASS_DEF + "func f()int{try{return 1;}catch(e *!#Error){return 1;}}");
+        checkFail(ERROR_CLASS_DEF + "func f()int{try{return 1;}catch(e *!#Error){}}");
+        checkFail(ERROR_CLASS_DEF + "func f()int{try{}catch(e *!#Error){return 1;}}");
+        checkSucc(ERROR_CLASS_DEF + "func f()int{try{return 1;}catch(e *!#Error){}final{return 1;}}");
+        checkSucc(ERROR_CLASS_DEF + "func f()int{try{}catch(e *!#Error){return 1;}final{return 1;}}");
     }
 
     //
@@ -3531,6 +3544,105 @@ public class SemanticAnalysisTest {
         for (var file : required(dir.listFiles(Constants.srcFilter()))) {
             parseSample(file);
         }
+    }
+
+    // error class helper — simplified error class, no List dependency
+    private static final String ERROR_CLASS_DEF =
+            "class Error{var fn uint64;var line uint32; "
+                    + "func trace(f uint64,l uint32){fn=f;line=l;} "
+                    + "macro error trace(f uint64,l uint32){trace(f,l);}} ";
+
+    @Test
+    public void testMacroErrorTrace() {
+        // Class with macro error trace can throw and catch
+        checkSucc(ERROR_CLASS_DEF + "func f(){ throw new(Error); }");
+        checkSucc(ERROR_CLASS_DEF + "func f(){ try{}catch(e *!#Error){} }");
+
+        // Class without error macro cannot throw
+        checkFail("class E{} func f(){ throw new(E); }");
+
+        // final class cannot throw
+        checkFail("class E final {} func f(){ throw new(E); }");
+
+        // Non-class type cannot throw
+        checkFail("func f(){ throw 1; }");
+    }
+
+    @Test
+    public void testCatchMultiTypes() {
+        var d = ERROR_CLASS_DEF
+                + "class IoError : Error {} class FmtError : Error {} "
+                + "class ArgError : Error {} ";
+
+        // Multi-type catch — common ancestor is Error
+        checkSucc(d + "func f(){ try{}catch(e *!#IoError | *!#FmtError){} }");
+        checkSucc(d + "func f(){ try{}catch(e *!#IoError | *!#FmtError | *!#ArgError){} }");
+
+        // Multi-type catch + finally
+        checkSucc(d + "func f(){ try{}catch(e *!#IoError | *!#FmtError){} final{} }");
+
+        // Use common ancestor members in catch body
+        checkSucc(d + "func f(){ try{}catch(e *!#IoError | *!#FmtError){ var x = e; } }");
+    }
+
+    @Test
+    public void testCatchMultiTypesFail() {
+        // catch type must be a strong reference
+        var d = ERROR_CLASS_DEF + "class IoError : Error {} class FmtError : Error {} ";
+        checkFail(d + "func f(){ try{}catch(e IoError | FmtError){} }");
+
+        // catch type contains final class (final class has no runtime type info)
+        checkFail("class E final {} " + ERROR_CLASS_DEF
+                + "func f(){ try{}catch(e *E | *!#IoError){} }");
+
+        // Non-class/interface type cannot be used as catch type
+        checkFail("struct S{} func f(){ try{}catch(e *S){} }");
+    }
+
+    @Test
+    public void testCatchWithInterface() {
+        // Interface can be used as catch type
+        var d = ERROR_CLASS_DEF
+                + "interface I { msg() int; } "
+                + "class IoError : Error (I) { func msg() int { return 0; } } ";
+        checkSucc(d + "func f(){ try{}catch(e *!#I){} }");
+
+        // Multi-type catch with interface (IoError implements I, so common ancestor exists)
+        checkSucc(d + "func f(){ try{}catch(e *!#IoError | *!#I){} }");
+    }
+
+    @Test
+    public void testCatchCoverage() {
+        var d = ERROR_CLASS_DEF
+                + "class IoError : Error {} class FmtError : Error {} ";
+
+        // Superclass catch before subclass catch — unreachable
+        checkFail(d + "func f(){ try{}catch(e *!#Error){}catch(e *!#IoError){} }");
+
+        // Subclass catch before superclass catch — valid
+        checkSucc(d + "func f(){ try{}catch(e *!#IoError){}catch(e *!#Error){} }");
+
+        // Same type catch — latter is unreachable
+        checkFail(d + "func f(){ try{}catch(e *!#Error){}catch(e *!#Error){} }");
+
+        // Multi-type covers single type
+        checkFail(d + "func f(){ try{}catch(e *!#IoError|*!#FmtError){}catch(e *!#IoError){} }");
+
+        // Sibling types do not cover each other
+        checkSucc(d + "func f(){ try{}catch(e *!#IoError){}catch(e *!#FmtError){} }");
+    }
+
+    @Test
+    public void testCatchCoverageWithInterface() {
+        var d = ERROR_CLASS_DEF
+                + "interface IError { msg() int; } "
+                + "class IoError : Error (IError) { func msg() int { return 0; } } ";
+
+        // Interface before implementation — unreachable
+        checkFail(d + "func f(){ try{}catch(e *IError){}catch(e *!#IoError){} }");
+
+        // Implementation before interface — valid
+        checkSucc(d + "func f(){ try{}catch(e *!#IoError){}catch(e *!#IError){} }");
     }
 
 }

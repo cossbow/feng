@@ -592,17 +592,17 @@ Only certain operators support customization:
 
 | Operator | Macro Name | Right Operand Type | Result Type  |
 |----------|------------|--------------------|--------------|
-| *        | mul        | Same as left       | Same as left |   
-| /        | div        | Same as left       | Same as left |   
-| %        | mod        | Same as left       | Same as left |   
-| +        | add        | Same as left       | Same as left |   
-| -        | sub        | Same as left       | Same as left |   
-| <        | lt         | Same as left       | bool         |   
-| <=       | le         | Same as left       | bool         |   
-| ==       | eq         | Same as left       | bool         |   
-| !=       | ne         | Same as left       | bool         |   
-| \>       | gt         | Same as left       | bool         |   
-| \>=      | ge         | Same as left       | bool         |   
+| *        | mul        | Same as left       | Same as left |
+| /        | div        | Same as left       | Same as left |
+| %        | mod        | Same as left       | Same as left |
+| +        | add        | Same as left       | Same as left |
+| -        | sub        | Same as left       | Same as left |
+| <        | lt         | Same as left       | bool         |
+| <=       | le         | Same as left       | bool         |
+| ==       | eq         | Same as left       | bool         |
+| !=       | ne         | Same as left       | bool         |
+| \>       | gt         | Same as left       | bool         |
+| \>=      | ge         | Same as left       | bool         |
 
 Example with complex numbers:
 
@@ -1120,18 +1120,18 @@ The unmodifiable marker is `#`, placed before the parameter parentheses. For exa
 ```feng
 class User {
    var id int;
-   
+
    func get#() int {
       // this.id = 0;            // ✖: Cannot modify field
       // id = 0;                 // ✖: Cannot modify field
       // *this = {};             // ✖: Cannot assign via dereference
       // const r &User = this;   // ✖: Cannot pass to mutable reference
-      
+
       // this.set(0);            // ✖: Cannot call mutable method
       // set(0);                 // ✖: Cannot call mutable method
       return id;
    }
-   
+
    func set(id int) {
       this.id = id;
    }
@@ -1148,13 +1148,13 @@ a [strong reference](#strong-reference-type):
 
 ```feng
 class User {
-   
+
    func foo*() {
       const r &User = this;      // ✔: Can be used as phantom reference by default
       const r *User = this;      // ✔: Can be used as strong reference
       gar();                     // ✔: Can call non-escaping method
    }
-   
+
    func gar() {
       const r &User = this;      // ✔: Can be used as phantom reference by default
       // const r *User = this;   // ✖: Cannot be used as strong reference
@@ -1553,7 +1553,7 @@ func test() {
    var a1 [*]int; // mappable
    var a2 [*][2]int; // mappable
    var a3 [*][3][4]int; // mappable
-   
+
    var a4 [*]*int; // not mappable
    var a4 [*][*]int; // not mappable
    var a4 [*][5]*int; // not mappable
@@ -2073,7 +2073,8 @@ Exception handling statements consist of three parts:
 1. `try` block: mandatory, wraps the code to be monitored.
 2. `catch` blocks: multiple allowed, each matching a different exception type. When matched, the corresponding code
    block executes; otherwise, matching continues.
-   If no block matches, the exception continues to propagate outward.
+   If no block matches, the exception continues to propagate outward. Since the caught instance must be escaped, the
+   catch type must be a [strong reference](#strong-reference-type), and must be declared as required and unmodifiable.
 3. `finally` block: executes regardless of whether an exception occurred or was caught.
    If a `return` statement exists in the `try` block, the expression after `return` is evaluated first, then the
    `finally` block executes, then the return is completed.
@@ -2088,9 +2089,9 @@ func calc() {
    try {
       step1();
       step2();
-   } catch(e *NilPointerError) {
+   } catch(e *!#NilPointerError) {
       println("Caught null pointer");
-   } catch(e *IllegalStateError | *IllegalArgumentError) {
+   } catch(e *!#IllegalStateError | *!#IllegalArgumentError) {
       println("Caught state error or argument error");
    } finally {
       println("Finally, execution continues after here");
@@ -2105,7 +2106,7 @@ With `catch` but no `finally`:
 func calc() {
    try {
       step1();
-   } catch(e *IllegalStateError) {
+   } catch(e *!#IllegalStateError) {
       println("Caught state error or argument error");
    }
    return getResult();
@@ -2191,7 +2192,7 @@ data:
    var b [4]Vector;
    b = a; // Copy data from a to b
    // Also equivalent to loop assignment
-   for (var i = 0; i < a.size; i++) 
+   for (var i = 0; i < a.size; i++)
        b[i] = a[i]; // Assignment refers to point 2 above
    b[0].x += 5.0; // Modifying b[0].x does not affect a; a[0].x remains '1.0'
    ```
@@ -2440,7 +2441,7 @@ func test() {
    // vec.x = 4.0; // Error
    const vecs [4]Vector = [{x=1.0,y=2.0,z=3.0}];
    // vecs[1].x = 4.0; // Error
-   const data Data = {v={x=1.0,y=2.0,z=3.0}}; 
+   const data Data = {v={x=1.0,y=2.0,z=3.0}};
    // data.ve.x = 4.0; // Error
 }
 ```
@@ -2869,7 +2870,7 @@ func test() {
 
 ## Exceptions _[Incomplete]_
 
-An exception class that can be thrown needs to define the `#error` macro `tracestack`, which tracks and collects stack
+An exception class that can be thrown needs to define the macro `error trace`, which tracks and collects stack
 information:
 
 ```feng
@@ -2880,12 +2881,12 @@ class Stack {
 export
 class Error {
    var stacks List`Stack`;
-   func tracestack(fn uint64, line uint32) {
+   func trace(fn uint64, line uint32) {
       var s Stack = {fn=fn,line=line};
       stacks.add(s);
    }
-   macro error tracestack(fn uint64, line uint32) {
-      tracestack(fn, line);
+   macro error trace(fn uint64, line uint32) {
+      trace(fn, line);
    }
 }
 ```

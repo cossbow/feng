@@ -1932,7 +1932,9 @@ func test() {
 
 ### 异常语句
 
-分为抛出和处理[异常](#异常-_未完成_)两种语句。
+分为抛出和处理异常两种语句。
+
+能逃逸的异常类型在[异常](#异常-_未完成_)中有规定，并且只能抛出一个逃逸的实例——`new`创建。
 
 #### 抛出异常
 
@@ -1957,18 +1959,17 @@ func example3() {
 
 如果发生了抛出异常，那这个会一直按调用链往外抛，直到被`catch`匹配到为止。
 
-抛出的异常的类型需要自己定义，在[异常](#异常-_未完成_)中详细说明。
-
-#### 处理异常
+#### 捕获异常
 
 异常处理语句分三个部分：
 
 1. `try`部分：必须的部分，将需要处理的代码块包裹起来。
 2. `catch`部分：可以有多个，分配匹配不同的异常类型。匹配到就执行对应的代码块，否则继续往后匹配。
-   如果没有都未匹配成功则继续往外抛出。
-3. `finally`部分：上面两部分无论什么情况，都必须执行这部分。
-   如果第1部分有`return`语句，先执行`return`后的表达式，再执行`finally`部分，最后再正式返回。
-   如果第2部分没有或者未捕获到异常，则先执行`finally`部分后继续抛出。
+   如果没有都未匹配成功则继续往外抛出。因为必须是逃逸的实例，捕获的类型只能是[强引用](#强引用类型)。
+   并且必须声明为非空、不可修改的强引用。
+3. `final`部分：上面两部分无论什么情况，都必须执行这部分。
+   如果第1部分有`return`语句，先执行`return`后的表达式，再执行`final`部分，最后再正式返回。
+   如果第2部分没有或者未捕获到异常，则先执行`final`部分后继续抛出。
 
 第2和3部分至少必须有一个。
 
@@ -1979,31 +1980,31 @@ func calc() {
    try {
       step1();
       step2();
-   } catch(e *NilPointerError) {
+   } catch(e *!#NilPointerError) {
       println("捕获到了空指针");
-   } catch(e *IllegalStateError | *IllegalArgumentError) {
+   } catch(e *!#IllegalStateError | *!#IllegalArgumentError) {
       println("捕获到了状态错误或者参数错误");
-   } finally {
+   } final {
       println("最终经过这里再往下执行");
    }
    return getResult();
 }
 ```
 
-没有`finally`部分，只有`catch`部分：
+没有`final`部分，只有`catch`部分：
 
 ```feng
 func calc() {
    try {
       step1();
-   } catch(e *IllegalStateError) {
+   } catch(e *!#IllegalStateError) {
       println("捕获到了状态错误或者参数错误");
    }
    return getResult();
 }
 ```
 
-没有`catch`部分，只有`finally`部分：
+没有`catch`部分，只有`final`部分：
 
 ```feng
 func calc() {
@@ -2011,13 +2012,13 @@ func calc() {
       step1();
       step2();
       return getResult();
-   } finally {
+   } final {
       println("最终经过这里再往下执行");
    }
 }
 ```
 
-`finally`可以用来释放外部资源，避免资源泄露。比如文件关闭：
+`final`可以用来释放外部资源，避免资源泄露。比如文件关闭：
 
 ```feng
 func readTxt() String {
@@ -2029,7 +2030,7 @@ func readTxt() String {
       step1(f);
       step2(f);
       return getTxt(f);
-   } finally {
+   } final {
       f.close();
    }
 }
@@ -2738,7 +2739,7 @@ func test() {
 
 ## 异常 _[未完成]_
 
-一个能被抛出的异常类需要定义`#error`宏`tracestack`，在这个宏里追踪并收集栈信息：
+能被抛出的异常类型只能是非final类，且需要定义宏`error trace`，在这个宏里追踪并收集栈信息：
 
 ```feng
 class Stack {
@@ -2748,12 +2749,12 @@ class Stack {
 export
 class Error {
    var stacks List`Stack`;
-   func tracestack(fn uint64, line uint32) {
+   func trace(fn uint64, line uint32) {
       var s Stack = {fn=fn,line=line};
       stacks.add(s);
    }
-   macro error tracestack(fn uint64, line uint32) {
-      tracestack(fn, line);
+   macro error trace(fn uint64, line uint32) {
+      trace(fn, line);
    }
 }
 ```

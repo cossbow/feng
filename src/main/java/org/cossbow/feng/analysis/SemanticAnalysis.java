@@ -804,6 +804,12 @@ public class SemanticAnalysis {
         cd.allFields().addAll(cd.fields());
         cd.allMethods().addAll(cd.methods());
 
+        // 填充 ancestors：沿 parent 链收集所有祖先类
+        cd.parent().use(pd -> {
+            cd.ancestors().add(pd);
+            cd.ancestors().addAll(pd.ancestors());
+        });
+
         if (!cd.parent().match(p ->
                 p != ClassDefinition.ObjectClass)) return;
         var pt = cd.inherit().must();
@@ -2540,32 +2546,241 @@ public class SemanticAnalysis {
         e.local(context.local().toList()); // 收集已声明变量，方便释放
         var g = optimize(e.exception());
         e.exception(g.a());
+
+        // Validate exception type
+        var td = g.b();
+        if (!(td instanceof DerivedTypeDeclarer dtd) ||
+                !dtd.isKind(STRONG) ||
+                !(dtd.def() instanceof ClassDefinition cd)
+                || cd.isFinal() || !cd.isErrorClass()) {
+            return semantic("only can throw a exception class: %s",
+                    td.pos());
+        }
+
         return e;
     }
 
     private Statement analyse(TryStatement e) {
         analyse(e.body());
         analyse(e.catchClauses());
+        checkCatchCoverage(e.catchClauses());
         analyse(e.finallyClause());
         return e;
+    }
+
+    /**
+     * Check catch clause coverage: if an earlier catch catches a supertype
+     * of a later catch, the later one is unreachable — report semantic error.
+     * Rule follows Java's unreachable catch check.
+     */
+    private void checkCatchCoverage(List<CatchClause> clauses) {
+        if (clauses.size() < 2) return;
+
+        var typeSets = new ArrayList<List<TypeDefinition>>(clauses.size());
+        for (var clause : clauses) {
+            var defs = clause.typeSet().stream()
+                    .filter(t -> t instanceof DerivedTypeDeclarer)
+                    .map(t -> ((DerivedTypeDeclarer) t).def())
+                    .toList();
+            typeSets.add(defs);
+        }
+
+        for (int i = 1; i < typeSets.size(); i++) {
+            var laterDefs = typeSets.get(i);
+            for (int j = 0; j < i; j++) {
+                if (isCoveredBy(laterDefs, typeSets.get(j))) {
+                    semantic("catch clause is already caught by earlier clause: %s",
+                            clauses.get(i).pos());
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Determine whether every type in 'later' can be matched by some type in 'earlier'
+     * (i.e., each type in 'later' is a descendant of some type in 'earlier').
+     */
+    private boolean isCoveredBy(List<TypeDefinition> later,
+                                List<TypeDefinition> earlier) {
+        for (var sub : later) {
+            boolean covered = false;
+            for (var sup : earlier) {
+                if (isSubtypeOf(sub, sup)) {
+                    covered = true;
+                    break;
+                }
+            }
+            if (!covered) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Determine whether 'sub' is a descendant of 'sup' (sub assignable to sup).
+     * Uses the populated ancestors() and allImpls().
+     */
+    private boolean isSubtypeOf(TypeDefinition sub, TypeDefinition sup) {
+        if (sub == sup) return true;
+        if (sub instanceof ClassDefinition cd) {
+            if (sup instanceof ClassDefinition scd) {
+                return cd.ancestors().contains(scd);
+            }
+            if (sup instanceof InterfaceDefinition sid) {
+                return cd.allImpls().contains(sid);
+            }
+        }
+        if (sub instanceof InterfaceDefinition iid
+                && sup instanceof InterfaceDefinition sid) {
+            // iid's parts transitive closure contains sid
+            return containsPart(iid, sid);
+        }
+        return false;
+    }
+
+    private boolean containsPart(InterfaceDefinition iid,
+                                 InterfaceDefinition target) {
+        for (var part : iid.partDefs) {
+            if (part == target) return true;
+            if (containsPart(part, target)) return true;
+        }
+        return false;
     }
 
     private Statement analyse(CatchClause e) {
         context.enterScope();
         var v = e.argument();
         analyse(v.modifier());
-        if (e.typeSet().size() > 1) {
-            // TODO: 推导类型的并集
-            return unsupported("catch multi types: %s",
-                    e.typeSet().get(1).pos());
-        } else {
-            v.type().set(e.typeSet().getFirst());
-        }
+
+        // Analyse all types
         for (var td : e.typeSet()) analyse(td);
+
+        // Validate catch type constraints
+        var defSet = validateCatchTypes(e.typeSet());
+
+        if (e.typeSet().size() == 1) {
+            v.type().set(e.typeSet().getFirst());
+        } else {
+            // Multiple types: infer lowest common ancestor
+            var lca = lowestCommonAncestor(defSet);
+            if (lca.none()) {
+                return semantic("catch types have no common ancestor: %s",
+                        e.typeSet().get(1).pos());
+            }
+            var fdt = (DerivedTypeDeclarer) e.typeSet().getFirst();
+            var dt = new DerivedType(fdt.pos(), lca.get().symbol(),
+                    TypeArguments.EMPTY);
+            findDef(dt);
+            var udt = new DerivedTypeDeclarer(fdt.pos(), dt, fdt.refer());
+            v.type().set(udt);
+        }
+
         context.putVar(v);
         analyse(e.body());
         context.exitScope(e);
         return e;
+    }
+
+    private Set<ObjectDefinition> validateCatchTypes(List<TypeDeclarer> types) {
+        var typeSet = new HashSet<ObjectDefinition>(types.size());
+        for (var td : types) {
+            if (!(td instanceof DerivedTypeDeclarer dtd)) {
+                return semantic("catch type must be class or interface: %s",
+                        td.pos());
+            }
+            var ref = dtd.refer();
+            if (ref.none() || !ref.get().isKind(STRONG) ||
+                    !ref.get().required() || !ref.get().unmodifiable()) {
+                return semantic("catch type must be required, unmodifiable and" +
+                        " strong-reference '%s': %s", dtd, dtd.pos());
+            }
+            var def = dtd.def();
+            if (!(def instanceof ObjectDefinition od)) {
+                return semantic("catch type must be class or interface: %s",
+                        dtd.pos());
+            }
+            if (def instanceof ClassDefinition cd && cd.isFinal()) {
+                return semantic("catch type must not be final class: %s", dtd.pos());
+            }
+            typeSet.add(od);
+        }
+        return typeSet;
+    }
+
+    /**
+     * Find the lowest common ancestor of multiple type definitions.
+     * All types must be DerivedTypeDeclarer with Refer.
+     * Returns the common ancestor as ObjectDefinition.
+     */
+    private Optional<ObjectDefinition> lowestCommonAncestor(
+            Set<ObjectDefinition> defSet) {
+        // Collect ancestor sets for each type (including itself)
+        var ancestorSets = new ArrayList<Set<ObjectDefinition>>(defSet.size());
+        for (var def : defSet) {
+            ancestorSets.add(collectAncestors(def));
+        }
+        if (ancestorSets.isEmpty()) return Optional.empty();
+
+        // Compute intersection
+        var common = new HashSet<>(ancestorSets.getFirst());
+        for (int i = 1; i < ancestorSets.size(); i++) {
+            common.retainAll(ancestorSets.get(i));
+        }
+        if (common.isEmpty()) return Optional.empty();
+
+        // Find the most specific ancestor in the intersection (not inherited by any other member)
+        ObjectDefinition mostSpecific = null;
+        for (var candidate : common) {
+            if (isMostSpecific(candidate, common)) {
+                mostSpecific = candidate;
+                break;
+            }
+        }
+        if (mostSpecific == null) {
+            // Fallback: pick Object
+            for (var c : common) {
+                if (c == ClassDefinition.ObjectClass) {
+                    mostSpecific = c;
+                    break;
+                }
+            }
+        }
+        if (mostSpecific == null) mostSpecific = common.iterator().next();
+
+        return Optional.of(mostSpecific);
+    }
+
+    private Set<ObjectDefinition> collectAncestors(ObjectDefinition def) {
+        var ancestors = new HashSet<ObjectDefinition>();
+        if (def instanceof ClassDefinition cd) {
+            ancestors.add(cd);
+            // Walk up the parent chain
+            var p = cd.parent();
+            while (p.has()) {
+                ancestors.add(p.get().get());
+                p = p.get().get().parent();
+            }
+            for (var id : cd.allImpls()) {
+                ancestors.add(id);
+            }
+        } else if (def instanceof InterfaceDefinition id) {
+            ancestors.add(id);
+            id.visitParts(ancestors::add);
+        }
+        return ancestors;
+    }
+
+    private boolean isMostSpecific(ObjectDefinition candidate,
+                                   Set<ObjectDefinition> common) {
+        for (var other : common) {
+            if (other == candidate) continue;
+            // If candidate is an ancestor of other, it is not the most specific
+            if (other instanceof ClassDefinition ocd &&
+                    ocd.ancestors().contains(candidate)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     //
@@ -4698,6 +4913,7 @@ public class SemanticAnalysis {
         macroResFree(cd);
         macroOperators(cd);
         macroIndexOperator(cd);
+        macroErrorTrace(cd);
     }
 
     private void macroResFree(ClassDefinition cd) {
@@ -4800,6 +5016,39 @@ public class SemanticAnalysis {
         var ms = os.map(m -> macroIndexSet(cd, m));
         var io = new IndexOperator(mg, ms);
         cd.indexOperator().set(io);
+    }
+
+    private void macroErrorTrace(ClassDefinition cd) {
+        var o = cd.macros().errorTrace();
+        if (o.none()) return;
+        var m = o.get();
+        if (!(m instanceof MacroFunc mf)) {
+            semantic("'%s' must be fun-macro: %s", m, m.pos());
+            return;
+        }
+        var mp = mf.procedure();
+        if (mp.params().size() != 2) {
+            semantic("'%s' require two parameters (fn uint64, line uint32): %s",
+                    mf, mf.pos());
+            return;
+        }
+
+        var params = new ArrayList<Parameter>(2);
+        for (var mv : mp.params()) {
+            if (mv.type().none()) {
+                semantic("error trace parameter must have type: %s", mv.pos());
+                return;
+            }
+            var td = mv.type().get();
+            analyse(td);
+            var v = new FixedParameter(mv.pos(), Modifier.empty(),
+                    mv.name(), td);
+            params.add(v);
+        }
+
+        var cm = macro2Method(cd, mf, params, Optional.empty(), false);
+        cd.methods().add(cm.name(), cm);
+        cd.errorTrace().set(cm);
     }
 
     private ClassMethod macroIndexGet(ClassDefinition cd, Macro m) {

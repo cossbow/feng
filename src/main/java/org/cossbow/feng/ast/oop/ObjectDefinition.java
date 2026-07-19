@@ -11,8 +11,9 @@ import java.util.List;
 /**
  * Type definition for implementing OOP
  */
-abstract
-public class ObjectDefinition extends TypeDefinition {
+abstract sealed
+public class ObjectDefinition extends TypeDefinition
+        permits ClassDefinition, InterfaceDefinition {
     public ObjectDefinition(Position pos,
                             Modifier modifier,
                             Symbol symbol,
