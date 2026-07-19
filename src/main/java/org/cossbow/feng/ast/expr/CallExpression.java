@@ -22,7 +22,7 @@ public class CallExpression extends PrimaryExpression {
     /**
      * The argument passed to the procedure
      */
-    private final List<Expression> arguments;
+    private List<Expression> arguments;
     /**
      * Variadic argument need to expand
      */
@@ -84,6 +84,10 @@ public class CallExpression extends PrimaryExpression {
 
     public List<Expression> arguments() {
         return arguments;
+    }
+
+    public void arguments(List<Expression> arguments) {
+        this.arguments = arguments;
     }
 
     public Optional<Prototype> prototype() {

@@ -58,7 +58,7 @@ public class TypeArguments extends Entity
     }
 
     /**
-     * check if this type contains type-paramster:
+     * check if this type contains type-parameter:
      * <p>
      * If {@code T} is type-parameter in this context, a type with
      * type-var is like: {@code T}, {@code List`T`}, etc.

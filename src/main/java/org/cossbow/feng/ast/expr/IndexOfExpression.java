@@ -36,6 +36,11 @@ public class IndexOfExpression extends PrimaryExpression {
     }
 
     @Override
+    public boolean unbound() {
+        return subject.unbound();
+    }
+
+    @Override
     public IndexOfExpression mirror() {
         return new IndexOfExpression(pos(), subject.mirror(), index.mirror());
     }

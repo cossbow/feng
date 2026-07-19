@@ -168,9 +168,11 @@ public class ArrayTypeDeclarer extends TypeDeclarer
     static final PrimitiveTypeDeclarer PARAM_INT = Primitive.INT.declarer();
     static final PrimitiveTypeDeclarer PARAM_BOOL = Primitive.BOOL.declarer();
 
-    static final ArrayMethod MethodSwap = new ArrayMethod("swap",
+    public static final
+    ArrayMethod MethodSwap = new ArrayMethod("swap",
             ParameterSet.anon(List.of(PARAM_INT, PARAM_INT)), false);
-    static final ArrayMethod MethodMove = new ArrayMethod("move",
+    public static final
+    ArrayMethod MethodMove = new ArrayMethod("move",
             ParameterSet.anon(List.of(PARAM_INT, PARAM_INT)), false);
 
     public static class ArrayMethod extends Method {

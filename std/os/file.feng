@@ -20,7 +20,7 @@ class File (Writer,Reader) {
 
     export
     func read(buf [&!]byte) int {
-        var n = fread(buf.values, 1, int32(buf.length), fp);
+        var n = fread(buf.values, 1, uint64(buf.length), fp);
         if (n <= 0) {
             return -1;
         }
@@ -32,13 +32,13 @@ class File (Writer,Reader) {
         if (offset>=data.length) return 0;
         var pos = data.values+uint64(offset);
         var len = length<data.length ? length : data.length;
-        var n = fwrite(pos, 1, int32(len), fp);
+        var n = fwrite(pos, 1, uint64(len), fp);
         return int(n);
     }
 
     export
     func seek(offset int, whence int) int {
-        var n = fseek(fp, int32(offset), int32(whence));
+        var n = fseek(fp, int64(offset), int32(whence));
         return int(n);
     }
 
@@ -99,16 +99,16 @@ func open(path [&!#]byte, mode OpenMode) *File {
     return file(fp);
 }
 
+func strLen(len int) int {
+    return len / 2;
+}
+
 export
 const stdin = file(__acrt_iob_func(0));
 export
 const stdout = file(__acrt_iob_func(1));
 export
 const stderr = file(__acrt_iob_func(2));
-
-func strLen(len int) int {
-    return len / 2;
-}
 
 export
 func printf(fmt [&!#]byte, ...) {

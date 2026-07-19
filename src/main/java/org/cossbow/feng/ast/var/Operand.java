@@ -28,22 +28,14 @@ public class Operand extends Entity {
      * Types of operand: derived
      */
     public final Lazy<TypeDeclarer> type = Lazy.nil();
-    /**
-     * Temporary variables used for relaying: not yet used
-     */
-    private final List<Variable> relay = new ArrayList<>();
 
     public Lazy<TypeDeclarer> type() {
         return type;
     }
 
-    public List<Variable> relay() {
-        return relay;
-    }
-
     /**
      * Deep copy for variadic inline expansion.
-     * Resets mutable state: type, relay.
+     * Resets mutable state: type.
      */
     public abstract Operand mirror();
 }

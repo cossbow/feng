@@ -56,4 +56,12 @@ public class MethodExpression extends PrimaryExpression {
     public String toString() {
         return subject + "." + method.name() + method.prototype();
     }
+
+    /**
+     * The method return value is a temporary value, unbound
+     */
+    @Override
+    public boolean unbound() {
+        return true;
+    }
 }

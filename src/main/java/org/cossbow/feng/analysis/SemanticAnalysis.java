@@ -49,7 +49,6 @@ import static org.cossbow.feng.util.ErrorUtil.*;
 public class SemanticAnalysis {
     private final ParseSymbolTable table;
     private final StackedContext context;
-    private final boolean low;
 
     // Constant expression calculator
     private final LiteralCalculator calculator = new LiteralCalculator();
@@ -59,21 +58,14 @@ public class SemanticAnalysis {
     private boolean used;
 
     public SemanticAnalysis(ParseSymbolTable table,
-                            SymbolContext root,
-                            boolean low) {
+                            SymbolContext root) {
         this.table = table;
         this.context = new StackedContext(root);
-        this.low = low;
         stringCache = new DedupCache<>(table.stringCache);
     }
 
-    public SemanticAnalysis(ParseSymbolTable table,
-                            boolean low) {
-        this(table, new GlobalSymbolContext(table), low);
-    }
-
     public SemanticAnalysis(ParseSymbolTable table) {
-        this(table, false);
+        this(table, new GlobalSymbolContext(table));
     }
 
     //
@@ -2128,13 +2120,6 @@ public class SemanticAnalysis {
         var g = optimize((Expression) e.call());
         if (g.a() instanceof CallExpression ce) {
             e.call(ce);
-            if (!needRelay(g.b())) return e;
-
-            var ve = makeRelay(ce);
-            var ds = new DeclarationStatement(e.pos(), List.of(ve.variable()));
-            var bs = new BlockStatement(e.pos(), List.of(ds));
-            e.replace().set(bs);
-            bs.stack(ds.variables());
             return e;
         }
 
@@ -3061,9 +3046,7 @@ public class SemanticAnalysis {
         }
 
         var s = (PrimaryExpression) sg.a();
-        var n = wrapRelayOperand(s, _s -> {
-            return new TupleOperand(op.pos(), _s, op.index());
-        });
+        var n = new TupleOperand(op.pos(), s, op.index());
         return Groups.g2(n, ttd.get(op.index()));
     }
 
@@ -3103,9 +3086,7 @@ public class SemanticAnalysis {
             return semantic("require array: %s", op.pos());
 
         var s = (PrimaryExpression) sg.a();
-        var n = wrapRelayOperand(s, _s -> {
-            return new IndexOperand(op.pos(), _s, ig.a());
-        });
+        var n = new IndexOperand(op.pos(), s, ig.a());
         return Groups.g2(n, atd.element());
     }
 
@@ -3140,9 +3121,7 @@ public class SemanticAnalysis {
             return semantic("unmodifiable operand '%s': %s", op, op.pos());
 
         var s = (PrimaryExpression) sg.a();
-        var n = wrapRelayOperand(s, _s -> {
-            return new FieldOperand(op.pos(), _s, name);
-        });
+        var n = new FieldOperand(op.pos(), s, name);
         var t = dtd.gm().mapIf(f.type());
         return Groups.g2(n, t);
     }
@@ -3186,9 +3165,7 @@ public class SemanticAnalysis {
             return semantic("unmodifiable operand '%s': %s", op, op.pos());
 
         var s = (PrimaryExpression) g.a();
-        var n = wrapRelayOperand(s, _s -> {
-            return new DereferOperand(op.pos(), _s);
-        });
+        var n = new DereferOperand(op.pos(), s);
         var t = g.b().derefer().must();
         return Groups.g2(n, t);
     }
@@ -3369,9 +3346,8 @@ public class SemanticAnalysis {
             return Groups.g2(n, t);
         }
 
-        var n = wrapRelayExpr(g.a(), t, a -> {
-            return new CheckNilExpression(e.pos(), a, nil);
-        });
+        var n = new CheckNilExpression(e.pos(), g.a(), nil);
+        n.resultType.set(t);
         return Groups.g2(n, t);
     }
 
@@ -3456,12 +3432,10 @@ public class SemanticAnalysis {
             var t = Primitive.BOOL.declarer(e.pos());
             var x = (PrimaryExpression) l.a();
             var y = (PrimaryExpression) r.a();
-            var n = wrapRelayExpr(x, y, t, (_x, _y) -> {
-                return new ReferEqualExpression(e.pos(),
-                        (PrimaryExpression) _x,
-                        (PrimaryExpression) _y,
-                        e.operator() == BinaryOperator.EQ);
-            });
+            var n = new ReferEqualExpression(e.pos(),
+                    (PrimaryExpression) x,
+                    (PrimaryExpression) y,
+                    e.operator() == BinaryOperator.EQ);
             return Groups.g2(n, t);
         }
         return semantic("not support %s %s %s: %s",
@@ -3712,13 +3686,12 @@ public class SemanticAnalysis {
     private void genericReplace(
             PrimaryExpression pe, GenericMap gm) {
         if (gm.isEmpty()) return;
-        if (pe instanceof SymbolExpression se) {
-            if (!se.generic().isEmpty()) return;
-            var fd = context.findFunc(se.symbol()).must();
-            se.generic(gm.mapAll(fd.generic()));
-        } else if (pe instanceof MethodExpression me) {
+        if (pe instanceof MethodExpression me) {
             if (!me.generic().isEmpty()) return;
             me.generic(gm.mapAll(me.method().generic()));
+        } else if (pe instanceof FunctionExpression fe) {
+            if (!fe.generic().isEmpty()) return;
+            fe.generic(gm.mapAll(fe.func().generic()));
         }
     }
 
@@ -3939,9 +3912,8 @@ public class SemanticAnalysis {
         var t = atd.element();
         var p = e.pos();
         var i = ie;
-        var n = wrapRelayExpr(a, t, _a -> {
-            return new IndexOfExpression(p, (PrimaryExpression) _a, i);
-        });
+        var n = new IndexOfExpression(p, (PrimaryExpression) a, i);
+        n.resultType.set(t);
         return Groups.g2(n, t);
     }
 
@@ -4066,10 +4038,9 @@ public class SemanticAnalysis {
         var f = o.get();
         var t = f.type();
 
-        var n = wrapRelayExpr(s, t, _s -> {
-            return new MemberOfExpression(_s.pos(),
-                    (PrimaryExpression) _s, f.name(), f);
-        });
+        var n = new MemberOfExpression(s.pos(),
+                (PrimaryExpression) s, f.name(), f);
+        n.resultType.set(t);
         return Groups.g2(n, t);
 
     }
@@ -4108,11 +4079,10 @@ public class SemanticAnalysis {
                 var f = checkExport(o.get(), cd, name);
                 var gm = st.gm();
                 var t = gm.mapIf(f.type());
-                var n = wrapRelayExpr(s, t, _s -> {
-                    return new MemberOfExpression(_s.pos(),
-                            (PrimaryExpression) _s,
-                            name, f);
-                });
+                var n = new MemberOfExpression(s.pos(),
+                        (PrimaryExpression) s,
+                        name, f);
+                n.resultType.set(t);
                 return Groups.g2(n, t);
             }
             return semantic("class '%s' not defined member '%s': %s",
@@ -4128,10 +4098,9 @@ public class SemanticAnalysis {
                     m.generic(), generic);
             var prot = gm.instantiate(m.prototype());
             var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
-            var n = wrapRelayExpr(s, t, _s -> {
-                return new MethodExpression(s.pos(),
-                        (PrimaryExpression) _s, m, generic);
-            });
+            var n = new MethodExpression(s.pos(),
+                    (PrimaryExpression) s, m, generic);
+            n.resultType.set(t);
             return Groups.g2(n, t);
         }
         var of = cd.allFields().tryGet(name);
@@ -4140,11 +4109,10 @@ public class SemanticAnalysis {
             var f = checkExport(of.get(), cd, name);
             if (f.type() instanceof FuncTypeDeclarer) {
                 var t = st.gm().mapIf(f.type());
-                var n = wrapRelayExpr(s, t, _s -> {
-                    return new MemberOfExpression(_s.pos(),
-                            (PrimaryExpression) _s, name,
-                            of.get());
-                });
+                var n = new MemberOfExpression(s.pos(),
+                        (PrimaryExpression) s, name,
+                        of.get());
+                n.resultType.set(t);
                 return Groups.g2(n, t);
             }
         }
@@ -4162,10 +4130,9 @@ public class SemanticAnalysis {
             var o = sd.fields().tryGet(name);
             if (o.has()) {
                 var f = o.get();
-                var n = wrapRelayExpr(s, f.type(), _s -> {
-                    return new MemberOfExpression(_s.pos(),
-                            (PrimaryExpression) _s, name, f);
-                });
+                var n = new MemberOfExpression(s.pos(),
+                        (PrimaryExpression) s, name, f);
+                n.resultType.set(f.type());
                 return Groups.g2(n, f.type());
             }
         } else if (def instanceof ClassDefinition cd) {
@@ -4182,10 +4149,9 @@ public class SemanticAnalysis {
                 checkUnmodifiable(s, m, name);
                 var prot = st.gm().instantiate(m.prototype());
                 var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
-                var n = wrapRelayExpr(s, t, _s -> {
-                    return new MethodExpression(s.pos(),
-                            (PrimaryExpression) _s, m, generic);
-                });
+                var n = new MethodExpression(s.pos(),
+                        (PrimaryExpression) s, m, generic);
+                n.resultType.set(t);
                 return Groups.g2(n, t);
             }
         } else if (def instanceof EnumDefinition ed) {
@@ -4698,9 +4664,8 @@ public class SemanticAnalysis {
         var s = (PrimaryExpression) g.a();
         checkOptional(s);
         var t = g.b().derefer().must();
-        var n = wrapRelayExpr(s, t, _s -> {
-            return new DereferExpression(e.pos(), (PrimaryExpression) _s);
-        });
+        var n = new DereferExpression(e.pos(), s);
+        n.resultType.set(t);
         return Groups.g2(n, t);
     }
 
@@ -4801,134 +4766,6 @@ public class SemanticAnalysis {
     // 2. When indirectly calling a method (e.g., a.b.run()),
     //    the called process or other threads may modify the field,
     //    leading to premature release.
-    // Warning: It's incomplete now, requires refactor.
-
-    private boolean needRelay(TypeDeclarer t) {
-        if (!low) return false;
-        if (t.maybeRefer().has()) return true; // 引用需要释放
-
-        // 返回值的情况
-        if (t instanceof DerivedTypeDeclarer dtd) {
-            if (!(dtd.def() instanceof ClassDefinition cd))
-                return false;
-            // 如果是类对象则需要释放
-            for (var f : cd.allFields()) {
-                if (needRelay(f.type()))
-                    return true;
-            }
-            return false;
-        }
-        if (t instanceof ArrayTypeDeclarer atd) {
-            if (atd.len() == 0) return false;
-            // 检查数组元素
-            return needRelay(atd.element());
-        }
-        return false;
-    }
-
-    private boolean needRelay(Expression e) {
-        if (!low) return false;
-        if (e instanceof NewExpression)
-            return true; // new创建的一定是
-        if (e instanceof CallExpression ce) {
-            var p = ce.prototype().must();
-            if (p.returnSet().none()) return false; // 无返回值
-            var t = p.returnSet().get();
-            return needRelay(t);
-        }
-        if (e instanceof BlockExpression be
-                && be.origin().has()) {
-            return needRelay(be.resultType.must());
-        }
-        return false;
-    }
-
-    private Variable makeTmpVar(String name, Expression e) {
-        var im = unmodifiable(e, false);
-        var vn = new Identifier(e.pos(), name, true);
-        return new Variable(e.pos(), Modifier.empty(),
-                im ? Declare.CONST : Declare.VAR,
-                vn, e.resultType, Lazy.of(e));
-    }
-
-    private VariableExpression makeRelay(Expression e) {
-        var v = makeTmpVar("feng$tmp_relay", e);
-        var ve = new VariableExpression(e.pos(), v);
-        ve.resultType.set(v.type());
-        return ve;
-    }
-
-    private Expression wrapRelay(
-            Expression s, TypeDeclarer t,
-            Function<? super Expression, ? extends Expression> c) {
-        var relay = makeRelay(s);
-        var n = c.apply(relay);
-        n.resultType.set(t);
-        var v2 = makeTmpVar("feng$tmp_result", n);
-
-        var ds = new DeclarationStatement(n.pos(),
-                CommonUtil.list(relay.variable(), v2));
-        var result = new VariableExpression(v2.pos(), v2);
-        var be = new BlockExpression(n.pos(),
-                CommonUtil.list(ds), result);
-        be.stack(ds.variables());
-        be.origin().set(n);
-        be.resultType.set(t);
-        return be;
-    }
-
-    private Expression wrapRelayExpr(
-            Expression s, TypeDeclarer t,
-            Function<? super Expression, ? extends Expression> c) {
-        if (!needRelay(s)) {
-            var n = c.apply(s);
-            n.resultType.set(t);
-            return n;
-        }
-        return wrapRelay(s, t, c);
-    }
-
-    private Expression wrapRelayExpr(
-            Expression a, Expression b,
-            TypeDeclarer t,
-            BiFunction<? super Expression, ? super Expression,
-                                ? extends Expression> c) {
-        var ca = needRelay(a);
-        var cb = needRelay(b);
-        if (!ca && !cb) return c.apply(a, b);
-
-        if (!cb)
-            return wrapRelayExpr(a, t, _a -> c.apply(_a, b));
-        if (!ca)
-            return wrapRelayExpr(b, t, _b -> c.apply(a, _b));
-
-        var v1 = makeTmpVar("feng$tmp_relay", a);
-        var r1 = new VariableExpression(v1.pos(), v1);
-        var v2 = makeTmpVar("feng$tmp_relay", a);
-        var r2 = new VariableExpression(v1.pos(), v2);
-        var n = c.apply(r1, r2);
-        n.resultType.set(t);
-        var vr = makeTmpVar("feng$tmp_result", n);
-
-        var ds = new DeclarationStatement(n.pos(), List.of(v1, v2, vr));
-        var result = new VariableExpression(vr.pos(), vr);
-        var be = new BlockExpression(n.pos(), List.of(ds), result);
-        be.stack(ds.variables());
-        be.origin().set(n);
-        return be;
-    }
-
-    private Operand wrapRelayOperand(
-            PrimaryExpression s,
-            Function<PrimaryExpression, Operand> c) {
-        if (!needRelay(s)) return c.apply(s);
-
-        var ve = makeRelay(s);
-        var n = c.apply(ve);
-        n.relay().add(ve.variable());
-        return n;
-    }
-
 
     // macro
 
@@ -5150,17 +4987,35 @@ public class SemanticAnalysis {
 
     // variadic expand
 
+    private Optional<FunctionExpression>
+    checkVariadicFunc(PrimaryExpression pe) {
+        if (pe instanceof FunctionExpression fe) {
+            invalid(fe.generic());
+            return Optional.of(fe);
+        }
+        if (pe instanceof SymbolExpression se) {
+            var o = context.findFunc(se.symbol());
+            if (o.has()) {
+                var fe = new FunctionExpression(pe.pos(),
+                        o.get(), se.generic());
+                return Optional.of(fe);
+            }
+        }
+        return Optional.empty();
+    }
+
     private Optional<Groups.G2<Expression, TypeDeclarer>>
     expand(CallExpression ce) {
         // During variadic body analysis, skip expansion
         if (enterFunc == null || enterFunc.variadic())
             return Optional.empty();
         // Check if the target of the call is the format function
-        if (!(ce.callee() instanceof SymbolExpression se))
+        var o = checkVariadicFunc(ce.callee());
+        if (o.none()) return Optional.empty();
+        var fe = o.get();
+        if (!FunctionDefinition.FORMAT_FUNC.equals(fe.func()))
             return Optional.empty();
-        if (!FunctionDefinition.FORMAT_FUNC.symbol().equals(se.symbol()))
-            return Optional.empty();
-        invalid(se.generic());
+        invalid(fe.generic());
 
         // Requires at least 2 arguments: output + format string
         // Spread variadic arguments before counting
@@ -5292,6 +5147,13 @@ public class SemanticAnalysis {
      * Returns a BlockStatement containing the buffer declaration + conversion
      * call + write call.
      */
+    // fmt helper
+    private Variable makeFmtVar(String name, Expression e) {
+        var vn = new Identifier(e.pos(), name, true);
+        return new Variable(e.pos(), Modifier.empty(),
+                Declare.VAR, vn, e.resultType, Lazy.of(e));
+    }
+
     private Statement formatPrimitive(
             Primitive prim, PrimaryExpression arg,
             PrimaryExpression out) {
@@ -5311,7 +5173,7 @@ public class SemanticAnalysis {
         // The convert result variable holds the returned length
         var convCall = new CallExpression(pos, convSym, List.of(arg, bufExpr), false);
         convCall.resultType.set(Primitive.INT.declarer());
-        var lenVar = makeTmpVar("_len", convCall);
+        var lenVar = makeFmtVar("_len", convCall);
         var lenExpr = new VariableExpression(pos, lenVar);
 
         // 3. Write: out.write(buf, 0, len)
@@ -5349,12 +5211,10 @@ public class SemanticAnalysis {
     expandVariadic(CallExpression ce) {
         if (enterFunc == null || enterFunc.variadic())
             return Optional.empty();
-        if (!(ce.callee() instanceof SymbolExpression se))
-            return Optional.empty();
-        // Look up the function definition by name (local module + builtins)
-        var def = context.findFunc(se.symbol());
-        if (def.none()) return Optional.empty();
-        var fd = def.get();
+        var o = checkVariadicFunc(ce.callee());
+        if (o.none()) return Optional.empty();
+        var fe = o.get();
+        var fd = fe.func();
         if (!fd.prototype().variadic())
             return Optional.empty();
         if (fd.procedure().none())
@@ -5363,6 +5223,7 @@ public class SemanticAnalysis {
         if (!fd.procedure().get().labels().isEmpty()) {
             return semantic("variadic function with labels cannot be inlined: %s", fd.symbol());
         }
+        invalid(fe.generic());
 
         var be = expandInlined(fd, ce, ce.pos());
         return Optional.of(optimize(be));

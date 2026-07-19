@@ -13,10 +13,8 @@ import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.dag.DAGGraph;
-import org.cossbow.feng.util.CommonUtil;
-import org.cossbow.feng.util.Groups;
+import org.cossbow.feng.util.*;
 import org.cossbow.feng.util.Optional;
-import org.cossbow.feng.util.RepeatList;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -32,7 +30,7 @@ import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
 import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
-public class CppGenerator {
+public class CppGenerator implements Generator {
     private final AnalyseSymbolTable table;
     private final Appendable out;
     private final boolean header;
@@ -58,19 +56,42 @@ public class CppGenerator {
     static final String baseHeader = "cpp11/Header.h";
     static final String mainFile = "cpp11/Main.cpp";
 
+    public static final Factory FACTORY = new Factory() {
+        @Override
+        public Generator create(AnalyseSymbolTable ast, Appendable out, boolean header, boolean debug) {
+            return new CppGenerator(ast, out, header, debug);
+        }
+
+        @Override
+        public String extension() {
+            return ".cpp";
+        }
+
+        @Override
+        public void copyBaseHeader(Path dir) {
+            try (var is = getResource(baseHeader)) {
+                Files.copy(is, dir.resolve("Header.h"),
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw ErrorUtil.sneaky(e);
+            }
+        }
+
+        @Override
+        public String compiler() {
+            return "c++";
+        }
+
+        @Override
+        public String version() {
+            return "c++20";
+        }
+    };
+
     private static InputStream getResource(String res) {
         var cl = Thread.currentThread().getContextClassLoader();
         return new BufferedInputStream(Objects.requireNonNull(
                 cl.getResourceAsStream(res)));
-    }
-
-    public static void copyBaseHeader(Path dir) {
-        try (var is = getResource(baseHeader)) {
-            Files.copy(is, dir.resolve("Header.h"),
-                    StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 
 
@@ -301,6 +322,7 @@ public class CppGenerator {
     }
 
     void declareType(StructureDefinition def) {
+        if (def.cType()) return; // C-imported struct: handled by bridge header
         write(def.generic());
         write(def.domain().name).write(' ');
         write(def.symbol());
@@ -374,6 +396,7 @@ public class CppGenerator {
     }
 
     void declareFunction(FunctionDefinition fd) {
+        if (fd.procedure().none()) return; // C-imported: handled by bridge header
         write(fd.generic());
         write(fd.symbol(), fd.prototype());
         endStmt();
@@ -680,6 +703,7 @@ public class CppGenerator {
     }
 
     private CppGenerator write(StructureDefinition sd) {
+        if (sd.cType()) return this; // C-imported struct: handled by bridge header
         write(sd.domain().name).write(' ');
         write(sd.symbol());
         write('{').indent();
@@ -690,7 +714,8 @@ public class CppGenerator {
         write("static_assert(sizeof(");
         write(sd.domain().name).write(' ');
         write(sd.symbol()).write(") == ");
-        write(sd.layout().must().size()).write(')');
+        var size = sd.layout().must().size();
+        write(Math.max(size, 1)).write(')');
         return endStmt();
     }
 
@@ -750,7 +775,6 @@ public class CppGenerator {
         if (table.module.has()) {
             if (!header) return;
         }
-        if (id.builtin()) return;
         write(id.generic());
         write("class ");
         write(id.symbol());
@@ -1804,10 +1828,9 @@ public class CppGenerator {
 
     private CppGenerator write(BlockExpression e) {
         write("({").indent();
-        write(e.block());
-        var re = e.result();
-        var rt = re.resultType.must();
-        writeValue(re, rt).endStmt();
+        for (var s : e.block()) write(s);
+        var rt = e.result().resultType.getOrElse(e.resultType);
+        writeValue(e.result(), rt.must()).endStmt();
         return dedent().write("})");
     }
 

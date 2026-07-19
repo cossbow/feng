@@ -20,6 +20,10 @@ class B:A {
     func run() {
     }
 }
+class C {
+    var a A;
+    func test() {}
+}
 func object1() {
     {
         var x *A = nil;
@@ -55,6 +59,12 @@ func object1() {
 
     var i *I = new(B);
     i.clone().clone().run();
+
+    {
+        var c C;
+        c.test();
+        c.a.run();
+    }
 }
 
 

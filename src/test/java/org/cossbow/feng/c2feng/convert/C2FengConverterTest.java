@@ -171,7 +171,7 @@ public class C2FengConverterTest {
         // static → no export
         conv.addGlobalVar(new CGlobalVar("internal",
                 new CPrimitiveType("int"), false, CLinkage.STATIC));
-        // extern → skipped
+        // extern → imported, not exported (defined elsewhere)
         conv.addGlobalVar(new CGlobalVar("external_var",
                 new CPrimitiveType("int"), false, CLinkage.EXTERN));
 
@@ -184,7 +184,7 @@ public class C2FengConverterTest {
 
         assertTrue(result.contains("export var errno int32;"));
         assertTrue(result.contains("var internal int32;"));   // no export
-        assertFalse(result.contains("external_var"));       // extern skipped
+        assertTrue(result.contains("var external_var int32;")); // extern imported, no export
     }
 
     @Test

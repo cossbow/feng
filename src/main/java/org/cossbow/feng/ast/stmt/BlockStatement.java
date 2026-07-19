@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class BlockStatement extends Statement implements Scope {
-    private final List<Statement> list;
+    private List<Statement> list;
     private final boolean newScope;
 
     public BlockStatement(Position pos,
@@ -26,6 +26,10 @@ public class BlockStatement extends Statement implements Scope {
 
     public List<Statement> list() {
         return list;
+    }
+
+    public void list(List<Statement> list) {
+        this.list = list;
     }
 
     public int size() {

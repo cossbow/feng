@@ -1,0 +1,458 @@
+package org.cossbow.feng;
+
+import org.cossbow.feng.analysis.AnalyseSymbolTable;
+import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.dcl.PrimitiveTypeDeclarer;
+import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.mod.FModule;
+import org.cossbow.feng.ast.mod.ModulePath;
+import org.cossbow.feng.ast.proc.FixedParameter;
+import org.cossbow.feng.coder.CGenerator;
+import org.cossbow.feng.coder.CppGenerator;
+import org.cossbow.feng.coder.Generator;
+import org.cossbow.feng.dag.DAGGraph;
+import org.cossbow.feng.mod.ModuleAnalysis;
+import org.cossbow.feng.mod.ModuleParser;
+import org.cossbow.feng.util.Command;
+import org.cossbow.feng.util.CommonUtil;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+import static org.cossbow.feng.util.CommonUtil.letters;
+import static org.cossbow.feng.util.ErrorUtil.argument;
+
+/**
+ * Compilation engine: generates C/C++ code for Feng modules,
+ * produces build system files, and invokes the native compiler.
+ * <p>
+ * Reusable from both CLI ({@link CompilerMain}) and tests.
+ */
+public class Compiler {
+
+    public enum Build {
+        MAKE,
+        CMAKE,
+    }
+
+    private final Generator.Factory factory;
+    private boolean debug;
+    private String pkg;
+    private Map<String, String> lib = Map.of();
+    private Build build = Build.MAKE;
+
+    public Compiler(Generator.Factory factory) {
+        this.factory = CommonUtil.required(factory);
+    }
+
+    public Compiler debug(boolean debug) {
+        this.debug = debug;
+        return this;
+    }
+
+    public Compiler pkg(String pkg) {
+        this.pkg = pkg;
+        return this;
+    }
+
+    public Compiler lib(Map<String, String> lib) {
+        this.lib = lib;
+        return this;
+    }
+
+    public Compiler buildSystem(Build build) {
+        this.build = build;
+        return this;
+    }
+
+    // ---- public entry points ----
+
+    /**
+     * Compile a single source file.
+     */
+    public void compileFile(Path input, Path output)
+            throws IOException {
+        if (!Files.isRegularFile(input)) {
+            throw new IllegalArgumentException(input + " is not a regular file");
+        }
+        var fn = input.getFileName();
+        this.pkg = letters(CommonUtil.trimExt(fn.toString()));
+        var fm = parser(this.pkg, input.getParent(), this.lib).parseFile(fn);
+        compile(fm, output);
+    }
+
+    /**
+     * Compile a single module (directory).
+     */
+    public void compileModule(Path input, Path output)
+            throws IOException {
+        if (!Files.isDirectory(input)) {
+            throw new IllegalArgumentException(input + " is not a dir");
+        }
+        var dir = input.getParent();
+        var fn = input.getFileName();
+        if (this.pkg == null) this.pkg = letters(fn.toString());
+        var dag = parser(this.pkg, dir, this.lib).parseModule(fn);
+        compile(dag, output);
+    }
+
+    /**
+     * Compile an entire package (directory tree).
+     */
+    public void compilePackage(Path input, Path output)
+            throws IOException {
+        if (!Files.isDirectory(input)) {
+            throw new IllegalArgumentException(input + " is not a dir");
+        }
+        if (this.pkg == null)
+            this.pkg = letters(input.getFileName().toString());
+        var dag = parser(this.pkg, input, this.lib).parsePackage();
+        compile(dag, output);
+    }
+    // ---- parser helpers ----
+
+    private static Path toPath(String value) {
+        try {
+            return Paths.get(value);
+        } catch (InvalidPathException e) {
+            return argument("invalid path: %s", value);
+        }
+    }
+
+    private static Map<Identifier, ModuleParser> getLibParsers(
+            String pkg, Map<String, String> lib) {
+        if (lib == null || lib.isEmpty()) return Map.of();
+        var parsers = new HashMap<Identifier, ModuleParser>();
+        if (lib.containsKey(pkg)) {
+            return argument("package conflict with library '%s'",
+                    pkg);
+        }
+        for (var le : lib.entrySet()) {
+            var base = toPath(le.getValue());
+            var p = new ModuleParser(le.getKey(), base, UTF_8);
+            if (parsers.put(p.pkg(), p) != null) {
+                return argument("package '%s' conflict in libraries",
+                        le.getKey());
+            }
+        }
+        return parsers;
+    }
+
+    private static ModuleParser parser(
+            String pkg, Path dir,
+            Map<String, String> lib) {
+        return new ModuleParser(pkg, dir, UTF_8,
+                getLibParsers(pkg, lib));
+    }
+
+    // ---- core pipeline ----
+
+    public void compile(DAGGraph<FModule> dag, Path dir)
+            throws IOException {
+        var moduleNames = new ArrayList<String>();
+        new ModuleAnalysis().analyse(dag);
+        factory.copyBaseHeader(dir);
+
+        // Build map of all analyzed module tables for cross-module generic lookup
+        Map<ModulePath, AnalyseSymbolTable> imported = new java.util.HashMap<>();
+        for (var fm : dag) {
+            imported.put(fm.path(), fm.result.must());
+        }
+
+        // Collect all C source files from all modules
+        var allCSources = new ArrayList<Path>();
+        boolean hasMain = false;
+        for (var fm : dag) {
+            var mp = fm.path();
+            var ast = fm.result.must();
+            if (!hasMain) {
+                hasMain = ast.main.has();
+            }
+            if (!fm.cSources().isEmpty()) {
+                // Pure C module — generate bridge header, copy sources, skip generation
+                genBridgeHeader(fm, dir);
+                copyCSources(fm, dir);
+                allCSources.addAll(fm.cSources());
+            } else if (!fm.headerFiles().isEmpty()) {
+                // C header-only module
+                generate(ast, dir, mp.filename(), moduleNames, imported);
+                copyCSources(fm, dir);
+                genBridgeHeader(fm, dir);
+            } else {
+                generate(ast, dir, mp.filename(), moduleNames, imported);
+            }
+        }
+        if (build == Build.MAKE) {
+            generateMakefile(dir, moduleNames, allCSources, hasMain);
+        } else {
+            generateCMakeLists(dir, moduleNames, allCSources, hasMain);
+        }
+        runBuild(dir);
+    }
+
+    // ---- single-module code generation ----
+
+    void generate(AnalyseSymbolTable ast, Path dir, String name,
+                  List<String> moduleNames,
+                  Map<ModulePath, AnalyseSymbolTable> importedTables) throws IOException {
+        var ext = factory.extension();
+        var src = dir.resolve(name + ext);
+        try (var w = Files.newBufferedWriter(src, UTF_8)) {
+            var gen = factory.create(ast, w, false, debug);
+            if (gen instanceof CGenerator cg) cg.importedTables(importedTables);
+            gen.write();
+        }
+        var header = dir.resolve(name + ".h");
+        try (var w = Files.newBufferedWriter(header, UTF_8)) {
+            var gen = factory.create(ast, w, true, debug);
+            if (gen instanceof CGenerator cg) cg.importedTables(importedTables);
+            gen.write();
+        }
+        moduleNames.add(name);
+    }
+
+    // ---- bridge header for C modules ----
+
+    void genBridgeHeader(FModule fm, Path dir) throws IOException {
+        var name = fm.path().filename();
+        var isC = factory.extension().equals(".c");
+        var pureC = !fm.cSources().isEmpty();
+        // Pure-C module: write bridge content directly as the module header
+        // Header-only module: write bridge as _bridge.h, append include to .h
+        var outPath = pureC ? dir.resolve(name + ".h") : dir.resolve(name + "_bridge.h");
+
+        try (var w = Files.newBufferedWriter(outPath, UTF_8)) {
+            w.write("// auto-generated bridge for " + (isC ? "C" : "C++") + " functions: " + name + "\n\n");
+            // Include the original C headers so function declarations are visible
+            if (!isC && !fm.headerFiles().isEmpty()) w.write("extern \"C\" {\n");
+            for (var h : fm.headerFiles()) {
+                w.write("#include \"");
+                w.write(h.getFileName().toString());
+                w.write("\"\n");
+            }
+            if (!isC && !fm.headerFiles().isEmpty()) w.write("}\n");
+            if (!fm.headerFiles().isEmpty()) w.write("\n");
+            // Typedef for struct/union types
+            var ast = fm.result.must();
+            for (var sd : ast.dagStructures) {
+                w.write("typedef ");
+                w.append(sd.domain().name).append(' ');
+                w.append(sd.symbol().name().value()).append(' ');
+                w.append(fm.path().toString()).append('$');
+                w.write(sd.symbol().name().value());
+                w.write(";\n");
+            }
+            for (var fd : ast.functionList) {
+                if (fd.builtin() || fd.procedure().has()) continue;
+                var cName = fd.symbol().name().value();
+                // Skip C implementation-reserved identifiers (names starting
+                // with '_') that pollute system headers, except for explicitly
+                // needed functions like __acrt_iob_func.
+                if (cName.startsWith("_") && !"__acrt_iob_func".equals(cName)) continue;
+                var prefix = fm.path().toString() + "$";
+                var retType = cTypeOf(fd.prototype().returnType());
+                var inlineKw = isC ? "static inline " : "inline ";
+                w.write(inlineKw + retType + " ");
+                w.write(prefix);
+                w.write(fd.symbol().name().value());
+                w.write("(");
+                boolean first = true;
+                int paramIdx = 0;
+                for (var p : fd.prototype().parameterSet()) {
+                    if (!first) w.write(", ");
+                    first = false;
+                    var fp = (FixedParameter) p;
+                    w.write(cTypeOf(fp.type()));
+                    w.write(' ');
+                    var pName = fp.name().get().value();
+                    if (pName.isEmpty()) pName = "_" + paramIdx;
+                    w.write(pName);
+                    paramIdx++;
+                }
+                if (isC) {
+                    // C: cast function pointer directly
+                    w.write(") {\n\treturn ((");
+                } else {
+                    // C++: using + reinterpret_cast
+                    w.write(") {\n\tusing F = ");
+                }
+                w.write(retType);
+                w.write("(*)(");
+                first = true;
+                for (var p : fd.prototype().parameterSet()) {
+                    if (!first) w.write(", ");
+                    first = false;
+                    var fp = (FixedParameter) p;
+                    w.write(cTypeOf(fp.type()));
+                }
+                if (isC) {
+                    w.write("))");
+                } else {
+                    w.write(");\n\treturn reinterpret_cast<F>(");
+                }
+                w.write(fd.symbol().name().value());
+                w.write(")(");
+                first = true;
+                paramIdx = 0;
+                for (var p : fd.prototype().parameterSet()) {
+                    if (!first) w.write(", ");
+                    first = false;
+                    var fp = (FixedParameter) p;
+                    var pName = fp.name().get().value();
+                    if (pName.isEmpty()) pName = "_" + paramIdx;
+                    w.write(pName);
+                    paramIdx++;
+                }
+                w.write(");\n}\n");
+            }
+        }
+
+        // For header-only modules, append bridge include to the module's .h
+        if (!pureC) {
+            var hPath = dir.resolve(name + ".h");
+            try (var w = Files.newBufferedWriter(hPath, UTF_8,
+                    java.nio.file.StandardOpenOption.APPEND)) {
+                w.write("\n#include \"" + name + "_bridge.h\"\n");
+            }
+        }
+    }
+
+    // ---- build execution ----
+
+    void runBuild(Path dir) {
+        if (build == Build.CMAKE) {
+            var isC = factory.extension().equals(".c");
+            var cmakeArgs = new ArrayList<String>();
+            cmakeArgs.add("cmake");
+            if (System.getProperty("os.name", "").startsWith("Windows")) {
+                cmakeArgs.add("-G");
+                cmakeArgs.add("MinGW Makefiles");
+            }
+            cmakeArgs.add(".");
+            cmakeArgs.add("-DCMAKE_C_COMPILER=cc");
+            if (!isC) cmakeArgs.add("-DCMAKE_CXX_COMPILER=c++");
+            var ret = new Command(dir, cmakeArgs).exec();
+            if (ret.code() != 0) {
+                System.err.printf("cmake configure failed (exit %d): %s",
+                        ret.code(), ret.err());
+                return;
+            }
+            ret = new Command(dir, "cmake", "--build", ".").exec();
+            if (ret.code() != 0) {
+                System.err.printf("build failed (exit %d): %s",
+                        ret.code(), ret.err());
+            }
+        } else {
+            var ret = new Command(dir, "make").exec();
+            if (ret.code() != 0) {
+                System.err.printf("build failed (exit %d): %s",
+                        ret.code(), ret.err());
+            }
+        }
+    }
+
+    // ---- build system generation ----
+
+    void generateCMakeLists(Path dir, List<String> moduleNames,
+                            List<Path> cSources, boolean hasMain) throws IOException {
+        var isC = factory.extension().equals(".c");
+        var langStandard = isC ? "C_STANDARD 11" : "CXX_STANDARD 20";
+        try (var w = Files.newBufferedWriter(dir.resolve("CMakeLists.txt"), UTF_8)) {
+            w.write("cmake_minimum_required(VERSION 3.16)\n");
+            w.write("project(" + pkg + ")\n\n");
+            w.write("set(CMAKE_" + langStandard + ")\n");
+            w.write("set(CMAKE_" + (isC ? "C" : "CXX") + "_STANDARD_REQUIRED ON)\n\n");
+
+            w.write("file(GLOB SOURCES \"*." + (isC ? "c" : "cpp") + "\")\n");
+            if (!isC && !cSources.isEmpty()) {
+                w.write("file(GLOB C_SOURCES \"*.c\")\n");
+                w.write("set_source_files_properties(${C_SOURCES} PROPERTIES LANGUAGE C)\n");
+            }
+            if (hasMain) {
+                w.write("\nadd_executable(${PROJECT_NAME} ${SOURCES}");
+            } else {
+                w.write("\nadd_library(${PROJECT_NAME} STATIC ${SOURCES}");
+            }
+            if (!isC && !cSources.isEmpty()) w.write(" ${C_SOURCES}");
+            w.write(")\n");
+        }
+    }
+
+    void generateMakefile(Path dir, List<String> moduleNames,
+                          List<Path> cSources, boolean hasMain) throws IOException {
+        var isC = factory.extension().equals(".c");
+        var srcExt = isC ? ".c" : ".cpp";
+        var compilerVar = isC ? "CC" : "CXX";
+        var flagsVar = isC ? "CFLAGS" : "CXXFLAGS";
+        var stdFlag = isC ? "--std=c11" : "--std=c++20";
+        var arVar = "AR";
+        try (var w = Files.newBufferedWriter(dir.resolve("Makefile"), UTF_8)) {
+            w.write("# Makefile for Fēng generated " + (isC ? "C" : "C++") + " code\n");
+            w.write("# Generated by the Fēng compiler\n\n");
+
+            w.write(compilerVar + " ?= " + (isC ? "cc" : "c++") + "\n");
+            if (!isC) w.write("CC ?= cc\n");
+            w.write(flagsVar + " ?= " + stdFlag + " -O2\n");
+            if (!isC) w.write("CFLAGS ?= --std=c11 -O2\n\n");
+            else w.write("\n");
+
+            w.write("SRCS := $(wildcard *" + srcExt + ")\n");
+            if (!isC && !cSources.isEmpty()) {
+                w.write("C_SRCS := $(wildcard *.c)\n");
+                w.write("C_OBJS := $(C_SRCS:.c=.o)\n");
+            }
+            w.write("OBJS := $(SRCS:" + srcExt + "=.o)");
+            if (!isC && !cSources.isEmpty()) w.write(" $(C_OBJS)");
+            w.write("\n");
+            if (hasMain) {
+                w.write("TARGET := " + pkg + "\n\n");
+                w.write("$(TARGET): $(OBJS)\n");
+                w.write("\t$(" + compilerVar + ") $(" + flagsVar + ") -o $@ $^\n\n");
+            } else {
+                w.write("TARGET := lib" + pkg + ".a\n\n");
+                w.write("$(TARGET): $(OBJS)\n");
+                w.write("\t" + arVar + " rcs $@ $^\n\n");
+            }
+
+            w.write("$(OBJS): Header.h\n\n");
+
+            w.write("%.o: %" + srcExt + "\n");
+            w.write("\t$(" + compilerVar + ") $(" + flagsVar + ") -c $< -o $@\n");
+            if (!isC) {
+                w.write("\n%.o: %.c\n");
+                w.write("\t$(CC) $(CFLAGS) -c $< -o $@\n");
+            }
+            w.write("\nclean:\n");
+            w.write("\trm -f $(OBJS) $(TARGET)\n");
+        }
+    }
+
+    // ---- utilities ----
+
+    void copyCSources(FModule fm, Path dir) throws IOException {
+        for (var src : fm.cSources()) {
+            var target = dir.resolve(src.getFileName());
+            Files.copy(src, target, REPLACE_EXISTING);
+        }
+        for (var hdr : fm.headerFiles()) {
+            var target = dir.resolve(hdr.getFileName());
+            Files.copy(hdr, target, REPLACE_EXISTING);
+        }
+    }
+
+    static String cTypeOf(TypeDeclarer td) {
+        if (td instanceof PrimitiveTypeDeclarer ptd) {
+            return CppGenerator.PrimitiveName.get(ptd.primitive());
+        }
+        return "Uint64";
+    }
+}

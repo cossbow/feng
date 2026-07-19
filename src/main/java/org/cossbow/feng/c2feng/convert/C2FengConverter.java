@@ -149,9 +149,7 @@ public class C2FengConverter {
     // ========== Global variable ==========
 
     public void addGlobalVar(CGlobalVar gv) {
-        if (gv.linkage() == CLinkage.EXTERN) return;
-
-        var export = gv.linkage() != CLinkage.STATIC;
+        var export = gv.linkage() == CLinkage.DEFAULT;
         var v = new Variable(ZERO,
                 modifier(export),
                 gv.isConst() ? Declare.CONST : Declare.VAR,

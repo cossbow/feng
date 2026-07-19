@@ -2,7 +2,7 @@
 
 class A {
     var id int;
-    var name [*]byte;
+    var name [*#]byte;
     var tag [64]byte;
 }
 
@@ -14,8 +14,8 @@ func test(i int) {
     var a2 = A {tag="fffff"};
 
     var x1 [13]byte = "xxxyyy";
-    const x2 [&]byte = "xxxccc";
-    var x3 [*]byte = "xxxrrr";
+    const x2 [&#]byte = "xxxccc";
+    var x3 [*#]byte = "xxxrrr";
 }
 
 

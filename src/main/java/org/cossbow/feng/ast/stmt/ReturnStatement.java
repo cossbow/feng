@@ -30,7 +30,6 @@ public class ReturnStatement extends Statement {
 
     private final Lazy<Procedure> procedure = Lazy.nil();
     private List<Variable> local = List.of();
-    private Lazy<Expression> relay = Lazy.nil();
 
     public Lazy<Procedure> procedure() {
         return procedure;
@@ -42,10 +41,6 @@ public class ReturnStatement extends Statement {
 
     public void local(List<Variable> local) {
         this.local = local;
-    }
-
-    public Lazy<Expression> relay() {
-        return relay;
     }
 
     //

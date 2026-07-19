@@ -58,6 +58,10 @@ public class MemberOfExpression extends PrimaryExpression {
         return generic;
     }
 
+    @Override
+    public boolean unbound() {
+        return subject.unbound();
+    }
 
     public Optional<? extends Field> field() {
         return field;

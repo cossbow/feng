@@ -1,0 +1,32 @@
+
+class A {
+    var n [*]*B;
+}
+class B {
+    var n [*]*A;
+}
+func makeA(n int) *A {
+    if (n<1) return nil;
+    var a = new(A, {n=new([4]*B)});
+    for(var i=0; i<n; i+=1) {
+        a.n[i] = makeB(n-1);
+    }
+    return a;
+}
+func makeB(n int) *B {
+    if (n<1) return nil;
+    var a = new(B, {n=new([3]*A)});
+    for(var i=0; i<3; i+=1) {
+        a.n[i] = makeA(n-1);
+    }
+    return a;
+}
+func test(n int) {
+    var a = makeA(n);
+    var r = a.n[0];
+}
+
+func main(args [&!#][*!#]byte) {
+    test(2);
+    test(10);
+}

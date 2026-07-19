@@ -32,6 +32,10 @@ public class CommonUtil {
         return fn.substring(0, i);
     }
 
+    public static String letters(String name) {
+        return name.replaceAll("[^a-zA-Z0-9]", "");
+    }
+
     public static byte[] concat(byte[] first, byte[]... more) {
         var len = first.length;
         for (byte[] m : more) len += m.length;

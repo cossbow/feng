@@ -6,6 +6,7 @@ import org.cossbow.feng.err.SemanticException;
 import org.cossbow.feng.err.SyntaxException;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 
 final
 public class ErrorUtil {
@@ -41,8 +42,8 @@ public class ErrorUtil {
         throw new UnreachableException();
     }
 
-    public static <T> T io(IOException e) throws RuntimeIOException {
-        throw new RuntimeIOException(e);
+    public static <T> T io(IOException e) throws UncheckedIOException {
+        throw new UncheckedIOException(e);
     }
 
     public static <T> T syntax(String fmt, Object... args) throws SyntaxException {
@@ -66,6 +67,10 @@ public class ErrorUtil {
                 entity, entity.pos(), old.pos());
     }
 
+    public static <T> T backend(String fmt, Object... arg) {
+        throw new BackendException(fmt.formatted(arg));
+    }
+
     public static class UnreachableException extends RuntimeException {
     }
 
@@ -75,15 +80,15 @@ public class ErrorUtil {
         }
     }
 
-    public static class RuntimeIOException extends RuntimeException {
-        public RuntimeIOException(Throwable e) {
-            super("IO error", e, true, false);
+    public static class BackendException extends RuntimeException {
+        public BackendException(String message) {
+            super(message);
         }
     }
 
-    public static class WarnException extends RuntimeException {
-        public WarnException(String msg) {
-            super(msg, null, true, false);
-        }
+    @SuppressWarnings("unchecked")
+    public static <T extends Throwable>
+    T sneaky(Throwable t) throws T {
+        throw (T) t;
     }
 }

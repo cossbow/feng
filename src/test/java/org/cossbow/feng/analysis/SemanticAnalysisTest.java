@@ -31,7 +31,7 @@ public class SemanticAnalysisTest {
         System.out.println(code);
         System.out.println("<<<");
         var src = BaseParseTest.doParseFile(code);
-        new SemanticAnalysis(src.table(), false).analyse();
+        new SemanticAnalysis(src.table()).analyse();
     }
 
     void checkFail(String code) {
@@ -3554,7 +3554,7 @@ public class SemanticAnalysisTest {
         System.out.printf("[test]%s.feng\n", file.getName());
         var parser = new SourceParser(UTF_8);
         var src = parser.parse(file.toPath());
-        new SemanticAnalysis(src.table(), false).analyse();
+        new SemanticAnalysis(src.table()).analyse();
     }
 
     @Test

@@ -33,7 +33,7 @@ public class BlockExpression extends PrimaryExpression
     /**
      * The sequence of statements within the block
      */
-    private final List<Statement> block;
+    private List<Statement> block;
     /**
      * The final expression
      */
@@ -50,6 +50,10 @@ public class BlockExpression extends PrimaryExpression
 
     public List<Statement> block() {
         return block;
+    }
+
+    public void block(List<Statement> block) {
+        this.block = block;
     }
 
     public Expression result() {

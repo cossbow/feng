@@ -40,6 +40,11 @@ public class TupleIndexExpression extends PrimaryExpression {
     }
 
     @Override
+    public boolean unbound() {
+        return subject.unbound();
+    }
+
+    @Override
     public TupleIndexExpression mirror() {
         return new TupleIndexExpression(pos(), subject.mirror(), index);
     }

@@ -1,0 +1,24 @@
+
+class Base {
+    var id int;
+    func getId() int {
+        return id;
+    }
+}
+
+class Child`T` : Base {
+    var v T;
+    func getV() T {
+        return v;
+    }
+}
+
+func test(n int) {
+    var c = new(Child`int`, {id=n,v=42});
+    var id = c.getId();
+    var v = c.getV();
+}
+
+func main(args [&!#][*!#]byte) {
+    test(1);
+}

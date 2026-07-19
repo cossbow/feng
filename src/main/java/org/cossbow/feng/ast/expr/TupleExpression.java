@@ -24,7 +24,7 @@ public class TupleExpression extends PrimaryExpression {
     /**
      * The element values
      */
-    private final List<Expression> elements;
+    private List<Expression> elements;
     /**
      * Marked types: {@code Optional} empty indicates no type marked.
      * <p>
@@ -42,6 +42,10 @@ public class TupleExpression extends PrimaryExpression {
 
     public List<Expression> elements() {
         return elements;
+    }
+
+    public void elements(List<Expression> elements) {
+        this.elements = elements;
     }
 
     public List<Optional<TypeDeclarer>> types() {

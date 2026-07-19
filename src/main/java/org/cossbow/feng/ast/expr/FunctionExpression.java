@@ -7,7 +7,7 @@ import org.cossbow.feng.ast.proc.FunctionDefinition;
 
 public class FunctionExpression extends PrimaryExpression {
     private final FunctionDefinition func;
-    private final TypeArguments generic;
+    private TypeArguments generic;
 
     public FunctionExpression(Position pos,
                               FunctionDefinition func,
@@ -23,6 +23,10 @@ public class FunctionExpression extends PrimaryExpression {
 
     public TypeArguments generic() {
         return generic;
+    }
+
+    public void generic(TypeArguments generic) {
+        this.generic = generic;
     }
 
     public Symbol symbol() {

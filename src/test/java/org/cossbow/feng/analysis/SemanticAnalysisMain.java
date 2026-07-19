@@ -20,7 +20,7 @@ public class SemanticAnalysisMain {
     static void checkSucc(String file) {
         System.out.printf("[check]>>> %s\n", file);
         var src = doParse(file);
-        new SemanticAnalysis(src.table(), false).analyse();
+        new SemanticAnalysis(src.table()).analyse();
     }
 
     public static void main(String[] args) {

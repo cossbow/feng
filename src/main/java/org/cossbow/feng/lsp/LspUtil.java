@@ -5,12 +5,14 @@ import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FixedParameter;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.util.ErrorUtil;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SymbolKind;
 
 final class LspUtil {
-    private LspUtil() {}
+    private LspUtil() {
+    }
 
     // ---- Position / Range conversion ----
 
@@ -67,7 +69,7 @@ final class LspUtil {
     // ---- DocumentSymbol conversion ----
 
     static DocumentSymbol toDocumentSymbol(TypeDefinition def) {
-        var kind = switch (def.domain()) {
+        SymbolKind kind = switch (def.domain()) {
             case CLASS -> SymbolKind.Class;
             case INTERFACE -> SymbolKind.Interface;
             case ENUM -> SymbolKind.Enum;
@@ -75,6 +77,7 @@ final class LspUtil {
             case ATTRIBUTE -> SymbolKind.Property;
             case FUNC -> SymbolKind.Function;
             case PRIMITIVE -> SymbolKind.TypeParameter;
+            case null, default -> ErrorUtil.unreachable();
         };
         return new DocumentSymbol(
                 def.symbol().name().value(),
