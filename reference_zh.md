@@ -2758,3 +2758,51 @@ class Error {
    }
 }
 ```
+
+## C模块
+
+支持使用C语言编写模块。头文件中需要声明被引用的符号（函数、类型或全局变量），编译器会解析头文件并给这些符号加上模块路径前缀。
+
+例如，路径为`jjj$mm`的C模块，头文件为：
+
+```C
+struct Complex { float r, i; };
+struct Complex add(struct Complex a, struct Complex b);
+```
+
+实现代码为：
+
+```C
+struct Complex add(struct Complex a, struct Complex b) {
+    return (struct Complex){.r = a.r + b.r, .i = a.i + b.i};
+}
+```
+
+在Fēng中就可以直接使用了：
+
+```feng
+import jjj$mm;
+
+func test() {
+    var a mm$Complex = {r = 1.1};  // i 默认为 0
+    var b mm$Complex = {i = 1.1};  // r 默认为 0
+    var c = mm$add(a, b);
+}
+```
+
+Fēng的`struct`/`union`与C语言不但关键字相同，内存布局也一致，因此可以直接传递。
+
+需要注意的是，Fēng不能直接使用C语言的指针，编译器在解析时会将指针统一转为`uint64`类型。
+Fēng的普通[引用类型变量](#引用类型变量)可以转换为`uint64`类型（只能转为`uint64`），这样就可以传递给C语言的指针参数。
+反向转换则是禁止的——引用的值只能通过`new`创建实例获得（参考[new表达式](#new表达式)），因此不存在安全隐患。
+
+例如：
+
+```feng
+func use(a *int) {
+    var p uint64 = uint64(a);
+    // var r *int = p;  // ✖ 不允许从 uint64 反向转换为引用
+}
+```
+
+[数组引用](#变长数组)不能直接转换为`uint64`，而是通过内置字段`values`获得指针（类型同样为`uint64`），以此传递给C语言。

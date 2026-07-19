@@ -34,6 +34,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -3836,20 +3837,30 @@ public class SemanticAnalysis {
             return semantic("inconvertible %s(%s): %s",
                     p, lit, e.pos());
         }
-        if (g.b() instanceof PrimitiveTypeDeclarer td) {
+        if (g.b().maybeRefer().has() && !(g.b() instanceof ArrayTypeDeclarer)) {
+            // If `a` is of type `*T`, we can convert `a` to `uint64`:
+            // for example: var a = new(int); var p = uint64(a);
+            if (p == Primitive.UINT64) {
+                var n = new ConvertExpression(e.pos(), p, g.a());
+                return Groups.g2(n, p.declarer(e.pos()));
+            }
+            return semantic("reference can only be converted " +
+                    "to uint64: %s", e.pos());
+        } else if (g.b() instanceof PrimitiveTypeDeclarer td) {
             // 基本类型就返回转换表达式：`bool`
-            if (e.primitive().isBool() == td.primitive().isBool()) {
-                if (e.primitive().isBool()) {
+            if (p.isBool() == td.primitive().isBool()) {
+                if (p.isBool()) {
                     // `bool`省略表达式
                     return Groups.g2(g.a(), g.b());
                 }
                 // 数值需要转
-                var n = new ConvertExpression(e.pos(), e.primitive(), g.a());
-                return Groups.g2(n, e.primitive().declarer(e.pos()));
+                var n = new ConvertExpression(e.pos(), p, g.a());
+                return Groups.g2(n, p.declarer(e.pos()));
             }
         }
 
-        return semantic("can't convert: %s", e.operand().pos());
+        return semantic("can't convert type '%s' to '%s': %s",
+                g.b(), p, e.pos());
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(CurrentExpression e) {
@@ -4876,7 +4887,7 @@ public class SemanticAnalysis {
             Expression a, Expression b,
             TypeDeclarer t,
             BiFunction<? super Expression, ? super Expression,
-                    ? extends Expression> c) {
+                                ? extends Expression> c) {
         var ca = needRelay(a);
         var cb = needRelay(b);
         if (!ca && !cb) return c.apply(a, b);

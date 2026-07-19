@@ -2890,3 +2890,51 @@ class Error {
    }
 }
 ```
+
+## C Modules
+
+Fēng supports writing modules in C. Header files must declare the symbols (functions, types, or global variables) to be referenced; the compiler will parse the headers and prefix these symbols with the module path.
+
+For example, a C module with the path `jjj$mm` has the following header:
+
+```C
+struct Complex { float r, i; };
+struct Complex add(struct Complex a, struct Complex b);
+```
+
+And the implementation:
+
+```C
+struct Complex add(struct Complex a, struct Complex b) {
+    return (struct Complex){.r = a.r + b.r, .i = a.i + b.i};
+}
+```
+
+It can then be used directly in Fēng:
+
+```feng
+import jjj$mm;
+
+func test() {
+    var a mm$Complex = {r = 1.1};  // i defaults to 0
+    var b mm$Complex = {i = 1.1};  // r defaults to 0
+    var c = mm$add(a, b);
+}
+```
+
+Fēng's `struct`/`union` share not only the same keywords as C, but also the same memory layout, so they can be passed directly.
+
+Note that Fēng cannot directly use C pointers — the compiler converts all pointers to the `uint64` type during parsing.
+Fēng's regular [reference type variables](#reference-type-variables) can be converted to `uint64` (only to `uint64`), allowing them to be passed to C pointer parameters.
+Reverse conversion is prohibited — reference values can only be obtained through `new` (see [new Expression](#new-expression)), so there are no safety concerns.
+
+For example:
+
+```feng
+func use(a *int) {
+    var p uint64 = uint64(a);
+    // var r *int = p;  // ✖ reverse conversion from uint64 to reference is not allowed
+}
+```
+
+[Array references](#variable-length-array) cannot be directly converted to `uint64`; instead, use the built-in field `values` to obtain the pointer (also of type `uint64`) for passing to C.

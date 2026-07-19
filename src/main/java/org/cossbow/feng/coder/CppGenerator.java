@@ -1773,8 +1773,12 @@ public class CppGenerator {
     }
 
     private CppGenerator write(ConvertExpression e) {
-        return write(e.primitive()).write('(')
-                .write(e.operand()).write(')');
+        write(e.primitive()).write('(').write(e.operand());
+        var td = e.operand().resultType.must();
+        if (td.maybeRefer().has()) {
+            write(".t");
+        }
+        return write(')');
     }
 
     private CppGenerator write(EnumValueExpression e) {

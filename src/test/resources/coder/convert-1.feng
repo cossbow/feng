@@ -1,0 +1,20 @@
+
+func p1(a float){
+    var s int32 = int32(a);
+}
+
+func c1(a *float) {
+    var s = uint64(a);
+}
+
+class A {var id int;}
+func c3(a *A) {
+    var s = uint64(a);
+}
+
+struct B {id int;}
+func c5(a *B) {
+    var s = uint64(a);
+}
+
+

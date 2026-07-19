@@ -130,7 +130,6 @@ public class ArrayTypeDeclarer extends TypeDeclarer
     public static final ArrayField FieldLength = new ArrayField(ZERO,
             new Identifier("length"),
             Primitive.INT.declarer());
-
     /**
      * Returns the memory address of the first element as a raw pointer value.
      * Used for passing Fēng array data to C functions (which expect uint64).

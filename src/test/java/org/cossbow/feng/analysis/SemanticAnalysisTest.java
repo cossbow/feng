@@ -1055,6 +1055,27 @@ public class SemanticAnalysisTest {
         checkFail("func f(a float){ var s int = int(1+a); }");
         checkSucc("func f(a float){ var s int = int(float(1)+a); }");
         checkSucc("func f(a float){ var s int = int(1+int(a)); }");
+
+        checkFail("class A{var id int;} func f(a A) {var s = int(a); }");
+        checkFail("struct A{id int;} func f(a A) {var s = int(a); }");
+        checkFail("enum A{S,} func f(a A) {var s = int(a); }");
+    }
+
+    @Test
+    public void testConvertExpression2() {
+        checkSucc("func f(a *int) { var s = uint64(a); }");
+        checkFail("func f(a *int) { var s = int(a); }");
+        checkSucc("func f(a *bool) { var s = uint64(a); }");
+        checkFail("func f(a *bool) { var s = int(a); }");
+        checkFail("func f(a [*]int) { var s = uint64(a); }");
+        checkFail("func f(a [*]bool) { var s = uint64(a); }");
+
+        checkSucc("class A{var id int;} func f(a *A) {var s = uint64(a); }");
+        checkFail("class A{var id int;} func f(a *A) {var s = int(a); }");
+        checkSucc("struct A{id int;} func f(a *A) {var s = uint64(a); }");
+        checkFail("struct A{id int;} func f(a *A) {var s = int(a); }");
+        checkSucc("enum A{S,} func f(a *A) {var s = uint64(a); }");
+        checkFail("enum A{S,} func f(a *A) {var s = int(a); }");
     }
 
     @Test
