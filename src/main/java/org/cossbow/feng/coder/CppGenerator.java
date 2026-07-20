@@ -1332,6 +1332,7 @@ public class CppGenerator {
             case LambdaExpression ee -> write(ee);
             case LiteralExpression ee -> write(ee);
             case MemberOfExpression ee -> write(ee);
+            case FunctionExpression ee -> write(ee);
             case MethodExpression ee -> write(ee);
             case NewExpression ee -> write(ee);
             case ObjectExpression ee -> write(ee);
@@ -1594,6 +1595,12 @@ public class CppGenerator {
         ofMember(e.subject());
         if (!e.generic().isEmpty()) return unreachable();
         write(e.member());
+        return this;
+    }
+
+    private CppGenerator write(FunctionExpression e) {
+        write(e.symbol());
+        write(e.generic());
         return this;
     }
 

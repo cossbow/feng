@@ -34,7 +34,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -212,6 +211,8 @@ public class SemanticAnalysis {
                 case IndexOfExpression e -> q.add(e.subject());
                 case TupleIndexExpression e -> q.add(e.subject());
                 case LiteralExpression e -> {
+                }
+                case FunctionExpression e -> {
                 }
                 case null, default -> semantic("can't depend of global: %s", c);
             }
@@ -3024,6 +3025,7 @@ public class SemanticAnalysis {
             case BinaryExpression ee -> left;
             case UnaryExpression ee -> left;
             case EnumExpression ee -> true;
+            case FunctionExpression ee -> true;
             case null, default -> unreachable();
         };
     }
@@ -3218,6 +3220,7 @@ public class SemanticAnalysis {
             case VariableExpression ee -> Groups.g2(ee,
                     ee.variable().type().must());
             case DereferExpression ee -> optimize(ee);
+            case FunctionExpression ee -> optimize(ee);
             case null, default -> unreachable();
         };
         g.a().resultType.set(g.b());
@@ -4381,8 +4384,8 @@ public class SemanticAnalysis {
                     od.get().generic(), re.generic());
             var prot = gm.instantiate(od.get().prototype());
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
-            re.symbol(od.get().symbol());
-            return Groups.g2(re, td);
+            var n = new FunctionExpression(re.pos(), od.get(), re.generic());
+            return Groups.g2(n, td);
         }
 
         if (s.module().none() && enterClass != null) {
@@ -4467,8 +4470,8 @@ public class SemanticAnalysis {
                 prot = gm.instantiate(prot);
             }
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
-            re.symbol(fd.symbol());
-            return Groups.g2(re, td);
+            var n = new FunctionExpression(re.pos(), fd, re.generic());
+            return Groups.g2(n, td);
         }
 
         var t = context.findType(s);
@@ -4745,6 +4748,10 @@ public class SemanticAnalysis {
                 (PrimaryExpression) s.a(), e.index());
         var t = ttd.get(e.index());
         return Groups.g2(n, t);
+    }
+
+    private Groups.G2<Expression, TypeDeclarer> optimize(FunctionExpression e) {
+        return Groups.g2(e, e.resultType.must());
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(PairsExpression e) {
