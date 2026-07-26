@@ -488,7 +488,9 @@ var ca [2]Car = [{id=1},{id=2}];
 
 #### Field Expression
 
-A special literal expression for initializing derived types with definable fields, such as struct types and classes:
+Like array expressions, this is a special literal expression specifically for initializing value types of derived types with definable fields, such as struct types and classes.
+
+For example:
 
 ```feng
 class Car {
@@ -504,7 +506,40 @@ Initialized fields need not be in the order defined, and fields cannot be initia
 // var car Car = {id=10,id=100}; // Error: duplicate field id
 ```
 
+Like array expressions, types cannot be automatically inferred; either the type must be known from context, or a type prefix must be added to the expression:
+
+```feng
+var car = Car{id=10,speed=80.5};
+```
+
 Refer to [Classes](#classes) and [Struct Types](#struct-types) for other initialization details.
+
+#### Tuple Expression
+
+Used to initialize [tuple](#tuple) values. A tuple expression arranges values within parentheses, corresponding to the tuple definition, and requires at least 2 values.
+
+For example:
+
+```feng
+var empty (bool,int) = (false,0);
+```
+
+Unlike array expressions and field expressions, the type annotation for tuples is written after each value:
+
+```feng
+var empty = (false:bool,0:int);
+```
+
+If the values in a tuple are literals, the type annotation can be omitted for `true`/`false` because they can be unambiguously inferred as `bool`, but not for other literals. For example, an integer literal defaults to `int`, but could also correspond to `uint`, `int32`, and so on.
+
+```feng
+func far() {
+   var a = (false,1:int);     // ✓: type annotation after false is omitted
+   // var b = (false,1);      // ✗: type annotation after 1 cannot be omitted
+   var i int = 0;
+   var c = (false,i);         // ✓: i's type is clear, can be omitted
+}
+```
 
 #### Assertion Expression
 
@@ -691,16 +726,12 @@ func sample(engine *Engine) {
 
 ### Fields
 
-Most [variable](#variables) type definitions apply to class fields, except:
-
-1. Fields cannot be of [phantom reference type](#phantom-reference-type), but can be
-   of [weak reference type](#weak-reference-type).
-2. Fields can only be defined with `const` and `var`.
+Most [variable](#variables) type definitions apply to class fields, but they cannot be defined as a [phantom reference type](#phantom-reference-type).
 
 ```feng
 class Cat {
    const id int;
-   var name *rom;
+   var name [*#]byte;
    var mothr,father *Cat;
    var children []*Cat;
    // var who Cat; // ✖
@@ -742,7 +773,7 @@ If a class has no `const` fields, initialization is not required.
 ```feng
 class Mouse {
    var id int;
-   var name *rom;
+   var name [*#]byte;
 }
 func test() {
    var m1 Mouse;
@@ -760,38 +791,15 @@ For example, the `Dog` class below can only be instantiated in the current modul
 export
 class Dog {
     const id int;
-    var name *rom;
+    var name [*#]byte;
 }
 export
 func newDog(id int) *Dog {
     return new(Dog, {id=id});
 }
 export
-func dog(id int, name *rom) Dog {
+func dog(id int, name [*#]byte) Dog {
     return {id=id, name=name};
-}
-```
-
-#### Weak Reference Type
-
-A special reference type for fields, denoted by `~` before the type name.
-This type of reference does not affect instance deallocation, and the referenced instance is automatically set to `nil`
-when deallocated.
-When using reference counting for memory management, circular references are a logical problem that can be manually
-solved with weak references:
-
-1. Weak references do not affect instance deallocation (no increment of reference count), allowing the count to reach
-   zero.
-2. When the instance is deallocated, the weak reference field is set to `nil`, ensuring memory safety.
-
-For example, defining the forward reference field `prev` in a doubly linked list `Node` as a weak reference prevents the
-reference count from never reaching zero:
-
-```feng
-class Node {
-    var key String;
-    var next *Node;
-    var prev ~Node;
 }
 ```
 
@@ -902,6 +910,10 @@ func use3(f &Foo) {
 
 `this` can only be passed to strong references within the [escaping method](#escaping-methods).
 
+### super Keyword
+
+The `super` keyword refers to the immediate parent class. Its primary purpose is to call parent class methods, especially when you need to call a method that has been overridden.
+
 ### Inheritance
 
 Inheritance (also called extension) extends an existing class by adding new fields and methods.
@@ -930,8 +942,8 @@ Example of class polymorphism: first define a parent class `Animal` with a field
 
 ```feng
 class Animal {
-    var name *rom;
-    func eat(food *rom) {
+    var name [*#]byte;
+    func eat(food [*#]byte) {
         printf("Animal %s eating %s\n", name, food);
     }
 }
@@ -942,7 +954,7 @@ prototype:
 
 ```feng
 class Cat : Animal {
-    func eat(food *rom) {
+    func eat(food [*#]byte) {
         printf("Cat %s eating %s.\n", age, name, food);
     }
 }
@@ -960,7 +972,6 @@ func test() {
 
 This example shows that the `eat` method can have multiple implementations after inheritance, and parent class
 references pointing to different subclasses will call the subclass's implementation.
-**Subclasses must have identical prototypes when overriding parent class methods.**
 
 [Assertion expressions](#assertion-expression) are supported for subtype checking:
 
@@ -1040,6 +1051,45 @@ func test() {
 ```
 
 [Assertion expressions](#assertion-expression) are also supported for type checking.
+
+#### Method Covariance
+
+When a parent class reference points to a subclass instance, or an interface reference points to an implementing class instance, this operation is known in object-oriented programming as **covariance**.
+
+Polymorphic method return values support covariance, meaning the return type of a subclass method can be a subclass or implementing class of the parent class method's return type.
+However, its parameters must remain identical, and the escaping and unmodifiable markers on the method must also match.
+
+Here are examples of return type covariance only:
+
+```feng
+class A {}
+class B : A {}
+class ABox {
+   func get() *A {
+      return new(A);
+   }
+}
+class BBox : ABox {
+   func get() *B {   // Override get() method, but the return type is a subclass of the parent's get() return type
+      return new(B);
+   }
+}
+```
+
+Interface implementing classes also support covariance:
+
+```feng
+class A {}
+class B : A {}
+interface I {
+   func get() *A;
+}
+class Box (I) {
+   func get() *B {   // Implement get() method, but the return type is a subclass of the interface's get() return type
+      return new(B);
+   }
+}
+```
 
 ### Root Class
 
@@ -1264,7 +1314,7 @@ func test() {
    var s2 TaskState = DONE;             // s2 known, prefix can be omitted
    var i int = TaskState.RUN.id;        // i initialized to integer 1
    i = s2.id;                           // i assigned 3
-   var n [*#]byte = s2.name;            // n initialized to rom reference containing string "DONE"
+   var n [*#]byte = s2.name;            // n initialized to byte array reference containing string "DONE"
    var v int = BillState.SEND.value;    // v initialized to integer 5
 }
 ```
@@ -1345,18 +1395,20 @@ struct Request {
 }
 ```
 
-Bit-fields specify the actual bit width used for a field, applicable only to Primitive Types.
-The bit-field value is within the range of the field's type width, placed after the field name.
-Example setting `code` bit-field to `6` (with `type` unspecified):
+You can specify the actual bit width used by a field. This can only be set for [primitive type](#primitive-types) fields.
+The configured bit width value ranges from 1 to the type's bit width; for example, for `int32`, the field bit width ranges from 1 to 32.
+
+The configured bit width is placed after the field name in parentheses: field_name `(` bit_width `)` type.
+The bit width must be a [compile-time constant](#compile-time-constants).
+For example, setting the `code` field's bit-field to `6` (the `type` field is not set):
 
 ```feng
 struct Request {
-    type, code:6 int;
-    data [56]uint8;
+    type, code(6) int;
 }
 ```
 
-A notable exception: unions can only specify one field during initialization:
+A union can only specify one field during initialization:
 
 ```feng
 union Foo {
@@ -1444,15 +1496,37 @@ If fewer, elements are initialized sequentially from the first position; remaini
 var b [4]int = [1,2];   // b initialized to: [1,2,0,0]
 ```
 
-When initialized with an expression, the expression's result must be an array of the same type and length:
+When initialized with an expression, as a value type, assignment requires the same array type, including element type and length:
 
 ```feng
 func foo() [4]int {
     return [1,2,3,4]
 }
 func foobar() {
-    var a [4]int = foo();
-    // var b [2]int = foo(); // Error
+    var a [4]int = foo();     // Same array type
+    // var b [2]int = foo();  // ✖: different length, not the same type
+    // var c [2]bool = foo(); // ✖: different element type, not the same type
+}
+```
+
+Type inference from an untyped [array literal](#array-literal) is not supported.
+
+When the left operand's type is already known:
+
+```feng
+func far() {
+   var a [4]int = [1,2,3]; // Explicitly declared type
+   a = [11,22];   // a's type is already known
+}
+```
+
+When the left operand's type is unknown, such as when the type is omitted in a variable declaration, the type is inferred from the right side. In this case, the type prefix before the literal must not be used:
+
+```feng
+func far() {
+   var a = [4]int[1,2,3];  // Inferred type: [4]int
+   var b = []int[1,2,3];   // Inferred type: [3]int
+   // var c = [1,2,3];     // ✖: cannot infer type
 }
 ```
 
@@ -1486,6 +1560,52 @@ class Foobar {
 
 Note: [Struct type](#struct-types) fields cannot be [references](#reference-type-variables); the length must be
 specified.
+
+## Tuple
+
+A tuple is a simple aggregate type that groups different types together. Notation: `(` Type1 `,` Type2 `,` Type3 `)`.
+The types in a tuple can be any type except [phantom references](#phantom-reference-type), and there must be at least 2 elements.
+
+For example:
+
+```feng
+var ga (bool,int);
+var gb (bool,*int);
+var gc (int,[*]uint64,[16]byte);
+class Car {
+   var int speed;
+}
+var gd (int,Car);
+```
+
+A tuple is a value type and can be assigned directly, for instance using a [tuple expression](#tuple-expression). For example:
+
+```feng
+var gr (bool,int) = (true,-1);
+```
+
+Individual elements of a tuple can be accessed using the syntax: tuple `.` index.
+Note: the `.` operator is used to access elements, but what follows is not a field name — it is an index.
+
+For example:
+
+```feng
+func far(a (bool,int,[*]byte)) {
+   var ok bool = a.0;
+   var code int = a.1;
+   var name = a.2;      // The tuple has a known type, so name can be inferred as [*]byte
+}
+```
+
+In the example above, the [parameters](#parameter-list) are immutable and therefore cannot be modified. Below is an example with modification:
+
+```feng
+func bar(ok bool, code int) {
+   var a (bool,int);
+   a.0 = ok;
+   a.1 = code;
+}
+```
 
 ## mappable
 
@@ -1607,34 +1727,15 @@ func add(a, b int) int {
 }
 ```
 
-### Return Type List
+### Return Type
 
-The return type list is declared between the parameter list and the function body, enclosed in parentheses. Example:
-function `foo` returns an `int` and a `float`:
-
-```feng
-func foo() (int, float) {}
-```
-
-When there is only a single return value, parentheses can be omitted:
+The return type is declared between the parameter list and the function body. Example: function `foo` returns a `float`:
 
 ```feng
-func online() bool {};
-```
-
-Multiple return values have significant design implications. For example, when needing both a function's result and
-error information, returning both avoids modifying an external variable via reference parameter:
-
-```feng
-func createDevice(host *Host) (*Device, *Error) {
-   if (host.inRecovery()) {
-      return nil, errorInRecovery;
-   }
-   // TODO
+func foo() float {
+   return 0.1;
 }
 ```
-
-Error information can also be [thrown](#throwing-exceptions); both approaches are viable.
 
 ### Function Body
 
@@ -1718,6 +1819,8 @@ func use1(a !func()) {
 }
 ```
 
+Function prototypes support covariance, similar to [method covariance](#method-covariance): the return type of the right-hand value can be a subclass or implementing class of the left-hand operand's return type.
+
 ## Variadic Functions
 
 Variadic functions are special functions where the number and types of trailing parameters are not fixed and are automatically expanded at compile time.
@@ -1739,6 +1842,21 @@ import std$bytes;
 func test() {
    var buf bytes$BufferWriter;
    format(buf, "This is first line.");
+}
+```
+
+#### Custom Variadic Parameters
+
+Currently, custom variadic parameters can be defined, but they can only be passed to another variadic parameter. In other words, this feature is currently only used to wrap the `format` function.
+
+Variadic parameters are indicated by `...`, which can only be placed at the end of the parameter list, so only one set of variadic parameters can be defined.
+
+For example, define a function that prints to standard output:
+
+```feng
+// Global object stdout defined above
+func printf(fmt [&!#]byte, ...) {   // Define variadic parameters
+    format(stdout, fmt, ...);       // Forward variadic parameters
 }
 ```
 
@@ -1989,17 +2107,6 @@ func test(x,y int, u *User, a []int) {
 }
 ```
 
-#### Variable Initialization
-
-The initialization assignment on the right side of the [variable declaration statement](#variable-declaration-statement)
-is optional, and it supports defining multiple variables and initializing them:
-
-```feng
-func test() {
-   var a,b,c = 1, "ggyy", 1.6;
-}
-```
-
 ### Variable Declaration Statement
 
 Declaring one or a group of [variables](#variables) starts with `var` or `const`, followed by the variable name(s), then
@@ -2035,11 +2142,45 @@ func test() {
 }
 ```
 
+### Return Statement
+
+The return statement unconditionally terminates execution of the current procedure (function or method). When a function needs to return a value, the return statement carries a value to the caller.
+
+For a function with no return value, its return statement must not carry a return value:
+
+```feng
+func foo(n int) {
+   if (n == 0) {
+      return;
+      // return 0; // Error: cannot return a value
+   }
+   // TODO something with n
+}
+```
+
+If the procedure defines a [return type](#return-type):
+
+1. All return statements must carry a return value.
+2. The return value must be compatible with the function's return type, following the same rules as assignment.
+3. Every reachable branch must have a terminating statement.
+
+For example:
+
+```feng
+func test(n int) bool {
+   return n > 0;
+   // return;     // Error: missing return value
+   // return n;   // Error: return value type mismatch
+}
+```
+
+The return statement is a type of [terminating statement](#terminating-statements).
+
 ### Exception Statements
 
-Two types: throwing and handling [exceptions](#exceptions-_[Incomplete]_).
+Exception statements are divided into two types: throwing and handling [exceptions](#exceptions).
 
-#### Throwing Exceptions
+#### Throwing Exception Statement
 
 Throwing an exception handles errors not addressed by return values. After throwing an exception:
 
@@ -2064,9 +2205,9 @@ func example3() {
 
 Once an exception is thrown, it propagates up the call chain until caught by a `catch` block.
 
-The type of the thrown exception must be defined by the user, as detailed in [Exceptions](#exceptions-_[Incomplete]_).
+The type of the thrown exception must be defined by the user, as detailed in [Exceptions](#exceptions).
 
-#### Handling Exceptions
+#### Handling Exception Statement
 
 Exception handling statements consist of three parts:
 
@@ -2146,6 +2287,66 @@ func readTxt() String {
 ```
 
 Note: The parameter `e` in `catch` matching parentheses is a constant parameter.
+
+### Terminating Statements
+
+A terminating statement is not a distinct kind of statement, but a collective term for return statements and exception statements.
+
+Every function that returns a value must end its statement list with a **terminating statement**.
+
+Example of valid code:
+
+```feng
+func abs(n int) int {
+   if (n > 0) {
+      return n;
+   } else {
+      return -n;
+   }
+}
+```
+
+A counterexample:
+
+```feng
+func abs(n int) int {
+   if (n > 0) {
+      // missing return statement here
+   } else {
+      return -n;
+   }
+   // The n > 0 branch falls through to here, clearly missing a return statement
+}
+```
+
+Therefore, the following example is valid:
+
+```feng
+func abs(n int) int {
+   if (n > 0) {
+      // nothing done
+   } else {
+      return -n;
+   }
+   return n;
+}
+```
+
+There is one special case that also counts as having a terminating statement: an infinite loop that the compiler can prove will never exit. Never exiting is equivalent to termination, because the only way to exit is for a statement inside the loop to throw an exception or forcibly terminate the program.
+
+For example, where the loop condition is the constant `true` and the loop body contains no statement that would cause the loop to exit:
+
+```feng
+func test() {
+   while(true) {
+      run();
+   }
+}
+```
+
+Note: if `run()` throws an exception, the entire `test` function terminates, rather than exiting the loop, so this is considered an infinite loop.
+
+Terminating statements require the compiler to perform control flow analysis for more complex cases.
 
 ## Variables
 
@@ -2539,8 +2740,23 @@ func test() {
 
 ### Array Literals
 
+This type of literal is only used to initialize [fixed-length array](#fixed-length-array) types.
+
 List array elements within square brackets: `[1,2,3]`, `["Hello", "Good"]`, etc.
-The array element type must be compatible with all elements; if no compatible type exists, it is disallowed.
+
+The array type can be placed explicitly before the literal; this is related to type inference — see [Fixed-Length Array](#fixed-length-array).
+
+For example:
+
+```feng
+var ga1 = [4]int[1,2,3];   // Explicitly declare a length-4 int array
+```
+
+If the length is omitted, the length is inferred from the number of elements:
+
+```feng
+var ga2 = []int[1,2,3];    // Equivalent to: [3]int
+```
 
 ## Macros
 
@@ -2815,7 +3031,7 @@ func use() {
 }
 ```
 
-However, for initialization expressions, type annotations must be present for inference to work:
+However, for initialization expressions (array expressions, field expressions, and tuple expressions), type annotations must be present for inference to work:
 
 ```feng
 func use() {
@@ -2868,9 +3084,9 @@ func test() {
 }
 ```
 
-## Exceptions _[Incomplete]_
+## Exceptions
 
-An exception class that can be thrown needs to define the macro `error trace`, which tracks and collects stack
+An exception class that can be thrown must be a non-final class and needs to define the macro `error trace`, which tracks and collects stack
 information:
 
 ```feng
@@ -2890,6 +3106,14 @@ class Error {
    }
 }
 ```
+
+## Compile-time Constants
+
+Compile-time constants are constants whose values can be deduced and calculated at compile time. The following are compile-time constants:
+
+1. Literals.
+2. Variables declared with `const` whose type is a [primitive type](#primitive-types) or a [string literal](#string-literals).
+3. All expressions composed entirely of compile-time constants are also compile-time constants, because their results can be computed at compile time.
 
 ## C Modules
 

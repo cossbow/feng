@@ -1890,20 +1890,6 @@ public class SemanticAnalysis {
         if (r instanceof LiteralTypeDeclarer rl)
             return assignValue(l, rl, re);
 
-        if (r instanceof ArrayTypeDeclarer ra) {
-            // 数组比较复杂，虚比较每一层的元素
-            // 数组引用本身可以是虚引用，但元素不能是，通过typeNest控制
-            if (l instanceof ArrayTypeDeclarer la) {
-                var d = ra.literal() ? 0 : 2;
-                typeNest += d;
-                try {
-                    return assignValue(la, ra, re, e);
-                } finally {
-                    typeNest -= d;
-                }
-            }
-        }
-
         if (r instanceof FuncTypeDeclarer rf) {
             if (l instanceof FuncTypeDeclarer lf)
                 return compatible(lf.prototype(),
@@ -3844,7 +3830,8 @@ public class SemanticAnalysis {
     private Groups.G2<Expression, TypeDeclarer> optimize(CurrentExpression e) {
         assert enterClass != null;
         assert enterMethod != null;
-        // 必定是在类的方法里
+        // TODO
+        var def = e.isSelf() ? enterClass : enterClass.parent().must();
         var dt = new DerivedType(e.pos(), e.type(), TypeArguments.EMPTY);
         dt.def(enterClass);
         var kind = enterMethod.escaped() ? STRONG : PHANTOM;

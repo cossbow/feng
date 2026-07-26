@@ -61,9 +61,9 @@ class [CppGenerator](src/main/java/org/cossbow/feng/coder/CppGenerator.java).
 
 Completed code features:
 
-1. Derived class definitions: Classes, interfaces, struct types, function types completed; properties _[*Incomplete*]_
-2. Expressions: Power operation _[*Incomplete*]_
-3. Statements: Exceptions _[*Incomplete*]_
+1. Derived class definitions: Classes, interfaces, struct types, function types completed
+2. Expressions: Completed
+3. Statements: Completed
 4. Variables: Completed
 5. Types: Completed
 6. Polymorphic calls for classes: Completed
@@ -71,8 +71,8 @@ Completed code features:
 8. Variable cleanup and reference instance management: Completed
 9. Literals and initialization: Completed
 10. Generics: Completed
-11. String formatting: _[*Incomplete*]_
-12. Modules: One cpp file generated per module.
+11. String formatting: Completed
+12. Modules: One C/C++ file generated per module.
 
 # Tool Building
 
@@ -107,6 +107,7 @@ Parameter descriptions:
 4. -p Current package name: Defaults to the filename or directory name.
 5. -L Add dependency packages: Multiple packages can be specified as key-value pairs (package name = path), for example:
    `-Lfoo=D:\dev\libs\foo`
+6. -b Backend build tool: Optionally `make` or `cmake`
 
 Compile a single source file:
 

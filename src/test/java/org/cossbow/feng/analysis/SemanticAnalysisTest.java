@@ -2325,6 +2325,7 @@ public class SemanticAnalysisTest {
         checkSucc("var a [2]int = [2]int[1,2];");
         checkSucc("var a [2]int = ([2]int[1,2]);");
         checkFail("var a [2]int = [1]int[1,2];");
+        checkFail("var a [2]int = []int[1];");
         checkSucc("var a [2]int = []int[1,2];");
         checkFail("var a [2]int = []int[1,2,3];");
 
@@ -2332,7 +2333,7 @@ public class SemanticAnalysisTest {
         checkSucc(d + "var a [2]A = [{id=1}];");
         checkSucc(d + "var a [2]A = [({id=1})];");
         checkSucc(d + "var a [2]A = [2]A[{id=1}];");
-        checkSucc(d + "var a [2]A = []A[{id=1}];");
+        checkSucc(d + "var a [2]A = []A[{id=1},{}];");
 
         checkSucc(d + "var a = []int[1];");
         checkFail(d + "var a = []int[{id=1}];");
