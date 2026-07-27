@@ -28,22 +28,6 @@ public class GeneratorTest {
 
     // ---- single-file tests ----
 
-    private void exec(Path subDir) {
-        var os = System.getProperty("os.name");
-        var name = PkgName;
-        if ("win".equals(os)) {
-            name += ".exe";
-        }
-        var r = new Command(subDir, name).exec();
-        if (r.code() != 0) {
-            ErrorUtil.backend("exec error(%d): %s", r.code(), r.err());
-        }
-        var err = r.out().lines().filter(s -> s.startsWith("ref="))
-                .toList();
-        if (err.isEmpty()) return;
-        ErrorUtil.backend("exec has memory bug: %s", err);
-    }
-
     @Test
     public void testSampleSource(@TempDir Path tempDir) throws IOException {
         var dir = ResourceUtil.getDir("coder");
@@ -55,7 +39,6 @@ public class GeneratorTest {
             var subDir = tempDir.resolve(name);
             Files.createDirectories(subDir);
             compiler(PkgName).compileFile(file, subDir);
-//            exec(subDir);
         }
     }
 

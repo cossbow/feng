@@ -84,16 +84,6 @@ static inline bool Feng$dec(void* p) {
     return false;
 }
 
-// ===== runtime checks =====
-static inline void Feng$required(void* p) {
-    if (!p) abort();
-}
-
-static inline int64_t Feng$checkIndex(int64_t i, int64_t bound) {
-    if (0 <= i && i < bound) return i;
-    abort();
-}
-
 // ===== mappable cast =====
 #define Feng$cast(ptr, type) ((type*)(void*)(ptr))
 
@@ -180,6 +170,49 @@ static inline void* Feng$iface_vtable(const Feng$Meta* meta, const Feng$Meta* if
         if (meta->ifaces[i].type == iface)
             return (char*)meta + meta->ifaces[i].offset;
     return NULL;
+}
+
+// ===== exception handling via setjmp/longjmp =====
+#include <setjmp.h>
+
+typedef struct Feng$ExFrame {
+    jmp_buf               buf;
+    struct Feng$ExFrame*  prev;
+    void*                 exception;
+    int                   state;       // 0=normal, 1=caught, 2=unhandled
+} Feng$ExFrame;
+
+extern _Thread_local Feng$ExFrame* Feng$ex_top;
+
+// throw an exception (NORETURN), takes ownership of ex (strong ref)
+void Feng$throw(void* ex);
+
+// get the object meta pointer (first field of every feng object)
+static inline const struct Feng$Meta* Feng$objMeta(void* p) {
+    return *(const struct Feng$Meta**)p;
+}
+
+// runtime exception types (lightweight, meta only — no stack trace in runtime layer)
+typedef struct Feng$NullPointerError {
+    const Feng$Meta* $meta;
+} Feng$NullPointerError;
+
+typedef struct Feng$IndexOutOfBoundsError {
+    const Feng$Meta* $meta;
+} Feng$IndexOutOfBoundsError;
+
+void Feng$throwNullPointer();           // throw *NullPointerError
+void Feng$throwIndexOutOfBounds();      // throw *IndexOutOfBoundsError
+
+// ===== runtime checks =====
+static inline void Feng$required(void* p) {
+    if (!p) Feng$throwNullPointer();
+}
+
+static inline int64_t Feng$checkIndex(int64_t i, int64_t bound) {
+    if (0 <= i && i < bound) return i;
+    Feng$throwIndexOutOfBounds();
+    return -1; // fix warning: non-void function does not return a value in all control paths
 }
 
 // ===== debug =====

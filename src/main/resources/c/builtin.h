@@ -19,7 +19,7 @@ typedef struct $Object {
     const Feng$Meta* $meta;
 } $Object;
 
-extern const Feng$Meta Feng$meta_Object;
+extern const Feng$Meta Feng$meta_$Object;
 
 static inline void* Feng$newObject(int64_t size, const Feng$Meta* meta) {
     void* _p = Feng$alloc(size);

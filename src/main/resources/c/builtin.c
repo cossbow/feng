@@ -1,7 +1,37 @@
 #include "builtin.h"
 #include <float.h>
 
-const Feng$Meta Feng$meta_Object = {sizeof(struct $Object), NULL, 0, NULL, NULL};
+// ===== exception handling =====
+_Thread_local Feng$ExFrame* Feng$ex_top = NULL;
+
+void Feng$throw(void* ex) {
+    if (!Feng$ex_top) {
+        fprintf(stderr, "unhandled exception\n");
+        abort();
+    }
+    Feng$ex_top->exception = ex;
+    Feng$ex_top->state = 2;  // unhandled (catch sets to 1 if matched)
+    longjmp(Feng$ex_top->buf, 1);
+}
+
+// ===== runtime exception types =====
+const Feng$Meta Feng$meta_NullPointerError = {sizeof(Feng$NullPointerError), &Feng$meta_$Object, 0, NULL, NULL};
+const Feng$Meta Feng$meta_IndexOutOfBoundsError = {sizeof(Feng$IndexOutOfBoundsError), &Feng$meta_$Object, 0, NULL, NULL};
+
+void Feng$throwNullPointer() {
+    Feng$NullPointerError* e = Feng$alloc(sizeof(Feng$NullPointerError));
+    e->$meta = &Feng$meta_NullPointerError;
+    Feng$throw(e);
+}
+
+void Feng$throwIndexOutOfBounds() {
+    Feng$IndexOutOfBoundsError* e = Feng$alloc(sizeof(Feng$IndexOutOfBoundsError));
+    e->$meta = &Feng$meta_IndexOutOfBoundsError;
+    Feng$throw(e);
+}
+
+// ===== built-in type metadata =====
+const Feng$Meta Feng$meta_$Object = {sizeof(struct $Object), NULL, 0, NULL, NULL};
 
 const Feng$Meta_$Writer Feng$meta_$Writer = {{0}};
 const Feng$Meta_$Writable Feng$meta_$Writable = {{0}};

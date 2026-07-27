@@ -124,6 +124,10 @@ public class CGenerator implements Generator {
     // When true, DerivedTypeDeclarer fields are written with 'struct' prefix
     // because inside a struct body the typedef name may not be in scope yet.
     private boolean insideStructBody = false;
+    // exception handling: inside try-with-finally → transform return to flag+goto
+    private boolean insideTryFinally = false;
+    // exception handling: nesting counter for unique finally labels
+    private int tryFinallyDepth = 0;
 
     // ---- dedup / deferred emission ----
     // Types and functions needed by code are registered first, then emitted
@@ -2644,8 +2648,8 @@ public class CGenerator implements Generator {
             case LabeledStatement ee -> write(ee);
             case ReturnStatement ee -> write(ee);
             case SwitchStatement ee -> write(ee);
-            case ThrowStatement ee -> unsupported("throw");
-            case TryStatement ee -> unsupported("try");
+            case ThrowStatement ee -> write(ee);
+            case TryStatement ee -> write(ee);
             default -> unreachable();
         }
         return this;
@@ -2826,11 +2830,231 @@ public class CGenerator implements Generator {
     }
 
     private CGenerator write(ReturnStatement rs) {
+        // Inside try-with-finally: defer return until after finally executes
+        if (insideTryFinally) {
+            int depth = tryFinallyDepth - 1; // depth was already incremented for current try
+            if (rs.result().none()) {
+                write("_feng_returned").write(depth).write(" = true; ");
+                write("goto _feng_finally_").write(depth).endStmt();
+            } else {
+                var re = rs.result().get();
+                write("_feng_retval").write(depth).write(" = ").write(re).endStmt();
+                write("_feng_returned").write(depth).write(" = true; ");
+                write("goto _feng_finally_").write(depth).endStmt();
+            }
+            return this;
+        }
         if (rs.result().none()) return write("return").endStmt();
         var re = rs.result().get();
         var prot = rs.procedure().must().prototype();
         var rt = prot.returnSet().must();
         return write("return ").writeValue(re, rt).endStmt();
+    }
+
+    private CGenerator write(ThrowStatement ts) {
+        var exExpr = ts.exception();
+        var td = (DerivedTypeDeclarer) exExpr.resultType.must();
+        var cd = (ClassDefinition) td.def();
+
+        // Find the nearest error trace method along the parent chain
+        ClassMethod etMethod = findErrorTrace(cd);
+
+        // ({ void* _ex = <expr>; error_trace(_ex, fn, ln); Feng$throw(_ex); })
+        write("({ void* _ex = (void*)(");
+        write(exExpr);
+        write("); ");
+        if (etMethod != null) {
+            // Call error trace macro: Class$feng$macro$error$trace(_ex, &label, line)
+            var owner = etMethod.master() != null ? (ClassDefinition) etMethod.master() : cd;
+            write(owner.symbol());
+            write("$feng$macro$error$trace(_ex, ");
+            write("(Uint64)(uintptr_t)&&_feng_fn_label, ");
+            write(ts.pos().start() != null ? ts.pos().start().getLine() : 0);
+            write("); ");
+        }
+        write("Feng$throw(_ex); })");
+        return endStmt();
+    }
+
+    /**
+     * Find the error trace macro method on a class or its ancestors.
+     */
+    private ClassMethod findErrorTrace(ClassDefinition cd) {
+        var et = cd.errorTrace();
+        if (et.has()) return et.must();
+        var p = cd.parent();
+        while (p.has()) {
+            var pc = p.must();
+            var pet = pc.errorTrace();
+            if (pet.has()) return pet.must();
+            p = pc.parent();
+        }
+        return null;
+    }
+
+    private CGenerator write(TryStatement ts) {
+        boolean hasFinally = ts.finallyClause().has();
+        boolean hasCatches = !ts.catchClauses().isEmpty();
+        int depth = tryFinallyDepth;
+
+        write('{').indent();
+
+        // Return-tracking: needed only when finally exists (return must defer to after finally)
+        if (hasFinally) {
+            var proc = procOf(ts.body());
+            if (proc != null && proc.returnSet().has()) {
+                write("volatile ");
+                write(proc.returnSet().must());
+                write(" _feng_retval").write(depth).write("; ");
+            }
+            write("volatile bool _feng_returned").write(depth).write(" = false; ").newLine();
+        }
+
+        // Exception frame (volatile: values must survive longjmp per C11)
+        write("volatile Feng$ExFrame _frame").write(depth);
+        write(" = {.prev = Feng$ex_top}; ");
+        write("Feng$ex_top = (Feng$ExFrame*)&_frame").write(depth).endStmt();
+
+        write("if (setjmp(*(jmp_buf*)&_frame").write(depth).write(".buf) == 0) {").indent();
+
+        // === TRY body ===
+        if (hasFinally) {
+            insideTryFinally = true;
+            tryFinallyDepth++;
+        }
+        write(ts.body());
+        if (hasFinally) {
+            tryFinallyDepth--;
+            if (tryFinallyDepth == 0) insideTryFinally = false;
+        }
+        dedent();
+
+        if (hasCatches) {
+            write("} else {").indent();
+            write("void* _ex = _frame").write(depth).write(".exception;").newLine();
+
+            boolean first = true;
+            for (var cc : ts.catchClauses()) {
+                if (first) {
+                    write("if (");
+                } else {
+                    write(" else if (");
+                }
+                first = false;
+
+                boolean firstType = true;
+                for (var catchType : cc.typeSet()) {
+                    if (!firstType) write(" || ");
+                    firstType = false;
+                    if (catchType instanceof DerivedTypeDeclarer dtd
+                            && dtd.def() instanceof ClassDefinition ccd) {
+                        // class → use is_kind (supports parent class matching)
+                        write("Feng$is_kind(Feng$objMeta(_ex), (const Feng$Meta*)&Feng$meta_");
+                        write(ccd.symbol());
+                        write(")");
+                    } else if (catchType instanceof DerivedTypeDeclarer dtd
+                            && dtd.def() instanceof InterfaceDefinition ifd) {
+                        // interface → use iface_vtable (supports interface matching)
+                        write("Feng$iface_vtable(Feng$objMeta(_ex), (const Feng$Meta*)&Feng$meta_");
+                        write(ifd.symbol());
+                        write(") != NULL");
+                    } else {
+                        unreachable();
+                    }
+                }
+                write(") {").indent();
+
+                // Declare catch variable; if single type, use typed pointer
+                var arg = cc.argument();
+                if (cc.typeSet().size() == 1) {
+                    var ctd = (DerivedTypeDeclarer) cc.typeSet().get(0);
+                    var def = ctd.def();
+                    if (def instanceof InterfaceDefinition) {
+                        // interface → void* (no concrete C struct for interface)
+                        write("void* ").varName(arg).write(" = _ex;").newLine();
+                    } else {
+                        var ccd = (ClassDefinition) def;
+                        write(ccd.symbol()).write("* ").varName(arg)
+                                .write(" = (").write(ccd.symbol()).write("*)_ex;").newLine();
+                    }
+                } else {
+                    write("void* ").varName(arg).write(" = _ex;").newLine();
+                }
+
+                write(cc.body());
+                write("Feng$dec(_ex); ");  // release ref held by frame
+                write("_frame").write(depth).write(".state = 1; /* caught */").newLine();
+                dedent().write('}');
+            }
+            write(" { /* fallthrough */ }").newLine(); // all catches unmatched
+            dedent();
+        }
+        write('}').newLine();
+
+        write("Feng$ex_top = _frame").write(depth).write(".prev;").newLine();
+
+        // === FINALLY ===
+        if (hasFinally) {
+            write("_feng_finally_").write(depth).write(':').newLine();
+            write(ts.finallyClause().must());
+            write("if (_feng_returned").write(depth).write(") return _feng_retval")
+                    .write(depth).endStmt();
+        }
+
+        // Re-throw unhandled exception
+        if (hasCatches) {
+            write("if (_frame").write(depth)
+                    .write(".state != 1 && _frame").write(depth)
+                    .write(".exception) { Feng$throw(_frame").write(depth)
+                    .write(".exception); }").newLine();
+        } else if (hasFinally) {
+            write("if (_frame").write(depth)
+                    .write(".exception) { Feng$throw(_frame").write(depth)
+                    .write(".exception); }").newLine();
+        }
+
+        dedent().write('}').newLine();
+        return this;
+    }
+
+    /**
+     * Search a statement tree for a ReturnStatement to extract the enclosing
+     * Procedure's prototype (for return type in try-finally).
+     */
+    private Prototype procOf(Statement s) {
+        if (s instanceof ReturnStatement rs && rs.procedure().has()) {
+            return rs.procedure().must().prototype();
+        }
+        if (s instanceof BlockStatement bs) {
+            for (var st : bs.list()) {
+                var p = procOf(st);
+                if (p != null) return p;
+            }
+        }
+        if (s instanceof IfStatement is) {
+            var p = procOf(is.yes());
+            if (p != null) return p;
+            if (is.not().has()) {
+                p = procOf(is.not().get());
+                if (p != null) return p;
+            }
+        }
+        if (s instanceof ForStatement fs) {
+            if (fs instanceof ConditionalForStatement cfs) {
+                return procOf(cfs.body());
+            }
+        }
+        if (s instanceof SwitchStatement ss) {
+            for (var br : ss.branches()) {
+                var p = procOf(br.body());
+                if (p != null) return p;
+            }
+        }
+        if (s instanceof TryStatement ts) {
+            var p = procOf(ts.body());
+            if (p != null) return p;
+        }
+        return null;
     }
 
     private CGenerator write(SwitchStatement ss) {
@@ -2860,7 +3084,9 @@ public class CGenerator implements Generator {
 
     private boolean noTerminal(List<Statement> list) {
         if (list.isEmpty()) return false;
-        return !(list.getLast() instanceof ReturnStatement);
+        var last = list.getLast();
+        return !(last instanceof ReturnStatement
+              || last instanceof ThrowStatement);
     }
 
     private void exitScope(Scope s) {
@@ -3236,7 +3462,7 @@ public class CGenerator implements Generator {
                 write(".instance_size = sizeof(").writeMangledName(dt).write("),").newLine();
                 cd.parent().use(p -> {
                     if (p == ClassDefinition.ObjectClass)
-                        write(".super = &Feng$meta_Object,").newLine();
+                        write(".super = &Feng$meta_$Object,").newLine();
                     else
                         write(".super = (const Feng$Meta*)&Feng$meta_").write(parentMangledName(cd, dt))
                                 .write(".base,").newLine();
@@ -3324,7 +3550,7 @@ public class CGenerator implements Generator {
         write(".instance_size = sizeof(").write(cd.symbol()).write("),").newLine();
         cd.parent().use(p -> {
             if (p == ClassDefinition.ObjectClass)
-                write(".super = &Feng$meta_Object,");
+                write(".super = &Feng$meta_$Object,");
             else if (cd.inherit().has() && !cd.inherit().must().generic().isEmpty()) {
                 write(".super = (const Feng$Meta*)&Feng$meta_").write(mangledName(cd.inherit().must())).write(".base,");
             } else {
@@ -4255,6 +4481,12 @@ public class CGenerator implements Generator {
             }
         } else if (stmt instanceof SwitchStatement ss) {
             for (var br : ss.branches()) preScanCleanupStmts(br);
+        } else if (stmt instanceof TryStatement ts) {
+            preScanCleanupStmts(ts.body());
+            for (var cc : ts.catchClauses()) {
+                preScanCleanupStmts(cc.body());
+            }
+            ts.finallyClause().use(this::preScanCleanupStmts);
         }
     }
 
@@ -4460,6 +4692,7 @@ public class CGenerator implements Generator {
 
     private CGenerator write(Procedure proc) {
         write('{').indent();
+        write("_feng_fn_label:;").newLine();  // for error trace; ';' avoids C11 warning when followed by declaration
         write((Statement) proc.body());
         if (noTerminal(proc.body().list())) exitScope(proc);
         dedent().write('}').newLine();

@@ -1,0 +1,43 @@
+
+interface I {}
+
+class Error {}
+
+class MyError:Error (I) {
+    var fn uint64;
+    var line int;
+    macro error trace(fn uint64, line int) {
+        this.fn = fn;
+        this.line = line;
+    }
+}
+
+func task() {
+    throw new(MyError);
+}
+
+func main(args [&!#][*!#]byte) {
+    try{
+        task();
+    } catch (e *!#MyError) {
+        var l = e.line;
+    }
+    try{
+        task();
+    } catch (o *!#Error) {
+        var e = o?(*#MyError);
+        var l = e.line;
+    }
+    try{
+        task();
+    } catch (o *!#Object) {
+        var e = o?(*#MyError);
+        var l = e.line;
+    }
+    try{
+        task();
+    } catch (i *!#I) {
+        var e = i?(*#MyError);
+        var l = e.line;
+    }
+}

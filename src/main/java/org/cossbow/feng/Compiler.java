@@ -85,7 +85,8 @@ public class Compiler {
             throw new IllegalArgumentException(input + " is not a regular file");
         }
         var fn = input.getFileName();
-        this.pkg = letters(CommonUtil.trimExt(fn.toString()));
+        if (this.pkg == null)
+            this.pkg = letters(CommonUtil.trimExt(fn.toString()));
         var fm = parser(this.pkg, input.getParent(), this.lib).parseFile(fn);
         compile(fm, output);
     }
