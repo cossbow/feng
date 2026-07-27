@@ -4,7 +4,7 @@ import org.cossbow.feng.Compiler;
 
 import java.util.Map;
 
-public class CppGeneratorTest extends GeneratorTest {
+public class CppGeneratorTest {
     protected Compiler compiler(String pkg) {
         var c = new Compiler(CppGenerator.FACTORY);
         c.pkg(pkg);

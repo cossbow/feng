@@ -34,7 +34,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -1239,30 +1238,32 @@ public class SemanticAnalysis {
     //
 
     private void checkMain(FunctionDefinition fd) {
-        analyse(fd);
-
         var prot = fd.prototype();
         if (prot.returnSet().has()) {
             semantic("func main can't has return: %s",
                     prot.returnSet().get().pos());
             return;
         }
-        if (prot.parameterSet().size() != 1) {
+        if (prot.parameterSet().size() > 1) {
             semantic("func main can have only one parameter: %s",
                     prot.parameterSet().pos());
             return;
+        } else if (prot.parameterSet().size() == 1) {
+            var p = prot.parameterSet().fixed(0);
+            if (p.type() instanceof ArrayTypeDeclarer at &&
+                    at.refer().match(r -> r.isKind(PHANTOM) && r.required() && r.unmodifiable())
+                    && at.element() instanceof ArrayTypeDeclarer et &&
+                    et.refer().match(r -> r.required() && r.unmodifiable()) &&
+                    et.element() instanceof PrimitiveTypeDeclarer pt &&
+                    pt.primitive() == Primitive.BYTE) {
+                //
+            } else {
+                semantic("func main required parameter type as '[&!#][*!#]byte': %s", p.pos());
+                return;
+            }
         }
-        var p = prot.parameterSet().fixed(0);
-        if (p.type() instanceof ArrayTypeDeclarer at &&
-                at.refer().match(r -> r.isKind(PHANTOM) && r.required() && r.unmodifiable())
-                && at.element() instanceof ArrayTypeDeclarer et &&
-                et.refer().match(r -> r.required() && r.unmodifiable()) &&
-                et.element() instanceof PrimitiveTypeDeclarer pt &&
-                pt.primitive() == Primitive.BYTE) {
-            return;
-        }
+        analyse(fd);
 
-        semantic("func main required parameter type as '[&!#][*!#]byte': %s", p.pos());
     }
 
     private FunctionDefinition enterFunc;
@@ -3830,10 +3831,9 @@ public class SemanticAnalysis {
     private Groups.G2<Expression, TypeDeclarer> optimize(CurrentExpression e) {
         assert enterClass != null;
         assert enterMethod != null;
-        // TODO
         var def = e.isSelf() ? enterClass : enterClass.parent().must();
-        var dt = new DerivedType(e.pos(), e.type(), TypeArguments.EMPTY);
-        dt.def(enterClass);
+        var dt = new DerivedType(e.pos(), def.symbol(), TypeArguments.EMPTY);
+        dt.def(def);
         var kind = enterMethod.escaped() ? STRONG : PHANTOM;
         var ref = new Refer(e.pos(), kind, true, false);
         var td = new DerivedTypeDeclarer(e.pos(), dt, Optional.of(ref));
@@ -4771,11 +4771,14 @@ public class SemanticAnalysis {
             semantic("'%s' must be fun-macro: %s", m, m.pos());
             return;
         }
-        if (!mf.procedure().params().isEmpty())
-            semantic("'%s' has no parameters: %s", mf, mf.pos());
+        var mp = mf.procedure();
+        if (!mp.params().isEmpty())
+            semantic("'%s' can't have parameters: %s", mf, mf.pos());
+        if (mp.result().has())
+            semantic("'%s' can't have returns: %s", mf, mf.pos());
 
         var pt = new Prototype(mf.pos(), new ParameterSet(mf.pos()));
-        var body = new BlockStatement(mf.pos(), mf.procedure().body(), false);
+        var body = new BlockStatement(mf.pos(), mp.body(), false);
         var proc = new Procedure(mf.pos(), pt, body, Map.of());
         var cm = new ClassMethod(mf.pos(), Modifier.empty(), mf.makeId(),
                 TypeParameters.empty(), false, false, proc, false);

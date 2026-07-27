@@ -1,0 +1,7 @@
+func test(n int) {
+    var r = new(int,n);
+}
+
+func main() {
+    test(15);
+}

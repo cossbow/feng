@@ -420,6 +420,11 @@ public class CppGenerator implements Generator {
         newLine();
         if (header) return;
 
+        if (!main.prototype().parameterSet().isEmpty()) {
+            write("#define FENG_MAIN_HAS_ARGS").newLine();
+            newLine();
+        }
+
         try (var is = getResource(mainFile);
              var ir = new InputStreamReader(Objects.requireNonNull(is));
              var r = new BufferedReader(ir)) {

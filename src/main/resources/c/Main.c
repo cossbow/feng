@@ -1,4 +1,4 @@
-
+#ifdef FENG_MAIN_HAS_ARGS
 #ifndef FENG_TYPEDEF_ArraySRef_ArraySRef_Byte
 #define FENG_TYPEDEF_ArraySRef_ArraySRef_Byte
 typedef struct { Feng$ArraySRef_Byte* $values; Int64 $length; } Feng$ArraySRef_ArraySRef_Byte;
@@ -14,10 +14,12 @@ static inline void Feng$cleanup_arr_ArraySRef_Byte(Feng$ArraySRef_ArraySRef_Byte
 	}
 }
 #endif
+#endif
 
 
 int main(int argc, char **argv) {
 	{
+#ifdef FENG_MAIN_HAS_ARGS
 		Feng$ArraySRef_ArraySRef_Byte list FENG$DEC(Feng$cleanup_arr_ArraySRef_Byte);
 		list.$values = Feng$alloc(argc*sizeof(void*));
 		list.$length = argc;
@@ -29,6 +31,10 @@ int main(int argc, char **argv) {
 			list.$values[i].$length = len;
 		}
 		$main((Feng$ArrayPRef_ArraySRef_Byte){list.$values, list.$length});
+#else
+		(void)argc; (void)argv;
+		$main();
+#endif
 	}
 #ifdef FENG_DEBUG_MEMORY
 	feng$debug(false);

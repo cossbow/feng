@@ -184,7 +184,7 @@ public class SemanticAnalysisTest {
         checkFail(def + "func f(a A) {}");
 
         checkFail("class A{macro resource free(int){}}");
-//        checkFail("class A{macro resource free()int{}}");
+        checkFail("class A{macro resource free()int{}}");
     }
 
     @Test
@@ -210,6 +210,20 @@ public class SemanticAnalysisTest {
         var d = "class A{var id int; func m()this{}} ";
         // TODO: return this
 //        checkSucc(d + "func f(a *A){var id = a.m().id;}");
+    }
+
+    @Test
+    public void testSuper1() {
+        var d = "class B:A { func run() { super.run(); } } ";
+        checkSucc(d + "class A { func run() {} }");
+        checkFail(d + "class A { }");
+    }
+
+    @Test
+    public void testSuper2() {
+        var d = "class A { var a int; } ";
+        checkSucc(d + "class B:A { var b int; func f() { super.a = 1; } } ");
+        checkFail(d + "class B:A { var b int; func f() { super.b = 1; } } ");
     }
 
     //
