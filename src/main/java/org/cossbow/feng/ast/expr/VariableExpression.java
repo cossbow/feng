@@ -1,8 +1,11 @@
 package org.cossbow.feng.ast.expr;
 
+import org.cossbow.feng.ast.GlobalVariable;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.dcl.Variable;
+import org.cossbow.feng.ast.gen.TypeArguments;
+import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
 
 /**
@@ -13,6 +16,7 @@ import org.cossbow.feng.util.Optional;
  */
 public class VariableExpression extends PrimaryExpression {
     private final Variable variable;
+    // After analysis, the symbol will be left blank
     private final Optional<Symbol> symbol;
 
     public VariableExpression(Position pos, Variable variable,
@@ -41,25 +45,22 @@ public class VariableExpression extends PrimaryExpression {
     }
 
     /**
-     * Mirror by creating a new VariableExpression node.
-     * <p>
-     * The variable and symbol references are kept as-is (shared).
-     * This works because:
-     * <ul>
-     *   <li>Global variables (like stdout) — the Variable object is globally
-     *       shared and its type/value are already fully analyzed.</li>
-     *   <li>Parameter variables (like fmt) — the original Variable has
-     *       value=nil, so resolveFormatString falls through to
-     *       context.findVar(symbol) which finds the mirror variable
-     *       created by expandInlined in the current scope.</li>
-     * </ul>
-     * The key benefit: a new Expression node gets fresh
-     * expectType/resultType/expectCallable state, independent
-     * from other expansion copies.
+     * Mirror by creating a new Expression.
      */
     @Override
-    public VariableExpression mirror() {
-        return this;
+    public PrimaryExpression mirror() {
+        // Global variables are under the module defined by the function.
+        // If they are parsed and bound before expansion, they cannot be
+        // parsed again, otherwise the variable cannot be found
+        if (variable instanceof GlobalVariable)
+            return this;
+        // This method should not be called in subsequent processing as
+        // it is only deployed before analysis.
+        if (symbol.none())
+            return ErrorUtil.unreachable();
+        // Local variables need to be parsed again after expansion
+        return new SymbolExpression(pos(), symbol.get(),
+                TypeArguments.EMPTY);
     }
 
     //

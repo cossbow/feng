@@ -229,16 +229,19 @@ public class Compiler {
         var pureC = !fm.cSources().isEmpty();
         // Pure-C module: write bridge content directly as the module header
         // Header-only module: write bridge as _bridge.h, append include to .h
-        var outPath = pureC ? dir.resolve(name + ".h") : dir.resolve(name + "_bridge.h");
+        var outPath = dir.resolve(name + (pureC ? ".h" : "_bridge.h"));
 
+        var guard = "__HEADER_BRIDGE_" + name.toUpperCase();
         try (var w = Files.newBufferedWriter(outPath, UTF_8)) {
+            w.append("#ifndef ").append(guard).write('\n');
+            w.append("#define ").append(guard).append('\n');
             w.write("// auto-generated bridge for " + (isC ? "C" : "C++") + " functions: " + name + "\n\n");
             // Include the original C headers so function declarations are visible
             if (!isC && !fm.headerFiles().isEmpty()) w.write("extern \"C\" {\n");
             for (var h : fm.headerFiles()) {
-                w.write("#include \"");
-                w.write(h.getFileName().toString());
-                w.write("\"\n");
+                w.append("#include ").append('"')
+                        .append(h.getFileName().toString());
+                w.append('"').write("\n");
             }
             if (!isC && !fm.headerFiles().isEmpty()) w.write("}\n");
             if (!fm.headerFiles().isEmpty()) w.write("\n");
@@ -315,6 +318,7 @@ public class Compiler {
                 }
                 w.write(");\n}\n");
             }
+            w.write("#endif\n");
         }
 
         // For header-only modules, append bridge include to the module's .h

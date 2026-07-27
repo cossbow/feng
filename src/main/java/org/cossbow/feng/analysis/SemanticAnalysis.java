@@ -2218,7 +2218,7 @@ public class SemanticAnalysis {
         context.putVar(iv);
 
         // create value variable
-        var ie = new VariableExpression(in.pos(), iv);
+        var ie = new VariableExpression(in.pos(), iv, new Symbol(in));
         var ve = vec.apply(ie);
         ve.resultType.set(vt);
         var vv = new Variable(vn.pos(), Modifier.empty(), Declare.CONST, vn,
@@ -5150,7 +5150,7 @@ public class SemanticAnalysis {
         var bufVar = new Variable(pos, Modifier.empty(), Declare.VAR,
                 new Identifier(pos, "_fb", true),
                 Lazy.of(bufType), Lazy.nil());
-        var bufExpr = new VariableExpression(pos, bufVar);
+        var bufExpr = new VariableExpression(pos, bufVar, new Symbol(bufVar.name()));
 
         // 2. Conversion: Feng$xxxToStr(arg, buf)
         var convName = prim.isFloat() ? "floatToStr" : "intToStr";
@@ -5161,7 +5161,7 @@ public class SemanticAnalysis {
         var convCall = new CallExpression(pos, convSym, List.of(arg, bufExpr), false);
         convCall.resultType.set(Primitive.INT.declarer());
         var lenVar = makeFmtVar("_len", convCall);
-        var lenExpr = new VariableExpression(pos, lenVar);
+        var lenExpr = new VariableExpression(pos, lenVar, new Symbol(lenVar.name()));
 
         // 3. Write: out.write(buf, 0, len)
         var writeName = new Identifier("write");
