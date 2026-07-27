@@ -13,6 +13,7 @@ public class FModule {
     private final ParseSymbolTable table;
     private List<Path> cSources = List.of();
     private List<Path> headerFiles = List.of();
+    private List<String> linkLibs = List.of();
 
     public FModule(ModulePath path,
                    List<ModulePath> imports,
@@ -48,6 +49,14 @@ public class FModule {
 
     public void headerFiles(List<Path> files) {
         this.headerFiles = List.copyOf(files);
+    }
+
+    public List<String> linkLibs() {
+        return linkLibs;
+    }
+
+    public void linkLibs(List<String> libs) {
+        this.linkLibs = List.copyOf(libs);
     }
 
     public final Lazy<AnalyseSymbolTable> result = Lazy.nil();

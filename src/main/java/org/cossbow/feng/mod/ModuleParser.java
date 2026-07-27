@@ -136,6 +136,17 @@ public class ModuleParser {
         }
     }
 
+    /**
+     * Load {@code feng.cfg} from the module directory and apply
+     * its settings to the module (e.g. link libraries).
+     */
+    private void processConfig(Path module, FModule fm) throws IOException {
+        var cfg = ModuleConfig.load(absPath(module));
+        if (!cfg.linkLibs().isEmpty()) {
+            fm.linkLibs(cfg.linkLibs());
+        }
+    }
+
     private FModule parseModuleFiles(Path module, List<Path> files, List<Path> cSources) {
         var mp = new ModulePath(pkg, module);
         var fm = mergeFiles(mp, parseFiles(mp, files));
@@ -150,6 +161,14 @@ public class ModuleParser {
             processHeaders(module, fm);
         } catch (Exception e) {
             System.err.println("warning: failed to parse C headers in "
+                    + absPath(module) + ": " + e.getMessage());
+        }
+
+        // Load module-level configuration (feng.cfg)
+        try {
+            processConfig(module, fm);
+        } catch (IOException e) {
+            System.err.println("warning: failed to load config in "
                     + absPath(module) + ": " + e.getMessage());
         }
 

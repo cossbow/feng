@@ -3115,20 +3115,56 @@ Compile-time constants are constants whose values can be deduced and calculated 
 2. Variables declared with `const` whose type is a [primitive type](#primitive-types) or a [string literal](#string-literals).
 3. All expressions composed entirely of compile-time constants are also compile-time constants, because their results can be computed at compile time.
 
-## C Modules
+## Calling C
 
-Fēng supports writing modules in C. Header files must declare the symbols (functions, types, or global variables) to be referenced; the compiler will parse the headers and prefix these symbols with the module path.
+Fēng supports direct use of C functions and types.
 
-For example, a C module with the path `jjj$mm` has the following header:
+### C Types
+
+Fēng's `struct`/`union` share not only the same keywords as C, but also the same memory layout, so they can be passed directly.
+
+Fēng's primitive types correspond exactly to C in both bit width and signedness, and can be passed by value directly; the `bool` type also corresponds to C's `bool` type.
+
+**Pointer handling**: Fēng cannot directly use C pointers — the compiler converts all pointers to the `uint64` type during parsing.
+Fēng's regular [reference type variables](#reference-type-variables) can be converted to `uint64` (only to `uint64`), allowing them to be passed to C pointer parameters.
+**Note**: reverse conversion is strictly prohibited — reference values can only be obtained through `new` (see [new Expression](#new-expression)), so there are no safety concerns at the Fēng level.
+[Array references](#variable-length-array) cannot be directly converted to `uint64`; instead, use the built-in field `values` to obtain the pointer (also of type `uint64`) for passing to C.
+
+For example:
+
+```feng
+func use(a *int) {
+    var p uint64 = uint64(a);
+    // var r *int = p;  // ✖ reverse conversion from uint64 to reference is not allowed
+}
+```
+
+### C Modules
+
+Modules can be written in pure C, but mixing C and Fēng code within a single module is not supported.
+
+C module headers declare the symbols to be referenced (functions, types, or global variables). The compiler parses them, adds the module path prefix, and the module can then be imported and used like any ordinary Fēng module.
+
+For example, a C module with the path `jjj$mm` has the following directory structure:
+
+```
+jjj/mm/
+├── mm.h       ← header: struct and function declarations
+└── mm.c       ← implementation: function bodies
+```
+
+Header `mm.h`:
 
 ```C
 struct Complex { float r, i; };
 struct Complex add(struct Complex a, struct Complex b);
 ```
 
-And the implementation:
+Implementation `mm.c`:
 
 ```C
+#include "mm.h"
+
 struct Complex add(struct Complex a, struct Complex b) {
     return (struct Complex){.r = a.r + b.r, .i = a.i + b.i};
 }
@@ -3146,19 +3182,17 @@ func test() {
 }
 ```
 
-Fēng's `struct`/`union` share not only the same keywords as C, but also the same memory layout, so they can be passed directly.
+### Calling C Libraries
 
-Note that Fēng cannot directly use C pointers — the compiler converts all pointers to the `uint64` type during parsing.
-Fēng's regular [reference type variables](#reference-type-variables) can be converted to `uint64` (only to `uint64`), allowing them to be passed to C pointer parameters.
-Reverse conversion is prohibited — reference values can only be obtained through `new` (see [new Expression](#new-expression)), so there are no safety concerns.
+To call an external C library (libc or third-party), simply place a header file in the module directory that includes the target library's header and declares the symbols you need.
 
-For example:
+**libc** is linked automatically — no extra configuration required. See the [`std/os`](std/os) module: the header [`file.h`](std/os/file.h) includes `<stdio.h>`, allowing [`file.feng`](std/os/file.feng) to directly call libc functions such as `fopen` and `fwrite`.
 
-```feng
-func use(a *int) {
-    var p uint64 = uint64(a);
-    // var r *int = p;  // ✖ reverse conversion from uint64 to reference is not allowed
-}
+**Third-party libraries** (e.g. `pthread`, `m`, `dl`) are not auto-linked. Create a `feng.cfg` file in the module directory to declare the required libraries:
+
+```properties
+# feng.cfg — declare libraries to link, comma-separated (without -l prefix)
+link = pthread
 ```
 
-[Array references](#variable-length-array) cannot be directly converted to `uint64`; instead, use the built-in field `values` to obtain the pointer (also of type `uint64`) for passing to C.
+Multiple libraries are comma-separated: `link = pthread,m`.
