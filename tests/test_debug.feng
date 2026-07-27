@@ -1,0 +1,8 @@
+import std$string;
+import std$error;
+
+func main(args [&!#][*!#]byte) {
+    var s2 = string$fromUtf8("你好世界");
+    var r0 = s2.rune(0);
+    var rc = s2.runeCount();
+}

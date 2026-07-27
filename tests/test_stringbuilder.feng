@@ -19,7 +19,91 @@ func testAppendInt() {
     var bl = s.byteLength();
 }
 
+func testAppendBool() {
+    var sb = stringbuilder$newBuilder();
+    sb.appendBool(true);
+    sb.append(string$fromUtf8(" "));
+    sb.appendBool(false);
+    var s = sb.build();
+    var bl = s.byteLength();
+}
+
+func testAppendInt64() {
+    var sb = stringbuilder$newBuilder();
+    sb.appendInt64(int64(1234567890123));
+    var s = sb.build();
+}
+
+func testAppendUint() {
+    var sb = stringbuilder$newBuilder();
+    sb.appendUint(uint(42));
+    var s = sb.build();
+}
+
+func testAppendBytes() {
+    var sb = stringbuilder$newBuilder();
+    sb.appendBytes("raw bytes");
+    var s = sb.build();
+    var bl = s.byteLength();
+}
+
+func testAppendByte() {
+    var sb = stringbuilder$newBuilder();
+    sb.appendByte(65);  // 'A'
+    sb.appendByte(66);  // 'B'
+    var s = sb.build();
+    var bl = s.byteLength();
+}
+
+func testAppendRune() {
+    var sb = stringbuilder$newBuilder();
+    sb.appendRune(int32(20320));  // 你
+    var s = sb.build();
+}
+
+func testAppendFloat() {
+    var sb = stringbuilder$newBuilder();
+    sb.appendFloat(3.14);
+    var s = sb.build();
+}
+
+func testClear() {
+    var sb = stringbuilder$newBuilder();
+    sb.append(string$fromUtf8("hello"));
+    sb.clear();
+    var ie = sb.isEmpty();
+    // ie should be true
+    var s = sb.build();
+}
+
+func testLength() {
+    var sb = stringbuilder$newBuilder();
+    sb.append(string$fromUtf8("hi"));
+    var len = sb.length();
+    // len should be 2
+
+    var sb2 = stringbuilder$newBuilder();
+    var ie = sb2.isEmpty();
+    // ie should be true
+}
+
+func testCapacity() {
+    var sb = stringbuilder$newBuilderCapacity(100);
+    sb.append(string$fromUtf8("test"));
+    var s = sb.build();
+}
+
 func main(args [&!#][*!#]byte) {
     testBasic();
     testAppendInt();
+    testAppendBool();
+    testAppendInt64();
+    testAppendUint();
+    testAppendBytes();
+    testAppendByte();
+    testAppendRune();
+    testAppendFloat();
+    testClear();
+    testLength();
+    testCapacity();
 }

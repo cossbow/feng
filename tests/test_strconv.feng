@@ -1,21 +1,176 @@
 import std$strconv;
+import std$error;
 
 func testParseInt() {
     var r1 = strconv$parseInt("12345");
     var v1 = r1.0;
     var ok1 = r1.1;
+    // ok1 should be true, v1 == 12345
 
     var r2 = strconv$parseInt("-99");
     var v2 = r2.0;
     var ok2 = r2.1;
+    // ok2 should be true, v2 == -99
+
+    var r3 = strconv$parseInt("+42");
+    var v3 = r3.0;
+    var ok3 = r3.1;
+    // ok3 should be true, v3 == 42
+
+    var r4 = strconv$parseInt("");
+    var ok4 = r4.1;
+    // ok4 should be false
+
+    var r5 = strconv$parseInt("12a");
+    var ok5 = r5.1;
+    // ok5 should be false
+}
+
+func testParseInt64() {
+    var r1 = strconv$parseInt64("9223372036854775807");
+    var ok1 = r1.1;
+
+    var r2 = strconv$parseInt64("-9223372036854775808");
+    var ok2 = r2.1;
+}
+
+func testParseUint() {
+    var r1 = strconv$parseUint("12345");
+    var ok1 = r1.1;
+
+    var r2 = strconv$parseUint("0");
+    var ok2 = r2.1;
+
+    var r3 = strconv$parseUint("");
+    var ok3 = r3.1;
+    // ok3 should be false
+}
+
+func testParseUint64() {
+    var r = strconv$parseUint64("18446744073709551615");
+    var ok = r.1;
+}
+
+func testParseFloat64() {
+    var r1 = strconv$parseFloat64("3.14");
+    var ok1 = r1.1;
+    var v1 = r1.0;
+
+    var r2 = strconv$parseFloat64("-0.5");
+    var ok2 = r2.1;
+
+    var r3 = strconv$parseFloat64("42");
+    var ok3 = r3.1;
+
+    var r4 = strconv$parseFloat64("42.");
+    var ok4 = r4.1;
+
+    var r5 = strconv$parseFloat64("");
+    var ok5 = r5.1;
+    // ok5 should be false
+}
+
+func testParseBool() {
+    var r1 = strconv$parseBool("true");
+    var v1 = r1.0;
+    var ok1 = r1.1;
+
+    var r2 = strconv$parseBool("false");
+    var v2 = r2.0;
+    var ok2 = r2.1;
+
+    var r3 = strconv$parseBool("TRUE");
+    var ok3 = r3.1;
+    // ok3 should be false (case-sensitive)
+
+    var r4 = strconv$parseBool("");
+    var ok4 = r4.1;
+    // ok4 should be false
 }
 
 func testFormatInt() {
-    var s = strconv$formatInt(42);
-    var s2 = strconv$formatInt(-7);
+    var s1 = strconv$formatInt(0);
+    var s2 = strconv$formatInt(42);
+    var s3 = strconv$formatInt(-7);
+    var s4 = strconv$formatInt(-12345);
+}
+
+func testFormatInt64() {
+    var s = strconv$formatInt64(int64(1234567890123));
+}
+
+func testFormatUint() {
+    var s1 = strconv$formatUint(uint(0));
+    var s2 = strconv$formatUint(uint(42));
+}
+
+func testFormatUint64() {
+    var s = strconv$formatUint64(uint64(1234567890123));
+}
+
+func testFormatFloat() {
+    var s1 = strconv$formatFloat(0.0);
+    var s2 = strconv$formatFloat(3.14);
+    var s3 = strconv$formatFloat(-0.5);
+}
+
+func testFormatBool() {
+    var s1 = strconv$formatBool(true);
+    var s2 = strconv$formatBool(false);
+}
+
+func testMustParseInt() {
+    var v1 = strconv$mustParseInt("12345");
+    var v2 = strconv$mustParseInt("-99");
+}
+
+func testMustParseInt64() {
+    var v = strconv$mustParseInt64("1234567890123");
+}
+
+func testMustParseUint() {
+    var v = strconv$mustParseUint("42");
+}
+
+func testMustParseUint64() {
+    var v = strconv$mustParseUint64("42");
+}
+
+func testMustParseFloat64() {
+    var v = strconv$mustParseFloat64("3.14");
+}
+
+func testMustParseBool() {
+    var v1 = strconv$mustParseBool("true");
+    var v2 = strconv$mustParseBool("false");
+}
+
+func testMustParseError() {
+    try {
+        strconv$mustParseInt("not-a-number");
+    } catch(e *!#error$ParseError) {
+        // expected
+    }
 }
 
 func main(args [&!#][*!#]byte) {
     testParseInt();
+    testParseInt64();
+    testParseUint();
+    testParseUint64();
+    testParseFloat64();
+    testParseBool();
     testFormatInt();
+    testFormatInt64();
+    testFormatUint();
+    testFormatUint64();
+    testFormatFloat();
+    testFormatBool();
+    testMustParseInt();
+    testMustParseInt64();
+    testMustParseUint();
+    testMustParseUint64();
+    testMustParseFloat64();
+    testMustParseBool();
+    testMustParseError();
 }

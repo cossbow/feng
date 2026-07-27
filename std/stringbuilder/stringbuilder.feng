@@ -60,9 +60,44 @@ class StringBuilder (Writer) {
     }
 
     export
-    func appendFloat(v float64) {
+    func appendFloat(v float) {
         var s = strconv$formatFloat(v);
         append(Str$fromUtf8(s));
+    }
+
+    export
+    func appendBool(v bool) {
+        var s = strconv$formatBool(v);
+        append(Str$fromUtf8(s));
+    }
+
+    export
+    func appendInt64(v int64) {
+        var s = strconv$formatInt64(v);
+        append(Str$fromUtf8(s));
+    }
+
+    export
+    func appendUint(v uint) {
+        var s = strconv$formatUint(v);
+        append(Str$fromUtf8(s));
+    }
+
+    // Append raw bytes without going through String.
+    export
+    func appendBytes(data [&!#]byte) {
+        if (data.length == 0) { return; }
+        ensureCapacity(data.length);
+        for (var i = 0; i < data.length; i += 1) {
+            buf[len] = data[i];
+            len += 1;
+        }
+    }
+
+    // Reset length to zero (does not free the buffer).
+    export
+    func clear() {
+        len = 0;
     }
 
     export

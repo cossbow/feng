@@ -1,4 +1,5 @@
 import std$string;
+import std$error;
 
 func testBasic() {
     var s = string$fromUtf8("Hello");
@@ -54,6 +55,97 @@ func testEmpty() {
     var ie = e.isEmpty();
 }
 
+func testSplit() {
+    var s = string$fromUtf8("a,b,c");
+    var parts = s.split(string$fromUtf8(","));
+    // parts should have 3 elements: "a", "b", "c"
+    var p0 = parts[0];
+    var p1 = parts[1];
+    var p2 = parts[2];
+
+    // empty separator: returns entire string
+    var s2 = string$fromUtf8("hello");
+    var parts2 = s2.split(string$EMPTY);
+}
+
+func testSplitEmpty() {
+    var s = string$fromUtf8("");
+    var parts = s.split(string$fromUtf8(","));
+}
+
+func testJoin() {
+    var parts = new([3]string$String);
+    parts[0] = string$fromUtf8("a");
+    parts[1] = string$fromUtf8("b");
+    parts[2] = string$fromUtf8("c");
+    var joined = string$join(parts, string$fromUtf8(","));
+
+    // join empty
+    var empty = new([0]string$String);
+    var e = string$join(empty, string$fromUtf8(","));
+
+    // single element
+    var single = new([1]string$String);
+    single[0] = string$fromUtf8("only");
+    var s = string$join(single, string$fromUtf8(","));
+}
+
+func testReplace() {
+    var s = string$fromUtf8("hello world hello");
+    var r = s.replace(string$fromUtf8("hello"), string$fromUtf8("hi"));
+    var bl = r.byteLength();
+
+    // replace with empty -> remove all
+    var r2 = s.replace(string$fromUtf8("hello"), string$EMPTY);
+
+    // no match
+    var r3 = s.replace(string$fromUtf8("xyz"), string$fromUtf8("abc"));
+}
+
+func testTrim() {
+    var s1 = string$fromUtf8("  hello  ");
+    var t1 = s1.trim();
+
+    var s2 = string$fromUtf8("\t\n  world  \r\n");
+    var t2 = s2.trim();
+
+    // already trimmed
+    var s3 = string$fromUtf8("abc");
+    var t3 = s3.trim();
+
+    // all whitespace
+    var s4 = string$fromUtf8("   ");
+    var t4 = s4.trim();
+}
+
+func testToLower() {
+    var s = string$fromUtf8("Hello, WORLD!");
+    var lower = s.toLower();
+}
+
+func testToUpper() {
+    var s = string$fromUtf8("Hello, world!");
+    var upper = s.toUpper();
+}
+
+func testRuneException() {
+    var s = string$fromUtf8("你好");
+    try {
+        s.rune(10);  // out of bounds
+    } catch(e *!#error$IndexOutOfBoundsError) {
+        // expected
+    }
+}
+
+func testSubstringException() {
+    var s = string$fromUtf8("hello");
+    try {
+        s.substring(5, 2);  // start > end
+    } catch(e *!#error$IllegalArgumentError) {
+        // expected
+    }
+}
+
 func main(args [&!#][*!#]byte) {
     testBasic();
     testCompare();
@@ -63,4 +155,13 @@ func main(args [&!#][*!#]byte) {
     testSubstring();
     testRune();
     testEmpty();
+    testSplit();
+    testSplitEmpty();
+    testJoin();
+    testReplace();
+    testTrim();
+    testToLower();
+    testToUpper();
+    testRuneException();
+    testSubstringException();
 }

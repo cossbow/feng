@@ -1,4 +1,5 @@
 import std$encoding$utf8;
+import std$error;
 
 export
 class String (Writable) {
@@ -134,13 +135,16 @@ class String (Writable) {
     }
 
     // Substring by byte offsets [start, end).
+    // Throws IllegalArgumentError if start < 0, end < 0, or start > end.
     export
     func substring(start, end int) String {
-        if (value == nil) { return EMPTY; }
-        var s = start;
+        if (start < 0 || end < 0 || start > end) {
+            throw new(error$IllegalArgumentError);
+        }
+        if (value == nil || end == 0) { return EMPTY; }
         var e = end;
-        if (s < 0) { s = 0; }
         if (e > value.length) { e = value.length; }
+        var s = start;
         if (s >= e) { return EMPTY; }
         var n = e - s;
         var buf = new([n]byte);
@@ -151,10 +155,10 @@ class String (Writable) {
     }
 
     // Get the rune at character index (not byte index).
-    // Returns -1 if index out of range.
+    // Throws IndexOutOfBoundsError if index is out of range.
     export
     func rune(index int) int32 {
-        if (value == nil) { return int32(-1); }
+        if (index < 0) { throw new(error$IndexOutOfBoundsError); }
         const v [&#]byte = value;
         var i = 0;
         var count = 0;
@@ -168,7 +172,210 @@ class String (Writable) {
             i += dec.1;
             count += 1;
         }
-        return int32(-1);
+        throw new(error$IndexOutOfBoundsError);
+    }
+
+    // Split the string by separator sep.
+    // Returns a dynamic array of substrings.
+    export
+    func split(sep String) [*]String {
+        if (value == nil) { return new([1]String); }
+        if (sep.value == nil || sep.value.length == 0) {
+            var r = new([1]String);
+            var buf = new([value.length]byte);
+            for (var i = 0; i < value.length; i += 1) {
+                buf[i] = value[i];
+            }
+            r[0] = {value=buf};
+            return r;
+        }
+        // Count separators
+        var sepLen = sep.value.length;
+        var count = 0;
+        var pos = 0;
+        for (pos + sepLen <= value.length) {
+            var match = true;
+            for (var j = 0; j < sepLen; j += 1) {
+                if (value[pos + j] != sep.value[j]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                count += 1;
+                pos += sepLen;
+            } else {
+                pos += 1;
+            }
+        }
+        // Build result
+        var result = new([count + 1]String);
+        var idx = 0;
+        var start = 0;
+        pos = 0;
+        for (pos + sepLen <= value.length) {
+            var match = true;
+            for (var j = 0; j < sepLen; j += 1) {
+                if (value[pos + j] != sep.value[j]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                // Extract [start, pos)
+                if (pos > start) {
+                    var n = pos - start;
+                    var buf = new([n]byte);
+                    for (var k = 0; k < n; k += 1) {
+                        buf[k] = value[start + k];
+                    }
+                    result[idx] = {value=buf};
+                } else {
+                    result[idx] = EMPTY;
+                }
+                idx += 1;
+                start = pos + sepLen;
+                pos = start;
+            } else {
+                pos += 1;
+            }
+        }
+        // Last part
+        if (start < value.length) {
+            var n = value.length - start;
+            var buf = new([n]byte);
+            for (var k = 0; k < n; k += 1) {
+                buf[k] = value[start + k];
+            }
+            result[idx] = {value=buf};
+        } else {
+            result[idx] = EMPTY;
+        }
+        return result;
+    }
+
+    // Replace all occurrences of oldStr with newStr.
+    export
+    func replace(oldStr, newStr String) String {
+        if (value == nil) { return EMPTY; }
+        if (oldStr.value == nil || oldStr.value.length == 0) { return {value=value}; }
+        // First, count occurrences to allocate result
+        var oldLen = oldStr.value.length;
+        var count = 0;
+        var end = value.length - oldLen;
+        var i = 0;
+        for (i <= end) {
+            var match = true;
+            for (var j = 0; j < oldLen; j += 1) {
+                if (value[i + j] != oldStr.value[j]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                count += 1;
+                i += oldLen;
+            } else {
+                i += 1;
+            }
+        }
+        if (count == 0) { return {value=value}; }
+        // Allocate result buffer
+        var nLen int = 0;
+        if (newStr.value != nil) { nLen = newStr.value.length; }
+        var resultLen = value.length - count * oldLen + count * nLen;
+        var buf = new([resultLen]byte);
+        var wi = 0;
+        var ri = 0;
+        for (ri <= end) {
+            var match = true;
+            for (var j = 0; j < oldLen; j += 1) {
+                if (value[ri + j] != oldStr.value[j]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                // Write newStr
+                if (newStr.value != nil) {
+                    for (var j = 0; j < nLen; j += 1) {
+                        buf[wi] = newStr.value[j];
+                        wi += 1;
+                    }
+                }
+                ri += oldLen;
+            } else {
+                buf[wi] = value[ri];
+                wi += 1;
+                ri += 1;
+            }
+        }
+        // Copy remaining
+        for (ri < value.length) {
+            buf[wi] = value[ri];
+            wi += 1;
+            ri += 1;
+        }
+        return {value=buf};
+    }
+
+    // Trim leading and trailing ASCII whitespace (space, tab, newline, carriage return).
+    export
+    func trim() String {
+        if (value == nil || value.length == 0) { return EMPTY; }
+        var start = 0;
+        var end = value.length;
+        // Trim left
+        for (start < end) {
+            var c = value[start];
+            if (c != 32 && c != 9 && c != 10 && c != 13) { break; }
+            start += 1;
+        }
+        // Trim right
+        for (end > start) {
+            var c = value[end - 1];
+            if (c != 32 && c != 9 && c != 10 && c != 13) { break; }
+            end -= 1;
+        }
+        if (start >= end) { return EMPTY; }
+        var n = end - start;
+        var buf = new([n]byte);
+        for (var i = 0; i < n; i += 1) {
+            buf[i] = value[start + i];
+        }
+        return {value=buf};
+    }
+
+    // Convert ASCII uppercase letters to lowercase.
+    export
+    func toLower() String {
+        if (value == nil) { return EMPTY; }
+        var buf = new([value.length]byte);
+        for (var i = 0; i < value.length; i += 1) {
+            var c = value[i];
+            if (c >= 65 && c <= 90) {  // 'A'..'Z'
+                buf[i] = byte(int(c) + 32);
+            } else {
+                buf[i] = c;
+            }
+        }
+        return {value=buf};
+    }
+
+    // Convert ASCII lowercase letters to uppercase.
+    export
+    func toUpper() String {
+        if (value == nil) { return EMPTY; }
+        var buf = new([value.length]byte);
+        for (var i = 0; i < value.length; i += 1) {
+            var c = value[i];
+            if (c >= 97 && c <= 122) {  // 'a'..'z'
+                buf[i] = byte(int(c) - 32);
+            } else {
+                buf[i] = c;
+            }
+        }
+        return {value=buf};
     }
 
     // Writable implementation
@@ -191,6 +398,49 @@ func fromUtf8(data [*#]byte) String {
 export
 func fromBytes(data [*#]byte) String {
     return {value=data};
+}
+
+// Join an array of Strings with a separator.
+export
+func join(parts [&!#]String, sep String) String {
+    if (parts.length == 0) { return EMPTY; }
+    if (parts.length == 1) {
+        var s = parts[0];
+        if (s.value == nil) { return EMPTY; }
+        var buf = new([s.value.length]byte);
+        for (var i = 0; i < s.value.length; i += 1) {
+            buf[i] = s.value[i];
+        }
+        return {value=buf};
+    }
+    // Calculate total length
+    var sepLen = 0;
+    if (sep.value != nil) { sepLen = sep.value.length; }
+    var totalLen = 0;
+    for (var i = 0; i < parts.length; i += 1) {
+        var s = parts[i];
+        if (s.value != nil) { totalLen += s.value.length; }
+    }
+    totalLen += sepLen * (parts.length - 1);
+    // Build result
+    var buf = new([totalLen]byte);
+    var pos = 0;
+    for (var i = 0; i < parts.length; i += 1) {
+        var s = parts[i];
+        if (s.value != nil) {
+            for (var j = 0; j < s.value.length; j += 1) {
+                buf[pos] = s.value[j];
+                pos += 1;
+            }
+        }
+        if (i < parts.length - 1 && sep.value != nil) {
+            for (var j = 0; j < sepLen; j += 1) {
+                buf[pos] = sep.value[j];
+                pos += 1;
+            }
+        }
+    }
+    return {value=buf};
 }
 
 export

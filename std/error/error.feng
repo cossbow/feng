@@ -1,0 +1,43 @@
+// Exception base class and common error types for the Fēng standard library.
+// All exception classes must have the `macro error trace(fn uint64, line uint32)` macro
+// to collect stack trace information when thrown.
+
+export
+class Error {
+    var fn uint64;
+    var line uint32;
+
+    func trace(fnAddr uint64, lineNum uint32) {
+        fn = fnAddr;
+        line = lineNum;
+    }
+
+    macro error trace(fnAddr uint64, lineNum uint32) {
+        trace(fnAddr, lineNum);
+    }
+}
+
+// Thrown when an argument does not meet the expected preconditions.
+export
+class IllegalArgumentError : Error {
+}
+
+// Thrown when an operation is invoked at an illegal or inappropriate time.
+export
+class IllegalStateError : Error {
+}
+
+// Thrown when an index is out of the valid range.
+export
+class IndexOutOfBoundsError : Error {
+}
+
+// Thrown when parsing fails (e.g., strconv functions).
+export
+class ParseError : Error {
+}
+
+// Thrown when an operation is not supported.
+export
+class UnsupportedError : Error {
+}

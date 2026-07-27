@@ -39,8 +39,31 @@ class BufferWriter (Writer) {
     }
 
     export
+    func writeByte(b byte) {
+        growIfNeed(1);
+        buf[len] = b;
+        len += 1;
+    }
+
+    export
     func get() ([*!#]byte, int) {
         return (buf, len);
+    }
+
+    export
+    func length() int {
+        return len;
+    }
+
+    export
+    func isEmpty() bool {
+        return len == 0;
+    }
+
+    // Reset length to zero (does not free the buffer).
+    export
+    func clear() {
+        len = 0;
     }
 
     export
@@ -48,13 +71,18 @@ class BufferWriter (Writer) {
         var src = buf;
         var dst = new([len]byte);
         util$copy`byte`(src, dst, len);
-        return src;
+        return dst;
     }
 
     export
     func reader() BufferReader {
         return {buf=buf,len=len};
     }
+}
+
+export
+func newWriter() BufferWriter {
+    return {};
 }
 
 export
@@ -70,5 +98,33 @@ class BufferReader (Reader) {
             b[i] = buf[off];
         }
         return off-old;
+    }
+
+    // Reset to read from new data.
+    export
+    func reset(data [*!#]byte, length int) {
+        off = 0;
+        // buf and len are const, so reset is done externally by creating new BufferReader
+    }
+
+    // Seek to an absolute position.
+    export
+    func seek(pos int) {
+        if (pos < 0) { off = 0; }
+        else if (pos > len) { off = len; }
+        else { off = pos; }
+    }
+
+    // Number of bytes remaining to read.
+    export
+    func remaining() int {
+        if (off >= len) { return 0; }
+        return len - off;
+    }
+
+    // Whether all bytes have been read.
+    export
+    func isEmpty() bool {
+        return off >= len;
     }
 }

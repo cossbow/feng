@@ -1,0 +1,111 @@
+import std$bytes;
+
+func testBufferWriterWrite() {
+    var bw = bytes$newWriter();
+    var data = "Hello, Buffer!";
+    var n = bw.write(data, 0, data.length);
+}
+
+func testBufferWriterWriteByte() {
+    var bw = bytes$newWriter();
+    bw.writeByte(65);  // 'A'
+    bw.writeByte(66);  // 'B'
+    bw.writeByte(67);  // 'C'
+    var buf = bw.get();
+    var bl = buf.1;
+}
+
+func testBufferWriterLength() {
+    var bw = bytes$newWriter();
+    bw.writeByte(65);
+    var len = bw.length();
+    var ie = bw.isEmpty();
+}
+
+func testBufferWriterClear() {
+    var bw = bytes$newWriter();
+    bw.writeByte(65);
+    bw.clear();
+    var ie = bw.isEmpty();
+    var len = bw.length();
+}
+
+func testBufferWriterCopy() {
+    var bw = bytes$newWriter();
+    bw.writeByte(65);
+    bw.writeByte(66);
+    var copied = bw.copy();
+    var bl = copied.length;
+}
+
+func testBufferWriterGet() {
+    var bw = bytes$newWriter();
+    bw.writeByte(65);
+    var t = bw.get();
+    var buf = t.0;
+    var len = t.1;
+}
+
+func testBufferWriterReader() {
+    var bw = bytes$newWriter();
+    bw.writeByte(65);
+    bw.writeByte(66);
+    var br = bw.reader();
+    var out = new([2]byte);
+    var n = br.read(out);
+}
+
+func testBufferReaderRead() {
+    var bw = bytes$newWriter();
+    bw.writeByte(65);
+    bw.writeByte(66);
+    bw.writeByte(67);
+    var br = bw.reader();
+
+    var buf1 = new([1]byte);
+    var n1 = br.read(buf1);
+
+    var buf2 = new([2]byte);
+    var n2 = br.read(buf2);
+}
+
+func testBufferReaderSeek() {
+    var bw = bytes$newWriter();
+    bw.writeByte(65);
+    bw.writeByte(66);
+    bw.writeByte(67);
+    var br = bw.reader();
+
+    br.seek(1);
+    var rem = br.remaining();
+
+    var buf = new([2]byte);
+    var n = br.read(buf);
+}
+
+func testBufferReaderRemaining() {
+    var bw = bytes$newWriter();
+    bw.writeByte(65);
+    bw.writeByte(66);
+    var br = bw.reader();
+    var rem = br.remaining();
+    var ie = br.isEmpty();
+
+    var buf = new([2]byte);
+    br.read(buf);
+    var rem2 = br.remaining();
+    var ie2 = br.isEmpty();
+}
+
+func main(args [&!#][*!#]byte) {
+    testBufferWriterWrite();
+    testBufferWriterWriteByte();
+    testBufferWriterLength();
+    testBufferWriterClear();
+    testBufferWriterCopy();
+    testBufferWriterGet();
+    testBufferWriterReader();
+    testBufferReaderRead();
+    testBufferReaderSeek();
+    testBufferReaderRemaining();
+}

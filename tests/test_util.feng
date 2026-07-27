@@ -1,0 +1,65 @@
+import std$util;
+
+func testCopy() {
+    var src [5]int = [1, 2, 3, 4, 5];
+    var dst [5]int;
+    util$copy`int`(src, dst, 5);
+}
+
+func testEqual() {
+    var a [3]int = [1, 2, 3];
+    var b [3]int = [1, 2, 3];
+    var c [3]int = [1, 2, 4];
+    var eq1 = util$equal`int`(a, b);  // true
+    var eq2 = util$equal`int`(a, c);  // false
+
+    // different lengths
+    var d [4]int = [1, 2, 3, 4];
+    var eq3 = util$equal`int`(a, d);  // false
+}
+
+func testFill() {
+    var arr [5]int;
+    util$fill`int`(arr, 42);
+    // all elements should be 42
+}
+
+func testReverse() {
+    var arr [4]int = [1, 2, 3, 4];
+    util$reverse`int`(arr);
+    // arr should be [4, 3, 2, 1]
+
+    // single element
+    var s [1]int = [5];
+    util$reverse`int`(s);
+    // s should be [5]
+}
+
+func testIndexOf() {
+    var arr [5]int = [10, 20, 30, 20, 50];
+    var i1 = util$indexOf`int`(arr, 30);  // 2
+    var i2 = util$indexOf`int`(arr, 20);  // 1 (first occurrence)
+    var i3 = util$indexOf`int`(arr, 99);  // -1
+}
+
+func testContains() {
+    var arr [3]int = [1, 2, 3];
+    var c1 = util$contains`int`(arr, 2);   // true
+    var c2 = util$contains`int`(arr, 99);  // false
+}
+
+func testCopyByteSlice() {
+    var src = "hello";
+    var dst = new([5]byte);
+    util$copy`byte`(src, dst, 5);
+}
+
+func main(args [&!#][*!#]byte) {
+    testCopy();
+    testEqual();
+    testFill();
+    testReverse();
+    testIndexOf();
+    testContains();
+    testCopyByteSlice();
+}
