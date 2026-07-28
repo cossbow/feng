@@ -60,10 +60,6 @@ public class MacroTable {
         return tryGet(TYPE_RESOURCE, RESOURCE_FREE);
     }
 
-    public Optional<Macro> errorTrace() {
-        return tryGet(TYPE_ERROR, ERROR_TRACE);
-    }
-
     public IdentifierMap<Macro> operators() {
         return tables.getOrDefault(TYPE_OPERATOR, new IdentifierMap<>());
     }
@@ -80,9 +76,6 @@ public class MacroTable {
 
     public static final Identifier TYPE_RESOURCE = new Identifier("resource");
     public static final Identifier RESOURCE_FREE = new Identifier("free");
-
-    public static final Identifier TYPE_ERROR = new Identifier("error");
-    public static final Identifier ERROR_TRACE = new Identifier("trace");
 
     public static final Identifier TYPE_OPERATOR = new Identifier("operator");
     public static final Map<Identifier, BinaryOperator> BINARY_OPERATOR = BinaryOperator

@@ -4,7 +4,7 @@
 // ===== exception handling =====
 _Thread_local Feng$ExFrame* Feng$ex_top = NULL;
 
-void Feng$throw(void* ex) {
+_Noreturn void Feng$throw(void* ex) {
     if (!Feng$ex_top) {
         fprintf(stderr, "unhandled exception\n");
         abort();
@@ -15,18 +15,29 @@ void Feng$throw(void* ex) {
 }
 
 // ===== runtime exception types =====
-const Feng$Meta Feng$meta_NullPointerError = {sizeof(Feng$NullPointerError), &Feng$meta_$Object, 0, NULL, NULL};
-const Feng$Meta Feng$meta_IndexOutOfBoundsError = {sizeof(Feng$IndexOutOfBoundsError), &Feng$meta_$Object, 0, NULL, NULL};
+const Feng$Meta Feng$meta_$Exception = {
+    sizeof($Exception), &Feng$meta_$Object, 0, NULL, NULL
+};
+const Feng$Meta Feng$meta_$NilException = {
+    sizeof($NilException), &Feng$meta_$Exception, 0, NULL, NULL
+};
+const Feng$Meta Feng$meta_$OutOfBoundsException = {
+    sizeof($OutOfBoundsException), &Feng$meta_$Exception, 0, NULL, NULL
+};
 
-void Feng$throwNullPointer() {
-    Feng$NullPointerError* e = Feng$alloc(sizeof(Feng$NullPointerError));
-    e->$meta = &Feng$meta_NullPointerError;
+void Feng$throwNullPointer(Uint64 fn, Uint32 line) {
+    $NilException* e = Feng$alloc(sizeof($NilException));
+    e->$meta = &Feng$meta_$NilException;
+    e->fn = fn;
+    e->line = line;
     Feng$throw(e);
 }
 
-void Feng$throwIndexOutOfBounds() {
-    Feng$IndexOutOfBoundsError* e = Feng$alloc(sizeof(Feng$IndexOutOfBoundsError));
-    e->$meta = &Feng$meta_IndexOutOfBoundsError;
+void Feng$throwIndexOutOfBounds(Uint64 fn, Uint32 line) {
+    $OutOfBoundsException* e = Feng$alloc(sizeof($OutOfBoundsException));
+    e->$meta = &Feng$meta_$OutOfBoundsException;
+    e->fn = fn;
+    e->line = line;
     Feng$throw(e);
 }
 

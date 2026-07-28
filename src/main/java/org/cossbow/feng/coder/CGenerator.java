@@ -2030,6 +2030,7 @@ public class CGenerator implements Generator {
     private CGenerator visitNewDefined(NewDefinedType ndt, NewExpression e) {
         var def = findType(ndt.type());
         var nonFinal = def instanceof ClassDefinition cd && !cd.isFinal();
+        var isBuiltin = def.builtin();
         e.arg().use(a -> {
             // new(Foo, {id=2}) → block expression: alloc + assign fields
             write("({ ").write(ndt.type()).write(" *_p = (")
@@ -2037,18 +2038,19 @@ public class CGenerator implements Generator {
             if (nonFinal) {
                 var cd = (ClassDefinition) def;
                 write("Feng$newObject(sizeof(").write(ndt.type()).write("), ");
-                writeMetaBaseRef(cd, (DerivedType) ndt.type());
+                if (isBuiltin) write("&Feng$meta_").write(cd.symbol());
+                else writeMetaBaseRef(cd, (DerivedType) ndt.type());
                 write(")");
             } else
                 write("Feng$alloc(sizeof(").write(ndt.type()).write("))");
             write("; ");
             if (a instanceof ObjectExpression oe) {
-                if (def instanceof ClassDefinition cd) {
-                    for (var f : cd.allFields().values()) {
+                if (def instanceof ClassDefinition cd2) {
+                    for (var f : cd2.allFields().values()) {
                         var val = oe.entries().tryGet(f.name());
                         if (val.has()) {
-                            var ft = cd.generic().isEmpty() ? f.type()
-                                    : resolveFromMap(f.type(), buildTypeMap(cd.generic(), ((DerivedType) ndt.type()).generic()));
+                            var ft = cd2.generic().isEmpty() ? f.type()
+                                    : resolveFromMap(f.type(), buildTypeMap(cd2.generic(), ((DerivedType) ndt.type()).generic()));
                             write("_p->").write(f.name()).write(" = ")
                                     .writeValue(val.get(), ft).endStmt();
                         }
@@ -2070,7 +2072,8 @@ public class CGenerator implements Generator {
                 write("({ ").write(ndt.type()).write(" *_p = (")
                         .write(ndt.type()).write(" *)Feng$newObject(sizeof(")
                         .write(ndt.type()).write("), ");
-                writeMetaBaseRef(cd, (DerivedType) ndt.type());
+                if (isBuiltin) write("&Feng$meta_").write(cd.symbol());
+                else writeMetaBaseRef(cd, (DerivedType) ndt.type());
                 write("); _p; })");
             } else {
                 write("((").write(ndt.type()).write(" *)Feng$alloc(sizeof(")
@@ -2280,7 +2283,10 @@ public class CGenerator implements Generator {
         var t = e.index().resultType.must();
         return write("Feng$checkIndex(").write(e.index())
                 .write(',').write('(').write(t).write(')')
-                .write(e.def().size()).write(')');
+                .write(e.def().size())
+                .write(", (Uint64)(uintptr_t)&&_feng_fn_label, ")
+                .write(e.pos().start() != null ? e.pos().start().getLine() : 0)
+                .write(')');
     }
 
     private CGenerator write(IsExpression e) {
@@ -2385,12 +2391,13 @@ public class CGenerator implements Generator {
     }
 
     /**
-     * Count non-Object parent levels for metadata nesting
+     * Count non-builtin parent levels for metadata nesting.
+     * Built-in classes (Object, Exception) use plain Feng$Meta without .base wrappers.
      */
     private int parentDepth(ClassDefinition cd) {
         int d = 0;
         var cur = cd;
-        while (cur.parent().has() && cur.parent().must() != ClassDefinition.ObjectClass) {
+        while (cur.parent().has() && !cur.parent().must().builtin()) {
             d++;
             cur = cur.parent().must();
         }
@@ -2402,8 +2409,10 @@ public class CGenerator implements Generator {
      */
     private CGenerator writeMetaBaseRef(ClassDefinition cd) {
         write("&Feng$meta_").write(cd.symbol());
-        int d = parentDepth(cd) + 1;
-        for (int i = 0; i < d; i++) write(".base");
+        if (!cd.builtin()) {
+            int d = parentDepth(cd) + 1;
+            for (int i = 0; i < d; i++) write(".base");
+        }
         return this;
     }
 
@@ -2412,8 +2421,10 @@ public class CGenerator implements Generator {
      */
     private CGenerator writeMetaBaseRef(DerivedType dt) {
         write("&Feng$meta_").write(mangledName(dt));
-        int d = parentDepth((ClassDefinition) dt.def()) + 1;
-        for (int i = 0; i < d; i++) write(".base");
+        if (!((ClassDefinition) dt.def()).builtin()) {
+            int d = parentDepth((ClassDefinition) dt.def()) + 1;
+            for (int i = 0; i < d; i++) write(".base");
+        }
         return this;
     }
 
@@ -2429,6 +2440,10 @@ public class CGenerator implements Generator {
      * Write reference to parent class's base Feng$Meta for .super field
      */
     private CGenerator writeSuperRef(ClassDefinition parentCd) {
+        if (parentCd.builtin()) {
+            // built-in classes use plain Feng$Meta, no wrapper struct
+            return write("&Feng$meta_").write(parentCd.symbol());
+        }
         write("(const Feng$Meta*)&Feng$meta_").write(parentCd.symbol());
         int d = parentDepth(parentCd) + 1;
         for (int i = 0; i < d; i++) write(".base");
@@ -2856,38 +2871,41 @@ public class CGenerator implements Generator {
         var td = (DerivedTypeDeclarer) exExpr.resultType.must();
         var cd = (ClassDefinition) td.def();
 
-        // Find the nearest error trace method along the parent chain
-        ClassMethod etMethod = findErrorTrace(cd);
+        // Find the trace method (defined on Exception or a subclass)
+        var traceMethod = findTraceMethod(cd);
 
-        // ({ void* _ex = <expr>; error_trace(_ex, fn, ln); Feng$throw(_ex); })
+        // ({ void* _ex = <expr>; Class$trace(_ex, fn, ln); Feng$throw(_ex); })
         write("({ void* _ex = (void*)(");
         write(exExpr);
         write("); ");
-        if (etMethod != null) {
-            // Call error trace macro: Class$feng$macro$error$trace(_ex, &label, line)
-            var owner = etMethod.master() != null ? (ClassDefinition) etMethod.master() : cd;
+        if (traceMethod != null) {
+            var owner = traceMethod.master() != null
+                    ? (ClassDefinition) traceMethod.master() : cd;
             write(owner.symbol());
-            write("$feng$macro$error$trace(_ex, ");
-            write("(Uint64)(uintptr_t)&&_feng_fn_label, ");
-            write(ts.pos().start() != null ? ts.pos().start().getLine() : 0);
-            write("); ");
+            write("$trace(_ex, ");
+        } else {
+            write("Feng$errorSetTrace(_ex, ");
         }
-        write("Feng$throw(_ex); })");
+        write("(Uint64)(uintptr_t)&&_feng_fn_label, ");
+        write(ts.pos().start() != null ? ts.pos().start().getLine() : 0);
+        write("); ");
+        write("Feng$throw(_ex); __builtin_unreachable(); })");
         return endStmt();
     }
 
     /**
-     * Find the error trace macro method on a class or its ancestors.
+     * Find the trace method on a class or its ancestors.
+     * Returns the method from the class that actually DEFINES it (not inherited copies).
      */
-    private ClassMethod findErrorTrace(ClassDefinition cd) {
-        var et = cd.errorTrace();
-        if (et.has()) return et.must();
-        var p = cd.parent();
-        while (p.has()) {
-            var pc = p.must();
-            var pet = pc.errorTrace();
-            if (pet.has()) return pet.must();
-            p = pc.parent();
+    private ClassMethod findTraceMethod(ClassDefinition cd) {
+        var traceId = new Identifier("trace");
+        // check own methods first (avoid inherited copies with wrong master)
+        var m = cd.methods().tryGet(traceId);
+        if (m.has()) return (ClassMethod) m.get();
+        // walk parent chain
+        for (var p = cd.parent(); p.has(); p = p.get().get().parent()) {
+            m = p.get().get().methods().tryGet(traceId);
+            if (m.has()) return (ClassMethod) m.get();
         }
         return null;
     }
@@ -3777,7 +3795,7 @@ public class CGenerator implements Generator {
             }
             write("typedef struct Feng$Meta_").write(cd.symbol()).write(" {").indent();
             cd.parent().use(p -> {
-                if (p == ClassDefinition.ObjectClass)
+                if (p == ClassDefinition.ObjectClass || p.builtin())
                     write("Feng$Meta base").endStmt();
                 else {
                     // if inheriting from a concrete generic instantiation, use mangled name
@@ -4697,7 +4715,8 @@ public class CGenerator implements Generator {
 
     private CGenerator write(Procedure proc) {
         write('{').indent();
-        write("_feng_fn_label:;").newLine();  // for error trace; ';' avoids C11 warning when followed by declaration
+        // for exceptions
+        write("_feng_fn_label:;").newLine();
         write((Statement) proc.body());
         if (noTerminal(proc.body().list())) exitScope(proc);
         dedent().write('}').newLine();

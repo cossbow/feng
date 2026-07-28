@@ -1,7 +1,7 @@
 import std$error;
 func main(args [&!#][*!#]byte) {
     try {
-        throw new(error$ParseError);
-    } catch(e *!#error$ParseError) {
+        throw new(error$ParseException);
+    } catch(e *!#error$ParseException) {
     }
 }

@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import static org.cossbow.feng.ast.Position.ZERO;
@@ -68,10 +67,6 @@ public class InterfaceDefinition extends ObjectDefinition {
     //
 
     /**
-     * Automatically generate class IDs for implementing dynamic features
-     */
-    private final int id = IdGenerator.getAndIncrement();
-    /**
      * Collection of cached interface definitions after analyzing {@link #parts}
      */
     public final List<InterfaceDefinition> partDefs = new ArrayList<>();
@@ -84,10 +79,6 @@ public class InterfaceDefinition extends ObjectDefinition {
      * The collection of classes that implement this interface
      */
     public final Set<ClassDefinition> impls = new HashSet<>();
-
-    public int id() {
-        return id;
-    }
 
     public List<DerivedType> supers() {
         return parts.values();
@@ -108,8 +99,7 @@ public class InterfaceDefinition extends ObjectDefinition {
         return (allMethods.isEmpty() ? methods : allMethods).tryGet(name);
     }
 
-    //
-    private static final AtomicInteger IdGenerator = new AtomicInteger(0);
+    // static
 
     /**
      * The bytes writer interface

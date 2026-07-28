@@ -148,7 +148,7 @@ func testMustParseBool() {
 func testMustParseError() {
     try {
         strconv$mustParseInt("not-a-number");
-    } catch(e *!#error$ParseError) {
+    } catch(e *!#error$ParseException) {
         // expected
     }
 }

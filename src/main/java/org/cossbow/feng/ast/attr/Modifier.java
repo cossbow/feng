@@ -36,4 +36,9 @@ public class Modifier extends Entity {
         return new Modifier(Position.ZERO, false,
                 new SymbolMap<>());
     }
+
+    public static Modifier empty(boolean export) {
+        return new Modifier(Position.ZERO, export,
+                new SymbolMap<>());
+    }
 }

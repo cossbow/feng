@@ -21,6 +21,11 @@ typedef struct $Object {
 
 extern const Feng$Meta Feng$meta_$Object;
 
+// ===== built-in exception metadata =====
+extern const Feng$Meta Feng$meta_$Exception;
+extern const Feng$Meta Feng$meta_$NilException;
+extern const Feng$Meta Feng$meta_$OutOfBoundsException;
+
 static inline void* Feng$newObject(int64_t size, const Feng$Meta* meta) {
     void* _p = Feng$alloc(size);
     (($Object*)_p)->$meta = meta;

@@ -15,6 +15,7 @@ import org.cossbow.feng.mod.ModuleAnalysis;
 import org.cossbow.feng.mod.ModuleParser;
 import org.cossbow.feng.util.Command;
 import org.cossbow.feng.util.CommonUtil;
+import org.cossbow.feng.util.ErrorUtil;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -356,19 +357,19 @@ public class Compiler {
             if (!isC) cmakeArgs.add("-DCMAKE_CXX_COMPILER=c++");
             var ret = new Command(dir, cmakeArgs).exec();
             if (ret.code() != 0) {
-                System.err.printf("cmake configure failed (exit %d): %s",
+                ErrorUtil.backend("cmake configure failed (exit %d): %s",
                         ret.code(), ret.err());
                 return;
             }
             ret = new Command(dir, "cmake", "--build", ".").exec();
             if (ret.code() != 0) {
-                System.err.printf("build failed (exit %d): %s",
+                ErrorUtil.backend("build failed (exit %d): %s",
                         ret.code(), ret.err());
             }
         } else {
             var ret = new Command(dir, "make").exec();
             if (ret.code() != 0) {
-                System.err.printf("build failed (exit %d): %s",
+                ErrorUtil.backend("build failed (exit %d): %s",
                         ret.code(), ret.err());
             }
         }

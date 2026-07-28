@@ -2230,9 +2230,9 @@ func calc() {
    try {
       step1();
       step2();
-   } catch(e *!#NilPointerError) {
+   } catch(e *!#NilException) {
       println("Caught null pointer");
-   } catch(e *!#IllegalStateError | *!#IllegalArgumentError) {
+   } catch(e *!#IllegalStateException | *!#IllegalArgumentException) {
       println("Caught state error or argument error");
    } finally {
       println("Finally, execution continues after here");
@@ -2247,7 +2247,7 @@ With `catch` but no `finally`:
 func calc() {
    try {
       step1();
-   } catch(e *!#IllegalStateError) {
+   } catch(e *!#IllegalStateException) {
       println("Caught state error or argument error");
    }
    return getResult();
@@ -3086,24 +3086,33 @@ func test() {
 
 ## Exceptions
 
-An exception class that can be thrown must be a non-final class and needs to define the macro `error trace`, which tracks and collects stack
-information:
+The exception type that can be thrown must be the built-in `Exception` class or one of its subclasses. The definition of `Exception` is as follows
+(built-in):
 
 ```feng
-class Stack {
-    var fn uint64;
-    var line uint32;
+class Exception {
+   var fn uint64;
+   var line uint32;
+   func trace(fnAddr uint64, lineNum uint32) {
+      fn = fnAddr;
+      line = lineNum;
+   }
 }
-export
-class Error {
-   var stacks List`Stack`;
-   func trace(fn uint64, line uint32) {
-      var s Stack = {fn=fn,line=line};
-      stacks.add(s);
-   }
-   macro error trace(fn uint64, line uint32) {
-      trace(fn, line);
-   }
+```
+
+In addition to the built-in `Exception`, there are two more built-in exception classes. They are built-in because they are thrown dynamically at
+runtime:
+
+1. `NilException`: thrown when a reference used at runtime is `nil`.
+2. `OutOfBoundsException`: thrown when an array index access exceeds the actual length.
+
+Custom exceptions can be defined:
+
+```feng
+class MyException : Exception {
+}
+func run() {
+   throw new(MyException);
 }
 ```
 

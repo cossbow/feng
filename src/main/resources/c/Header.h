@@ -185,34 +185,55 @@ typedef struct Feng$ExFrame {
 extern _Thread_local Feng$ExFrame* Feng$ex_top;
 
 // throw an exception (NORETURN), takes ownership of ex (strong ref)
-void Feng$throw(void* ex);
+_Noreturn void Feng$throw(void* ex);
 
 // get the object meta pointer (first field of every feng object)
 static inline const struct Feng$Meta* Feng$objMeta(void* p) {
     return *(const struct Feng$Meta**)p;
 }
 
-// runtime exception types (lightweight, meta only — no stack trace in runtime layer)
-typedef struct Feng$NullPointerError {
+// runtime exception types
+typedef struct $Exception {
     const Feng$Meta* $meta;
-} Feng$NullPointerError;
+    Uint64 fn;
+    Uint32 line;
+} $Exception;
 
-typedef struct Feng$IndexOutOfBoundsError {
+typedef struct $NilException {
     const Feng$Meta* $meta;
-} Feng$IndexOutOfBoundsError;
+    Uint64 fn;
+    Uint32 line;
+} $NilException;
 
-void Feng$throwNullPointer();           // throw *NullPointerError
-void Feng$throwIndexOutOfBounds();      // throw *IndexOutOfBoundsError
+typedef struct $OutOfBoundsException {
+    const Feng$Meta* $meta;
+    Uint64 fn;
+    Uint32 line;
+} $OutOfBoundsException;
 
-// ===== runtime checks =====
-static inline void Feng$required(void* p) {
-    if (!p) Feng$throwNullPointer();
+// exception throw helpers (carry fn/line for stack trace)
+void Feng$throwNullPointer(Uint64 fn, Uint32 line);
+void Feng$throwIndexOutOfBounds(Uint64 fn, Uint32 line);
+
+// Base trace implementation — called by generated throw-statement code;
+// subclasses may override $Exception$trace for additional behavior.
+static inline void $Exception$trace(void* self, Uint64 fn, Uint32 line) {
+    ((struct $Exception*)self)->fn = fn;
+    ((struct $Exception*)self)->line = line;
 }
 
-static inline int64_t Feng$checkIndex(int64_t i, int64_t bound) {
+// ===== runtime checks =====
+// Note: Feng$required and Feng$checkIndex are kept as macros so that
+// the caller site's __LINE__ and label address can be captured.
+// They should be called with (ptr, &&_feng_fn_label, __LINE__) from generated code.
+static inline void Feng$required(void* p, Uint64 fn, Uint32 line) {
+    if (!p) Feng$throwNullPointer(fn, line);
+}
+
+static inline int64_t Feng$checkIndex(int64_t i, int64_t bound, Uint64 fn, Uint32 line) {
     if (0 <= i && i < bound) return i;
-    Feng$throwIndexOutOfBounds();
-    return -1; // fix warning: non-void function does not return a value in all control paths
+    Feng$throwIndexOutOfBounds(fn, line);
+    return -1;
 }
 
 // ===== debug =====

@@ -2129,9 +2129,9 @@ func calc() {
    try {
       step1();
       step2();
-   } catch(e *!#NilPointerError) {
+   } catch(e *!#NilException) {
       println("捕获到了空指针");
-   } catch(e *!#IllegalStateError | *!#IllegalArgumentError) {
+   } catch(e *!#IllegalStateException | *!#IllegalArgumentException) {
       println("捕获到了状态错误或者参数错误");
    } final {
       println("最终经过这里再往下执行");
@@ -2146,7 +2146,7 @@ func calc() {
 func calc() {
    try {
       step1();
-   } catch(e *!#IllegalStateError) {
+   } catch(e *!#IllegalStateException) {
       println("捕获到了状态错误或者参数错误");
    }
    return getResult();
@@ -2964,30 +2964,33 @@ func test() {
 
 ## 异常
 
-能被抛出的异常类型只能是非final类，且需要定义宏`error trace`，在这个宏里追踪并收集栈信息：
+能被抛出的异常类型必须是内置异常`Exception`类或者它的子类，这个`Exception`的定义如下（内置）：
 
 ```feng
-class Stack {
-    var fn uint64;
-    var line uint32;
-}
-export
-class Error {
-   var stacks List`Stack`;
-   func trace(fn uint64, line uint32) {
-      var s Stack = {fn=fn,line=line};
-      stacks.add(s);
-   }
-   macro error trace(fn uint64, line uint32) {
-      trace(fn, line);
+class Exception {
+   var fn uint64;
+   var line uint32;
+   func trace(fnAddr uint64, lineNum uint32) {
+      fn = fnAddr;
+      line = lineNum;
    }
 }
 ```
 
-这个`error trace`宏的参数是固定的：
+除了内置`Exception`外，还内置了两个内置的异常类。之所以内置是因为在运行会动态的抛出：
 
-1. 第一个参数是`uint64`的，是函数或方法的的地址值。
-2. 第二个参数是`uint32`的，是抛出异常的位置——代码行。
+1. `NilException`：运行时使用的引用如果是`nil`就会抛出这个异常。
+2. `OutOfBoundsException`：通过索引访问数组时，如果索引超出实际长度则抛出此异常。
+
+可以自定义异常：
+
+```feng
+class MyException : Exception {
+}
+func run() {
+   throw new(MyException);
+}
+```
 
 ## 编译期常量
 

@@ -48,9 +48,9 @@ class Feng$UseAfterFree : public std::exception {
 
 template<typename T>
 requires std::integral<T>
-static T Feng$checkIndex(T index, T bounds) {
+static T Feng$checkIndex(T index, T bounds, Uint64 fn, Uint32 line) {
 	if (0 <= index && index < bounds) return index;
-	throw Feng$OutOfBounds();
+	Feng$throwIndexOutOfBounds(fn, line);
 }
 
 // 快速幂：计算 a^b
@@ -83,6 +83,43 @@ template<typename T>
 static T *Feng$required(T *p) {
 	if (p != nullptr) return p;
 	throw Feng$NilPointer();
+}
+
+// OOP exception types with stack trace (fn/line)
+class $Exception : public $Object {
+public:
+	Uint64 fn;
+	Uint32 line;
+
+	$Exception() : fn(0), line(0) {}
+	static void trace(void *self, Uint64 fnAddr, Uint32 lineNum) {
+		((class $Exception*)self)->fn = fnAddr;
+		((class $Exception*)self)->line = lineNum;
+	}
+};
+
+class $NilException : public $Exception {
+public:
+	$NilException() : $Exception() {}
+};
+
+class $OutOfBoundsException : public $Exception {
+public:
+	$OutOfBoundsException() : $Exception() {}
+};
+
+// Exception throw helpers (carry fn/line for stack trace)
+static void Feng$throwNullPointer(Uint64 fn, Uint32 line) {
+	auto e = Feng$alloc(sizeof($NilException));
+	auto ne = new(e) $NilException();
+	ne->fn = fn;
+	ne->line = line;
+	// C++ does not use setjmp/longjmp; throw as native C++ exception
+	throw Feng$NilPointer();
+}
+
+static void Feng$throwIndexOutOfBounds(Uint64 fn, Uint32 line) {
+	throw Feng$OutOfBounds();
 }
 
 // The root of polymorphism and abstraction classes

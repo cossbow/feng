@@ -135,11 +135,11 @@ class String (Writable) {
     }
 
     // Substring by byte offsets [start, end).
-    // Throws IllegalArgumentError if start < 0, end < 0, or start > end.
+    // Throws IllegalArgumentException if start < 0, end < 0, or start > end.
     export
     func substring(start, end int) String {
         if (start < 0 || end < 0 || start > end) {
-            throw new(error$IllegalArgumentError);
+            throw new(error$IllegalArgumentException);
         }
         if (value == nil || end == 0) { return EMPTY; }
         var e = end;
@@ -155,10 +155,10 @@ class String (Writable) {
     }
 
     // Get the rune at character index (not byte index).
-    // Throws IndexOutOfBoundsError if index is out of range.
+    // Throws OutOfBoundsException if index is out of range.
     export
     func rune(index int) int32 {
-        if (index < 0) { throw new(error$IndexOutOfBoundsError); }
+        if (index < 0) { throw new(OutOfBoundsException); }
         const v [&#]byte = value;
         var i = 0;
         var count = 0;
@@ -172,7 +172,7 @@ class String (Writable) {
             i += dec.1;
             count += 1;
         }
-        throw new(error$IndexOutOfBoundsError);
+        throw new(OutOfBoundsException);
     }
 
     // Split the string by separator sep.

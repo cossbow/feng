@@ -1,43 +1,22 @@
 
-interface I {}
 
-class Error {}
-
-class MyError:Error (I) {
-    var fn uint64;
-    var line int;
-    macro error trace(fn uint64, line int) {
-        this.fn = fn;
-        this.line = line;
-    }
+class MyException:Exception {
 }
 
 func task() {
-    throw new(MyError);
+    throw new(MyException);
 }
 
 func main(args [&!#][*!#]byte) {
     try{
         task();
-    } catch (e *!#MyError) {
+    } catch (e *!#MyException) {
         var l = e.line;
     }
     try{
         task();
-    } catch (o *!#Error) {
-        var e = o?(*#MyError);
-        var l = e.line;
-    }
-    try{
-        task();
-    } catch (o *!#Object) {
-        var e = o?(*#MyError);
-        var l = e.line;
-    }
-    try{
-        task();
-    } catch (i *!#I) {
-        var e = i?(*#MyError);
+    } catch (o *!#Exception) {
+        var e = o?(*#MyException);
         var l = e.line;
     }
 }

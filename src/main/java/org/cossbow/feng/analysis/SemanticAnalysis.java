@@ -2528,15 +2528,14 @@ public class SemanticAnalysis {
 
         // Validate exception type
         var td = g.b();
-        if (!(td instanceof DerivedTypeDeclarer dtd) ||
-                !dtd.isKind(STRONG) ||
-                !(dtd.def() instanceof ClassDefinition cd)
-                || cd.isFinal() || !cd.isErrorClass()) {
-            return semantic("only can throw a exception class: %s",
-                    td.pos());
+        if (td instanceof DerivedTypeDeclarer dtd &&
+                dtd.refer().match(r -> r.isKind(STRONG) && r.required())
+                && dtd.def() instanceof ClassDefinition cd
+                && !cd.isFinal() && cd.isException()) {
+            return e;
         }
-
-        return e;
+        return semantic("only can throw a exception class: %s",
+                td.pos());
     }
 
     private Statement analyse(TryStatement e) {
@@ -2660,8 +2659,8 @@ public class SemanticAnalysis {
         return e;
     }
 
-    private Set<ObjectDefinition> validateCatchTypes(List<TypeDeclarer> types) {
-        var typeSet = new HashSet<ObjectDefinition>(types.size());
+    private Set<ClassDefinition> validateCatchTypes(List<TypeDeclarer> types) {
+        var typeSet = new HashSet<ClassDefinition>(types.size());
         for (var td : types) {
             if (!(td instanceof DerivedTypeDeclarer dtd)) {
                 return semantic("catch type must be class or interface: %s",
@@ -2674,14 +2673,11 @@ public class SemanticAnalysis {
                         " strong-reference '%s': %s", dtd, dtd.pos());
             }
             var def = dtd.def();
-            if (!(def instanceof ObjectDefinition od)) {
-                return semantic("catch type must be class or interface: %s",
-                        dtd.pos());
+            if (def instanceof ClassDefinition cd && cd.isException()) {
+                typeSet.add(cd);
+                continue;
             }
-            if (def instanceof ClassDefinition cd && cd.isFinal()) {
-                return semantic("catch type must not be final class: %s", dtd.pos());
-            }
-            typeSet.add(od);
+            return semantic("catch type must be Exception: %s", dtd.pos());
         }
         return typeSet;
     }
@@ -2689,12 +2685,12 @@ public class SemanticAnalysis {
     /**
      * Find the lowest common ancestor of multiple type definitions.
      * All types must be DerivedTypeDeclarer with Refer.
-     * Returns the common ancestor as ObjectDefinition.
+     * Returns the common ancestor as ClassDefinition.
      */
-    private Optional<ObjectDefinition> lowestCommonAncestor(
-            Set<ObjectDefinition> defSet) {
+    private Optional<ClassDefinition> lowestCommonAncestor(
+            Set<ClassDefinition> defSet) {
         // Collect ancestor sets for each type (including itself)
-        var ancestorSets = new ArrayList<Set<ObjectDefinition>>(defSet.size());
+        var ancestorSets = new ArrayList<Set<ClassDefinition>>(defSet.size());
         for (var def : defSet) {
             ancestorSets.add(collectAncestors(def));
         }
@@ -2708,7 +2704,7 @@ public class SemanticAnalysis {
         if (common.isEmpty()) return Optional.empty();
 
         // Find the most specific ancestor in the intersection (not inherited by any other member)
-        ObjectDefinition mostSpecific = null;
+        ClassDefinition mostSpecific = null;
         for (var candidate : common) {
             if (isMostSpecific(candidate, common)) {
                 mostSpecific = candidate;
@@ -2729,8 +2725,8 @@ public class SemanticAnalysis {
         return Optional.of(mostSpecific);
     }
 
-    private Set<ObjectDefinition> collectAncestors(ObjectDefinition def) {
-        var ancestors = new HashSet<ObjectDefinition>();
+    private Set<ClassDefinition> collectAncestors(ClassDefinition def) {
+        var ancestors = new HashSet<ClassDefinition>();
         if (def instanceof ClassDefinition cd) {
             ancestors.add(cd);
             // Walk up the parent chain
@@ -2739,18 +2735,12 @@ public class SemanticAnalysis {
                 ancestors.add(p.get().get());
                 p = p.get().get().parent();
             }
-            for (var id : cd.allImpls()) {
-                ancestors.add(id);
-            }
-        } else if (def instanceof InterfaceDefinition id) {
-            ancestors.add(id);
-            id.visitParts(ancestors::add);
         }
         return ancestors;
     }
 
-    private boolean isMostSpecific(ObjectDefinition candidate,
-                                   Set<ObjectDefinition> common) {
+    private boolean isMostSpecific(ClassDefinition candidate,
+                                   Set<ClassDefinition> common) {
         for (var other : common) {
             if (other == candidate) continue;
             // If candidate is an ancestor of other, it is not the most specific
@@ -4760,7 +4750,6 @@ public class SemanticAnalysis {
         macroResFree(cd);
         macroOperators(cd);
         macroIndexOperator(cd);
-        macroErrorTrace(cd);
     }
 
     private void macroResFree(ClassDefinition cd) {
@@ -4866,39 +4855,6 @@ public class SemanticAnalysis {
         var ms = os.map(m -> macroIndexSet(cd, m));
         var io = new IndexOperator(mg, ms);
         cd.indexOperator().set(io);
-    }
-
-    private void macroErrorTrace(ClassDefinition cd) {
-        var o = cd.macros().errorTrace();
-        if (o.none()) return;
-        var m = o.get();
-        if (!(m instanceof MacroFunc mf)) {
-            semantic("'%s' must be fun-macro: %s", m, m.pos());
-            return;
-        }
-        var mp = mf.procedure();
-        if (mp.params().size() != 2) {
-            semantic("'%s' require two parameters (fn uint64, line uint32): %s",
-                    mf, mf.pos());
-            return;
-        }
-
-        var params = new ArrayList<Parameter>(2);
-        for (var mv : mp.params()) {
-            if (mv.type().none()) {
-                semantic("error trace parameter must have type: %s", mv.pos());
-                return;
-            }
-            var td = mv.type().get();
-            analyse(td);
-            var v = new FixedParameter(mv.pos(), Modifier.empty(),
-                    mv.name(), td);
-            params.add(v);
-        }
-
-        var cm = macro2Method(cd, mf, params, Optional.empty(), false);
-        cd.methods().add(cm.name(), cm);
-        cd.errorTrace().set(cm);
     }
 
     private ClassMethod macroIndexGet(ClassDefinition cd, Macro m) {

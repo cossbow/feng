@@ -2,15 +2,19 @@ package org.cossbow.feng.ast.oop;
 
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
+import org.cossbow.feng.ast.dcl.Declare;
+import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
+import org.cossbow.feng.ast.proc.FixedParameter;
+import org.cossbow.feng.ast.proc.ParameterSet;
+import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 final
@@ -118,10 +122,6 @@ public class ClassDefinition extends ObjectDefinition {
     //
 
     /**
-     * Automatically generate class IDs for implementing dynamic features
-     */
-    private final int id = IdGenerator.getAndIncrement();
-    /**
      * After analyzing the {@link #inherit}, cache will be defined here
      */
     private final Lazy<ClassDefinition> parent = Lazy.nil();
@@ -175,16 +175,6 @@ public class ClassDefinition extends ObjectDefinition {
      * {@code a[i] = v;}
      */
     private final Lazy<IndexOperator> indexOperator = Lazy.nil();
-    /**
-     * Error class analysis callback:
-     * <p>
-     * {@code macro error trace(fn uint64, line uint32) { ... }}
-     */
-    private final Lazy<ClassMethod> errorTrace = Lazy.nil();
-
-    public int id() {
-        return id;
-    }
 
     public List<DerivedType> supers() {
         if (parent.match(p -> p == ClassDefinition.ObjectClass))
@@ -232,27 +222,18 @@ public class ClassDefinition extends ObjectDefinition {
         return inheritMethods;
     }
 
+    public boolean isException() {
+        // A class is an exception class if Exception is in its ancestor chain
+        if (this == ExceptionClass) return true;
+        return parent().match(ClassDefinition::isException);
+    }
+
     public boolean resource() {
         return resourceFree.has() || macros.resourceFree().has();
     }
 
     public Lazy<ClassMethod> resourceFree() {
         return resourceFree;
-    }
-
-    public boolean isErrorClass() {
-        if (errorTrace.has()) return true;
-        // 沿 parent 链向上查找 error macro
-        var p = parent();
-        while (p.has()) {
-            if (p.get().get().errorTrace.has()) return true;
-            p = p.get().get().parent();
-        }
-        return false;
-    }
-
-    public Lazy<ClassMethod> errorTrace() {
-        return errorTrace;
     }
 
     public Map<BinaryOperator, ClassMethod> binaryOperators() {
@@ -272,12 +253,6 @@ public class ClassDefinition extends ObjectDefinition {
 
     // static
 
-    private static final AtomicInteger IdGenerator = new AtomicInteger(0);
-
-    public static int maxId() {
-        return IdGenerator.get();
-    }
-
     public static final Symbol ObjectSymbol = new Symbol(new Identifier("Object"));
     public static final DerivedType ObjectType = new DerivedType(
             Position.ZERO, ObjectSymbol, TypeArguments.EMPTY);
@@ -289,7 +264,116 @@ public class ClassDefinition extends ObjectDefinition {
                     new IdentifierMap<>(), new IdentifierMap<>(),
                     new MacroTable());
 
+    // --- built-in exception classes ---
+
+    /**
+     * The built-in Exception class — base of all exception types.
+     * The standard library {@code std$error$Exception} overlays this definition.
+     */
+    public static final Symbol ExceptionSymbol =
+            new Symbol(new Identifier("Exception"));
+
+    private static IdentifierMap<ClassField> _exFields() {
+        var m = new IdentifierMap<ClassField>(2);
+        var fn = new ClassField(Position.ZERO, Modifier.empty(),
+                Declare.VAR, new Identifier("fn"),
+                Primitive.UINT64.declarer());
+        var line = new ClassField(Position.ZERO, Modifier.empty(),
+                Declare.VAR, new Identifier("line"),
+                Primitive.UINT32.declarer());
+        m.add(fn.name(), fn);
+        m.add(line.name(), line);
+        return m;
+    }
+
+    /**
+     * The {@code trace(fnAddr uint64, lineNum uint32)} method on Exception.
+     */
+    private static final ClassMethod traceMethod = new ClassMethod(Position.ZERO,
+            Modifier.empty(true), new Identifier("trace"),
+            TypeParameters.empty(), false, false,
+            new Prototype(Position.ZERO, new ParameterSet(Position.ZERO, List.of(
+                    FixedParameter.create("fnAddr", Primitive.UINT64),
+                    FixedParameter.create("lineNum", Primitive.UINT32)
+            )), Optional.empty()), false);
+
+    public static final ClassDefinition ExceptionClass;
+    public static final ClassDefinition NilExceptionClass;
+    public static final ClassDefinition OutOfBoundsExceptionClass;
+
     static {
+        // -- Exception --
+        var exFields = _exFields();
+        var exMethods = new IdentifierMap<ClassMethod>(1);
+        exMethods.add(traceMethod.name(), traceMethod);
+        ExceptionClass = new ClassDefinition(Position.ZERO,
+                Modifier.empty(), ExceptionSymbol,
+                TypeParameters.empty(), false,
+                Optional.of(new DerivedType(Position.ZERO,
+                        ObjectSymbol, TypeArguments.EMPTY)),
+                new SymbolMap<>(), exFields, exMethods, new MacroTable());
+
+        // -- NilException (inherits fn/line fields from Exception) --
+        NilExceptionClass = new ClassDefinition(Position.ZERO, Modifier.empty(),
+                new Symbol(new Identifier("NilException")),
+                TypeParameters.empty(), false,
+                Optional.of(new DerivedType(Position.ZERO,
+                        ExceptionSymbol, TypeArguments.EMPTY)),
+                new SymbolMap<>(), new IdentifierMap<>(),
+                new IdentifierMap<>(), new MacroTable());
+
+        // -- OutOfBoundsException (inherits fn/line fields from Exception) --
+        OutOfBoundsExceptionClass = new ClassDefinition(Position.ZERO, Modifier.empty(),
+                new Symbol(new Identifier("OutOfBoundsException")),
+                TypeParameters.empty(), false,
+                Optional.of(new DerivedType(Position.ZERO,
+                        ExceptionSymbol, TypeArguments.EMPTY)),
+                new SymbolMap<>(), new IdentifierMap<>(),
+                new IdentifierMap<>(), new MacroTable());
+
+        // mark as built-in
         ObjectClass.builtin(true);
+        ExceptionClass.builtin(true);
+        NilExceptionClass.builtin(true);
+        OutOfBoundsExceptionClass.builtin(true);
+
+        // set trace method master (must be done before wire-up)
+        traceMethod.master(ExceptionClass);
+
+        // wire up parent chain
+        ExceptionClass.parent().set(ObjectClass);
+        ObjectClass.markInherited();
+
+        NilExceptionClass.parent().set(ExceptionClass);
+        ExceptionClass.markInherited();
+
+        OutOfBoundsExceptionClass.parent().set(ExceptionClass);
+        ExceptionClass.markInherited();
+
+        // When analyzing inheritance, some fields will be filled in,
+        // which we manually handle here
+        for (var cd : List.of(ExceptionClass, NilExceptionClass,
+                OutOfBoundsExceptionClass)) {
+            cd.allFields().addAll(cd.fields());
+            cd.allMethods().addAll(cd.methods());
+            cd.parent().use(pd -> {
+                cd.ancestors().add(pd);
+                cd.ancestors().addAll(pd.ancestors());
+
+                for (var pf : pd.allFields()) {
+                    if (!cd.fields().exists(pf.name())) {
+                        var nf = pf.clone();
+                        cd.inheritFields().add(nf.name(), nf);
+                        cd.allFields().add(nf.name(), nf);
+                    }
+                }
+                for (var pm : pd.allMethods()) {
+                    if (!cd.methods().exists(pm.name())) {
+                        cd.inheritMethods().add(pm.name(), pm);
+                        cd.allMethods().add(pm.name(), pm);
+                    }
+                }
+            });
+        }
     }
 }

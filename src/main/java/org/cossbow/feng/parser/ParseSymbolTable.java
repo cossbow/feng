@@ -122,6 +122,9 @@ public class ParseSymbolTable {
                 BUILTIN.types.add(new Identifier(k.code), v));
         BUILTIN.add(AttributeDefinition.InheritDef);
         BUILTIN.add(ClassDefinition.ObjectClass);
+        BUILTIN.add(ClassDefinition.ExceptionClass);
+        BUILTIN.add(ClassDefinition.NilExceptionClass);
+        BUILTIN.add(ClassDefinition.OutOfBoundsExceptionClass);
         BUILTIN.add(InterfaceDefinition.WriterType);
         BUILTIN.add(InterfaceDefinition.WritableType);
         BUILTIN.add(InterfaceDefinition.ReaderType);

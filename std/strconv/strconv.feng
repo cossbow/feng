@@ -151,12 +151,12 @@ export func parseBool(s [&!#]byte) (bool, bool) {
     return (false, false);
 }
 
-// ----- must* variants that throw ParseError on failure -----
+// ----- must* variants that throw ParseException on failure -----
 
 export func mustParseInt(s [&!#]byte) int {
     var r = parseInt(s);
     if (!r.1) {
-        throw new(error$ParseError);
+        throw new(error$ParseException);
     }
     return r.0;
 }
@@ -164,7 +164,7 @@ export func mustParseInt(s [&!#]byte) int {
 export func mustParseInt64(s [&!#]byte) int64 {
     var r = parseInt64(s);
     if (!r.1) {
-        throw new(error$ParseError);
+        throw new(error$ParseException);
     }
     return r.0;
 }
@@ -172,7 +172,7 @@ export func mustParseInt64(s [&!#]byte) int64 {
 export func mustParseUint(s [&!#]byte) uint {
     var r = parseUint(s);
     if (!r.1) {
-        throw new(error$ParseError);
+        throw new(error$ParseException);
     }
     return r.0;
 }
@@ -180,7 +180,7 @@ export func mustParseUint(s [&!#]byte) uint {
 export func mustParseUint64(s [&!#]byte) uint64 {
     var r = parseUint64(s);
     if (!r.1) {
-        throw new(error$ParseError);
+        throw new(error$ParseException);
     }
     return r.0;
 }
@@ -188,7 +188,7 @@ export func mustParseUint64(s [&!#]byte) uint64 {
 export func mustParseFloat64(s [&!#]byte) float {
     var r = parseFloat64(s);
     if (!r.1) {
-        throw new(error$ParseError);
+        throw new(error$ParseException);
     }
     return r.0;
 }
@@ -196,7 +196,7 @@ export func mustParseFloat64(s [&!#]byte) float {
 export func mustParseBool(s [&!#]byte) bool {
     var r = parseBool(s);
     if (!r.1) {
-        throw new(error$ParseError);
+        throw new(error$ParseException);
     }
     return r.0;
 }

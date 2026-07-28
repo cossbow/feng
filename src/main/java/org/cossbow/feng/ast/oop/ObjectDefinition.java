@@ -23,9 +23,6 @@ public class ObjectDefinition extends TypeDefinition
     }
 
     abstract
-    public int id();
-
-    abstract
     public List<DerivedType> supers();
 
     abstract

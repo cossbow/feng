@@ -1819,7 +1819,10 @@ public class CppGenerator implements Generator {
         return write("Feng$checkIndex(").
                 write(e.index()).write(',')
                 .write('(').write(t).write(')')
-                .write(e.def().size()).write(')');
+                .write(e.def().size())
+                .write(", (Uint64)(uintptr_t)&&_feng_fn_label, ")
+                .write(e.pos().start() != null ? e.pos().start().getLine() : 0)
+                .write(')');
     }
 
     private CppGenerator write(ConditionalExpression e) {
