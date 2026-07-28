@@ -35,6 +35,7 @@ public class CppGenerator implements Generator {
     private final Appendable out;
     private final boolean header;
     private final boolean debug;
+    private final boolean memchk;   // enables FENG_DEBUG_MEMORY
 
     public CppGenerator(AnalyseSymbolTable table,
                         Appendable out, boolean header,
@@ -43,6 +44,7 @@ public class CppGenerator implements Generator {
         this.out = out;
         this.header = header;
         this.debug = debug;
+        memchk = Boolean.parseBoolean(System.getProperty("feng.memchk"));
     }
 
     public CppGenerator(AnalyseSymbolTable table,
@@ -196,7 +198,7 @@ public class CppGenerator implements Generator {
             write("#define __HEADER_").write(name).newLine();
             return;
         }
-        if (debug) write("#define FENG_DEBUG_MEMORY").newLine();
+        if (memchk) write("#define FENG_DEBUG_MEMORY").newLine();
     }
 
     private void endFile() {

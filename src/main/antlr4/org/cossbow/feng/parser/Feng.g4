@@ -395,6 +395,7 @@ statement
     | forStatement
     | throwStatement
     | tryStatement
+    | assertStatement
     | returnStatement
     | continueStatement
     | breakStatement
@@ -448,6 +449,10 @@ embedAssignment
 // statement: throw
 throwStatement
     : THROW expression SEMI
+    ;
+// statement: assert
+assertStatement
+    : ASSERT expression SEMI
     ;
 // statement: try
 tryStatement

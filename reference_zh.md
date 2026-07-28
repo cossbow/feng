@@ -232,7 +232,7 @@ func test() {
 | 顺序 | 运算符集              | 备注    |
 |----|-------------------|-------|
 | 1  | new(),圆括号,字面量     |       |
-| 2  | 断言,索引,引用字段,函数调用,块 |       |
+| 2  | is,索引,引用字段,函数调用,块 |       |
 | 3  | +,-,!             | 一元运算符 |
 | 4  | ^                 | 幂运算   |
 | 5  | *,/,%             |       |
@@ -512,7 +512,7 @@ func far() {
 }
 ```
 
-#### 断言表达式
+#### is表达式
 
 用于判断是否能类的引用是否能进行转换的语法，比如类的实例的引用传递可以给接口或父类指针，反过来则需要判断其类型。
 
@@ -931,7 +931,7 @@ func test() {
 
 通过这个例子可以看到，方法`eat`在继承之后可以允许有多个实现，父类引用的不同子类均会指向子类实现的方法。
 
-支持[断言表达式](#断言表达式)来判断子类型：
+支持[is表达式](#is表达式)来判断子类型：
 
 ```feng
 func test(animal *Animal) {
@@ -1005,7 +1005,7 @@ func test() {
 }
 ```
 
-当然也支持[断言表达式](#断言表达式)判断类型。
+当然也支持[is表达式](#is表达式)判断类型。
 
 #### 方法协变
 
@@ -2187,6 +2187,40 @@ func readTxt() String {
 
 注意：`catch`匹配括号里的参数`e`是常量参数。
 
+### assert语句
+
+这个语句仅在开启Debug时才会生效，否则编译期会忽略。
+
+assert语句是用来断言一个表达式结果为`true`，如果是`false`则抛出`AssertException`（内置异常）。
+
+用法举例：
+
+```feng
+func query(id int) {
+   assert(id >= 0);
+   // Do querying ...
+}
+func test1() {
+   query(-1);  // 传负数不满足条件，assert将会抛出AssertException
+}
+```
+
+注意：如果未开启Debug情况下会忽略assert语句，如果在语句中调用了会导致副作用的操作，可能会影响代码逻辑。
+
+例如：
+
+```feng
+var counter int = 0;
+func getAndInc() int {
+   counter += 1;
+   return counter;
+}
+func test() {
+   assert(getAndInc() > 0);   // 调用了会增加计数器的getAndInc()
+   var c = getAndInc();       // 在开启Debug时比关闭Debug时，c的值会不同
+}
+```
+
 ### 终止语句
 
 终止语句不是一种语句，而是返回语句和异常语句的统称。
@@ -3078,7 +3112,7 @@ func test() {
 
 ```properties
 # feng.cfg —— 声明需要链接的库，逗号分隔（不含 -l 前缀）
-link = pthread
+link=pthread
 ```
 
 多个库用逗号分隔：`link = pthread,m`。

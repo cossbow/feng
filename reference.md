@@ -251,7 +251,7 @@ The following table lists the precedence of major operators (decreasing from top
 | Level | Operator Set                                         | Notes           |
 |-------|------------------------------------------------------|-----------------|
 | 1     | new(), parentheses, literals                         |                 |
-| 2     | assertion, index, field access, function call, block |                 |
+| 2     | is, index, field access, function call, block |                 |
 | 3     | +, -, !                                              | Unary operators |
 | 4     | ^                                                    | Exponentiation  |
 | 5     | *, /, %                                              |                 |
@@ -541,7 +541,7 @@ func far() {
 }
 ```
 
-#### Assertion Expression
+#### is Expression
 
 Used to check whether a class reference can be converted. For example, a reference to a class instance can be passed to
 an interface or parent class pointer; conversion back requires type checking.
@@ -973,7 +973,7 @@ func test() {
 This example shows that the `eat` method can have multiple implementations after inheritance, and parent class
 references pointing to different subclasses will call the subclass's implementation.
 
-[Assertion expressions](#assertion-expression) are supported for subtype checking:
+[is expressions](#is-expression) are supported for subtype checking:
 
 ```feng
 func test(animal *Animal) {
@@ -1050,7 +1050,7 @@ func test() {
 }
 ```
 
-[Assertion expressions](#assertion-expression) are also supported for type checking.
+[is expressions](#is-expression) are also supported for type checking.
 
 #### Method Covariance
 
@@ -2288,6 +2288,40 @@ func readTxt() String {
 
 Note: The parameter `e` in `catch` matching parentheses is a constant parameter.
 
+### assert Statement
+
+This statement only takes effect when Debug mode is enabled; otherwise, it is ignored at compile time.
+
+The `assert` statement is used to assert that an expression evaluates to `true`, and throws `AssertException` (a built-in exception) if it is `false`.
+
+Usage example:
+
+```feng
+func query(id int) {
+   assert(id >= 0);
+   // Do querying ...
+}
+func test1() {
+   query(-1);  // Passing a negative value fails the condition; assert will throw AssertException
+}
+```
+
+Note: When Debug mode is not enabled, `assert` statements are ignored. If an `assert` statement calls an operation that produces side effects, it may affect code logic.
+
+For example:
+
+```feng
+var counter int = 0;
+func getAndInc() int {
+   counter += 1;
+   return counter;
+}
+func test() {
+   assert(getAndInc() > 0);   // Calls getAndInc() which increments the counter
+   var c = getAndInc();       // The value of c differs between Debug and non-Debug builds
+}
+```
+
 ### Terminating Statements
 
 A terminating statement is not a distinct kind of statement, but a collective term for return statements and exception statements.
@@ -3201,7 +3235,7 @@ To call an external C library (libc or third-party), simply place a header file 
 
 ```properties
 # feng.cfg — declare libraries to link, comma-separated (without -l prefix)
-link = pthread
+link=pthread
 ```
 
 Multiple libraries are comma-separated: `link = pthread,m`.

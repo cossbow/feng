@@ -128,6 +128,7 @@ public class ParseSymbolTable {
         BUILTIN.add(ClassDefinition.ExceptionClass);
         BUILTIN.add(ClassDefinition.NilExceptionClass);
         BUILTIN.add(ClassDefinition.OutOfBoundsExceptionClass);
+        BUILTIN.add(ClassDefinition.AssertExceptionClass);
         BUILTIN.add(InterfaceDefinition.WriterType);
         BUILTIN.add(InterfaceDefinition.WritableType);
         BUILTIN.add(InterfaceDefinition.ReaderType);

@@ -211,6 +211,12 @@ typedef struct $OutOfBoundsException {
     Uint32 line;
 } $OutOfBoundsException;
 
+typedef struct $AssertException {
+    const Feng$Meta* $meta;
+    Uint64 fn;
+    Uint32 line;
+} $AssertException;
+
 // exception throw helpers (carry fn/line for stack trace)
 void Feng$throwNullPointer(Uint64 fn, Uint32 line);
 void Feng$throwIndexOutOfBounds(Uint64 fn, Uint32 line);

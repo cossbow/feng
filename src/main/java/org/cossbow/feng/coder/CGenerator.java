@@ -45,7 +45,8 @@ public class CGenerator implements Generator {
     private final AnalyseSymbolTable table;
     private Appendable out;
     private final boolean header;   // true = header file, false = source file
-    private final boolean debug;    // enables FENG_DEBUG_MEMORY
+    private final boolean debug;
+    private final boolean memchk;   // enables FENG_DEBUG_MEMORY
     // imported modules' symbol tables (null = single-module mode)
     private Map<ModulePath, AnalyseSymbolTable> importedTables;
 
@@ -56,6 +57,7 @@ public class CGenerator implements Generator {
         this.out = out;
         this.header = header;
         this.debug = debug;
+        memchk = Boolean.parseBoolean(System.getProperty("feng.memchk"));
     }
 
     public CGenerator(AnalyseSymbolTable table,
@@ -639,7 +641,8 @@ public class CGenerator implements Generator {
             write("#define __HEADER_").write(name).newLine();
             return;
         }
-        if (debug) write("#define FENG_DEBUG_MEMORY").newLine();
+        if (debug) write("#define FENG_DEBUG").newLine();
+        if (memchk) write("#define FENG_DEBUG_MEMORY").newLine();
     }
 
     private void includeHeaders() {
@@ -2665,6 +2668,7 @@ public class CGenerator implements Generator {
             case SwitchStatement ee -> write(ee);
             case ThrowStatement ee -> write(ee);
             case TryStatement ee -> write(ee);
+            case AssertStatement ee -> write(ee);
             default -> unreachable();
         }
         return this;
@@ -2910,6 +2914,28 @@ public class CGenerator implements Generator {
         return null;
     }
 
+    private CGenerator write(AssertStatement as) {
+        if (!debug) return this;  // no-op in non-debug mode
+
+        write("if (!(");
+        write(as.condition());
+        write(")) { ");
+        // ({ $AssertException* _ex = Feng$alloc(sizeof($AssertException));
+        //    _ex->$meta = &Feng$meta_$AssertException;
+        //    $Exception$trace(_ex, (Uint64)(uintptr_t)&&_feng_fn_label, line);
+        //    Feng$throw(_ex); __builtin_unreachable(); })
+        write("({ $AssertException* _ex = Feng$alloc(sizeof($AssertException)); ");
+        write("_ex->$meta = &Feng$meta_$AssertException; ");
+        write("$Exception$trace(_ex, ");
+        write("(Uint64)(uintptr_t)&&_feng_fn_label, ");
+        write(as.pos().start() != null ? as.pos().start().getLine() : 0);
+        write("); ");
+        write("Feng$throw(_ex); __builtin_unreachable(); })");
+        endStmt();
+        write(" }");
+        return this;
+    }
+
     private CGenerator write(TryStatement ts) {
         boolean hasFinally = ts.finallyClause().has();
         boolean hasCatches = !ts.catchClauses().isEmpty();
@@ -3104,7 +3130,7 @@ public class CGenerator implements Generator {
         if (list.isEmpty()) return false;
         var last = list.getLast();
         return !(last instanceof ReturnStatement
-              || last instanceof ThrowStatement);
+                || last instanceof ThrowStatement);
     }
 
     private void exitScope(Scope s) {

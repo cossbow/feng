@@ -1413,6 +1413,7 @@ public class SemanticAnalysis {
             case SwitchStatement ss -> analyse(ss);
             case ThrowStatement ss -> analyse(ss);
             case TryStatement ss -> analyse(ss);
+            case AssertStatement ss -> analyse(ss);
             case CatchClause ss -> analyse(ss);
             case null, default -> unreachable();
         };
@@ -2517,6 +2518,16 @@ public class SemanticAnalysis {
         }
         return semantic("only can throw a exception class: %s",
                 td.pos());
+    }
+
+    private Statement analyse(AssertStatement e) {
+        var g = optimize(e.condition());
+        if (g.b().isBool()) {
+            e.condition(g.a());
+            return e;
+        }
+        return semantic("assert condition must be bool, got %s",
+                e.condition().pos());
     }
 
     private Statement analyse(TryStatement e) {

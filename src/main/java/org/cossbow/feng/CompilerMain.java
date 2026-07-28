@@ -40,11 +40,12 @@ public class CompilerMain {
             description = "build system type: make (default), cmake",
             converter = BuildConverter.class)
     private Compiler.Build build = Compiler.Build.MAKE;
+    @Parameter(names = {"-D", "--debug"},
+            description = "enable debug mode (assert statements, debug checks)")
+    private boolean debug = false;
 
     // backend selector — controlled by JVM property: -Dfeng.target=c|cpp
     private static final String TARGET_PROP = "feng.target";
-    private static final boolean DEBUG =
-            Boolean.parseBoolean(System.getProperty("feng.memchk"));
 
     private Compiler compiler() {
         var t = System.getProperty(TARGET_PROP, "c");
@@ -53,7 +54,7 @@ public class CompilerMain {
             default -> CGenerator.FACTORY;
         };
         var c = new Compiler(factory);
-        c.debug(DEBUG);
+        c.debug(debug);
         c.buildSystem(build);
         c.pkg(pkg);
         c.lib(lib);

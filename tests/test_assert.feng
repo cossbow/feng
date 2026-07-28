@@ -1,0 +1,16 @@
+import std$error;
+import std$os;
+
+func checkPositive(n int) int {
+    assert(n > 0);
+    return n * 2;
+}
+
+func main(args [&!#][*!#]byte) {
+    var a = checkPositive(5);
+    try {
+        var b = checkPositive(-1);
+    } catch (e *!#AssertException) {
+        os$printf("success for get assert exception");
+    }
+}

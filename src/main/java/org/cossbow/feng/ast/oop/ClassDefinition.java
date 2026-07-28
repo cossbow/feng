@@ -300,6 +300,7 @@ public class ClassDefinition extends ObjectDefinition {
     public static final ClassDefinition ExceptionClass;
     public static final ClassDefinition NilExceptionClass;
     public static final ClassDefinition OutOfBoundsExceptionClass;
+    public static final ClassDefinition AssertExceptionClass;
 
     static {
         // -- Exception --
@@ -331,11 +332,21 @@ public class ClassDefinition extends ObjectDefinition {
                 new SymbolMap<>(), new IdentifierMap<>(),
                 new IdentifierMap<>(), new MacroTable());
 
+        // -- AssertException (inherits fn/line fields from Exception) --
+        AssertExceptionClass = new ClassDefinition(Position.ZERO, Modifier.empty(),
+                new Symbol(new Identifier("AssertException")),
+                TypeParameters.empty(), false,
+                Optional.of(new DerivedType(Position.ZERO,
+                        ExceptionSymbol, TypeArguments.EMPTY)),
+                new SymbolMap<>(), new IdentifierMap<>(),
+                new IdentifierMap<>(), new MacroTable());
+
         // mark as built-in
         ObjectClass.builtin(true);
         ExceptionClass.builtin(true);
         NilExceptionClass.builtin(true);
         OutOfBoundsExceptionClass.builtin(true);
+        AssertExceptionClass.builtin(true);
 
         // set trace method master (must be done before wire-up)
         traceMethod.master(ExceptionClass);
@@ -350,10 +361,13 @@ public class ClassDefinition extends ObjectDefinition {
         OutOfBoundsExceptionClass.parent().set(ExceptionClass);
         ExceptionClass.markInherited();
 
+        AssertExceptionClass.parent().set(ExceptionClass);
+        ExceptionClass.markInherited();
+
         // When analyzing inheritance, some fields will be filled in,
         // which we manually handle here
         for (var cd : List.of(ExceptionClass, NilExceptionClass,
-                OutOfBoundsExceptionClass)) {
+                OutOfBoundsExceptionClass, AssertExceptionClass)) {
             cd.allFields().addAll(cd.fields());
             cd.allMethods().addAll(cd.methods());
             cd.parent().use(pd -> {

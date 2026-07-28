@@ -1402,6 +1402,11 @@ final class SourceParseVisitor
     }
 
     @Override
+    public Entity visitAssertStatement(FengParser.AssertStatementContext ctx) {
+        return new AssertStatement(posOf(ctx), (Expression) visit(ctx.expression()));
+    }
+
+    @Override
     public Entity visitCatchClause(FengParser.CatchClauseContext ctx) {
         var modifier = parseModifier(ctx.modifier());
         var name = identifier(ctx.name);

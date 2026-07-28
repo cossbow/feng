@@ -24,6 +24,9 @@ const Feng$Meta Feng$meta_$NilException = {
 const Feng$Meta Feng$meta_$OutOfBoundsException = {
     sizeof($OutOfBoundsException), &Feng$meta_$Exception, 0, NULL, NULL
 };
+const Feng$Meta Feng$meta_$AssertException = {
+    sizeof($AssertException), &Feng$meta_$Exception, 0, NULL, NULL
+};
 
 void Feng$throwNullPointer(Uint64 fn, Uint32 line) {
     $NilException* e = Feng$alloc(sizeof($NilException));
