@@ -1,60 +1,74 @@
+import std$testing;
 import std$string;
 import std$error;
 
+@Test
 func testBasic() {
     var s = string$fromUtf8("Hello");
-    var bl = s.byteLength();
-    var rc = s.runeCount();
-    var ie = s.isEmpty();
+    testing$assertTrue(s.byteLength() == 5);
+    testing$assertTrue(s.runeCount() == 5);
+    testing$assertFalse(s.isEmpty());
 }
 
+@Test
 func testCompare() {
     var a = string$fromUtf8("abc");
     var b = string$fromUtf8("abc");
     var c = string$fromUtf8("abd");
-    var cmp1 = a.compare(b);
-    var cmp2 = a.compare(c);
-    var eq1 = a.equals(b);
-    var eq2 = a.equals(c);
+    testing$assertTrue(a.compare(b) == 0);
+    testing$assertTrue(a.compare(c) < 0);
+    testing$assertTrue(a.equals(b));
+    testing$assertFalse(a.equals(c));
 }
 
+@Test
 func testConcat() {
     var a = string$fromUtf8("Hello");
     var b = string$fromUtf8(" World");
     var c = a.concat(b);
-    var bl = c.byteLength();
+    testing$assertTrue(c.byteLength() == 11);
 }
 
+@Test
 func testIndexOf() {
     var s = string$fromUtf8("Hello, World!");
     var i1 = s.indexOf(87);  // 'W' = 87
+    testing$assertTrue(i1 == 7);
     var i2 = s.indexOfStr(string$fromUtf8("World"));
+    testing$assertTrue(i2 == 7);
     var c = s.contains(string$fromUtf8("World"));
+    testing$assertTrue(c);
 }
 
+@Test
 func testPrefixSuffix() {
     var s = string$fromUtf8("Hello, World!");
-    var sw = s.startsWith(string$fromUtf8("Hello"));
-    var ew = s.endsWith(string$fromUtf8("World!"));
+    testing$assertTrue(s.startsWith(string$fromUtf8("Hello")));
+    testing$assertTrue(s.endsWith(string$fromUtf8("World!")));
 }
 
+@Test
 func testSubstring() {
     var s = string$fromUtf8("Hello, World!");
     var sub = s.substring(7, 12);
-    var bl = sub.byteLength();
+    testing$assertTrue(sub.byteLength() == 5);
 }
 
+@Test
 func testRune() {
     var s = string$fromUtf8("你好世界");
     var r0 = s.rune(0);
-    var rc = s.runeCount();
+    testing$assertTrue(r0 != 0);  // valid rune
+    testing$assertTrue(s.runeCount() == 4);
 }
 
+@Test
 func testEmpty() {
     var e = string$EMPTY;
-    var ie = e.isEmpty();
+    testing$assertTrue(e.isEmpty());
 }
 
+@Test
 func testSplit() {
     var s = string$fromUtf8("a,b,c");
     var parts = s.split(string$fromUtf8(","));
@@ -68,11 +82,13 @@ func testSplit() {
     var parts2 = s2.split(string$EMPTY);
 }
 
+@Test
 func testSplitEmpty() {
     var s = string$fromUtf8("");
     var parts = s.split(string$fromUtf8(","));
 }
 
+@Test
 func testJoin() {
     var parts = new([3]string$String);
     parts[0] = string$fromUtf8("a");
@@ -90,10 +106,11 @@ func testJoin() {
     var s = string$join(single, string$fromUtf8(","));
 }
 
+@Test
 func testReplace() {
     var s = string$fromUtf8("hello world hello");
     var r = s.replace(string$fromUtf8("hello"), string$fromUtf8("hi"));
-    var bl = r.byteLength();
+    testing$assertTrue(r.byteLength() > 0);
 
     // replace with empty -> remove all
     var r2 = s.replace(string$fromUtf8("hello"), string$EMPTY);
@@ -102,6 +119,7 @@ func testReplace() {
     var r3 = s.replace(string$fromUtf8("xyz"), string$fromUtf8("abc"));
 }
 
+@Test
 func testTrim() {
     var s1 = string$fromUtf8("  hello  ");
     var t1 = s1.trim();
@@ -118,25 +136,29 @@ func testTrim() {
     var t4 = s4.trim();
 }
 
+@Test
 func testToLower() {
     var s = string$fromUtf8("Hello, WORLD!");
     var lower = s.toLower();
 }
 
+@Test
 func testToUpper() {
     var s = string$fromUtf8("Hello, world!");
     var upper = s.toUpper();
 }
 
+@Test
 func testRuneException() {
     var s = string$fromUtf8("你好");
     try {
         s.rune(10);  // out of bounds
-    } catch(e *!#error$IndexOutOfBoundsException) {
+    } catch(e *!#OutOfBoundsException) {
         // expected
     }
 }
 
+@Test
 func testSubstringException() {
     var s = string$fromUtf8("hello");
     try {
@@ -144,24 +166,4 @@ func testSubstringException() {
     } catch(e *!#error$IllegalArgumentException) {
         // expected
     }
-}
-
-func main(args [&!#][*!#]byte) {
-    testBasic();
-    testCompare();
-    testConcat();
-    testIndexOf();
-    testPrefixSuffix();
-    testSubstring();
-    testRune();
-    testEmpty();
-    testSplit();
-    testSplitEmpty();
-    testJoin();
-    testReplace();
-    testTrim();
-    testToLower();
-    testToUpper();
-    testRuneException();
-    testSubstringException();
 }

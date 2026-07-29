@@ -18,8 +18,3 @@ class ParseException : Exception {
 export
 class UnsupportedException : Exception {
 }
-
-// Thrown when an index is out of bounds (e.g., array, string, enum).
-export
-class IndexOutOfBoundsException : Exception {
-}

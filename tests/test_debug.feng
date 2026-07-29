@@ -1,8 +1,10 @@
+import std$testing;
 import std$string;
-import std$error;
 
-func main(args [&!#][*!#]byte) {
+@Test
+func testDebugString() {
     var s2 = string$fromUtf8("你好世界");
+    testing$assertTrue(s2.runeCount() == 4);
     var r0 = s2.rune(0);
-    var rc = s2.runeCount();
+    testing$assertTrue(r0 != 0);
 }

@@ -1,7 +1,11 @@
+import std$testing;
 import std$error;
-func main(args [&!#][*!#]byte) {
+
+@Test
+func testThrowCatch() {
     try {
         throw new(error$ParseException);
     } catch(e *!#error$ParseException) {
+        // expected
     }
 }

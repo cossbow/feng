@@ -29,21 +29,30 @@ public class ModuleParser {
     private final Map<Identifier, ModuleParser> libs;
     // C source files from ALL scanned directories (including pure-C modules)
     private final List<Path> allCSources = new ArrayList<>();
+    // whether test mode is enabled (filters out testing modules)
+    private final boolean testMode;
 
     public List<Path> allCSources() {
         return allCSources;
     }
 
     public ModuleParser(String pkg, Path base, Charset charset,
-                        Map<Identifier, ModuleParser> libs) {
+                        Map<Identifier, ModuleParser> libs,
+                        boolean testMode) {
         this.pkg = new Identifier(pkg);
         this.base = base;
         this.charset = charset;
         this.libs = libs;
+        this.testMode = testMode;
+    }
+
+    public ModuleParser(String pkg, Path base, Charset charset,
+                        Map<Identifier, ModuleParser> libs) {
+        this(pkg, base, charset, libs, false);
     }
 
     public ModuleParser(String pkg, Path base, Charset charset) {
-        this(pkg, base, charset, Map.of());
+        this(pkg, base, charset, Map.of(), false);
     }
 
     public Identifier pkg() {
@@ -145,6 +154,7 @@ public class ModuleParser {
         if (!cfg.linkLibs().isEmpty()) {
             fm.linkLibs(cfg.linkLibs());
         }
+        fm.testing(cfg.testing());
     }
 
     private FModule parseModuleFiles(Path module, List<Path> files, List<Path> cSources) {
@@ -212,8 +222,10 @@ public class ModuleParser {
         }
         var edges = new ArrayList<Groups.G2<FModule, FModule>>();
         for (var fm : modules.values()) {
-            for (ModulePath i : fm.imports()) {
-                edges.add(Groups.g2(modules.get(i), fm));
+            for (var i : fm.imports()) {
+                var dep = modules.get(i);
+                if (dep == null) continue;
+                edges.add(Groups.g2(dep, fm));
             }
         }
         return DAGUtil.make(modules.values(), edges);
@@ -225,6 +237,8 @@ public class ModuleParser {
         for (var i : imports) {
             if (modules.containsKey(i)) continue;
             var im = searchLib(i);
+            // In non-test mode, skip modules marked testing=true
+            if (!testMode && im.testing()) continue;
             modules.put(im.path(), im);
             collectLibs(modules, im.imports());
         }

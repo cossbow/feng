@@ -121,9 +121,9 @@ public class ParseSymbolTable {
         PrimitiveDefinition.types.forEach((k, v) ->
                 BUILTIN.types.add(new Identifier(k.code), v));
         BUILTIN.add(AttributeDefinition.InheritDef);
-        BUILTIN.add(AttributeDefinition.InlineDef);
         BUILTIN.add(AttributeDefinition.PackDef);
         BUILTIN.add(AttributeDefinition.AlignDef);
+        BUILTIN.add(AttributeDefinition.TestDef);
         BUILTIN.add(ClassDefinition.ObjectClass);
         BUILTIN.add(ClassDefinition.ExceptionClass);
         BUILTIN.add(ClassDefinition.NilExceptionClass);

@@ -47,7 +47,7 @@ public class CGenerator implements Generator {
     private final boolean header;   // true = header file, false = source file
     private final boolean debug;
     private final boolean memchk;   // enables FENG_DEBUG_MEMORY
-    // imported modules' symbol tables (null = single-module mode)
+    public Set<String> testFilter;
     private Map<ModulePath, AnalyseSymbolTable> importedTables;
 
     public CGenerator(AnalyseSymbolTable table,
@@ -4423,6 +4423,8 @@ public class CGenerator implements Generator {
         }
         writeComment("function declaration");
         for (var fd : table.functionList) {
+            if (table.test && table.main.has()
+                    && fd == table.main.must()) continue;
             declareFunction(fd);
             newLine();
         }
@@ -4593,6 +4595,9 @@ public class CGenerator implements Generator {
         writeComment("function definition");
         for (var fd : table.functionList) {
             if (fd.builtin()) continue;
+            // In test mode, skip user's main — test runner provides its own
+            if (table.test && table.main.has()
+                    && fd == table.main.must()) continue;
             implFunc(fd);
             newLine();
         }
@@ -4650,7 +4655,74 @@ public class CGenerator implements Generator {
             }
         }
         newLine();
-        table.main.use(this::writeMain);
+        if (table.test && !table.testcases.isEmpty()) {
+            writeTestRunner(table.testcases);
+        } else {
+            table.main.use(this::writeMain);
+        }
+        newLine();
+    }
+
+    void writeTestRunner(List<Symbol> testcases) {
+        if (header) return;
+
+        writeComment("auto-generated test runner");
+        table.module.use(fm -> {
+            write("#include \"").write(fm.path().filename())
+                    .write(".h\"").newLine();
+        });
+        write("#include <stdio.h>").newLine();
+        newLine();
+
+        // Test entry struct
+        write("typedef struct {").indent().newLine();
+        write("const char* name;").newLine();
+        write("void (*func)(void);").newLine();
+        dedent().write("} Feng$TestEntry;").newLine();
+        newLine();
+
+        // Test registry
+        write("static Feng$TestEntry Feng$tests[] = {").indent().newLine();
+        for (var ts : testcases) {
+            if (!table.testFilter.isEmpty()
+                    && !table.testFilter.contains(ts.name().toString())) {
+                continue;
+            }
+            write("{\"").write(ts.name().toString())
+                    .write("\", &").write(ts).write("},").newLine();
+        }
+        write("{NULL, NULL}").newLine();
+        dedent().write("};").newLine();
+        newLine();
+
+        // main function
+        write("int main(void) {").indent().newLine();
+        write("int passed = 0;").newLine();
+        write("int failed = 0;").newLine();
+        newLine();
+        write("for (int i = 0; Feng$tests[i].name != NULL; i++) {").indent().newLine();
+        write("printf(\"  RUN  %s ... \", Feng$tests[i].name);").newLine();
+        write("fflush(stdout);").newLine();
+        newLine();
+        write("volatile Feng$ExFrame _frame = {.prev = Feng$ex_top};").newLine();
+        write("Feng$ex_top = (Feng$ExFrame*)&_frame;").newLine();
+        newLine();
+        write("if (setjmp(*(jmp_buf*)&_frame.buf) == 0) {").indent().newLine();
+        write("Feng$tests[i].func();").newLine();
+        write("Feng$ex_top = _frame.prev;").newLine();
+        write("printf(\"PASS\\n\");").newLine();
+        write("passed++;").newLine();
+        dedent().write("} else {").newLine();
+        indent().write("Feng$ex_top = _frame.prev;").newLine();
+        write("printf(\"FAIL\\n\");").newLine();
+        write("failed++;").newLine();
+        dedent().write("}").newLine();
+        dedent().write("}").newLine();
+        newLine();
+        write("printf(\"\\nResults: %d passed, %d failed, %d total\\n\",").newLine();
+        write("       passed, failed, passed + failed);").newLine();
+        write("return failed > 0 ? 1 : 0;").newLine();
+        dedent().write("}").newLine();
         newLine();
     }
 

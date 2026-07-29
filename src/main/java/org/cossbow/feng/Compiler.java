@@ -24,8 +24,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
@@ -47,6 +49,8 @@ public class Compiler {
 
     private final Generator.Factory factory;
     private boolean debug;
+    private boolean test;
+    private Set<String> testFilter = Set.of();
     private String pkg;
     private Map<String, String> lib = Map.of();
     private Build build = Build.MAKE;
@@ -57,6 +61,19 @@ public class Compiler {
 
     public Compiler debug(boolean debug) {
         this.debug = debug;
+        if (debug) ErrorUtil.setTraceError(true);
+        return this;
+    }
+
+    public Compiler test(boolean test) {
+        this.test = test;
+        if (test) ErrorUtil.setTraceError(true);
+        return this;
+    }
+
+    public Compiler testFilter(List<String> names) {
+        this.testFilter = names.isEmpty() ? Set.of()
+                : new HashSet<>(names);
         return this;
     }
 
@@ -120,6 +137,30 @@ public class Compiler {
         var dag = parser(this.pkg, input, this.lib).parsePackage();
         compile(dag, output);
     }
+
+    /**
+     * Compile a test file or directory.
+     * Supports both single test files and test module directories.
+     */
+    public void compileTest(Path input, Path output)
+            throws IOException {
+        this.test = true;
+        if (Files.isRegularFile(input)) {
+            var fn = input.getFileName();
+            if (this.pkg == null)
+                this.pkg = letters(CommonUtil.trimExt(fn.toString()));
+            var dag = parser(this.pkg, input.getParent(), this.lib).parseFile(fn);
+            compile(dag, output);
+        } else if (Files.isDirectory(input)) {
+            if (this.pkg == null)
+                this.pkg = letters(input.getFileName().toString());
+            var dag = parser(this.pkg, input, this.lib).parseModule(
+                    input.getFileName());
+            compile(dag, output);
+        } else {
+            throw new IllegalArgumentException(input + " is not a file or directory");
+        }
+    }
     // ---- parser helpers ----
 
     private static Path toPath(String value) {
@@ -131,7 +172,7 @@ public class Compiler {
     }
 
     private static Map<Identifier, ModuleParser> getLibParsers(
-            String pkg, Map<String, String> lib) {
+            String pkg, Map<String, String> lib, boolean test) {
         if (lib == null || lib.isEmpty()) return Map.of();
         var parsers = new HashMap<Identifier, ModuleParser>();
         if (lib.containsKey(pkg)) {
@@ -140,7 +181,8 @@ public class Compiler {
         }
         for (var le : lib.entrySet()) {
             var base = toPath(le.getValue());
-            var p = new ModuleParser(le.getKey(), base, UTF_8);
+            var p = new ModuleParser(le.getKey(), base, UTF_8,
+                    Map.of(), test);
             if (parsers.put(p.pkg(), p) != null) {
                 return argument("package '%s' conflict in libraries",
                         le.getKey());
@@ -149,11 +191,11 @@ public class Compiler {
         return parsers;
     }
 
-    private static ModuleParser parser(
+    private ModuleParser parser(
             String pkg, Path dir,
             Map<String, String> lib) {
         return new ModuleParser(pkg, dir, UTF_8,
-                getLibParsers(pkg, lib));
+                getLibParsers(pkg, lib, test), test);
     }
 
     // ---- core pipeline ----
@@ -161,7 +203,7 @@ public class Compiler {
     public void compile(DAGGraph<FModule> dag, Path dir)
             throws IOException {
         var moduleNames = new ArrayList<String>();
-        new ModuleAnalysis().analyse(dag);
+        new ModuleAnalysis(test).analyse(dag);
         factory.copyBaseHeader(dir);
 
         // Build map of all analyzed module tables for cross-module generic lookup
@@ -172,10 +214,12 @@ public class Compiler {
 
         // Collect all C source files from all modules
         var allCSources = new ArrayList<Path>();
-        boolean hasMain = false;
+        boolean hasMain = test;  // test mode always produces executable
         for (var fm : dag) {
             var mp = fm.path();
             var ast = fm.result.must();
+            ast.test = test;
+            ast.testFilter = testFilter;
             if (!hasMain) {
                 hasMain = ast.main.has();
             }

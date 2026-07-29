@@ -3034,6 +3034,67 @@ func run() {
 2. 声明为`const`的变量，且类型为[原始类型](#原始类型)和[字符串字面量](#字符串字面量)。
 3. 所有由编译期常量组成的表达式也是编译期常量，因为通过运算能在编译期计算出结果。
 
+## 单元测试
+
+编译期在测试模式下会只编译单元测试。
+
+### 单元测试用例
+
+单元测试的测试用例函数需要加上`@Test`属性：
+
+```feng
+func far() {}
+@Test
+func testFar() {
+   far();
+}
+```
+
+测试用例函数可以在模块的任意位置，可以与正常代码混合编写，编译期会自动区分。
+例如和`main`函数一起，在测试模式下不会编译`main`函数，只会编译测试用例；而编译模式下则忽略所有测试用例：
+
+```feng
+import std$os;
+@Test
+func testFar() {
+   os$printf("This is testcase\n");
+}
+func main() {
+   os$printf("This is main\n");
+}
+```
+
+测试用例的函数不能带参数和返回值，下面是反例：
+
+```feng
+@Test
+func test1() int { return 0; }   // ✖：不能有返回值
+@Test
+func test2(a int) {}             // ✖：不能有参数
+```
+
+测试用例不能被其他函数或方法调用，下面也是反例：
+
+```feng
+@Test
+func test1() {}
+@Test
+func test2() {
+   test1();    // ✖：不能被其他测试用例调用
+}
+func far() {
+   test1();    // ✖：不能被函数调用
+}
+func main() {
+   test1();    // ✖：不能被main函数调用
+}
+class Tr {
+   func run() {
+      test1(); // ✖：不能被方法调用
+   }
+}
+```
+
 ## 调用C语言
 
 支持让Fēng直接使用C语言的函数和类型。

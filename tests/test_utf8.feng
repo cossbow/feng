@@ -1,40 +1,42 @@
+import std$testing;
 import std$encoding$utf8;
 
+@Test
 func testRuneLenAscii() {
     var s = "Hello";
     var n = utf8$runeLen(s);
+    testing$assertTrue(n > 0);
 }
 
+@Test
 func testRuneLenUtf8() {
     var s = "你好";
     var n = utf8$runeLen(s);
+    testing$assertTrue(n == 2);
 }
 
+@Test
 func testDecodeRuneAscii() {
     var s = "ABC";
     var dec = utf8$decodeRune(s, 0);
 }
 
+@Test
 func testDecodeRuneUtf8() {
     var s = "你";
     var dec = utf8$decodeRune(s, 0);
 }
 
+@Test
 func testEncodeRune() {
     var buf = new([4]uint8);
     var n = utf8$encodeRune(buf, 0, int32(20320));
+    testing$assertTrue(n > 0);
 }
 
+@Test
 func testValid() {
     var s1 = "Hello";
     var v = utf8$valid(s1);
-}
-
-func main(args [&!#][*!#]byte) {
-    testRuneLenAscii();
-    testRuneLenUtf8();
-    testDecodeRuneAscii();
-    testDecodeRuneUtf8();
-    testEncodeRune();
-    testValid();
+    testing$assertTrue(v);
 }

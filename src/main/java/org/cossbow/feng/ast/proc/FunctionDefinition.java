@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.Definition;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
+import org.cossbow.feng.ast.attr.AttributeDefinition;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.ast.dcl.ReferKind;
@@ -71,6 +72,13 @@ public class FunctionDefinition extends Definition {
         return prototype.variadic();
     }
 
+
+    //
+
+    public boolean testcase() {
+        return modifier().attributes().exists(
+                AttributeDefinition.TestDef.symbol());
+    }
 
     //
 

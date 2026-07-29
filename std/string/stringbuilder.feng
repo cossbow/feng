@@ -1,6 +1,5 @@
 import std$encoding$utf8;
 import std$strconv;
-import std$string Str;
 
 export
 class StringBuilder (Writer) {
@@ -25,7 +24,7 @@ class StringBuilder (Writer) {
     }
 
     export
-    func append(s Str$String) {
+    func append(s String) {
         var b = s.bytes();
         if (b == nil) { return; }
         ensureCapacity(b.length);
@@ -56,31 +55,31 @@ class StringBuilder (Writer) {
     export
     func appendInt(v int) {
         var s = strconv$formatInt(v);
-        append(Str$fromUtf8(s));
+        append(fromUtf8(s));
     }
 
     export
     func appendFloat(v float) {
         var s = strconv$formatFloat(v);
-        append(Str$fromUtf8(s));
+        append(fromUtf8(s));
     }
 
     export
     func appendBool(v bool) {
         var s = strconv$formatBool(v);
-        append(Str$fromUtf8(s));
+        append(fromUtf8(s));
     }
 
     export
     func appendInt64(v int64) {
         var s = strconv$formatInt64(v);
-        append(Str$fromUtf8(s));
+        append(fromUtf8(s));
     }
 
     export
     func appendUint(v uint) {
         var s = strconv$formatUint(v);
-        append(Str$fromUtf8(s));
+        append(fromUtf8(s));
     }
 
     // Append raw bytes without going through String.
@@ -111,12 +110,12 @@ class StringBuilder (Writer) {
     }
 
     export
-    func build() Str$String {
+    func build() String {
         var b = new([len]byte);
         for (var i = 0; i < len; i += 1) {
             b[i] = buf[i];
         }
-        return Str$fromUtf8(b);
+        return fromUtf8(b);
     }
 
     // Writable - enables: format(sb, "count: {}", n)

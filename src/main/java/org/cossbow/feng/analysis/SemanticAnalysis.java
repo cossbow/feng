@@ -48,6 +48,7 @@ import static org.cossbow.feng.util.ErrorUtil.*;
 public class SemanticAnalysis {
     private final ParseSymbolTable table;
     private final StackedContext context;
+    private final boolean test;
 
     // Constant expression calculator
     private final LiteralCalculator calculator = new LiteralCalculator();
@@ -57,14 +58,15 @@ public class SemanticAnalysis {
     private boolean used;
 
     public SemanticAnalysis(ParseSymbolTable table,
-                            SymbolContext root) {
+                            SymbolContext root, boolean test) {
         this.table = table;
         this.context = new StackedContext(root);
         stringCache = new DedupCache<>(table.stringCache);
+        this.test = test;
     }
 
     public SemanticAnalysis(ParseSymbolTable table) {
-        this(table, new GlobalSymbolContext(table));
+        this(table, new GlobalSymbolContext(table), false);
     }
 
     //
@@ -369,7 +371,10 @@ public class SemanticAnalysis {
         result.dagClasses = visitClasses(table.types);
         // A function may also depend on all types, so its
         // prototype should also be analyzed first
-        table.functions.forEach(this::declareFunc);
+        var functions = table.functions.stream()
+                .filter(fd -> test || !fd.testcase())
+                .toList();
+        functions.forEach(this::declareFunc);
 
         // Then analyze the remaining global variables
         var rest = subtract(table.variables.values(),
@@ -383,12 +388,15 @@ public class SemanticAnalysis {
         visitAttribute(table.types);
 
         // Finally, analyze the statements within the function
-        table.functions.forEach(this::analyse);
+        functions.forEach(this::analyse);
         table.main.use(this::checkMain);
         result.main.set(table.main);
 
+        // Check test points
+        result.testcases = checkTestcases(functions);
+
         result.typeList = table.types.stream().toList();
-        result.functionList = table.functions.stream()
+        result.functionList = functions.stream()
                 .filter(Predicate.not(FunctionDefinition::variadic))
                 .toList();
 
@@ -1245,6 +1253,39 @@ public class SemanticAnalysis {
         }
         analyse(fd);
 
+    }
+
+    /**
+     * Check on testcase:
+     * - no parameters
+     * - no return value
+     */
+    private List<Symbol> checkTestcases(
+            Iterable<FunctionDefinition> functions) {
+        var list = new ArrayList<Symbol>();
+        for (var fd : functions) {
+            if (!fd.testcase()) continue;
+
+            if (!fd.generic().isEmpty()) {
+                return semantic("testcase '%s' can't be generic: %s",
+                        fd.symbol(), fd.generic().pos());
+            }
+            var prot = fd.prototype();
+            if (!prot.parameterSet().isEmpty()) {
+                return semantic("testcase '%s' must have no parameters: %s",
+                        fd.symbol(), prot.parameterSet().pos());
+            }
+            if (prot.variadic()) {
+                return semantic("testcase '%s' can't have variadic: %s",
+                        fd.symbol(), prot.parameterSet().pos());
+            }
+            if (prot.returnSet().has()) {
+                return semantic("testcase '%s' must have no return value: %s",
+                        fd.symbol(), prot.returnSet().get().pos());
+            }
+            list.add(fd.symbol());
+        }
+        return list;
     }
 
     private FunctionDefinition enterFunc;
@@ -4331,11 +4372,14 @@ public class SemanticAnalysis {
 
         var od = context.findFunc(s);
         if (od.has()) {
+            var f = od.get();
+            if (f.testcase()) return semantic(
+                    "can't call testcase '%s': %s", re, re.pos());
             var gm = GenericMap.make(re, false,
-                    od.get().generic(), re.generic());
-            var prot = gm.instantiate(od.get().prototype());
+                    f.generic(), re.generic());
+            var prot = gm.instantiate(f.prototype());
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
-            var n = new FunctionExpression(re.pos(), od.get(), re.generic());
+            var n = new FunctionExpression(re.pos(), f, re.generic());
             return Groups.g2(n, td);
         }
 
@@ -4396,6 +4440,8 @@ public class SemanticAnalysis {
         var f = context.findFunc(s);
         if (f.has()) {
             var fd = f.get();
+            if (fd.testcase()) return semantic(
+                    "can't call testcase '%s': %s", re, re.pos());
             var prot = fd.prototype();
             if (!fd.generic().isEmpty()) {
                 // This a generic function, need replace types

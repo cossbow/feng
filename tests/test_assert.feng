@@ -1,16 +1,19 @@
+import std$testing;
 import std$error;
-import std$os;
 
-func checkPositive(n int) int {
-    assert(n > 0);
-    return n * 2;
+// NOTE: This test requires --debug flag to enable assert statements
+
+@Test
+func testAssertPass() {
+    assert(5 > 0);
+    // should pass without exception
 }
 
-func main(args [&!#][*!#]byte) {
-    var a = checkPositive(5);
+@Test
+func testAssertFail() {
     try {
-        var b = checkPositive(-1);
-    } catch (e *!#AssertException) {
-        os$printf("success for get assert exception");
+        assert(1 < 0);  // deliberately false
+    } catch(e *!#AssertException) {
+        // expected
     }
 }

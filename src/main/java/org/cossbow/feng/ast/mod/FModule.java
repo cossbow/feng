@@ -14,6 +14,7 @@ public class FModule {
     private List<Path> cSources = List.of();
     private List<Path> headerFiles = List.of();
     private List<String> linkLibs = List.of();
+    private boolean testing;
 
     public FModule(ModulePath path,
                    List<ModulePath> imports,
@@ -57,6 +58,14 @@ public class FModule {
 
     public void linkLibs(List<String> libs) {
         this.linkLibs = List.copyOf(libs);
+    }
+
+    public boolean testing() {
+        return testing;
+    }
+
+    public void testing(boolean v) {
+        this.testing = v;
     }
 
     public final Lazy<AnalyseSymbolTable> result = Lazy.nil();

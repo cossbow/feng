@@ -2,8 +2,8 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.EnumDefinition;
 import org.cossbow.feng.ast.GlobalVariable;
+import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
-import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.mod.FModule;
@@ -37,6 +37,21 @@ public class AnalyseSymbolTable {
 
     public Map<StringLiteral, StringLiteral> stringCache;
     public final Lazy<FunctionDefinition> main = Lazy.nil();
+
+    /**
+     * Whether test mode is enabled.
+     */
+    public boolean test;
+
+    /**
+     * Testcase name filter — empty means run all.
+     */
+    public Set<String> testFilter = Set.of();
+
+    /**
+     * Functions annotated with @Test, collected during semantic analysis.
+     */
+    public List<Symbol> testcases = List.of();
 
     // ---- Monomorphization results (populated by Monomorphization pass) ----
 

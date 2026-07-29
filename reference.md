@@ -3158,6 +3158,67 @@ Compile-time constants are constants whose values can be deduced and calculated 
 2. Variables declared with `const` whose type is a [primitive type](#primitive-types) or a [string literal](#string-literals).
 3. All expressions composed entirely of compile-time constants are also compile-time constants, because their results can be computed at compile time.
 
+## Unit Testing
+
+In test mode, the compiler only compiles unit tests.
+
+### Test Cases
+
+Test case functions must be annotated with `@Test`:
+
+```feng
+func far() {}
+@Test
+func testFar() {
+   far();
+}
+```
+
+Test case functions can be placed anywhere in the module, mixed with regular code. The compiler distinguishes them automatically.
+For example, when combined with a `main` function, test mode skips `main` and only compiles test cases; compilation mode ignores all test cases:
+
+```feng
+import std$os;
+@Test
+func testFar() {
+   os$printf("This is testcase\n");
+}
+func main() {
+   os$printf("This is main\n");
+}
+```
+
+Test case functions must not have parameters or return values. Counter-examples:
+
+```feng
+@Test
+func test1() int { return 0; }   // ✖: must not have a return value
+@Test
+func test2(a int) {}             // ✖: must not have parameters
+```
+
+Test case functions cannot be called by other functions or methods. Counter-examples:
+
+```feng
+@Test
+func test1() {}
+@Test
+func test2() {
+   test1();    // ✖: cannot be called by another test case
+}
+func far() {
+   test1();    // ✖: cannot be called by a function
+}
+func main() {
+   test1();    // ✖: cannot be called by the main function
+}
+class Tr {
+   func run() {
+      test1(); // ✖: cannot be called by a method
+   }
+}
+```
+
 ## Calling C
 
 Fēng supports direct use of C functions and types.

@@ -25,6 +25,16 @@ import java.util.stream.Collectors;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class ModuleAnalysis {
+    // In test model
+    private final boolean test;
+
+    public ModuleAnalysis(boolean test) {
+        this.test = test;
+    }
+
+    public ModuleAnalysis() {
+        this(false);
+    }
 
     private ParseSymbolTable buildMetadata(FModule m) {
         var buf = new BufferOutputStream(4096);
@@ -55,6 +65,7 @@ public class ModuleAnalysis {
                     m.imports().size() + 1);
             for (var i : m.imports()) {
                 var im = tabMap.get(i);
+                if (im == null) continue;
                 if (im.main.has()) {
                     ErrorUtil.semantic("can't import main-module: %s", i, i.pos());
                     return;
@@ -64,7 +75,7 @@ public class ModuleAnalysis {
 
             var context = new GlobalSymbolContext(imports, m.table());
             var ast = new SemanticAnalysis(
-                    m.table(), context).analyse();
+                    m.table(), context, test).analyse();
             ast.module.set(m);
 
             // AST lowering: insert temporary variables for
@@ -99,7 +110,7 @@ public class ModuleAnalysis {
     public AnalyseSymbolTable analyse(FModule module) {
         var context = new GlobalSymbolContext(module.table());
         var ast = new SemanticAnalysis(
-                module.table(), context)
+                module.table(), context, test)
                 .analyse();
         ast.module.set(module);
 

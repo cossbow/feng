@@ -1,0 +1,31 @@
+import std$string;
+
+// ===== 断言异常类型 =====
+export
+class AssertionException : Exception {
+    var message string$String;
+}
+
+// ===== 断言函数 =====
+
+// 条件为真
+export
+func assertTrue(condition bool) {
+    if (!condition) {
+        throw new(AssertionException, {message = string$fromUtf8("expected true, got false")});
+    }
+}
+
+// 条件为假
+export
+func assertFalse(condition bool) {
+    if (condition) {
+        throw new(AssertionException, {message = string$fromUtf8("expected false, got true")});
+    }
+}
+
+// 无条件的失败
+export
+func fail(message string$String) {
+    throw new(AssertionException, {message = message});
+}

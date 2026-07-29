@@ -1,109 +1,103 @@
-import std$stringbuilder;
+import std$testing;
 import std$string;
 
+@Test
 func testBasic() {
-    var sb = stringbuilder$newBuilder();
+    var sb = string$newBuilder();
     sb.append(string$fromUtf8("Hello"));
     sb.append(string$fromUtf8(" "));
     sb.append(string$fromUtf8("World"));
     var s = sb.build();
-    var bl = s.byteLength();
+    testing$assertTrue(s.byteLength() == 11);
 }
 
+@Test
 func testAppendInt() {
-    var sb = stringbuilder$newBuilder();
+    var sb = string$newBuilder();
     sb.appendInt(42);
     sb.append(string$fromUtf8(" "));
     sb.appendInt(-100);
     var s = sb.build();
-    var bl = s.byteLength();
+    testing$assertTrue(s.byteLength() > 0);
 }
 
+@Test
 func testAppendBool() {
-    var sb = stringbuilder$newBuilder();
+    var sb = string$newBuilder();
     sb.appendBool(true);
     sb.append(string$fromUtf8(" "));
     sb.appendBool(false);
     var s = sb.build();
-    var bl = s.byteLength();
+    testing$assertTrue(s.byteLength() > 0);
 }
 
+@Test
 func testAppendInt64() {
-    var sb = stringbuilder$newBuilder();
+    var sb = string$newBuilder();
     sb.appendInt64(int64(1234567890123));
     var s = sb.build();
 }
 
+@Test
 func testAppendUint() {
-    var sb = stringbuilder$newBuilder();
+    var sb = string$newBuilder();
     sb.appendUint(uint(42));
     var s = sb.build();
 }
 
+@Test
 func testAppendBytes() {
-    var sb = stringbuilder$newBuilder();
+    var sb = string$newBuilder();
     sb.appendBytes("raw bytes");
     var s = sb.build();
-    var bl = s.byteLength();
+    testing$assertTrue(s.byteLength() > 0);
 }
 
+@Test
 func testAppendByte() {
-    var sb = stringbuilder$newBuilder();
+    var sb = string$newBuilder();
     sb.appendByte(65);  // 'A'
     sb.appendByte(66);  // 'B'
     var s = sb.build();
-    var bl = s.byteLength();
+    testing$assertTrue(s.byteLength() > 0);
 }
 
+@Test
 func testAppendRune() {
-    var sb = stringbuilder$newBuilder();
+    var sb = string$newBuilder();
     sb.appendRune(int32(20320));  // 你
     var s = sb.build();
 }
 
+@Test
 func testAppendFloat() {
-    var sb = stringbuilder$newBuilder();
+    var sb = string$newBuilder();
     sb.appendFloat(3.14);
     var s = sb.build();
 }
 
+@Test
 func testClear() {
-    var sb = stringbuilder$newBuilder();
+    var sb = string$newBuilder();
     sb.append(string$fromUtf8("hello"));
     sb.clear();
-    var ie = sb.isEmpty();
-    // ie should be true
+    testing$assertTrue(sb.isEmpty());
     var s = sb.build();
 }
 
+@Test
 func testLength() {
-    var sb = stringbuilder$newBuilder();
+    var sb = string$newBuilder();
     sb.append(string$fromUtf8("hi"));
-    var len = sb.length();
-    // len should be 2
+    testing$assertTrue(sb.length() == 2);
 
-    var sb2 = stringbuilder$newBuilder();
-    var ie = sb2.isEmpty();
-    // ie should be true
+    var sb2 = string$newBuilder();
+    testing$assertTrue(sb2.isEmpty());
 }
 
+@Test
 func testCapacity() {
-    var sb = stringbuilder$newBuilderCapacity(100);
+    var sb = string$newBuilderCapacity(100);
     sb.append(string$fromUtf8("test"));
     var s = sb.build();
-}
-
-func main(args [&!#][*!#]byte) {
-    testBasic();
-    testAppendInt();
-    testAppendBool();
-    testAppendInt64();
-    testAppendUint();
-    testAppendBytes();
-    testAppendByte();
-    testAppendRune();
-    testAppendFloat();
-    testClear();
-    testLength();
-    testCapacity();
 }

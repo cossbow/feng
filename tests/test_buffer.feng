@@ -1,11 +1,14 @@
+import std$testing;
 import std$bytes;
 
+@Test
 func testBufferWriterWrite() {
     var bw = bytes$newWriter();
     var data = "Hello, Buffer!";
     var n = bw.write(data, 0, data.length);
 }
 
+@Test
 func testBufferWriterWriteByte() {
     var bw = bytes$newWriter();
     bw.writeByte(65);  // 'A'
@@ -15,21 +18,25 @@ func testBufferWriterWriteByte() {
     var bl = buf.1;
 }
 
+@Test
 func testBufferWriterLength() {
     var bw = bytes$newWriter();
     bw.writeByte(65);
     var len = bw.length();
-    var ie = bw.isEmpty();
+    testing$assertTrue(len == 1);
+    testing$assertFalse(bw.isEmpty());
 }
 
+@Test
 func testBufferWriterClear() {
     var bw = bytes$newWriter();
     bw.writeByte(65);
     bw.clear();
-    var ie = bw.isEmpty();
-    var len = bw.length();
+    testing$assertTrue(bw.isEmpty());
+    testing$assertTrue(bw.length() == 0);
 }
 
+@Test
 func testBufferWriterCopy() {
     var bw = bytes$newWriter();
     bw.writeByte(65);
@@ -38,6 +45,7 @@ func testBufferWriterCopy() {
     var bl = copied.length;
 }
 
+@Test
 func testBufferWriterGet() {
     var bw = bytes$newWriter();
     bw.writeByte(65);
@@ -46,6 +54,7 @@ func testBufferWriterGet() {
     var len = t.1;
 }
 
+@Test
 func testBufferWriterReader() {
     var bw = bytes$newWriter();
     bw.writeByte(65);
@@ -55,6 +64,7 @@ func testBufferWriterReader() {
     var n = br.read(out);
 }
 
+@Test
 func testBufferReaderRead() {
     var bw = bytes$newWriter();
     bw.writeByte(65);
@@ -69,6 +79,7 @@ func testBufferReaderRead() {
     var n2 = br.read(buf2);
 }
 
+@Test
 func testBufferReaderSeek() {
     var bw = bytes$newWriter();
     bw.writeByte(65);
@@ -83,6 +94,7 @@ func testBufferReaderSeek() {
     var n = br.read(buf);
 }
 
+@Test
 func testBufferReaderRemaining() {
     var bw = bytes$newWriter();
     bw.writeByte(65);
@@ -95,17 +107,4 @@ func testBufferReaderRemaining() {
     br.read(buf);
     var rem2 = br.remaining();
     var ie2 = br.isEmpty();
-}
-
-func main(args [&!#][*!#]byte) {
-    testBufferWriterWrite();
-    testBufferWriterWriteByte();
-    testBufferWriterLength();
-    testBufferWriterClear();
-    testBufferWriterCopy();
-    testBufferWriterGet();
-    testBufferWriterReader();
-    testBufferReaderRead();
-    testBufferReaderSeek();
-    testBufferReaderRemaining();
 }

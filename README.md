@@ -108,6 +108,8 @@ Parameter descriptions:
 5. -L Add dependency packages: Multiple packages can be specified as key-value pairs (package name = path), for example:
    `-Lfoo=D:\dev\libs\foo`
 6. -b Backend build tool: Optionally `make` or `cmake`
+7. -T [switch] Unit test mode: compiles only unit test cases into an executable; the `main` function is not compiled.
+8. --test-name Specify test cases: effective in unit test mode, filters test cases to execute. Can be specified multiple times.
 
 Compile a single source file:
 

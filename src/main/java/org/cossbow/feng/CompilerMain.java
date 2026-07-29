@@ -9,7 +9,9 @@ import org.cossbow.feng.util.ErrorUtil;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -43,6 +45,12 @@ public class CompilerMain {
     @Parameter(names = {"-D", "--debug"},
             description = "enable debug mode (assert statements, debug checks)")
     private boolean debug = false;
+    @Parameter(names = {"-T", "--test"},
+            description = "enable unit test mode")
+    private boolean test = false;
+    @Parameter(names = {"--test-name"},
+            description = "testcase name filter (repeatable)")
+    private List<String> testNames = new ArrayList<>();
 
     // backend selector — controlled by JVM property: -Dfeng.target=c|cpp
     private static final String TARGET_PROP = "feng.target";
@@ -55,6 +63,7 @@ public class CompilerMain {
         };
         var c = new Compiler(factory);
         c.debug(debug);
+        c.test(test).testFilter(testNames);
         c.buildSystem(build);
         c.pkg(pkg);
         c.lib(lib);
@@ -78,6 +87,7 @@ public class CompilerMain {
             case FILE -> c.compileFile(input, output);
             case MODULE -> c.compileModule(input, output);
             case PACKAGE -> c.compilePackage(input, output);
+            case TEST -> c.compileTest(input, output);
         }
     }
 
@@ -102,6 +112,7 @@ public class CompilerMain {
         FILE,
         MODULE,
         PACKAGE,
+        TEST,
     }
 
     static class SourceTypeConverter implements IStringConverter<SourceType> {
@@ -112,6 +123,7 @@ public class CompilerMain {
                     case 'f' -> SourceType.FILE;
                     case 'm' -> SourceType.MODULE;
                     case 'p' -> SourceType.PACKAGE;
+                    case 't' -> SourceType.TEST;
                     default -> null;
                 };
             } else {
@@ -119,6 +131,7 @@ public class CompilerMain {
                     case "file" -> SourceType.FILE;
                     case "module" -> SourceType.MODULE;
                     case "package" -> SourceType.PACKAGE;
+                    case "test" -> SourceType.TEST;
                     default -> null;
                 };
             }

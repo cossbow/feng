@@ -18,17 +18,32 @@ public class ModuleConfig {
 
     private final List<String> linkLibs;
 
-    private ModuleConfig(List<String> linkLibs) {
+    private final boolean testing;
+
+    private ModuleConfig(List<String> linkLibs, boolean testing) {
         this.linkLibs = linkLibs;
+        this.testing = testing;
     }
 
-    /** Libraries to pass to the linker (bare names, without {@code -l}). */
+    /**
+     * Libraries to pass to the linker (bare names, without {@code -l}).
+     */
     public List<String> linkLibs() {
         return linkLibs;
     }
 
-    /** Sentinel for a module without a {@code feng.cfg}. */
-    public static final ModuleConfig EMPTY = new ModuleConfig(List.of());
+    /**
+     * This module is for test
+     */
+    public boolean testing() {
+        return testing;
+    }
+
+    /**
+     * Sentinel for a module without a {@code feng.cfg}.
+     */
+    public static final ModuleConfig EMPTY =
+            new ModuleConfig(List.of(), false);
 
     /**
      * Load configuration from a module directory.
@@ -52,10 +67,12 @@ public class ModuleConfig {
         var libs = (raw == null || raw.isBlank())
                 ? List.<String>of()
                 : Arrays.stream(raw.split("\\s*,\\s*"))
-                        .map(String::strip)
-                        .filter(s -> !s.isEmpty())
-                        .toList();
+                .map(String::strip)
+                .filter(s -> !s.isEmpty())
+                .toList();
 
-        return new ModuleConfig(libs);
+        var test = Boolean.parseBoolean(props.getProperty("testing"));
+
+        return new ModuleConfig(libs, test);
     }
 }
