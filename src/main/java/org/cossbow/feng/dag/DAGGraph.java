@@ -66,11 +66,11 @@ public class DAGGraph<Key>
     public static <Key> DAGGraph<Key> make(Collection<Key> nodes,
                                            Iterable<Groups.G2<Key, Key>> edges) {
         if (null == nodes || nodes.isEmpty()) {
-            throw new IllegalArgumentException("keys empty");
+            throw new IllegalStateException("keys empty");
         }
         var all = Set.copyOf(nodes);
         if (all.size() != nodes.size()) {
-            throw new IllegalArgumentException("Has duplicate Key");
+            throw new IllegalStateException("Has duplicate Key");
         }
 
         var keyMap = new HashMap<Key, Key>(all.size());
@@ -83,10 +83,10 @@ public class DAGGraph<Key>
         for (var edge : edges) {
             Key from = keyMap.get(edge.a()), to = keyMap.get(edge.b());
             if (from == null) {
-                throw new IllegalArgumentException("Key not exists: " + edge.a());
+                throw new IllegalStateException("Key not exists: " + edge.a());
             }
             if (to == null) {
-                throw new IllegalArgumentException("Key not exists: " + edge.b());
+                throw new IllegalStateException("Key not exists: " + edge.b());
             }
 
             forward.computeIfAbsent(from, hashSet()).add(to);

@@ -74,6 +74,10 @@ public class SemanticAnalysis {
         return DAGUtil.make(nodes, edges);
     }
 
+    private boolean isLocal(Symbol s) {
+        return table.module.equals(s.module());
+    }
+
     //
 
 
@@ -182,7 +186,7 @@ public class SemanticAnalysis {
                     // After constant initialization, if the SymbolExpression is a
                     // referenced variable, it is replaced with a VariableExpression
                     var gv = (GlobalVariable) e.variable();
-                    if (table.module.equals(gv.symbol().module()))
+                    if (isLocal(gv.symbol()))
                         result.add(gv);
                 }
                 case BinaryExpression e -> {
@@ -626,6 +630,7 @@ public class SemanticAnalysis {
                     .flatMap(sf -> sf.bitfield().stream())
                     .flatMap(this::structureDepSizeof);
             Stream.concat(a, b).flatMap(this::structureInitDeps)
+                    .filter(d -> isLocal(d.symbol()))
                     .forEach(d -> edges.add(Groups.g2(d, sd)));
             all.add(sd);
         }
@@ -914,47 +919,6 @@ public class SemanticAnalysis {
         }
     }
 
-    private void checkImplList(
-            ClassDefinition cd, InterfaceDefinition id,
-            DerivedType dt) {
-        for (var im : id.allMethods()) {
-            var o = cd.method(im.name());
-            if (o.none()) {
-                semantic("%s unimplement method: %s%s",
-                        cd.symbol(), im.name(), im.pos());
-                return;
-            }
-            var cm = o.must();
-            if (id.export() && !cm.export()) {
-                semantic("implement exported interface, must export the method: %s",
-                        cm.pos());
-            }
-            var prot = dt.gm().instantiate(im.prototype());
-            compatible(prot, cm.prototype(), im).valid();
-            im.override().add(cm);
-        }
-    }
-
-    private void checkImplList(ClassDefinition cd) {
-        if (cd.builtin()) return;
-        cd.parent().use(pd ->
-                cd.allImpls().addAll(pd.allImpls()));
-        for (var dt : cd.impl()) {
-            var td = findDef(dt);
-            if ((td instanceof InterfaceDefinition id)) {
-                checkImplList(cd, id, dt);
-                cd.allImpls().add(id);
-                id.visitParts(d -> cd.allImpls().add(d));
-                continue;
-            }
-            semantic("require interface: %s", dt.pos());
-        }
-        for (var id : cd.allImpls()) {
-            id.impls.add(cd);
-        }
-
-    }
-
     private Optional<ClassDefinition>
     getClassTypeField(TypeDeclarer t) {
         if (t instanceof DerivedTypeDeclarer ctd) {
@@ -996,7 +960,10 @@ public class SemanticAnalysis {
             if (t.builtin()) continue;
             if (!(t instanceof ClassDefinition cd)) continue;
             var deps = findInitDeps(cd);
-            for (var dep : deps) edges.add(Groups.g2(dep, cd));
+            for (var dep : deps) {
+                if (!isLocal(dep.symbol())) continue;
+                edges.add(Groups.g2(dep, cd));
+            }
             all.add(cd);
         }
         if (all.isEmpty()) return DAGGraph.empty();
@@ -1183,6 +1150,7 @@ public class SemanticAnalysis {
 
             var parts = findParts(id);
             for (var part : parts) {
+                if (!isLocal(part.symbol())) continue;
                 edges.add(Groups.g2(part, id));
             }
             id.partDefs.addAll(parts);
