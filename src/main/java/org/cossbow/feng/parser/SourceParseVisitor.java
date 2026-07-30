@@ -594,10 +594,11 @@ final class SourceParseVisitor
         for (var ctx : membersCtx) {
             var type = (TypeDeclarer) visit(ctx.type);
             for (var fc : ctx.fields.structureField()) {
+                var attrs = parseAttributes(fc.attributes());
                 var field = new StructureField(posOf(fc),
                         identifier(fc.Identifier()),
                         visitOptional(fc.expression()),
-                        type);
+                        type, attrs);
                 fields.add(field.name(), field);
             }
         }

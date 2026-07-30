@@ -127,7 +127,7 @@ structureFields
     ;
 // structure field: bitfield must be constant expression
 structureField
-    : name=Identifier ('(' expression ')')?
+    : attributes name=Identifier ('(' expression ')')?
     ;
 definedStructureFieldType
     : definedType

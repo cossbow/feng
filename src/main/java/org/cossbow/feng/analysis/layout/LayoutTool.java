@@ -49,13 +49,13 @@ public class LayoutTool {
         long currentAlign(long align) {
             return pack > 0 ? Math.min(align, pack) : align;
         }
+    }
 
-        /**
-         * 计算对齐后的偏移
-         */
-        long alignOffset(long offset, long alignment) {
-            return (offset + alignment - 1) & (-alignment);
-        }
+    /**
+     * 计算对齐后的偏移
+     */
+    static long alignOffset(long offset, long alignment) {
+        return (offset + alignment - 1) & (-alignment);
     }
 
     public LayoutTool(SymbolContext context) {
@@ -205,6 +205,10 @@ public class LayoutTool {
 
             var size = getTypeSize(sf.type());
             var align = getTypeAlign(sf.type());
+            // @Align({value=n}) 覆盖自然对齐
+            if (sf.align() > 0) {
+                align = sf.align();
+            }
             addMember(size, align);
         }
 
@@ -228,7 +232,14 @@ public class LayoutTool {
     private StructureLayout structLayout(StructureDefinition sd) {
         var builder = new StructLayoutBuilder(sd.pack());
         builder.calcFields(sd.fields());
-        return builder.toLayout();
+        var layout = builder.toLayout();
+        if (sd.typeAlign() > 0) {
+            var a = sd.pack() > 0 ? Math.min(sd.typeAlign(), sd.pack()) : sd.typeAlign();
+            return new StructureLayout(layout.members(),
+                    alignOffset(layout.size(), a),
+                    Math.max(layout.align(), a));
+        }
+        return layout;
     }
 
 
@@ -276,7 +287,14 @@ public class LayoutTool {
 
     private StructureLayout unionLayout(StructureDefinition sd) {
         var builder = new UnionLayoutBuilder(sd.pack());
-        return builder.unionLayout(sd.fields().values());
+        var layout = builder.unionLayout(sd.fields().values());
+        if (sd.typeAlign() > 0) {
+            var a = sd.pack() > 0 ? Math.min(sd.typeAlign(), sd.pack()) : sd.typeAlign();
+            return new StructureLayout(layout.members(),
+                    alignOffset(layout.size(), a),
+                    Math.max(layout.align(), a));
+        }
+        return layout;
     }
 
 

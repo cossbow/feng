@@ -648,7 +648,20 @@ public class SemanticAnalysis {
 
     private void visitStructure(StructureDefinition sd) {
         analyse(sd.modifier());
+        var pack = extractAttrLayout(sd.modifier().attributes(),
+                AttributeDefinition.PackDef.symbol(),
+                AttributeDefinition.ValueField);
+        sd.pack(pack);
+        var sdlign = extractAttrLayout(sd.modifier().attributes(),
+                AttributeDefinition.AlignDef.symbol(),
+                AttributeDefinition.ValueField);
+        sd.typeAlign(sdlign);
         for (var sf : sd.fields()) {
+            analyse(sf.attributes());
+            var sfAlign = extractAttrLayout(sf.attributes(),
+                    AttributeDefinition.AlignDef.symbol(),
+                    AttributeDefinition.ValueField);
+            sf.align(sfAlign);
             visitBitfield(sf);
             analyse(sf.type());
         }
@@ -5246,6 +5259,40 @@ public class SemanticAnalysis {
                 return;
             }
             analyse(of.get(), n.value());
+        }
+    }
+
+    /**
+     * Extract int value
+     */
+    private int extractAttrLayout(
+            SymbolMap<Attribute> attrs,
+            Symbol s, Identifier field) {
+        var o = attrs.tryGet(s);
+        if (o.none()) return 0;
+        var a = o.get();
+        if (a.init().none()) return 0;
+        var init = a.init().get();
+        var n = init.entries().tryGet(field);
+        if (n.none()) return 0;
+        var le = (LiteralExpression) n.get();
+        var il = (IntegerLiteral) le.literal();
+        var v = il.value().intValue();
+        checkPowerOf2(v, a);
+        return v;
+    }
+
+    /**
+     * 检查值为 0 或 2 的非负整数幂
+     */
+    private void checkPowerOf2(int v,
+                               Attribute a) {
+        if (v <= 0) {
+            semantic("%s value must be positive, got %d: %s",
+                    a.type(), v, a.pos());
+        } else if ((v & (v - 1)) != 0) {
+            semantic("%s value must be power of 2, got %d: %s",
+                    a.type(), v, a.pos());
         }
     }
 

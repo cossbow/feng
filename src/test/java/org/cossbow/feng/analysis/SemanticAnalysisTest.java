@@ -2668,6 +2668,27 @@ public class SemanticAnalysisTest {
         checkFail("struct D{w int;} struct A{id(X.w) int;} const X D={w=10};");
     }
 
+    @Test
+    public void testStructLayout1() {
+        checkSucc("@Pack({value=1}) struct A {}");
+        checkFail("@Pack({value=0}) struct A {}");
+        checkFail("@Pack({value=3}) struct A {}");
+    }
+
+    @Test
+    public void testStructLayout2() {
+        checkSucc("@Align({value=1}) struct A {}");
+        checkFail("@Align({value=0}) struct A {}");
+        checkFail("@Align({value=3}) struct A {}");
+    }
+
+    @Test
+    public void testStructLayout3() {
+        checkSucc("struct A {@Align({value=1}) v int; }");
+        checkFail("struct A {@Align({value=0}) v int; }");
+        checkFail("struct A {@Align({value=3}) v int; }");
+    }
+
     //
 
     @Test

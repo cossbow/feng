@@ -57,6 +57,17 @@ public class StructureDefinition extends TypeDefinition {
         this.pack = pack;
     }
 
+    // @Align({value=n}) — 覆盖类型级对齐
+    private int typeAlign = 0;
+
+    public int typeAlign() {
+        return typeAlign;
+    }
+
+    public void typeAlign(int typeAlign) {
+        this.typeAlign = typeAlign;
+    }
+
     public long size() {
         return size;
     }

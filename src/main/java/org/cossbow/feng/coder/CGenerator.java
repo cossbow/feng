@@ -1174,7 +1174,7 @@ public class CGenerator implements Generator {
         write("#define ").write(guard).newLine();
         write("typedef struct { ");
         writeTypeName(elementTd);
-        write(" $values[").write(def.length()).write("]; Int64 $length; } ").write(typeName).endStmt();
+        write(" $values[").write(def.length()).write("]; } ").write(typeName).endStmt();
         write("#endif").newLine();
     }
 
@@ -4293,34 +4293,35 @@ public class CGenerator implements Generator {
         write(sf.type()).write(' ').write(sf.name());
         insideStructBody = prev;
         if (sf.bitfield().has()) write(':').write(sf.bits());
+        // @Align({value=n}) → __attribute__((aligned(n)))
+        if (sf.align() > 0) {
+            write(" __attribute__((aligned(").write(sf.align()).write(")))");
+        }
         return endStmt();
     }
 
     private CGenerator write(StructureDefinition sd) {
         if (sd.cType()) return this; // C-imported struct: handled by bridge header
-        write("typedef ").write(sd.domain().name).write(' ').write(sd.symbol());
+        var p = sd.pack();
+        if (p > 0) {
+            write("#pragma pack(push, ").write(p).write(')').newLine();
+        }
+        write("typedef ").write(sd.domain().name);
+        if (sd.typeAlign() > 0) {
+            write(" __attribute__((aligned(").write(sd.typeAlign()).write(")))");
+        }
+        write(' ').write(sd.symbol());
         write(" {").indent();
         for (var sf : sd.fields()) write(sf);
         dedent().write("} ").write(sd.symbol()).endStmt();
-        // Skip _Static_assert for structs containing FixedArray fields:
-        // CGenerator adds an Int64 $length member for FixedArray fields,
-        // so the actual C sizeof is larger than LayoutTool's computed size.
-        if (!hasFixedArrayField(sd)) {
-            write("_Static_assert(sizeof(").write(sd.symbol())
-                    .write(") == ")
-                    .write(sd.layout().must().size()).write(", \"size check\")");
-            endStmt();
+        if (p > 0) {
+            write("#pragma pack(pop)").newLine();
         }
+        write("_Static_assert(sizeof(").write(sd.symbol())
+                .write(") == ")
+                .write(sd.layout().must().size()).write(", \"size check\")");
+        endStmt();
         return this;
-    }
-
-    private boolean hasFixedArrayField(StructureDefinition sd) {
-        for (var sf : sd.fields()) {
-            if (sf.type() instanceof ArrayTypeDeclarer atd && atd.refer().none()) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // ---- string cache ----

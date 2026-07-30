@@ -1,0 +1,23 @@
+
+@Pack({value=1})
+struct At {
+    buf [64]byte;
+}
+@Pack({value=2})
+struct Bt {
+    buf [64]byte;
+}
+
+@Align({value=1})
+struct Ar {}
+@Align({value=2})
+struct Br {}
+struct Aw {
+    @Align({value=1})
+    v int;
+    @Align({value=2})
+    u int;
+}
+
+func main(args [&!#][*!#]byte) {
+}
