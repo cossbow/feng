@@ -2225,7 +2225,7 @@ public class CGenerator implements Generator {
     }
 
     private CGenerator write(CheckNilExpression e) {
-        if (!e.nil()) write('!');
+        if (e.nil()) write('!');
         write('(').write(e.subject());
         // array ref structs: nil-check the data pointer
         if (e.subject().resultType.must() instanceof ArrayTypeDeclarer)
