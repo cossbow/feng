@@ -1,10 +1,13 @@
 package org.cossbow.feng;
 
-import com.beust.jcommander.*;
-import com.beust.jcommander.converters.PathConverter;
 import org.cossbow.feng.coder.CGenerator;
 import org.cossbow.feng.coder.CppGenerator;
 import org.cossbow.feng.util.ErrorUtil;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.ITypeConverter;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.ParameterException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,37 +21,46 @@ import java.util.Map;
  * CLI entry point for the Fēng compiler.
  * Parses arguments, then delegates to {@link Compiler}.
  */
+@Command(name = "feng",
+        description = "Fēng compiler — compiles .f sources to C/C++")
 public class CompilerMain {
 
-    @Parameter(names = {"-p", "-pkg"},
+    @Option(names = {"-p", "--pkg"},
             description = "package name")
     private String pkg;
-    @Parameter(names = {"-t", "--source-type"},
+
+    @Option(names = {"-t", "--source-type"},
             description = "the source type",
             converter = SourceTypeConverter.class)
     private SourceType sourceType = SourceType.FILE;
-    @Parameter(names = {"-i", "--input"},
+
+    @Option(names = {"-i", "--input"},
             description = "path of input file/dir",
-            converter = PathConverter.class, required = true)
+            required = true)
     private Path input;
-    @Parameter(names = {"-o", "--output"},
-            description = "path of output dir, default to input dir",
-            converter = PathConverter.class)
+
+    @Option(names = {"-o", "--output"},
+            description = "path of output dir, default to input dir")
     private Path output;
-    @DynamicParameter(names = "-L",
-            description = "search libraries: [name=path] ...")
+
+    @Option(names = "-L",
+            description = "search libraries: name=path (repeatable)")
     private Map<String, String> lib = new HashMap<>();
-    @Parameter(names = {"-b", "--build"},
+
+    @Option(names = {"-b", "--build"},
             description = "build system type: make (default), cmake",
             converter = BuildConverter.class)
     private Compiler.Build build = Compiler.Build.MAKE;
-    @Parameter(names = {"-D", "--debug"},
+
+    @Option(names = {"-D", "--debug"},
             description = "enable debug mode (assert statements, debug checks)")
-    private boolean debug = false;
-    @Parameter(names = {"-T", "--test"},
+    private boolean debug;
+
+    @Option(names = {"-T", "--test"},
             description = "enable unit test mode")
-    private boolean test = false;
-    @Parameter(names = {"--test-name"},
+    private boolean test;
+
+    @Option(names = {"--test-name"},
             description = "testcase name filter (repeatable)")
     private List<String> testNames = new ArrayList<>();
 
@@ -91,16 +103,17 @@ public class CompilerMain {
         }
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         var main = new CompilerMain();
-        var cmd = JCommander.newBuilder().addObject(main).build();
+        var cmd = new CommandLine(main);
         try {
-            cmd.parse(args);
+            cmd.parseArgs(args);
             main.run();
         } catch (ParameterException e) {
-            cmd.usage();
+            System.err.println(e.getMessage());
+            cmd.usage(System.err);
             System.exit(1);
-        } catch (IllegalArgumentException e) {
+        } catch (IOException | IllegalArgumentException e) {
             System.err.println(e.getMessage());
             System.exit(1);
         }
@@ -115,7 +128,8 @@ public class CompilerMain {
         TEST,
     }
 
-    static class SourceTypeConverter implements IStringConverter<SourceType> {
+    static class SourceTypeConverter implements ITypeConverter<SourceType> {
+        @Override
         public SourceType convert(String s) {
             SourceType t;
             if (s.length() == 1) {
@@ -136,11 +150,12 @@ public class CompilerMain {
                 };
             }
             if (t != null) return t;
-            return ErrorUtil.argument("Unknown input type: %s", s);
+            throw new IllegalArgumentException("Unknown input type: " + s);
         }
     }
 
-    static class BuildConverter implements IStringConverter<Compiler.Build> {
+    static class BuildConverter implements ITypeConverter<Compiler.Build> {
+        @Override
         public Compiler.Build convert(String s) {
             Compiler.Build t;
             if (s.length() == 1) {
@@ -157,7 +172,7 @@ public class CompilerMain {
                 };
             }
             if (t != null) return t;
-            return ErrorUtil.argument("Unknown builder: %s", s);
+            throw new IllegalArgumentException("Unknown builder: " + s);
         }
     }
 }
