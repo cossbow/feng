@@ -1854,7 +1854,7 @@ public class CGenerator implements Generator {
             // temp in a statement expression so taking '&self' is valid C
             // (even unbound expressions like call results need materialization
             // because C forbids & on rvalues)
-            var matSelf = td.maybeRefer().none();
+            var matSelf = td.maybeRefer().none() && me.subject().unbound();
             if (matSelf) {
                 write("({ ").write(td).write(" _self = ");
                 write(me.subject());
@@ -4328,6 +4328,10 @@ public class CGenerator implements Generator {
 
     private CGenerator write(StructureDefinition sd) {
         if (sd.cType()) return this; // C-imported struct: handled by bridge header
+        // Ensure field-type typedefs (FixedArray, Tuple, func-proto, …) are
+        // emitted before the struct body.  DAG topological order guarantees
+        // element types are already complete by this point.
+        for (var sf : sd.fields()) ensureFieldTypeDecls(sf.type());
         var p = sd.pack();
         if (p > 0) {
             write("#pragma pack(push, ").write(p).write(')').newLine();

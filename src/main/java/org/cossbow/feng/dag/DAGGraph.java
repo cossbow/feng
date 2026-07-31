@@ -174,6 +174,16 @@ public class DAGGraph<Key>
         }
     }
 
+    public Set<Groups.G2<Key, Key>> edges() {
+        var set = new HashSet<Groups.G2<Key, Key>>();
+        visit((c, deps) -> {
+            for (Key d : deps) {
+                set.add(Groups.g2(d, c));
+            }
+        });
+        return set;
+    }
+
     public void bfs(Consumer<Key> user) {
         for (Key key : linear()) {
             user.accept(key);

@@ -398,6 +398,7 @@ public class Compiler {
             }
             cmakeArgs.add(".");
             cmakeArgs.add("-DCMAKE_C_COMPILER=cc");
+            cmakeArgs.add("--log-level=ERROR");
             if (!isC) cmakeArgs.add("-DCMAKE_CXX_COMPILER=c++");
             var ret = new Command(dir, cmakeArgs).exec();
             if (ret.code() != 0) {
@@ -405,13 +406,13 @@ public class Compiler {
                         ret.code(), ret.err());
                 return;
             }
-            ret = new Command(dir, "cmake", "--build", ".").exec();
+            ret = new Command(dir, "cmake", "--build", ".", "--", "-s").exec();
             if (ret.code() != 0) {
                 ErrorUtil.backend("build failed (exit %d): %s",
                         ret.code(), ret.err());
             }
         } else {
-            var ret = new Command(dir, "make").exec();
+            var ret = new Command(dir, "make", "-s").exec();
             if (ret.code() != 0) {
                 ErrorUtil.backend("build failed (exit %d): %s",
                         ret.code(), ret.err());

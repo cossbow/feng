@@ -218,13 +218,10 @@ public class RelayLowering {
             // the call was wrapped with temp vars.
             // convert BlockExpression to BlockStatement.
             var bs = new BlockStatement(cs.pos(), new ArrayList<>(be.block()));
-            // if non-void, add call as statement
-            var rt = be.resultType.must();
-            if (!(rt instanceof VoidTypeDeclarer)) {
-                var re = be.result();
-                if (re instanceof CallExpression rce) {
-                    bs.list().add(new CallStatement(rce.pos(), rce));
-                }
+            // add the call as a statement (including void calls)
+            var re = be.result();
+            if (re instanceof CallExpression rce) {
+                bs.list().add(new CallStatement(rce.pos(), rce));
             }
             cs.replace().set(bs);
             return cs;
