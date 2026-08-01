@@ -11,12 +11,6 @@ import org.cossbow.feng.util.Optional;
  * </ul>
  */
 public record CArrayType(CType elementType, Optional<Integer> length) implements CType {
-    @Override
-    public String typeName() {
-        return length.map(l -> elementType.typeName() + "[" + l + "]")
-                .getOrElse(elementType.typeName() + "[]");
-    }
-
     /**
      * Incomplete arrays (without a length) are treated as parameter
      * decay and are not considered complete types.

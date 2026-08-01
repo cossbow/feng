@@ -1,11 +1,16 @@
 package org.cossbow.feng.c2feng.parse;
 
+import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.mod.ModulePath;
+import org.cossbow.feng.c2feng.convert.C2FengConverter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test for {@link CHeaderParser}.
@@ -16,6 +21,24 @@ import static org.junit.jupiter.api.Assertions.*;
 public class CHeaderParserTest {
 
     private static final String RESOURCE = "src/test/resources/c2feng/test_header.h";
+
+    private Path parse(Path headerPath, Path outputDir)
+            throws IOException, InterruptedException {
+        if (!Files.isRegularFile(headerPath)) {
+            throw new IOException("header file not found: " + headerPath);
+        }
+        Files.createDirectories(outputDir);
+
+        var mp = new ModulePath(new Identifier("c_test"), Path.of(""));
+        var converter = new C2FengConverter(mp);
+        new CHeaderParser(headerPath).runInto(converter);
+
+        var outputFile = outputDir.resolve(mp + ".feng");
+        try (var w = Files.newBufferedWriter(outputFile)) {
+            converter.write(w);
+        }
+        return outputFile;
+    }
 
     @Test
     public void testParseHeader(@TempDir Path tempDir) throws Exception {
@@ -39,8 +62,7 @@ public class CHeaderParserTest {
             return;
         }
 
-        var parser = new CHeaderParser(header, "c_test", tempDir);
-        var outputFile = parser.run();
+        var outputFile = parse(header, tempDir);
 
         System.out.println("=== testParseHeader ===");
         System.out.println("Output: " + outputFile);

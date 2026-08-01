@@ -9,12 +9,6 @@ package org.cossbow.feng.c2feng.model;
 public sealed interface CType
         permits CPrimitiveType, CPointerType, CArrayType,
                 CStructType, CUnionType, CEnumType, CFunctionType {
-
-    /**
-     * A human-readable type name (for debugging and mapping).
-     */
-    String typeName();
-
     /**
      * Whether the type has a complete definition.
      * <p>

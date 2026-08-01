@@ -5,9 +5,6 @@ import java.util.List;
 /**
  * C struct type: {@code struct { fields }}
  */
-public record CStructType(String tagName, List<CField> fields, boolean isComplete) implements CType {
-    @Override
-    public String typeName() {
-        return "struct " + tagName;
-    }
+public record CStructType(String tagName, List<CField> fields,
+                          boolean isComplete, boolean anonymous) implements CType {
 }

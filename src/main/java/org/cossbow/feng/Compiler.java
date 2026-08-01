@@ -302,6 +302,7 @@ public class Compiler {
             // Typedef for struct/union types
             var ast = fm.result.must();
             for (var sd : ast.dagStructures) {
+                if (!sd.cType() || sd.anonymous()) continue; // only named C-imported structs
                 w.write("typedef ");
                 w.append(sd.domain().name).append(' ');
                 w.append(sd.symbol().name().value()).append(' ');

@@ -549,8 +549,15 @@ public class CGenerator implements Generator {
             write(PrimitiveName.get(ptd.primitive()));
             if (ptd.refer().has()) write('*');
         } else if (td instanceof DerivedTypeDeclarer dtd) {
-            if (insideStructBody) write("struct ");
-            write(dtd.derivedType());  // struct prefix handled by write(DerivedType)
+            if (insideStructBody) {
+                var def = dtd.def();
+                if (def instanceof StructureDefinition sd) {
+                    write(sd.domain().name).write(' ');
+                } else {
+                    write("struct ");
+                }
+            }
+            write(dtd.derivedType());  // struct/union prefix handled above
             if (dtd.refer().has()) write('*');
         } else if (td instanceof ArrayTypeDeclarer atd) {
             if (atd.refer().none())
@@ -980,7 +987,13 @@ public class CGenerator implements Generator {
         }
         if (def instanceof EnumDefinition)
             return write(Primitive.INT);
-        if (insideStructBody) write("struct ");
+        if (insideStructBody) {
+            if (def instanceof StructureDefinition sd) {
+                write(sd.domain().name).write(' ');
+            } else {
+                write("struct ");
+            }
+        }
         write(td.derivedType());
         if (td.refer().has()) write('*');
         return this;
@@ -2133,7 +2146,12 @@ public class CGenerator implements Generator {
         var sd = def instanceof StructureDefinition s ? s : null;
         var allFields = cd != null ? cd.allFields().values()
                 : sd.fields();
-        write('(').write(dt).write(')').write('{');
+        // Anonymous struct/unions: omit type prefix — C can infer from context
+        if (sd != null && sd.anonymous()) {
+            write('{');
+        } else {
+            write('(').write(dt).write(')').write('{');
+        }
         // non-final class value type: set $meta for virtual dispatch
         if (cd != null && !cd.isFinal()) {
             write(".$meta = ");
@@ -4327,7 +4345,7 @@ public class CGenerator implements Generator {
     }
 
     private CGenerator write(StructureDefinition sd) {
-        if (sd.cType()) return this; // C-imported struct: handled by bridge header
+        if (sd.cType() && !sd.anonymous()) return this; // named C-imported: handled by bridge header
         // Ensure field-type typedefs (FixedArray, Tuple, func-proto, …) are
         // emitted before the struct body.  DAG topological order guarantees
         // element types are already complete by this point.
@@ -4347,10 +4365,12 @@ public class CGenerator implements Generator {
         if (p > 0) {
             write("#pragma pack(pop)").newLine();
         }
-        write("_Static_assert(sizeof(").write(sd.symbol())
-                .write(") == ")
-                .write(sd.layout().must().size()).write(", \"size check\")");
-        endStmt();
+        if (!sd.cType() && sd.layout().has()) {
+            write("_Static_assert(sizeof(").write(sd.symbol())
+                    .write(") == ")
+                    .write(sd.layout().must().size()).write(", \"size check\")");
+            endStmt();
+        }
         return this;
     }
 

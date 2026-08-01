@@ -7,9 +7,12 @@ import org.cossbow.feng.util.json.JsonNode;
 import org.cossbow.feng.util.json.JsonParser;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Parses clang's {@code -ast-dump=json} output and populates
@@ -20,6 +23,10 @@ public class JsonAstParser {
     private final C2FengConverter converter;
     private final List<CTypedef> pendingTypedefs = new ArrayList<>();
     private final Set<String> processed = new HashSet<>();
+    /**
+     * Maps RecordDecl id → tagName for anonymous structs owned by typedefs.
+     */
+    private final Map<String, String> emptyRecordTags = new HashMap<>();
 
     public JsonAstParser(C2FengConverter converter) {
         this.converter = converter;
@@ -58,21 +65,45 @@ public class JsonAstParser {
         var kind = node.get("kind");
         if (kind == null || kind.isNull()) return;
 
+        var kindStr = kind.asText();
         var name = node.get("name");
-        if (name == null || name.isNull()) return;
+
+        // RecordDecl may have no "name" field at all (anonymous struct).
+        // Other declaration kinds require a name.
+        if (!"RecordDecl".equals(kindStr)) {
+            if (name == null || name.isNull()) return;
+        }
 
         // Skip implicit declarations before dedup check,
         // otherwise they'd block the real declaration.
         if (isImplicit(node)) return;
 
-        var key = kind.asText() + ":" + name.asText();
+        // Use name for dedup when available; fall back to id for anonymous
+        // declarations (e.g. empty-named structs) which would otherwise
+        // collide on e.g. "RecordDecl:" and skip all but the first.
+        var nameStr = name != null ? name.asText() : "";
+        var idNode = node.get("id");
+        var key = kindStr + ":"
+                + (nameStr.isEmpty() && idNode != null
+                ? idNode.asText()
+                : nameStr);
         if (!processed.add(key)) return; // skip duplicates
 
-        switch (kind.asText()) {
+        switch (kindStr) {
             case "RecordDecl" -> processRecord(node);
             case "EnumDecl" -> processEnum(node);
             case "FunctionDecl" -> processFunction(node);
             case "VarDecl" -> processVarDecl(node);
+            case "TypedefDecl" -> {
+                // Recurse into nested RecordDecl/EnumDecl inside typedefs,
+                // e.g. `typedef struct { ... } name;` or `typedef enum { ... } name;`
+                var inner = node.get("inner");
+                if (inner != null && inner.isArray()) {
+                    for (var child : inner.elements()) {
+                        if (child.isObject()) processDecl(child);
+                    }
+                }
+            }
         }
     }
 
@@ -87,12 +118,42 @@ public class JsonAstParser {
 
         if (!isCompleteDefinition(node)) return;
 
-        var name = node.get("name").asText();
-        if (name == null || name.isEmpty()) return;
+        var nameNode = node.get("name");
+        var name = nameNode != null ? nameNode.asText() : null;
+        boolean anonymous;
+        if (name != null && !name.isEmpty()) {
+            // Named struct/union — not anonymous
+            anonymous = false;
+        } else {
+            // Anonymous struct/union: try typedef mapping first (e.g.
+            // `typedef struct { ... } lldiv_t`), then fall back to
+            // location-based name for nested anonymous structs.
+            var id = node.get("id");
+            if (id != null && !id.isNull()) {
+                name = emptyRecordTags.get(id.asText());
+            }
+            if (name == null || name.isEmpty()) {
+                var tag = isStruct ? "struct" : "union";
+                name = locToAnonName(node, tag);
+            }
+            if (name == null || name.isEmpty()) return;
+            anonymous = true;
+        }
 
         var fields = new ArrayList<CField>();
         var inner = node.get("inner");
         if (inner != null && inner.isArray()) {
+            // First pass: process nested anonymous RecordDecl children
+            // so their definitions exist before fields reference them
+            for (var child : inner.elements()) {
+                if (!child.isObject()) continue;
+                var ckind = child.get("kind");
+                if (ckind == null || ckind.isNull()) continue;
+                if ("RecordDecl".equals(ckind.asText())) {
+                    processRecord(child);
+                }
+            }
+            // Second pass: process FieldDecl children
             for (var child : inner.elements()) {
                 if (child.isObject() && "FieldDecl".equals(
                         child.get("kind").asText())) {
@@ -102,9 +163,9 @@ public class JsonAstParser {
         }
 
         if (isStruct) {
-            converter.addStruct(new CStructType(name, fields, true));
+            converter.addStruct(new CStructType(name, fields, true, anonymous));
         } else {
-            converter.addUnion(new CUnionType(name, fields, true));
+            converter.addUnion(new CUnionType(name, fields, true, anonymous));
         }
     }
 
@@ -228,6 +289,39 @@ public class JsonAstParser {
 
     // ========== typedef ==========
 
+    private void processAnonymous(JsonNode node, CType underlying) {
+        // If this typedef wraps an anonymous struct/union, record its
+        // RecordDecl id so processRecord can recover the tag name later.
+        if (!(underlying instanceof CStructType st)
+                && !(underlying instanceof CUnionType ut))
+            return;
+
+        var inner = node.get("inner");
+        if (inner == null || !inner.isArray())
+            return;
+
+        for (var child : inner.elements()) {
+            if (child.isObject()
+                    && "ElaboratedType".equals(child.get("kind").asText())) {
+                var owned = child.get("ownedTagDecl");
+                if (owned == null || !owned.isObject()) {
+                    continue;
+                }
+                var recordId = owned.get("id");
+                if (recordId != null && !recordId.isNull()) {
+                    var tagName = switch (underlying) {
+                        case CStructType s -> s.tagName();
+                        case CUnionType u -> u.tagName();
+                        default -> null;
+                    };
+                    if (tagName != null && !tagName.isEmpty()) {
+                        emptyRecordTags.put(recordId.asText(), tagName);
+                    }
+                }
+            }
+        }
+    }
+
     private void processTypedef(JsonNode node) {
         var name = node.get("name");
         if (name == null || name.isNull()) return;
@@ -239,6 +333,8 @@ public class JsonAstParser {
         // Expand the underlying type from qualType
         var underlying = qualTypeToCType(qualType);
         pendingTypedefs.add(new CTypedef(name.asText(), underlying));
+
+        processAnonymous(node, underlying);
     }
 
     // ========== qualType → CType ==========
@@ -284,11 +380,14 @@ public class JsonAstParser {
         if (type.startsWith("struct ") || type.startsWith("union ") || type.startsWith("enum ")) {
             var space = type.indexOf(' ');
             var tagName = type.substring(space + 1).trim();
+            // Normalize anonymous struct/union names so they match nested definitions
+            var anonName = normalizeAnonTypeName(tagName);
+            var anonymous = !anonName.equals(tagName);
             // Strip possible "struct S &" -> we don't care about the address
             // for the metadata, we just need the tag name
             return switch (type.substring(0, space)) {
-                case "struct" -> new CStructType(tagName, List.of(), true);
-                case "union" -> new CUnionType(tagName, List.of(), true);
+                case "struct" -> new CStructType(anonName, List.of(), true, anonymous);
+                case "union" -> new CUnionType(anonName, List.of(), true, anonymous);
                 case "enum" -> new CEnumType(tagName, List.of());
                 default -> new CPrimitiveType(tagName);
             };
@@ -303,20 +402,15 @@ public class JsonAstParser {
             case "void" -> new CPrimitiveType("void");
             case "char", "signed char" -> new CPrimitiveType("char");
             case "unsigned char" -> new CPrimitiveType("unsigned char");
-            case "short", "signed short", "short int", "signed short int" ->
-                    new CPrimitiveType("short");
-            case "unsigned short", "unsigned short int" ->
-                    new CPrimitiveType("unsigned short");
+            case "short", "signed short", "short int", "signed short int" -> new CPrimitiveType("short");
+            case "unsigned short", "unsigned short int" -> new CPrimitiveType("unsigned short");
             case "int", "signed", "signed int" -> new CPrimitiveType("int");
             case "unsigned", "unsigned int" -> new CPrimitiveType("unsigned int");
-            case "long", "signed long", "long int", "signed long int" ->
-                    new CPrimitiveType("long");
-            case "unsigned long", "unsigned long int" ->
-                    new CPrimitiveType("unsigned long");
+            case "long", "signed long", "long int", "signed long int" -> new CPrimitiveType("long");
+            case "unsigned long", "unsigned long int" -> new CPrimitiveType("unsigned long");
             case "long long", "signed long long", "long long int",
                  "signed long long int" -> new CPrimitiveType("long long");
-            case "unsigned long long", "unsigned long long int" ->
-                    new CPrimitiveType("unsigned long long");
+            case "unsigned long long", "unsigned long long int" -> new CPrimitiveType("unsigned long long");
             case "float" -> new CPrimitiveType("float");
             case "double" -> new CPrimitiveType("double");
             case "_Bool", "bool" -> new CPrimitiveType("_Bool");
@@ -331,7 +425,8 @@ public class JsonAstParser {
     // ========== function qualType parser ==========
     // clang format: "int (const char *, int, ...)"
 
-    private record FuncTypeInfo(CType returnType, boolean variadic) {}
+    private record FuncTypeInfo(CType returnType, boolean variadic) {
+    }
 
     private FuncTypeInfo parseFunctionQualType(String qualType) {
         if (qualType == null || qualType.isEmpty()) {
@@ -385,6 +480,34 @@ public class JsonAstParser {
             else result = result.substring(0, result.length() - 8).trim(); // restrict
         }
         return result;
+    }
+
+    private static final Pattern ANON_TYPE_PATTERN =
+            Pattern.compile("\\(unnamed (struct|union) at .*?:(\\d+):(\\d+)\\)");
+
+    /**
+     * Normalize an anonymous struct/union type name from clang's qualType.
+     * E.g. "(unnamed struct at D:/path/file.h:120:20)" → "_anon_struct_120_20"
+     */
+    private static String normalizeAnonTypeName(String qualTypeTag) {
+        var m = ANON_TYPE_PATTERN.matcher(qualTypeTag);
+        if (m.find()) {
+            return "_anon_" + m.group(1) + "_" + m.group(2) + "_" + m.group(3);
+        }
+        return qualTypeTag;
+    }
+
+    /**
+     * Generate a normalized name for an anonymous struct/union from its location.
+     * Format: "_anon_struct_LINE_COL" or "_anon_union_LINE_COL"
+     */
+    private static String locToAnonName(JsonNode node, String tagUsed) {
+        var loc = node.get("loc");
+        if (loc == null || loc.isNull()) return null;
+        var line = loc.get("line");
+        var col = loc.get("col");
+        if (line == null || col == null || line.isNull() || col.isNull()) return null;
+        return "_anon_" + tagUsed + "_" + line.asInt() + "_" + col.asInt();
     }
 
     private static boolean isCompleteDefinition(JsonNode node) {

@@ -1419,6 +1419,19 @@ var foo Foo = {tag=1};
 // var foo Foo = {tag=1,fly=2}; // Error
 ```
 
+Nested anonymous struct types can be defined within a struct type:
+
+```feng
+struct A {
+   b struct {
+      v union {
+         v1 int64;
+         v2 struct { u [2]uint16; };
+      };
+   };
+}
+```
+
 ### Struct Type Instances
 
 Struct types can be instantiated in two ways:

@@ -8,6 +8,7 @@ import org.cossbow.feng.util.Lazy;
 
 public class StructureDefinition extends TypeDefinition {
     private IdentifierMap<StructureField> fields;
+    private boolean anonymous;
     private boolean cType;
 
     public StructureDefinition(Position pos,
@@ -16,9 +17,11 @@ public class StructureDefinition extends TypeDefinition {
                                TypeParameters generic,
                                TypeDomain domain,
                                IdentifierMap<StructureField> fields,
+                               boolean anonymous,
                                boolean cType) {
         super(pos, modifier, symbol, generic, domain);
         this.fields = fields;
+        this.anonymous = anonymous;
         this.cType = cType;
     }
 
@@ -27,8 +30,10 @@ public class StructureDefinition extends TypeDefinition {
                                Symbol symbol,
                                TypeParameters generic,
                                TypeDomain domain,
-                               IdentifierMap<StructureField> fields) {
-        this(pos, modifier, symbol, generic, domain, fields, false);
+                               IdentifierMap<StructureField> fields,
+                               boolean anonymous) {
+        this(pos, modifier, symbol, generic, domain, fields,
+                anonymous, false);
     }
 
     public IdentifierMap<StructureField> fields() {
@@ -37,6 +42,10 @@ public class StructureDefinition extends TypeDefinition {
 
     public boolean cType() {
         return cType;
+    }
+
+    public boolean anonymous() {
+        return anonymous;
     }
 
     public boolean newable() {

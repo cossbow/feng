@@ -4,6 +4,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.ast.mod.ModulePath;
+import org.cossbow.feng.c2feng.CModuleParser;
 import org.cossbow.feng.c2feng.convert.C2FengConverter;
 import org.cossbow.feng.c2feng.parse.CHeaderParser;
 import org.cossbow.feng.dag.DAGGraph;
@@ -128,16 +129,9 @@ public class ModuleParser {
                 if (name.equals(pkg.value() + ".h")) continue;
 
                 var modulePath = new ModulePath(pkg, module);
-                var converter = new C2FengConverter(modulePath);
-                var parser = new CHeaderParser(f, modulePath.toString(), dir);
-                try {
-                    parser.runInto(converter);
-                    fm.table().merge(converter.table());
-                    headers.add(f.toAbsolutePath().normalize());
-                } catch (Exception e) {
-                    System.err.println("warning: failed to parse header "
-                            + f + ": " + e.getMessage());
-                }
+                var pst = CModuleParser.parse(modulePath, f);
+                fm.table().merge(pst);
+                headers.add(f.toAbsolutePath().normalize());
             }
         }
         if (!headers.isEmpty()) {

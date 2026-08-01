@@ -560,7 +560,7 @@ final class SourceParseVisitor
         genericStack.push(generic);
         var fields = parseStructureMembers(ctx.structureFieldsDef());
         var def = new StructureDefinition(posOf(ctx), modifier, symbol,
-                generic, domain, fields);
+                generic, domain, fields, false);
         for (var f : fields) f.master().set(def);
         genericStack.pop();
         return def;
@@ -574,7 +574,8 @@ final class SourceParseVisitor
         var fields = parseStructureMembers(ctx.structureFieldsDef());
         var symbol = defineSymbol(CommonUtil.rand(domain.name));
         var def = new StructureDefinition(pos, Modifier.empty(),
-                symbol, TypeParameters.empty(), domain, fields);
+                symbol, TypeParameters.empty(), domain, fields,
+                true);
         table.types.add(symbol.name(), def);
         for (var f : fields) f.master().set(def);
         return def;

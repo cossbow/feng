@@ -11,8 +11,4 @@ import java.util.List;
  * emitted as a separate {@code const int}.
  */
 public record CEnumType(String tagName, List<CEnumConstant> constants) implements CType {
-    @Override
-    public String typeName() {
-        return "enum " + tagName;
-    }
 }

@@ -369,4 +369,142 @@ public class JsonAstParserTest {
         // const char *const → strip leading const, then strip trailing const → char * → pointer → uint64
         assertTrue(result.contains("s uint64"), "const char *const should map to uint64");
     }
+
+    @Test
+    public void testTypedefAnonymousStruct() throws Exception {
+        // Simulates real Clang output for:
+        //   typedef struct { long long quot; long long rem; } lldiv_t;
+        // RecordDecl is at TOP level with empty name; TypedefDecl links via
+        // ElaboratedType.ownedTagDecl.id.
+        var json = """
+                {
+                  "kind": "TranslationUnitDecl",
+                  "inner": [
+                    {
+                      "id": "0xabc",
+                      "kind": "RecordDecl",
+                      "tagUsed": "struct",
+                      "completeDefinition": true,
+                      "inner": [
+                        { "kind": "FieldDecl", "name": "quot", "type": { "qualType": "long long" } },
+                        { "kind": "FieldDecl", "name": "rem", "type": { "qualType": "long long" } }
+                      ]
+                    },
+                    {
+                      "kind": "TypedefDecl",
+                      "name": "lldiv_t",
+                      "type": { "qualType": "struct lldiv_t" },
+                      "inner": [
+                        {
+                          "kind": "ElaboratedType",
+                          "type": { "qualType": "struct lldiv_t" },
+                          "ownedTagDecl": {
+                            "id": "0xabc",
+                            "kind": "RecordDecl",
+                            "name": ""
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "FunctionDecl",
+                      "name": "ldiv",
+                      "type": { "qualType": "lldiv_t (long long, long long)" },
+                      "inner": [
+                        { "kind": "ParmVarDecl", "name": "numer", "type": { "qualType": "long long" } },
+                        { "kind": "ParmVarDecl", "name": "denom", "type": { "qualType": "long long" } }
+                      ]
+                    }
+                  ]
+                }
+                """;
+
+        var converter = new C2FengConverter(new ModulePath(new Identifier("m"), Path.of("")));
+        new JsonAstParser(converter).parse(json);
+
+        var out = new StringWriter();
+        converter.write(out);
+        var result = out.toString();
+
+        System.out.println("=== testTypedefAnonymousStruct ===");
+        System.out.println(result);
+
+        // The struct definition should be generated
+        assertTrue(result.contains("struct lldiv_t"), "struct lldiv_t should be in output");
+        // The function should reference m$lldiv_t as return type
+        assertTrue(result.contains("m$lldiv_t"), "m$lldiv_t should be referenced");
+    }
+
+    @Test
+    public void testMultipleAnonymousStructs() throws Exception {
+        // Verify that dedup key collision (all empty-named RecordDecls
+        // share "RecordDecl:") does NOT skip anonymous structs after
+        // the first one.
+        var json = """
+                {
+                  "kind": "TranslationUnitDecl",
+                  "inner": [
+                    {
+                      "id": "0xaaa",
+                      "kind": "RecordDecl",
+                      "tagUsed": "struct",
+                      "completeDefinition": true,
+                      "inner": [
+                        { "kind": "FieldDecl", "name": "quot", "type": { "qualType": "int" } },
+                        { "kind": "FieldDecl", "name": "rem", "type": { "qualType": "int" } }
+                      ]
+                    },
+                    {
+                      "kind": "TypedefDecl",
+                      "name": "div_t",
+                      "type": { "qualType": "struct div_t" },
+                      "inner": [
+                        {
+                          "kind": "ElaboratedType",
+                          "type": { "qualType": "struct div_t" },
+                          "ownedTagDecl": { "id": "0xaaa", "kind": "RecordDecl", "name": "" }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "0xbbb",
+                      "kind": "RecordDecl",
+                      "name": "",
+                      "tagUsed": "struct",
+                      "completeDefinition": true,
+                      "inner": [
+                        { "kind": "FieldDecl", "name": "quot", "type": { "qualType": "long long" } },
+                        { "kind": "FieldDecl", "name": "rem", "type": { "qualType": "long long" } }
+                      ]
+                    },
+                    {
+                      "kind": "TypedefDecl",
+                      "name": "lldiv_t",
+                      "type": { "qualType": "struct lldiv_t" },
+                      "inner": [
+                        {
+                          "kind": "ElaboratedType",
+                          "type": { "qualType": "struct lldiv_t" },
+                          "ownedTagDecl": { "id": "0xbbb", "kind": "RecordDecl", "name": "" }
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """;
+
+        var converter = new C2FengConverter(new ModulePath(new Identifier("m"), Path.of("")));
+        new JsonAstParser(converter).parse(json);
+
+        var out = new StringWriter();
+        converter.write(out);
+        var result = out.toString();
+
+        System.out.println("=== testMultipleAnonymousStructs ===");
+        System.out.println(result);
+
+        // Both structs should appear — the second one must not be dedup'd
+        assertTrue(result.contains("struct div_t"), "struct div_t should be in output");
+        assertTrue(result.contains("struct lldiv_t"), "struct lldiv_t should be in output");
+    }
 }

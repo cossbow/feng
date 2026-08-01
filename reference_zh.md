@@ -1354,6 +1354,19 @@ var foo Foo = {tag=1};
 // var foo Foo = {tag=1,fly=2}; // 错误×
 ```
 
+在结构类型内部可以定义嵌套的匿名的结构类型：
+
+```feng
+struct A {
+   b struct {
+      v union {
+         v1 int64;
+         v2 struct { u [2]uint16; };
+      };
+   };
+}
+```
+
 ### 结构类型实例
 
 结构类型可以有两种实例化方式：

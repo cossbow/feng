@@ -31,7 +31,7 @@ public class C2FengConverterTest {
                 new CField("x", new CPrimitiveType("int")),
                 new CField("y", new CPrimitiveType("double")),
                 new CField("data", new CPointerType(new CPrimitiveType("void"), false))
-        ), true));
+        ), true, false));
 
         var out = new StringWriter();
         conv.write(out);
@@ -54,7 +54,7 @@ public class C2FengConverterTest {
                 new CField("i", new CPrimitiveType("int")),
                 new CField("f", new CPrimitiveType("float")),
                 new CField("p", new CPointerType(new CPrimitiveType("void"), false))
-        ), true));
+        ), true, false));
 
         var out = new StringWriter();
         conv.write(out);
@@ -194,7 +194,7 @@ public class C2FengConverterTest {
         conv.addStruct(new CStructType("Buffer", List.of(
                 new CField("data", new CArrayType(new CPrimitiveType("char"), Optional.of(256))),
                 new CField("len", new CPrimitiveType("int"))
-        ), true));
+        ), true, false));
 
         var out = new StringWriter();
         conv.write(out);
@@ -213,7 +213,7 @@ public class C2FengConverterTest {
         conv.addStruct(new CStructType("Flags", List.of(
                 new CField("a", new CPrimitiveType("unsigned int"), Optional.of(1)),
                 new CField("b", new CPrimitiveType("unsigned int"), Optional.of(3))
-        ), true));
+        ), true, false));
 
         var out = new StringWriter();
         conv.write(out);
@@ -254,7 +254,7 @@ public class C2FengConverterTest {
         conv.addStruct(new CStructType("Point", List.of(
                 new CField("x", new CPrimitiveType("int")),
                 new CField("y", new CPrimitiveType("int"))
-        ), true));
+        ), true, false));
 
         conv.addEnum(new CEnumType("Color", List.of(
                 new CEnumConstant("RED", Optional.empty()),
@@ -267,12 +267,12 @@ public class C2FengConverterTest {
                         new CField("x", new CPrimitiveType("int")),
                         new CField("y", new CPrimitiveType("int"))
                 ),
-                new CStructType("Point", List.of(), true), // returns struct
+                new CStructType("Point", List.of(), true, false), // returns struct
                 false,
                 CLinkage.DEFAULT));
 
         conv.addFunction(new CFunction("destroy_point",
-                List.of(new CField("p", new CPointerType(new CStructType("Point", List.of(), true), false))),
+                List.of(new CField("p", new CPointerType(new CStructType("Point", List.of(), true, false), false))),
                 new CPrimitiveType("void"),
                 false,
                 CLinkage.DEFAULT));

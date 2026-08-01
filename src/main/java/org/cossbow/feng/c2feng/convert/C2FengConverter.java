@@ -70,7 +70,7 @@ public class C2FengConverter {
                 symbol(new Identifier(struct.tagName())),
                 TypeParameters.empty(),
                 TypeDomain.STRUCT,
-                fields, true));
+                fields, struct.anonymous(), true));
     }
 
     // ========== Union ==========
@@ -92,7 +92,7 @@ public class C2FengConverter {
                 symbol(new Identifier(union.tagName())),
                 TypeParameters.empty(),
                 TypeDomain.UNION,
-                fields, true));
+                fields, union.anonymous(), true));
     }
 
     // ========== Enum → const int constants ==========
