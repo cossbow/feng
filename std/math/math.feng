@@ -1,0 +1,376 @@
+// ========== Feng Standard Library -- math ==========
+// Pure Feng implementation. No C dependencies.
+
+// ===== Constants =====
+
+export
+const E = 2.718281828459045;
+
+export
+const PI = 3.141592653589793;
+
+export
+const PHI = 1.618033988749895;
+
+export
+const SQRT2 = 1.414213562373095;
+
+// ===== Classification =====
+
+export
+func isNaN(x float) bool {
+    return x != x;
+}
+
+export
+func isInf(x float) bool {
+    return x != x && x - x != 0.0;
+}
+
+export
+func signbit(x float) bool {
+    if (x < 0.0) return true;
+    if (x == 0.0) {
+        return 1.0 / x < 0.0;
+    }
+    return false;
+}
+
+// ===== Basic =====
+
+export
+func abs(x float) float {
+    if (x < 0.0) { return -x; }
+    return x;
+}
+
+export
+func min(a, b float) float {
+    if (a < b) { return a; }
+    return b;
+}
+
+export
+func max(a, b float) float {
+    if (a > b) { return a; }
+    return b;
+}
+
+// ===== Rounding =====
+
+export
+func floor(x float) float {
+    if (isNaN(x) || isInf(x)) { return x; }
+    var xi = int64(x);
+    if (x >= 0.0) { return float(xi); }
+    var fx = float(xi);
+    if (fx == x) { return fx; }
+    return fx - 1.0;
+}
+
+export
+func ceil(x float) float {
+    if (isNaN(x) || isInf(x)) { return x; }
+    var xi = int64(x);
+    if (x <= 0.0) { return float(xi); }
+    var fx = float(xi);
+    if (fx == x) { return fx; }
+    return fx + 1.0;
+}
+
+export
+func trunc(x float) float {
+    if (isNaN(x) || isInf(x)) { return x; }
+    return float(int64(x));
+}
+
+export
+func round(x float) float {
+    if (isNaN(x) || isInf(x)) { return x; }
+    if (x == 0.0) { return x; }
+    var xi = int64(x);
+    var frac = x - float(xi);
+    if (frac < 0.0) { frac = -frac; }
+    if (frac < 0.5) { return float(xi); }
+    if (frac > 0.5) {
+        if (x > 0.0) { return float(xi) + 1.0; }
+        return float(xi) - 1.0;
+    }
+    if ((xi & 1) == 0) { return float(xi); }
+    if (x > 0.0) { return float(xi) + 1.0; }
+    return float(xi) - 1.0;
+}
+
+// ===== sqrt via Newton =====
+
+export
+func sqrt(x float) float {
+    if (x < 0.0) {
+        // Return NaN via self-subtraction
+        var zero = 0.0;
+        return zero / zero;
+    }
+    if (x == 0.0) { return 0.0; }
+    var z = x;
+    for (var i = 0; i < 25; i += 1) {
+        z = (z + x / z) * 0.5;
+    }
+    return z;
+}
+
+// ===== exp via Taylor =====
+
+export
+func exp(x float) float {
+    if (x == 0.0) { return 1.0; }
+    if (isNaN(x)) { return x; }
+    if (x > 709.0) {
+        var zero = 0.0;
+        return 1.0 / zero;  // +Inf
+    }
+    if (x < -709.0) { return 0.0; }
+
+    var neg = x < 0.0;
+    var ax = neg ? -x : x;
+
+    var result = 1.0;
+    var term = 1.0;
+    for (var i = 1; i <= 40; i += 1) {
+        term = term * ax / float(i);
+        result = result + term;
+    }
+
+    if (neg) { return 1.0 / result; }
+    return result;
+}
+
+// ===== log via Newton =====
+
+export
+func log(x float) float {
+    if (x <= 0.0 || isNaN(x)) {
+        var zero = 0.0;
+        return zero / zero;  // NaN
+    }
+    if (x == 1.0) { return 0.0; }
+    if (isInf(x)) { return x; }
+
+    var y = float(int64(x)) - 1.0;
+    if (y < 0.0) { y = 0.0; }
+
+    for (var i = 0; i < 15; i += 1) {
+        var ey = exp(y);
+        y = y + (x - ey) / ey;
+    }
+    return y;
+}
+
+export
+func log10(x float) float {
+    var ln10 = 2.302585092994046;
+    return log(x) / ln10;
+}
+
+export
+func log2(x float) float {
+    var ln2 = 0.693147180559945;
+    return log(x) / ln2;
+}
+
+// ===== pow =====
+
+export
+func pow(x, y float) float {
+    if (y == 0.0) { return 1.0; }
+    if (x == 1.0) { return 1.0; }
+    if (isNaN(x) || isNaN(y)) {
+        var zero = 0.0;
+        return zero / zero;
+    }
+    if (x < 0.0 && y != trunc(y)) {
+        var zero = 0.0;
+        return zero / zero;
+    }
+    if (x == 0.0) {
+        if (y > 0.0) { return 0.0; }
+        var zero = 0.0;
+        return 1.0 / zero;
+    }
+    var neg = x < 0.0;
+    var base = neg ? -x : x;
+    var result = exp(y * log(base));
+    if (neg) {
+        var yi = int64(y);
+        if (float(yi) == y && (yi & 1) == 1) { result = -result; }
+    }
+    return result;
+}
+
+// ===== Trigonometric =====
+
+func reduceAngle(angle float) float {
+    var twoPI = 6.283185307179586;
+    var x = angle;
+    var n = int64(x / twoPI);
+    x = x - float(n) * twoPI;
+    if (x > PI)  { x = x - twoPI; }
+    if (x < -PI) { x = x + twoPI; }
+    return x;
+}
+
+func sinSeries(x float) float {
+    var x2 = x * x;
+    var result = x;
+    var term = x;
+    var sign = true;
+    for (var n = 3; n <= 21; n += 2) {
+        term = term * x2 / float(n * (n - 1));
+        if (sign) { result = result - term; }
+        else      { result = result + term; }
+        sign = !sign;
+    }
+    return result;
+}
+
+func cosSeries(x float) float {
+    var x2 = x * x;
+    var result = 1.0;
+    var term = 1.0;
+    var sign = true;
+    for (var n = 2; n <= 20; n += 2) {
+        term = term * x2 / float(n * (n - 1));
+        if (sign) { result = result - term; }
+        else      { result = result + term; }
+        sign = !sign;
+    }
+    return result;
+}
+
+export
+func sin(x float) float {
+    if (isNaN(x) || isInf(x)) {
+        var zero = 0.0;
+        return zero / zero;
+    }
+    return sinSeries(reduceAngle(x));
+}
+
+export
+func cos(x float) float {
+    if (isNaN(x) || isInf(x)) {
+        var zero = 0.0;
+        return zero / zero;
+    }
+    return cosSeries(reduceAngle(x));
+}
+
+export
+func tan(x float) float {
+    var c = cos(x);
+    if (c == 0.0) {
+        var zero = 0.0;
+        return 1.0 / zero;
+    }
+    return sin(x) / c;
+}
+
+export
+func asin(x float) float {
+    if (x < -1.0 || x > 1.0) {
+        var zero = 0.0;
+        return zero / zero;
+    }
+    if (x == 0.0) { return 0.0; }
+    if (x == 1.0) { return PI / 2.0; }
+    if (x == -1.0) { return -PI / 2.0; }
+
+    var y = x;
+    for (var i = 0; i < 15; i += 1) {
+        var sy = sin(y);
+        var cy = cos(y);
+        if (cy == 0.0) { break; }
+        y = y + (x - sy) / cy;
+    }
+    return y;
+}
+
+export
+func acos(x float) float {
+    return PI / 2.0 - asin(x);
+}
+
+export
+func atan(x float) float {
+    if (x == 0.0) { return 0.0; }
+
+    var neg = x < 0.0;
+    var ax = neg ? -x : x;
+
+    var invert = ax > 1.0;
+    if (invert) { ax = 1.0 / ax; }
+
+    var result = ax;
+    var term = ax;
+    var x2 = ax * ax;
+    var sign = true;
+    for (var n = 3; n <= 39; n += 2) {
+        term = term * x2;
+        if (sign) { result = result - term / float(n); }
+        else      { result = result + term / float(n); }
+        sign = !sign;
+    }
+
+    if (invert) {
+        result = PI / 2.0 - result;
+    }
+    if (neg) { result = -result; }
+    return result;
+}
+
+export
+func atan2(y, x float) float {
+    if (x == 0.0) {
+        if (y > 0.0) { return PI / 2.0; }
+        if (y < 0.0) { return -PI / 2.0; }
+        return 0.0;
+    }
+    var a = atan(y / x);
+    if (x > 0.0) { return a; }
+    if (y >= 0.0) { return a + PI; }
+    return a - PI;
+}
+
+// ===== Hyperbolic =====
+
+export
+func sinh(x float) float {
+    var e = exp(x);
+    if (isInf(e)) { return e; }
+    return (e - 1.0 / e) * 0.5;
+}
+
+export
+func cosh(x float) float {
+    var e = exp(x);
+    if (isInf(e)) { return e; }
+    return (e + 1.0 / e) * 0.5;
+}
+
+export
+func tanh(x float) float {
+    if (x == 0.0) { return 0.0; }
+    var e = exp(x);
+    if (isInf(e)) { return 1.0; }
+    var em = 1.0 / e;
+    return (e - em) / (e + em);
+}
+
+// ===== Sign manipulation =====
+
+export
+func copysignF(x, y float) float {
+    if (signbit(y) != signbit(x)) {
+        return -abs(x);
+    }
+    return abs(x);
+}

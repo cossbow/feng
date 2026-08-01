@@ -1,0 +1,7 @@
+import std$testing;
+import std$math;
+
+@Test
+func testConstantsOnly() {
+    testing$assertTrue(math$PI > 3.0);
+}

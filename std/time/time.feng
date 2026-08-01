@@ -1,0 +1,158 @@
+// ===== Duration =====
+
+export
+class Duration final {
+    const ns int64;
+
+    export func nanoseconds() int64  { return ns; }
+    export func microseconds() int64 { return ns / 1000; }
+    export func milliseconds() int64 { return ns / 1000000; }
+    export func seconds() float      { return float(ns) / 1e9; }
+
+    export func add(other Duration) Duration {
+        return {ns = ns + other.ns};
+    }
+    export func sub(other Duration) Duration {
+        return {ns = ns - other.ns};
+    }
+    export func compare(other Duration) int {
+        if (ns < other.ns) { return -1; }
+        if (ns > other.ns) { return 1; }
+        return 0;
+    }
+}
+
+export func nanosecond(n int64)  Duration { return {ns = n}; }
+export func microsecond(n int64) Duration { return {ns = n * 1000}; }
+export func millisecond(n int64) Duration { return {ns = n * 1000000}; }
+export func secondF(n float)     Duration { return {ns = int64(n * 1e9)}; }
+export func minuteF(n float)     Duration { return {ns = int64(n * 6e10)}; }
+export func hourF(n float)       Duration { return {ns = int64(n * 3.6e12)}; }
+
+// ===== Unix timestamp decomposition (pure Feng) =====
+
+func isLeapYear(y int) bool {
+    return (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
+}
+
+func daysInMonth(y, m int) int {
+    if (m == 2) {
+        if (isLeapYear(y)) { return 29; }
+        return 28;
+    }
+    if (m == 4 || m == 6 || m == 9 || m == 11) { return 30; }
+    return 31;
+}
+
+// Decompose Unix timestamp into date/time fields.
+// sec: seconds since 1970-01-01 00:00:00 UTC.
+// Returns fields via output parameters packed into a result tuple-style approach.
+// Since Feng doesn't have tuple returns with many fields,
+// we cache the decomposition in the Time instance.
+
+func decomposeUnix(sec int64) (int, int, int, int, int, int, int) {
+    // Convert to days + time-of-day
+    var days = int(sec / 86400);
+    var rem = int(sec % 86400);
+    if (rem < 0) {
+        rem = rem + 86400;
+        days = days - 1;
+    }
+    var hour = rem / 3600;
+    rem = rem % 3600;
+    var minute = rem / 60;
+    var second = rem % 60;
+
+    // Convert days to year/month/day
+    // Days since 1970-01-01
+    var y = 1970;
+    var findingYear = true;
+    for (findingYear) {
+        var yearDays = 365;
+        if (isLeapYear(y)) { yearDays = 366; }
+        if (days < yearDays) {
+            findingYear = false;
+        } else {
+            days = days - yearDays;
+            y = y + 1;
+        }
+    }
+
+    var m = 1;
+    var findingMonth = true;
+    for (findingMonth) {
+        var md = daysInMonth(y, m);
+        if (days < md) {
+            findingMonth = false;
+        } else {
+            days = days - md;
+            m = m + 1;
+        }
+    }
+    var d = days + 1;
+
+    // weekday: 1970-01-01 was Thursday (4)
+    var wd = (int(sec / 86400) + 4) % 7;
+    if (wd < 0) { wd = wd + 7; }
+
+    return (y, m, d, hour, minute, second, wd);
+}
+
+// ===== Time =====
+
+export
+class Time final {
+    const unix int64;
+
+    export func before(other Time) bool { return unix < other.unix; }
+    export func after(other Time)  bool { return unix > other.unix; }
+    export func equals(other Time) bool { return unix == other.unix; }
+
+    export func sub(other Time) Duration {
+        return {ns = (unix - other.unix) * 1000000000};
+    }
+
+    export func add(d Duration) Time {
+        return {unix = unix + d.ns / 1000000000};
+    }
+
+    // Field decomposition (local time).
+    // These call decomposeUnix which is pure Feng.
+    export func year() int {
+        var r = decomposeUnix(unix);
+        return r.0;
+    }
+    export func month() int {
+        var r = decomposeUnix(unix);
+        return r.1;
+    }
+    export func day() int {
+        var r = decomposeUnix(unix);
+        return r.2;
+    }
+    export func hour() int {
+        var r = decomposeUnix(unix);
+        return r.3;
+    }
+    export func minute() int {
+        var r = decomposeUnix(unix);
+        return r.4;
+    }
+    export func second() int {
+        var r = decomposeUnix(unix);
+        return r.5;
+    }
+    export func weekday() int {
+        var r = decomposeUnix(unix);
+        return r.6;
+    }
+}
+
+// ===== Factory =====
+
+// now() calls C time(NULL) to get current Unix timestamp.
+// The C time() function is available from <time.h> (via time.h).
+export
+func now() Time {
+    return {unix = int64(time(0))};
+}

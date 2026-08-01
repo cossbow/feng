@@ -1,0 +1,75 @@
+import std$testing;
+import std$math;
+
+@Test
+func testConstants() {
+    testing$assertTrue(math$PI > 3.14);
+    testing$assertTrue(math$PI < 3.15);
+    testing$assertTrue(math$E > 2.71);
+    testing$assertTrue(math$E < 2.72);
+}
+
+@Test
+func testAbs() {
+    testing$assertTrue(math$abs(5.0) == 5.0);
+    testing$assertTrue(math$abs(-5.0) == 5.0);
+    testing$assertTrue(math$abs(0.0) == 0.0);
+}
+
+@Test
+func testMinMax() {
+    testing$assertTrue(math$min(3.0, 5.0) == 3.0);
+    testing$assertTrue(math$max(3.0, 5.0) == 5.0);
+}
+
+@Test
+func testFloor() {
+    testing$assertTrue(math$floor(3.7) == 3.0);
+    testing$assertTrue(math$floor(-3.7) == -4.0);
+}
+
+@Test
+func testCeil() {
+    testing$assertTrue(math$ceil(3.2) == 4.0);
+    testing$assertTrue(math$ceil(-3.2) == -3.0);
+}
+
+@Test
+func testTrunc() {
+    testing$assertTrue(math$trunc(3.7) == 3.0);
+    testing$assertTrue(math$trunc(-3.7) == -3.0);
+}
+
+@Test
+func testSqrt() {
+    var r = math$sqrt(4.0);
+    testing$assertTrue(math$abs(r - 2.0) < 0.0001);
+    r = math$sqrt(2.0);
+    testing$assertTrue(r > 1.4);
+    testing$assertTrue(r < 1.42);
+}
+
+@Test
+func testPow() {
+    var r = math$pow(2.0, 3.0);
+    testing$assertTrue(math$abs(r - 8.0) < 0.001);
+}
+
+@Test
+func testExpLog() {
+    testing$assertTrue(math$exp(1.0) > 2.71);
+    testing$assertTrue(math$log(math$E) > 0.99);
+}
+
+@Test
+func testSinCos() {
+    testing$assertTrue(math$abs(math$sin(0.0)) < 0.0001);
+    testing$assertTrue(math$abs(math$cos(0.0) - 1.0) < 0.0001);
+}
+
+@Test
+func testIsNaN() {
+    testing$assertFalse(math$isNaN(1.0));
+    var nan = math$sqrt(-1.0);
+    testing$assertTrue(math$isNaN(nan));
+}

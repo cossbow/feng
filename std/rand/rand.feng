@@ -1,0 +1,87 @@
+import std$util;
+
+// ===== Xorshift128+ PRNG =====
+// Pure Feng implementation. No C dependencies.
+
+var state0 uint64 = 123456789;
+var state1 uint64 = 987654321;
+
+// Returns a pseudo-random uint64 and advances the internal state.
+func nextUint64() uint64 {
+    var s1 = state0;
+    var s0 = state1;
+    state0 = s0;
+    s1 = s1 ^ (s1 << 23);
+    s1 = s1 ^ (s1 >> 17);
+    s1 = s1 ^ s0 ^ (s0 >> 26);
+    state1 = s1;
+    return s0 + s1;
+}
+
+// ===== Seeding =====
+
+export
+func seed(s uint) {
+    state0 = uint64(s);
+    state1 = uint64(s) ^ 11376133511092950037;
+    // Warm up
+    nextUint64();
+}
+
+export
+func autoSeed() {
+    // Simple auto-seed: use internal counter
+    state0 = state0 * 6364136223846793005 + 1442695040888963407;
+    state1 = state1 * 6364136223846793005 + 1442695040888963407;
+    nextUint64();
+}
+
+// ===== Integer random =====
+
+export
+func nextInt32() int32 {
+    return int32(nextUint64() & 2147483647);
+}
+
+export
+func intn(n int) int {
+    if (n <= 0) { return 0; }
+    return int(nextUint64() % uint64(n));
+}
+
+export
+func intRange(low, high int) int {
+    var min = low;
+    var max = high;
+    if (min > max) {
+        var t = min;
+        min = max;
+        max = t;
+    }
+    var range = max - min + 1;
+    return min + int(nextUint64() % uint64(range));
+}
+
+// ===== Float random =====
+
+export
+func nextFloat() float {
+    // Generate float in [0, 1) using upper 32 bits
+    var v = (nextUint64() >> 32) & 4294967295;
+    return float(v) / 4294967296.0;
+}
+
+// ===== Shuffling =====
+
+export
+func shuffle`T`(arr [&!]T) {
+    var n = arr.length;
+    for (var i = n - 1; i > 0; i -= 1) {
+        var j = int(nextUint64() % uint64(i + 1));
+        if (i != j) {
+            var tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+        }
+    }
+}

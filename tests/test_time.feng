@@ -1,0 +1,65 @@
+import std$testing;
+import std$time;
+
+@Test
+func testNow() {
+    var t = time$now();
+    testing$assertTrue(t.year() >= 2025);
+    testing$assertTrue(t.month() >= 1);
+    testing$assertTrue(t.month() <= 12);
+    testing$assertTrue(t.day() >= 1);
+    testing$assertTrue(t.day() <= 31);
+    testing$assertTrue(t.hour() >= 0);
+    testing$assertTrue(t.hour() <= 23);
+}
+
+@Test
+func testTimeComparison() {
+    var t1 = time$now();
+    var t2 = time$now();
+    // t1 and t2 might be the same second, so use before/equals
+    testing$assertFalse(t1.after(t2));
+}
+
+@Test
+func testDurationCreate() {
+    var ns = time$nanosecond(100);
+    testing$assertTrue(ns.nanoseconds() == 100);
+    var us = time$microsecond(5);
+    testing$assertTrue(us.nanoseconds() == 5000);
+    var ms = time$millisecond(3);
+    testing$assertTrue(ms.nanoseconds() == 3000000);
+}
+
+@Test
+func testDurationAdd() {
+    var a = time$millisecond(10);
+    var b = time$millisecond(20);
+    var c = a.add(b);
+    testing$assertTrue(c.milliseconds() == 30);
+}
+
+@Test
+func testDurationSub() {
+    var a = time$millisecond(50);
+    var b = time$millisecond(20);
+    var c = a.sub(b);
+    testing$assertTrue(c.milliseconds() == 30);
+}
+
+@Test
+func testDurationCompare() {
+    var a = time$millisecond(10);
+    var b = time$millisecond(20);
+    testing$assertTrue(a.compare(b) < 0);
+    testing$assertTrue(b.compare(a) > 0);
+    testing$assertTrue(a.compare(a) == 0);
+}
+
+@Test
+func testTimeWeekday() {
+    var t = time$now();
+    var wd = t.weekday();
+    testing$assertTrue(wd >= 0);
+    testing$assertTrue(wd <= 6);
+}

@@ -1,0 +1,12 @@
+import std$testing;
+import std$sort;
+
+func lessInt(a, b int) bool {
+    return a < b;
+}
+
+@Test
+func testIsSortedOnly() {
+    var arr [5]int = [1, 2, 3, 4, 5];
+    testing$assertTrue(sort$isSorted(arr, lessInt));
+}

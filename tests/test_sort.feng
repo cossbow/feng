@@ -1,0 +1,44 @@
+import std$testing;
+import std$sort;
+
+@Test
+func testSortInt() {
+    var arr [5]int = [5, 3, 1, 4, 2];
+    sort$sort(arr);
+    testing$assertTrue(arr[0] == 1);
+    testing$assertTrue(arr[4] == 5);
+}
+
+@Test
+func testSortEmpty() {
+    var arr [0]int;
+    sort$sort(arr);
+}
+
+@Test
+func testSortSingle() {
+    var arr [1]int = [42];
+    sort$sort(arr);
+    testing$assertTrue(arr[0] == 42);
+}
+
+@Test
+func testSortReverse() {
+    var arr [5]int = [5, 4, 3, 2, 1];
+    sort$sort(arr);
+    for (var i = 1; i < arr.length; i += 1) {
+        testing$assertTrue(arr[i-1] < arr[i]);
+    }
+}
+
+@Test
+func testIsSortedTrue() {
+    var arr [5]int = [1, 2, 3, 4, 5];
+    testing$assertTrue(sort$isSorted(arr));
+}
+
+@Test
+func testIsSortedFalse() {
+    var arr [5]int = [1, 3, 2, 4, 5];
+    testing$assertFalse(sort$isSorted(arr));
+}

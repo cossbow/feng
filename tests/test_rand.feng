@@ -1,0 +1,78 @@
+import std$testing;
+import std$rand;
+
+@Test
+func testSeedAndInt() {
+    rand$seed(42);
+    var a = rand$nextInt32();
+    rand$seed(42);
+    var b = rand$nextInt32();
+    // Same seed should produce same sequence
+    testing$assertTrue(a == b);
+}
+
+@Test
+func testAutoSeed() {
+    // autoSeed should not crash
+    rand$autoSeed();
+    var v = rand$nextInt32();
+    // Just verify we get something back
+    testing$assertTrue(v >= 0);
+}
+
+@Test
+func testIntn() {
+    rand$seed(12345);
+    for (var i = 0; i < 100; i += 1) {
+        var v = rand$intn(10);
+        testing$assertTrue(v >= 0);
+        testing$assertTrue(v < 10);
+    }
+}
+
+@Test
+func testIntnZero() {
+    testing$assertTrue(rand$intn(0) == 0);
+    testing$assertTrue(rand$intn(-1) == 0);
+}
+
+@Test
+func testIntRange() {
+    rand$seed(54321);
+    for (var i = 0; i < 50; i += 1) {
+        var v = rand$intRange(5, 10);
+        testing$assertTrue(v >= 5);
+        testing$assertTrue(v <= 10);
+    }
+}
+
+@Test
+func testIntRangeSwapped() {
+    rand$seed(11111);
+    var v = rand$intRange(10, 5);
+    testing$assertTrue(v >= 5);
+    testing$assertTrue(v <= 10);
+}
+
+@Test
+func testNextFloat() {
+    rand$seed(9999);
+    for (var i = 0; i < 100; i += 1) {
+        var v = rand$nextFloat();
+        testing$assertTrue(v >= 0.0);
+        testing$assertTrue(v < 1.0);
+    }
+}
+
+@Test
+func testShuffle() {
+    rand$seed(7777);
+    var arr [5]int = [1, 2, 3, 4, 5];
+    rand$shuffle(arr);
+    // Elements should still be 1..5 after shuffle (set-wise)
+    var sum = 0;
+    for (var i = 0; i < arr.length; i += 1) {
+        sum += arr[i];
+    }
+    testing$assertTrue(sum == 15);
+}

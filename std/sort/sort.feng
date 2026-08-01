@@ -1,0 +1,68 @@
+// ===== Insertion sort for small subarrays =====
+
+func insertionSort(arr [&!]int, lo, hi int) {
+    for (var i = lo + 1; i <= hi; i += 1) {
+        var key = arr[i];
+        var j = i - 1;
+        for (j >= lo && key < arr[j]) {
+            arr[j + 1] = arr[j];
+            j -= 1;
+        }
+        arr[j + 1] = key;
+    }
+}
+
+// ===== Quick sort =====
+
+func quickSort(arr [&!]int, lo, hi int) {
+    if (hi - lo < 16) {
+        insertionSort(arr, lo, hi);
+        return;
+    }
+    // Median-of-three pivot
+    var mid = (lo + hi) / 2;
+    if (arr[mid] < arr[lo]) {
+        var tmp = arr[lo]; arr[lo] = arr[mid]; arr[mid] = tmp;
+    }
+    if (arr[hi] < arr[lo]) {
+        var tmp = arr[lo]; arr[lo] = arr[hi]; arr[hi] = tmp;
+    }
+    if (arr[hi] < arr[mid]) {
+        var tmp = arr[mid]; arr[mid] = arr[hi]; arr[hi] = tmp;
+    }
+    var tmp = arr[mid]; arr[mid] = arr[hi - 1]; arr[hi - 1] = tmp;
+    var pivot = arr[hi - 1];
+    var i = lo;
+    var j = hi - 1;
+    var scanning = true;
+    for (scanning) {
+        i += 1;
+        for (arr[i] < pivot) { i += 1; }
+        j -= 1;
+        for (pivot < arr[j]) { j -= 1; }
+        if (i >= j) {
+            scanning = false;
+        } else {
+            var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+        }
+    }
+    var t = arr[i]; arr[i] = arr[hi - 1]; arr[hi - 1] = t;
+    quickSort(arr, lo, i - 1);
+    quickSort(arr, i + 1, hi);
+}
+
+// ===== Public API =====
+
+export
+func sort(arr [&!]int) {
+    if (arr.length <= 1) { return; }
+    quickSort(arr, 0, arr.length - 1);
+}
+
+export
+func isSorted(arr [&!#]int) bool {
+    for (var i = 1; i < arr.length; i += 1) {
+        if (arr[i] < arr[i - 1]) { return false; }
+    }
+    return true;
+}
