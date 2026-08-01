@@ -980,12 +980,14 @@ public class Monomorphization {
         var initial = new LinkedHashSet<>(ast.concreteFuncInsts);
         ast.concreteFuncInsts.clear();
 
+        var processed = new HashSet<FuncInstantiation>();
         var allDiscovered = new LinkedHashSet<FuncInstantiation>();
         var worklist = new ArrayList<>(allFi);
         int i = 0;
         while (i < worklist.size()) {
             var fi = worklist.get(i++);
             if (fi.args().hasTypeVar()) continue;
+            if (!processed.add(fi)) continue;
             withMono(fi.fd().generic(), fi.args(), () -> preScanFunc(fi.fd()));
             allDiscovered.addAll(ast.concreteFuncInsts);
             worklist.addAll(ast.concreteFuncInsts);
