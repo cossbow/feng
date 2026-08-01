@@ -54,17 +54,6 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.graalvm.buildtools</groupId>
-                <artifactId>native-maven-plugin</artifactId>
-                <version>0.10.4</version>
-                <extensions>true</extensions>
-                <configuration>
-                    <buildArgs>
-                        <arg>-H:+AddAllFileSystemProviders</arg>
-                    </buildArgs>
-                </configuration>
-            </plugin>
-            <plugin>
                 <groupId>org.antlr</groupId>
                 <artifactId>antlr4-maven-plugin</artifactId>
                 <version>${antlr.version}</version>
