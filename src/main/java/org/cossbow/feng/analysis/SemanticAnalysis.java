@@ -5150,9 +5150,8 @@ public class SemanticAnalysis {
         var bufExpr = new VariableExpression(pos, bufVar, new Symbol(bufVar.name()));
 
         // 2. Conversion: Feng$xxxToStr(arg, buf)
-        var convName = prim.isFloat() ? "floatToStr" : "intToStr";
-        var convSym = new SymbolExpression(ZERO,
-                new Symbol(new Identifier(convName)),
+        var conv = FunctionDefinition.PrimitiveToStr(prim);
+        var convSym = new SymbolExpression(ZERO, conv.symbol(),
                 TypeArguments.EMPTY);
         // The convert result variable holds the returned length
         var convCall = new CallExpression(pos, convSym, List.of(arg, bufExpr), false);

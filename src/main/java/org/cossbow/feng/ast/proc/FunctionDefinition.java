@@ -114,10 +114,15 @@ public class FunctionDefinition extends Definition {
     public static final FunctionDefinition FLOAT_TO_STR_FUNC = new FunctionDefinition(ZERO,
             Modifier.empty(), new Symbol(new Identifier("floatToStr")),
             TypeParameters.empty(), new Prototype(ZERO, new ParameterSet(ZERO, List.of(
-            FixedParameter.create("n", Primitive.INT),
+            FixedParameter.create("n", Primitive.FLOAT),
             new FixedParameter(ZERO, new Identifier("buf"),
                     StringLiteral.array(ZERO, ReferKind.PHANTOM))
     )), Primitive.INT.declarer()));
+
+    public static FunctionDefinition PrimitiveToStr(Primitive p) {
+        if (p.isInteger()) return INT_TO_STR_FUNC;
+        return FLOAT_TO_STR_FUNC;
+    }
 
     //
     @Override
