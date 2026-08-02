@@ -76,7 +76,7 @@ public class CHeaderParser {
         cmd.add("-Xclang");
         cmd.add("-ast-dump=json");
         cmd.add("-fsyntax-only");
-        cmd.add("-std=c99");
+        cmd.add("-std=c11");
         cmd.add(header.toAbsolutePath().toString());
         return cmd;
     }
