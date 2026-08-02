@@ -119,8 +119,23 @@ public class FunctionDefinition extends Definition {
                     StringLiteral.array(ZERO, ReferKind.PHANTOM))
     )), Primitive.INT.declarer()));
 
+    /**
+     * func uintToStr(n Uint, buf [*!]byte) Int
+     */
+    public static final FunctionDefinition UINT_TO_STR_FUNC = new FunctionDefinition(ZERO,
+            Modifier.empty(), new Symbol(new Identifier("uintToStr")),
+            TypeParameters.empty(), new Prototype(ZERO, new ParameterSet(ZERO, List.of(
+            FixedParameter.create("n", Primitive.UINT),
+            new FixedParameter(ZERO, new Identifier("buf"),
+                    StringLiteral.array(ZERO, ReferKind.PHANTOM))
+    )), Primitive.INT.declarer()));
+
     public static FunctionDefinition PrimitiveToStr(Primitive p) {
-        if (p.isInteger()) return INT_TO_STR_FUNC;
+        if (p.isInteger()) {
+            if (Primitive.Unsigned.contains(p))
+                return UINT_TO_STR_FUNC;
+            return INT_TO_STR_FUNC;
+        }
         return FLOAT_TO_STR_FUNC;
     }
 

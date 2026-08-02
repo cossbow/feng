@@ -97,6 +97,30 @@ Int $intToStr(Int n, Feng$ArrayPRef_Byte buf) {
     return len;
 }
 
+Int $uintToStr(Uint n, Feng$ArrayPRef_Byte buf) {
+    if (buf.$length <= 0) return 0;
+
+    // 0 needs special handling
+    if (n == 0) {
+        buf.$values[0] = (Byte)'0';
+        return 1;
+    }
+
+    // extract digits in reverse order
+    Byte digits[20];
+    int nd = 0;
+    do {
+        digits[nd++] = (Byte)('0' + (n % 10));
+        n /= 10;
+    } while (n > 0);
+
+    Int64 to_copy = nd < buf.$length ? nd : buf.$length;
+    for (Int64 i = 0; i < nd && i < buf.$length; i++) {
+        buf.$values[i] = digits[nd - 1 - i];
+    }
+    return nd;
+}
+
 Int $floatToStr(Float64 n, Feng$ArrayPRef_Byte buf) {
     if (buf.$length <= 0) return 0;
 

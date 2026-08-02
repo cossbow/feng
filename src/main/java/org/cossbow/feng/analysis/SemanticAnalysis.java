@@ -5154,8 +5154,20 @@ public class SemanticAnalysis {
         var conv = FunctionDefinition.PrimitiveToStr(prim);
         var convSym = new SymbolExpression(ZERO, conv.symbol(),
                 TypeArguments.EMPTY);
+
+        // Widen the argument to match the conversion function's parameter type
+        // e.g. int16 → Int, uint32 → Uint, float32 → Float
+        var targetPrim = prim.isInteger()
+                ? (Primitive.Unsigned.contains(prim) ?
+                   Primitive.UINT : Primitive.INT)
+                : Primitive.FLOAT;
+        Expression convArg = arg;
+        if (prim != targetPrim) {
+            convArg = new ConvertExpression(pos, targetPrim, arg);
+        }
+
         // The convert result variable holds the returned length
-        var convCall = new CallExpression(pos, convSym, List.of(arg, bufExpr), false);
+        var convCall = new CallExpression(pos, convSym, List.of(convArg, bufExpr), false);
         convCall.resultType.set(Primitive.INT.declarer());
         var lenVar = makeFmtVar("_len", convCall);
         var lenExpr = new VariableExpression(pos, lenVar, new Symbol(lenVar.name()));

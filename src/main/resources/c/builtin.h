@@ -65,6 +65,7 @@ extern const Feng$Meta_$Reader Feng$meta_$Reader;
 // ===== built-in function prototypes =====
 
 Int $intToStr(Int n, Feng$ArrayPRef_Byte buf);
+Int $uintToStr(Uint n, Feng$ArrayPRef_Byte buf);
 Int $floatToStr(Float64 n, Feng$ArrayPRef_Byte buf);
 
 #endif

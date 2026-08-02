@@ -6,6 +6,7 @@ import org.cossbow.feng.util.Optional;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -117,6 +118,9 @@ public enum Primitive {
         CodeMap = Arrays.stream(values()).collect(Collectors
                 .toUnmodifiableMap(v -> v.code, Function.identity()));
     }
+
+    public static final Set<Primitive> Unsigned = Set.of(
+            UINT, UINT8, UINT16, UINT32, UINT64);
 
     //
 
