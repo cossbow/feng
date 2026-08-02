@@ -2379,6 +2379,9 @@ public class CGenerator implements Generator {
 
     private CGenerator write(IntegerLiteral e) {
         write(e.value().toString(e.radix()));
+        if (e.value().bitLength() >= 64) {
+            write("ULL");
+        }
         return this;
     }
 

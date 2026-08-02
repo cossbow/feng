@@ -11,9 +11,9 @@ func nextUint64() uint64 {
     var s1 = state0;
     var s0 = state1;
     state0 = s0;
-    s1 = s1 ^ (s1 << 23);
-    s1 = s1 ^ (s1 >> 17);
-    s1 = s1 ^ s0 ^ (s0 >> 26);
+    s1 = s1 ~ (s1 << 23);
+    s1 = s1 ~ (s1 >> 17);
+    s1 = s1 ~ s0 ~ (s0 >> 26);
     state1 = s1;
     return s0 + s1;
 }
@@ -23,7 +23,7 @@ func nextUint64() uint64 {
 export
 func seed(s uint) {
     state0 = uint64(s);
-    state1 = uint64(s) ^ 11376133511092950037;
+    state1 = uint64(s) ~ uint64(11376133511092950037);
     // Warm up
     nextUint64();
 }

@@ -195,6 +195,7 @@ public class SemanticAnalysis {
                     q.add(e.left());
                     q.add(e.right());
                 }
+                case ConvertExpression e -> q.add(e.operand());
                 case UnaryExpression e -> q.add(e.operand());
                 case ArrayExpression e -> q.addAll(e.elements());
                 case TupleExpression e -> q.addAll(e.elements());

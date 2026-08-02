@@ -1,10 +1,10 @@
 // ===== Insertion sort for small subarrays =====
 
-func insertionSort(arr [&!]int, lo, hi int) {
+func insertionSort`T`(arr [&!]T, lo, hi int, cmp func(T,T)int) {
     for (var i = lo + 1; i <= hi; i += 1) {
         var key = arr[i];
         var j = i - 1;
-        for (j >= lo && key < arr[j]) {
+        for (j >= lo && cmp(key, arr[j]) < 0) {
             arr[j + 1] = arr[j];
             j -= 1;
         }
@@ -14,20 +14,20 @@ func insertionSort(arr [&!]int, lo, hi int) {
 
 // ===== Quick sort =====
 
-func quickSort(arr [&!]int, lo, hi int) {
+func quickSort`T`(arr [&!]T, lo, hi int, cmp func(T,T)int) {
     if (hi - lo < 16) {
-        insertionSort(arr, lo, hi);
+        insertionSort`T`(arr, lo, hi, cmp);
         return;
     }
     // Median-of-three pivot
     var mid = (lo + hi) / 2;
-    if (arr[mid] < arr[lo]) {
+    if (cmp(arr[mid], arr[lo]) < 0) {
         var tmp = arr[lo]; arr[lo] = arr[mid]; arr[mid] = tmp;
     }
-    if (arr[hi] < arr[lo]) {
+    if (cmp(arr[hi], arr[lo]) < 0) {
         var tmp = arr[lo]; arr[lo] = arr[hi]; arr[hi] = tmp;
     }
-    if (arr[hi] < arr[mid]) {
+    if (cmp(arr[hi], arr[mid]) < 0) {
         var tmp = arr[mid]; arr[mid] = arr[hi]; arr[hi] = tmp;
     }
     var tmp = arr[mid]; arr[mid] = arr[hi - 1]; arr[hi - 1] = tmp;
@@ -37,9 +37,9 @@ func quickSort(arr [&!]int, lo, hi int) {
     var scanning = true;
     for (scanning) {
         i += 1;
-        for (arr[i] < pivot) { i += 1; }
+        for (cmp(arr[i], pivot) < 0) { i += 1; }
         j -= 1;
-        for (pivot < arr[j]) { j -= 1; }
+        for (cmp(pivot, arr[j]) < 0) { j -= 1; }
         if (i >= j) {
             scanning = false;
         } else {
@@ -47,22 +47,22 @@ func quickSort(arr [&!]int, lo, hi int) {
         }
     }
     var t = arr[i]; arr[i] = arr[hi - 1]; arr[hi - 1] = t;
-    quickSort(arr, lo, i - 1);
-    quickSort(arr, i + 1, hi);
+    quickSort`T`(arr, lo, i - 1, cmp);
+    quickSort`T`(arr, i + 1, hi, cmp);
 }
 
 // ===== Public API =====
 
 export
-func sort(arr [&!]int) {
+func sort`T`(arr [&!]T, cmp func(T,T)int) {
     if (arr.length <= 1) { return; }
-    quickSort(arr, 0, arr.length - 1);
+    quickSort`T`(arr, 0, arr.length - 1, cmp);
 }
 
 export
-func isSorted(arr [&!#]int) bool {
+func isSorted`T`(arr [&!#]T, cmp func(T,T)int) bool {
     for (var i = 1; i < arr.length; i += 1) {
-        if (arr[i] < arr[i - 1]) { return false; }
+        if (cmp(arr[i], arr[i - 1]) < 0) { return false; }
     }
     return true;
 }
