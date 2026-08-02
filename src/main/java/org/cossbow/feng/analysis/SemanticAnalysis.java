@@ -5148,7 +5148,7 @@ public class SemanticAnalysis {
         var bufVar = new Variable(pos, Modifier.empty(), Declare.VAR,
                 new Identifier(pos, "_fb", true),
                 Lazy.of(bufType), Lazy.nil());
-        var bufExpr = new VariableExpression(pos, bufVar, new Symbol(bufVar.name()));
+        var bufExpr = new VariableExpression(pos, bufVar);
 
         // 2. Conversion: Feng$xxxToStr(arg, buf)
         var conv = FunctionDefinition.PrimitiveToStr(prim);
@@ -5183,7 +5183,7 @@ public class SemanticAnalysis {
         return new BlockStatement(pos, List.of(
                 new DeclarationStatement(pos, List.of(bufVar)),
                 new DeclarationStatement(pos, List.of(lenVar)),
-                new CallStatement(pos, writeCe)), false);
+                new CallStatement(pos, writeCe)), true);
     }
 
     private Statement format(
