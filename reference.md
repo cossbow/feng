@@ -1724,6 +1724,13 @@ func test() {
 Parameters consist of a parameter name and type, are constants (implicit `const`), and their scope is within the
 function.
 
+```feng
+func test(a int, b[12]byte) {
+   // a = 1;      // ✖：a is immutable
+   // b[0] = 1;   // ✖：The element of b is immutable
+}
+```
+
 Example defining parameters `l` of type `Queue` and `a` of type `int`:
 
 ```feng
