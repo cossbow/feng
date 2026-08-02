@@ -44,13 +44,26 @@ func daysInMonth(y, m int) int {
     return 31;
 }
 
+export
+struct Datetime {
+    year(32) uint64;
+    month(4) uint64;
+    day(6) uint64;
+    hour(6) uint64;
+    minute(6) uint64;
+    second(6) uint64;
+    weekday(4) uint64;
+}
+
+export
+class Date final {
+    const dt Datetime;
+}
+
 // Decompose Unix timestamp into date/time fields.
 // sec: seconds since 1970-01-01 00:00:00 UTC.
-// Returns fields via output parameters packed into a result tuple-style approach.
-// Since Feng doesn't have tuple returns with many fields,
-// we cache the decomposition in the Time instance.
 
-func decomposeUnix(sec int64) (int, int, int, int, int, int, int) {
+func decomposeUnix(sec int64) Date {
     // Convert to days + time-of-day
     var days = int(sec / 86400);
     var rem = int(sec % 86400);
@@ -95,64 +108,76 @@ func decomposeUnix(sec int64) (int, int, int, int, int, int, int) {
     var wd = (int(sec / 86400) + 4) % 7;
     if (wd < 0) { wd = wd + 7; }
 
-    return (y, m, d, hour, minute, second, wd);
+    return Date{dt = Datetime{
+        year    = uint64(y),
+        month   = uint64(m),
+        day     = uint64(d),
+        hour    = uint64(hour),
+        minute  = uint64(minute),
+        second  = uint64(second),
+        weekday = uint64(wd),
+    }};
 }
 
 // ===== Time =====
 
 export
 class Time final {
-    const unix int64;
+    export
+    const sec  int64;
+    export
+    const nsec int64; // nanosecond within the second [0, 999999999]
 
-    export func before(other Time) bool { return unix < other.unix; }
-    export func after(other Time)  bool { return unix > other.unix; }
-    export func equals(other Time) bool { return unix == other.unix; }
+    export func before(other Time) bool {
+        return sec < other.sec
+            || (sec == other.sec && nsec < other.nsec);
+    }
+    export func after(other Time) bool {
+        return sec > other.sec
+            || (sec == other.sec && nsec > other.nsec);
+    }
+    export func equals(other Time) bool {
+        return sec == other.sec && nsec == other.nsec;
+    }
 
     export func sub(other Time) Duration {
-        return {ns = (unix - other.unix) * 1000000000};
+        return {ns = (sec - other.sec) * 1000000000
+                   + int64(nsec - other.nsec)};
     }
 
     export func add(d Duration) Time {
-        return {unix = unix + d.ns / 1000000000};
+        var extra_sec = d.ns / 1000000000;
+        var ns_rem = int32(d.ns % 1000000000);
+        var new_nsec = nsec + ns_rem;
+        if (new_nsec >= 1000000000) {
+            extra_sec = extra_sec + 1;
+            new_nsec = new_nsec - 1000000000;
+        } else if (new_nsec < 0) {
+            extra_sec = extra_sec - 1;
+            new_nsec = new_nsec + 1000000000;
+        }
+        return {sec = sec + extra_sec, nsec = new_nsec};
     }
 
-    // Field decomposition (local time).
-    // These call decomposeUnix which is pure Feng.
-    export func year() int {
-        var r = decomposeUnix(unix);
-        return r.0;
+    // Date decomposition (local time).
+    export func date() Date {
+        return decomposeUnix(sec);
     }
-    export func month() int {
-        var r = decomposeUnix(unix);
-        return r.1;
-    }
-    export func day() int {
-        var r = decomposeUnix(unix);
-        return r.2;
-    }
-    export func hour() int {
-        var r = decomposeUnix(unix);
-        return r.3;
-    }
-    export func minute() int {
-        var r = decomposeUnix(unix);
-        return r.4;
-    }
-    export func second() int {
-        var r = decomposeUnix(unix);
-        return r.5;
-    }
-    export func weekday() int {
-        var r = decomposeUnix(unix);
-        return r.6;
-    }
+    export func year() int    { return int(date().dt.year); }
+    export func month() int   { return int(date().dt.month); }
+    export func day() int     { return int(date().dt.day); }
+    export func hour() int    { return int(date().dt.hour); }
+    export func minute() int  { return int(date().dt.minute); }
+    export func second() int  { return int(date().dt.second); }
+    export func weekday() int { return int(date().dt.weekday); }
 }
 
 // ===== Factory =====
 
-// now() calls C time(NULL) to get current Unix timestamp.
-// The C time() function is available from <time.h> (via time.h).
 export
 func now() Time {
-    return {unix = int64(time(0))};
+    var t Time;
+    const r &!Time = t;
+    timespec_get(uint64(r), 1);
+    return t;
 }
