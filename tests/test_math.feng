@@ -73,3 +73,10 @@ func testIsNaN() {
     var nan = math$sqrt(-1.0);
     testing$assertTrue(math$isNaN(nan));
 }
+
+@Test
+func testAbsMin() {
+    // Test basic pure-Feng functions first
+    testing$assertTrue(math$abs(5.0) == 5.0);
+    testing$assertTrue(math$min(2.0, 3.0) == 2.0);
+}

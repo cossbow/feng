@@ -3,7 +3,7 @@ import std$string;
 import std$error;
 
 @Test
-func testBasic() {
+func testString() {
     var s = string$fromUtf8("Hello");
     testing$assertTrue(s.byteLength() == 5);
     testing$assertTrue(s.runeCount() == 5);
@@ -166,4 +166,106 @@ func testSubstringException() {
     } catch(e *!#error$IllegalArgumentException) {
         // expected
     }
+}
+
+
+@Test
+func testBuilder() {
+    var sb = string$newBuilder();
+    sb.append(string$fromUtf8("Hello"));
+    sb.append(string$fromUtf8(" "));
+    sb.append(string$fromUtf8("World"));
+    var s = sb.build();
+    testing$assertTrue(s.byteLength() == 11);
+}
+
+@Test
+func testAppendInt() {
+    var sb = string$newBuilder();
+    sb.appendInt(42);
+    sb.append(string$fromUtf8(" "));
+    sb.appendInt(-100);
+    var s = sb.build();
+    testing$assertTrue(s.byteLength() > 0);
+}
+
+@Test
+func testAppendBool() {
+    var sb = string$newBuilder();
+    sb.appendBool(true);
+    sb.append(string$fromUtf8(" "));
+    sb.appendBool(false);
+    var s = sb.build();
+    testing$assertTrue(s.byteLength() > 0);
+}
+
+@Test
+func testAppendInt64() {
+    var sb = string$newBuilder();
+    sb.appendInt64(int64(1234567890123));
+    var s = sb.build();
+}
+
+@Test
+func testAppendUint() {
+    var sb = string$newBuilder();
+    sb.appendUint(uint(42));
+    var s = sb.build();
+}
+
+@Test
+func testAppendBytes() {
+    var sb = string$newBuilder();
+    sb.appendBytes("raw bytes");
+    var s = sb.build();
+    testing$assertTrue(s.byteLength() > 0);
+}
+
+@Test
+func testAppendByte() {
+    var sb = string$newBuilder();
+    sb.appendByte(65);  // 'A'
+    sb.appendByte(66);  // 'B'
+    var s = sb.build();
+    testing$assertTrue(s.byteLength() > 0);
+}
+
+@Test
+func testAppendRune() {
+    var sb = string$newBuilder();
+    sb.appendRune(int32(20320));  // 你
+    var s = sb.build();
+}
+
+@Test
+func testAppendFloat() {
+    var sb = string$newBuilder();
+    sb.appendFloat(3.14);
+    var s = sb.build();
+}
+
+@Test
+func testClear() {
+    var sb = string$newBuilder();
+    sb.append(string$fromUtf8("hello"));
+    sb.clear();
+    testing$assertTrue(sb.isEmpty());
+    var s = sb.build();
+}
+
+@Test
+func testLength() {
+    var sb = string$newBuilder();
+    sb.append(string$fromUtf8("hi"));
+    testing$assertTrue(sb.length() == 2);
+
+    var sb2 = string$newBuilder();
+    testing$assertTrue(sb2.isEmpty());
+}
+
+@Test
+func testCapacity() {
+    var sb = string$newBuilderCapacity(100);
+    sb.append(string$fromUtf8("test"));
+    var s = sb.build();
 }

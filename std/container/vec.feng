@@ -1,0 +1,206 @@
+import std$error;
+
+// ===== Vector`T` — dynamic array with auto-growth =====
+//
+// Primary API is via standalone functions (for cross-module generic instantiation).
+// Class methods are internal helpers usable within the same module.
+
+export
+class Vector`T` {
+    var buf [*]T;    // internal buffer
+    var len int;      // current element count
+}
+
+// ===== factory functions =====
+
+export func newVector`T`() *Vector`T` {
+    return new(Vector`T`);
+}
+
+export func newVectorCap`T`(cap int) *Vector`T` {
+    var v = new(Vector`T`);
+    if (cap > 0) {
+        v.buf = new([cap]T);
+    }
+    return v;
+}
+
+export func vectorFromArray`T`(src [&!#]T) *Vector`T` {
+    var v = newVector`T`();
+    vectorAppendAll`T`(v, src);
+    return v;
+}
+
+// ===== helpers =====
+
+func ensureCapacity`T`(v *Vector`T`, need int) {
+    if (v.buf == nil) {
+        var cap = 8;
+        if (need > cap) {
+            cap = need;
+        }
+        v.buf = new([cap]T);
+        return;
+    }
+    if (v.len + need <= v.buf.length) {
+        return;
+    }
+    var newCap = v.buf.length * 2;
+    if (newCap < v.len + need) {
+        newCap = v.len + need;
+    }
+    var nb = new([newCap]T);
+    for (var i = 0; i < v.len; i += 1) {
+        nb[i] = v.buf[i];
+    }
+    v.buf = nb;
+}
+
+func checkIndex`T`(v *Vector`T`, index int) {
+    if (index < 0 || index >= v.len) {
+        throw new(OutOfBoundsException);
+    }
+}
+
+func checkInsertIndex`T`(v *Vector`T`, index int) {
+    if (index < 0 || index > v.len) {
+        throw new(OutOfBoundsException);
+    }
+}
+
+// ===== capacity =====
+
+export func vectorLength`T`(v *Vector`T`) int {
+    return v.len;
+}
+
+export func vectorCapacity`T`(v *Vector`T`) int {
+    if (v.buf == nil) {
+        return 0;
+    }
+    return v.buf.length;
+}
+
+export func vectorIsEmpty`T`(v *Vector`T`) bool {
+    return v.len == 0;
+}
+
+// ===== add =====
+
+export func vectorAppend`T`(v *Vector`T`, e T) {
+    ensureCapacity`T`(v, 1);
+    v.buf[v.len] = e;
+    v.len += 1;
+}
+
+export func vectorAppendAll`T`(v *Vector`T`, src [&!#]T) {
+    var srcLen = src.length;
+    ensureCapacity`T`(v, srcLen);
+    for (var i = 0; i < srcLen; i += 1) {
+        v.buf[v.len + i] = src[i];
+    }
+    v.len += srcLen;
+}
+
+export func vectorInsert`T`(v *Vector`T`, index int, e T) {
+    checkInsertIndex`T`(v, index);
+    ensureCapacity`T`(v, 1);
+    for (var i = v.len; i > index; i -= 1) {
+        v.buf[i] = v.buf[i - 1];
+    }
+    v.buf[index] = e;
+    v.len += 1;
+}
+
+// ===== access =====
+
+export func vectorGet`T`(v *Vector`T`, index int) T {
+    checkIndex`T`(v, index);
+    return v.buf[index];
+}
+
+export func vectorSet`T`(v *Vector`T`, index int, value T) {
+    checkIndex`T`(v, index);
+    v.buf[index] = value;
+}
+
+export func vectorRemoveLast`T`(v *Vector`T`) T {
+    if (v.len == 0) {
+        throw new(error$IllegalStateException);
+    }
+    v.len -= 1;
+    return v.buf[v.len];
+}
+
+export func vectorRemoveAt`T`(v *Vector`T`, index int) T {
+    checkIndex`T`(v, index);
+    var old = v.buf[index];
+    for (var i = index; i < v.len - 1; i += 1) {
+        v.buf[i] = v.buf[i + 1];
+    }
+    v.len -= 1;
+    return old;
+}
+
+// ===== search =====
+
+export func vectorIndexOf`T`(v *Vector`T`, value T) int {
+    for (var i = 0; i < v.len; i += 1) {
+        if (v.buf[i] == value) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+export func vectorLastIndexOf`T`(v *Vector`T`, value T) int {
+    var i = v.len - 1;
+    for (i >= 0) {
+        if (v.buf[i] == value) {
+            return i;
+        }
+        i -= 1;
+    }
+    return -1;
+}
+
+export func vectorContains`T`(v *Vector`T`, value T) bool {
+    return vectorIndexOf`T`(v, value) != -1;
+}
+
+// ===== mutation =====
+
+export func vectorClear`T`(v *Vector`T`) {
+    v.len = 0;
+}
+
+export func vectorTruncate`T`(v *Vector`T`, newLen int) {
+    if (newLen < v.len) {
+        v.len = newLen;
+    }
+}
+
+export func vectorReverse`T`(v *Vector`T`) {
+    var i = 0;
+    var j = v.len - 1;
+    for (i < j) {
+        var tmp = v.buf[i];
+        v.buf[i] = v.buf[j];
+        v.buf[j] = tmp;
+        i += 1;
+        j -= 1;
+    }
+}
+
+// ===== bulk =====
+
+export func vectorCopyTo`T`(v *Vector`T`, dst [&!]T) int {
+    var n = v.len;
+    if (dst.length < n) {
+        n = dst.length;
+    }
+    for (var i = 0; i < n; i += 1) {
+        dst[i] = v.buf[i];
+    }
+    return n;
+}

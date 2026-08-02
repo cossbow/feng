@@ -1,0 +1,228 @@
+// ===== BitSet — compact bit-level boolean set =====
+//
+// Stores bits in an int array (32 bits per int).
+// Auto-grows on set/toggle past the current capacity.
+
+export
+class BitSet {
+    var bits [*]int;   // word array, each int holds 32 bits
+    var length int;     // total bit capacity
+
+    // ===== set =====
+
+    export func set(index int) {
+        // Ensure capacity inline
+        var needLen = index + 1;
+        if (needLen > length) {
+            var newLen = length * 2;
+            if (newLen < needLen) { newLen = needLen; }
+            newLen = ((newLen + 31) / 32) * 32;
+            var wordCount = newLen / 32;
+            var newBits = new([wordCount]int);
+            if (bits != nil) {
+                for (var i = 0; i < bits.length; i += 1) {
+                    newBits[i] = bits[i];
+                }
+            }
+            bits = newBits;
+            length = newLen;
+        }
+        var wordIdx = index / 32;
+        var bitMask = 1 << (index % 32);
+        bits[wordIdx] = bits[wordIdx] | bitMask;
+    }
+
+    // ===== clear individual bit =====
+
+    export func clear(index int) {
+        if (index >= length) {
+            return;
+        }
+        var wordIdx = index / 32;
+        var bitMask = 1 << (index % 32);
+        bits[wordIdx] = bits[wordIdx] & (!bitMask);
+    }
+
+    // ===== toggle =====
+
+    export func toggle(index int) {
+        // Ensure capacity inline
+        var needLen = index + 1;
+        if (needLen > length) {
+            var newLen = length * 2;
+            if (newLen < needLen) { newLen = needLen; }
+            newLen = ((newLen + 31) / 32) * 32;
+            var wordCount = newLen / 32;
+            var newBits = new([wordCount]int);
+            if (bits != nil) {
+                for (var i = 0; i < bits.length; i += 1) {
+                    newBits[i] = bits[i];
+                }
+            }
+            bits = newBits;
+            length = newLen;
+        }
+        var wordIdx = index / 32;
+        var bitMask = 1 << (index % 32);
+        bits[wordIdx] = bits[wordIdx] ~ bitMask;
+    }
+
+    // ===== query =====
+
+    export func get(index int) bool {
+        if (index >= length) {
+            return false;
+        }
+        var wordIdx = index / 32;
+        var bitMask = 1 << (index % 32);
+        return (bits[wordIdx] & bitMask) != 0;
+    }
+
+    // Count of set bits (popcount).
+    export func count() int {
+        if (bits == nil) {
+            return 0;
+        }
+        var total = 0;
+        var wordCount = bits.length;
+        for (var i = 0; i < wordCount; i += 1) {
+            var v = bits[i];
+            for (var j = 0; j < 32; j += 1) {
+                total += v & 1;
+                v = v >> 1;
+            }
+        }
+        return total;
+    }
+
+    // Total bit capacity.
+    export func cap() int {
+        return length;
+    }
+
+    // True if no bits are set.
+    export func isEmpty() bool {
+        return count() == 0;
+    }
+
+    // ===== modify all =====
+
+    // Reset all bits to 0.
+    export func clearAll() {
+        if (bits != nil) {
+            var wordCount = bits.length;
+            for (var i = 0; i < wordCount; i += 1) {
+                bits[i] = 0;
+            }
+        }
+    }
+
+    // ===== set operations =====
+
+    // this = this & other
+    export func and(other *BitSet) {
+        if (other == nil) {
+            return;
+        }
+        if (bits == nil) {
+            return;
+        }
+        var minWords = bits.length;
+        if (other.bits.length < minWords) {
+            minWords = other.bits.length;
+        }
+        for (var i = 0; i < minWords; i += 1) {
+            bits[i] = bits[i] & other.bits[i];
+        }
+        for (var i = minWords; i < bits.length; i += 1) {
+            bits[i] = 0;
+        }
+    }
+
+    // this = this | other
+    export func or(other *BitSet) {
+        if (other == nil) {
+            return;
+        }
+        if (other.bits == nil) {
+            return;
+        }
+        // Expand if needed
+        var otherBits = other.length;
+        if (otherBits > length) {
+            var newLen = otherBits;
+            var wordCount = newLen / 32;
+            var newBits = new([wordCount]int);
+            if (bits != nil) {
+                for (var i = 0; i < bits.length; i += 1) {
+                    newBits[i] = bits[i];
+                }
+            }
+            bits = newBits;
+            length = newLen;
+        }
+        var otherWords = other.bits.length;
+        for (var i = 0; i < otherWords; i += 1) {
+            bits[i] = bits[i] | other.bits[i];
+        }
+    }
+
+    // this = this ~ other  (XOR)
+    export func xor(other *BitSet) {
+        if (other == nil) {
+            return;
+        }
+        if (other.bits == nil) {
+            return;
+        }
+        var otherBits = other.length;
+        if (otherBits > length) {
+            var newLen = otherBits;
+            var wordCount = newLen / 32;
+            var newBits = new([wordCount]int);
+            if (bits != nil) {
+                for (var i = 0; i < bits.length; i += 1) {
+                    newBits[i] = bits[i];
+                }
+            }
+            bits = newBits;
+            length = newLen;
+        }
+        var otherWords = other.bits.length;
+        for (var i = 0; i < otherWords; i += 1) {
+            bits[i] = bits[i] ~ other.bits[i];
+        }
+    }
+
+    // this = this & !other
+    export func andNot(other *BitSet) {
+        if (other == nil) {
+            return;
+        }
+        if (bits == nil) {
+            return;
+        }
+        var minWords = bits.length;
+        if (other.bits.length < minWords) {
+            minWords = other.bits.length;
+        }
+        for (var i = 0; i < minWords; i += 1) {
+            bits[i] = bits[i] & (!other.bits[i]);
+        }
+    }
+}
+
+// ===== factory functions =====
+
+export func newBitSet() *BitSet {
+    return new(BitSet);
+}
+
+export func newBitSetCap(nbits int) *BitSet {
+    var bs = new(BitSet);
+    if (nbits > 0) {
+        bs.set(nbits - 1);
+        bs.clear(nbits - 1);
+    }
+    return bs;
+}

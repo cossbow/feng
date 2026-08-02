@@ -1,0 +1,50 @@
+import std$error;
+
+// ===== Stack`T` — LIFO stack backed by Vector`T` =====
+
+export
+class Stack`T` {
+    var list *Vector`T`;
+}
+
+// ===== factory =====
+
+export func newStack`T`() *Stack`T` {
+    var s = new(Stack`T`);
+    s.list = newVector`T`();
+    return s;
+}
+
+// ===== core =====
+
+export func stackPush`T`(s *Stack`T`, e T) {
+    vectorAppend`T`(s.list, e);
+}
+
+export func stackPop`T`(s *Stack`T`) T {
+    if (vectorIsEmpty`T`(s.list)) {
+        throw new(error$IllegalStateException);
+    }
+    return vectorRemoveLast`T`(s.list);
+}
+
+export func stackPeek`T`(s *Stack`T`) T {
+    if (vectorIsEmpty`T`(s.list)) {
+        throw new(error$IllegalStateException);
+    }
+    return vectorGet`T`(s.list, vectorLength`T`(s.list) - 1);
+}
+
+// ===== properties =====
+
+export func stackSize`T`(s *Stack`T`) int {
+    return vectorLength`T`(s.list);
+}
+
+export func stackIsEmpty`T`(s *Stack`T`) bool {
+    return vectorIsEmpty`T`(s.list);
+}
+
+export func stackClear`T`(s *Stack`T`) {
+    vectorClear`T`(s.list);
+}
