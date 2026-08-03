@@ -1452,14 +1452,22 @@ public class CGenerator implements Generator {
      * Converts value to target type, handling ref wrapping and casts.
      */
     private CGenerator writeValue(Expression v, TypeDeclarer t) {
+        return writeValue(v, t, false);
+    }
+
+    private CGenerator writeValue(Expression v, TypeDeclarer t, boolean noRefInc) {
         if (v instanceof LiteralExpression le) return writeLiteral(le, t);
         var r = t.maybeRefer();
         if (r.none()) return write(v);
         if (r.get().isKind(PHANTOM)) return referPhantom(v, t);
-        return castRef(v, t);
+        return castRef(v, t, noRefInc);
     }
 
     private CGenerator castRef(Expression v, TypeDeclarer t) {
+        return castRef(v, t, false);
+    }
+
+    private CGenerator castRef(Expression v, TypeDeclarer t, boolean noRefInc) {
         var rt = v.resultType.must();
         if (t.baseTypeSame(rt)) {
             // SRef array → PRef array: wrap .$values & .$length fields
@@ -1474,7 +1482,8 @@ public class CGenerator implements Generator {
             // (unbound = temporary/new expression that transfers ownership)
             var needInc = t.maybeRefer().match(r -> r.isKind(STRONG))
                     && !v.unbound()
-                    && !(v instanceof IsExpression);
+                    && !(v instanceof IsExpression)
+                    && !noRefInc;
             // SRef array struct: inc the $values pointer, copy {$values, $length}
             if (needInc && t instanceof ArrayTypeDeclarer tat) {
                 var ek = typeKey(tat.element());
@@ -1495,7 +1504,8 @@ public class CGenerator implements Generator {
                 && isSubclass(rcd, tcd)) {
             // flat layout: simple pointer cast; Feng$inc unless source is unbound or target phantom
             var needInc = t.maybeRefer().match(r -> r.isKind(STRONG))
-                    && !v.unbound() && !(v instanceof IsExpression);
+                    && !v.unbound() && !(v instanceof IsExpression)
+                    && !noRefInc;
             if (needInc) write("Feng$inc(");
             write("((");
             // use mangled name for concrete generic types (Box_IntPtr, not Box)
@@ -1507,6 +1517,21 @@ public class CGenerator implements Generator {
             if (needInc) write(")");
             return this;
         }
+        // class → interface upcast: *!Class → *!Iface (interface ref is void*)
+        if (rt instanceof DerivedTypeDeclarer rdt && t instanceof DerivedTypeDeclarer tdt
+                && rdt.def() instanceof ClassDefinition rcd
+                && tdt.def() instanceof InterfaceDefinition tid
+                && allIfaces(rcd).contains(tid)) {
+            var needInc = t.maybeRefer().match(r -> r.isKind(STRONG))
+                    && !v.unbound() && !(v instanceof IsExpression)
+                    && !noRefInc;
+            if (needInc) write("Feng$inc(");
+            write("(void*)(");
+            write(v);
+            write(")");
+            if (needInc) write(")");
+            return this;
+        }
         if (t instanceof ArrayTypeDeclarer at) {
             if (rt.isNil()) {
                 // nil → array ref struct: empty {NULL, 0} literal
@@ -1515,7 +1540,8 @@ public class CGenerator implements Generator {
             // reinterpret source as array of at.element():
             //   {(E*)<data>, <byteSize>/sizeof(E)}   (cf. C++ Feng$mapU2A/A2A)
             var needInc = at.refer().match(r -> r.isKind(STRONG))
-                    && !v.unbound() && !(v instanceof IsExpression);
+                    && !v.unbound() && !(v instanceof IsExpression)
+                    && !noRefInc;
             write('(').write(t).write("){(").write(at.element()).write(" *)");
             if (needInc) write("Feng$inc(");
             else write("(void*)");
@@ -1542,7 +1568,8 @@ public class CGenerator implements Generator {
         if (rt instanceof ArrayTypeDeclarer) {
             // array → single ref: (U*)data   (cf. C++ Feng$mapA2U)
             var needInc = t.maybeRefer().match(r -> r.isKind(STRONG))
-                    && !v.unbound() && !(v instanceof IsExpression);
+                    && !v.unbound() && !(v instanceof IsExpression)
+                    && !noRefInc;
             write("((").baseTypeSymbol(t).write(" *)");
             if (needInc) write("Feng$inc(");
             else write("(void*)");
@@ -1553,7 +1580,8 @@ public class CGenerator implements Generator {
         // unrelated data-type reinterpret: (T*)(void*)ptr  (primitive/struct only)
         if (!rt.isNil() && t.maybeRefer().has() && isDataType(t)) {
             var needInc = t.maybeRefer().match(r -> r.isKind(STRONG))
-                    && !v.unbound() && !(v instanceof IsExpression);
+                    && !v.unbound() && !(v instanceof IsExpression)
+                    && !noRefInc;
             write("((").baseTypeSymbol(t).write(" *)");
             if (needInc) write("Feng$inc(");
             else write("(void*)");
@@ -2864,6 +2892,24 @@ public class CGenerator implements Generator {
         return write(s.label()).write(':').write(s.target());
     }
 
+    /**
+     * Check whether a return expression is a direct reference to a
+     * parameter variable. Parameters have no cleanup attribute, so
+     * returning one must skip Feng$inc — the caller already inc'd
+     * when passing the argument.
+     */
+    private static boolean isParameterOf(Expression re, Prototype prot) {
+        if (!(re instanceof VariableExpression ve)) return false;
+        var v = ve.variable();
+        for (var p : prot.parameterSet()) {
+            if (p instanceof FixedParameter fp
+                    && fp.var().has() && fp.var().must().equals(v)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private CGenerator write(ReturnStatement rs) {
         // Inside try-with-finally: defer return until after finally executes
         if (insideTryFinally) {
@@ -2883,7 +2929,9 @@ public class CGenerator implements Generator {
         var re = rs.result().get();
         var prot = rs.procedure().must().prototype();
         var rt = prot.returnSet().must();
-        return write("return ").writeValue(re, rt).endStmt();
+        // Parameters have no cleanup — skip Feng$inc, caller already inc'd
+        var noRefInc = isParameterOf(re, prot);
+        return write("return ").writeValue(re, rt, noRefInc).endStmt();
     }
 
     private CGenerator write(ThrowStatement ts) {

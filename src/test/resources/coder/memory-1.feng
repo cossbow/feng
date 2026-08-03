@@ -1,0 +1,63 @@
+
+interface I {
+    get() int;
+}
+
+interface J {
+    value() int;
+}
+
+class A (I,J) {
+    var i int;
+    func get() int {
+        return 32;
+    }
+    func value() int {
+        return 64;
+    }
+}
+
+// case-1: bound local var → strong I (needInc=true)
+func make(v int) *!I {
+    var a = new(A);
+    a.i = v;
+    return a;
+}
+
+// case-2: unbound new(A) → strong I (needInc=false due to unbound)
+func makeUnbound() *!I {
+    return new(A);
+}
+
+// case-3: parameter *!A → strong I (needInc=false due to noRefInc)
+func wrap(p *!A) *!I {
+    return p;
+}
+
+// case-4: bound local var → strong J (needInc=true, 不同接口)
+func makeJ(v int) *!J {
+    var a = new(A);
+    a.i = v;
+    return a;
+}
+
+
+func main() {
+    // case-1
+    var h = make(123);
+    assert(h.get() == 32);
+
+    // case-2
+    var h2 = makeUnbound();
+    assert(h2.get() == 32);
+
+    // case-3
+    var p = new(A);
+    p.i = 789;
+    var h3 = wrap(p);
+    assert(h3.get() == 32);
+
+    // case-4
+    var h4 = makeJ(100);
+    assert(h4.value() == 64);
+}
