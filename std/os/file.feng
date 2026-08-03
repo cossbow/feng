@@ -114,8 +114,3 @@ export
 func printf(fmt [&#]byte, ...) {
     format(stdout, fmt, ...);
 }
-
-export
-func logging(fmt [&#]byte, ...) {
-    printf(fmt, ...);
-}
