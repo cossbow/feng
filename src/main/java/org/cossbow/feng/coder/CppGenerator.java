@@ -1531,7 +1531,7 @@ public class CppGenerator implements Generator {
     }
 
     private CppGenerator write(IntegerLiteral e) {
-        write(e.value().toString(e.radix()));
+        write(e.toString());
         return this;
     }
 

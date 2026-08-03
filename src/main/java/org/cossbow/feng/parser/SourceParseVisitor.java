@@ -270,16 +270,18 @@ final class SourceParseVisitor
 
         var tn = (TerminalNode) ctx.getChild(0);
         var sym = tn.getSymbol();
-        var radix = switch (sym.getType()) {
-            case FengParser.DecimalInteger -> 10;
-            case FengParser.HexInteger -> 16;
-            case FengParser.OctalInteger -> 8;
-            case FengParser.BinaryInteger -> 2;
-            default -> throw new UnsupportedOperationException("unreachable branch");
+        IntegerLiteral.Radix radix = switch (sym.getType()) {
+            case FengParser.DecimalInteger -> IntegerLiteral.Radix.DEC;
+            case FengParser.HexInteger -> IntegerLiteral.Radix.HEX;
+            case FengParser.OctalInteger -> IntegerLiteral.Radix.OCT;
+            case FengParser.BinaryInteger -> IntegerLiteral.Radix.BIN;
+            default -> ErrorUtil.unreachable();
         };
         var txt = tn.getText();
-        if (radix != 10) txt = txt.substring(2);
-        return new IntegerLiteral(posOf(ctx), new BigInteger(txt, radix), radix);
+        if (radix != IntegerLiteral.Radix.DEC)
+            txt = txt.substring(2);
+        return new IntegerLiteral(posOf(ctx),
+                new BigInteger(txt, radix.value), radix);
     }
 
     private FloatLiteral parseFloat(TerminalNode tn) {

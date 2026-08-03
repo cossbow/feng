@@ -13,11 +13,11 @@ import java.math.BigInteger;
 public class IntegerLiteral extends Literal
         implements Comparable<IntegerLiteral> {
     private final BigInteger value;
-    private final transient int radix;
+    private final Radix radix;
 
     public IntegerLiteral(Position pos,
                           BigInteger value,
-                          int radix) {
+                          Radix radix) {
         super(pos);
         this.value = value;
         this.radix = radix;
@@ -25,19 +25,19 @@ public class IntegerLiteral extends Literal
 
     public IntegerLiteral(Position pos,
                           BigInteger value) {
-        this(pos, value, 10);
+        this(pos, value, Radix.DEC);
     }
 
     public IntegerLiteral(Position pos,
                           long value) {
-        this(pos, BigInteger.valueOf(value), 10);
+        this(pos, BigInteger.valueOf(value), Radix.DEC);
     }
 
     public BigInteger value() {
         return value;
     }
 
-    public int radix() {
+    public Radix radix() {
         return radix;
     }
 
@@ -67,6 +67,18 @@ public class IntegerLiteral extends Literal
 
     //
 
+    public enum Radix {
+        DEC(10), HEX(16), OCT(8), BIN(2),
+        ;
+        public final int value;
+
+        Radix(int value) {
+            this.value = value;
+        }
+    }
+
+    //
+
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof IntegerLiteral f)) return false;
@@ -87,6 +99,6 @@ public class IntegerLiteral extends Literal
 
     @Override
     public String toString() {
-        return value.toString(radix);
+        return value.toString(radix.value);
     }
 }

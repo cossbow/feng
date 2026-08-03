@@ -5,9 +5,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.dcl.PrimitiveTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.mod.FModule;
-import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.ast.proc.FixedParameter;
-import org.cossbow.feng.coder.CGenerator;
 import org.cossbow.feng.coder.CppGenerator;
 import org.cossbow.feng.coder.Generator;
 import org.cossbow.feng.dag.DAGGraph;
@@ -22,12 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
@@ -206,12 +199,6 @@ public class Compiler {
         new ModuleAnalysis(test).analyse(dag);
         factory.copyBaseHeader(dir);
 
-        // Build map of all analyzed module tables for cross-module generic lookup
-        Map<ModulePath, AnalyseSymbolTable> imported = new java.util.HashMap<>();
-        for (var fm : dag) {
-            imported.put(fm.path(), fm.result.must());
-        }
-
         // Collect all C source files from all modules
         var allCSources = new ArrayList<Path>();
         boolean hasMain = test;  // test mode always produces executable
@@ -230,11 +217,11 @@ public class Compiler {
                 allCSources.addAll(fm.cSources());
             } else if (!fm.headerFiles().isEmpty()) {
                 // C header-only module
-                generate(ast, dir, mp.filename(), moduleNames, imported);
+                generate(ast, dir, mp.filename(), moduleNames);
                 copyCSources(fm, dir);
                 genBridgeHeader(fm, dir);
             } else {
-                generate(ast, dir, mp.filename(), moduleNames, imported);
+                generate(ast, dir, mp.filename(), moduleNames);
             }
         }
 
@@ -257,19 +244,16 @@ public class Compiler {
     // ---- single-module code generation ----
 
     void generate(AnalyseSymbolTable ast, Path dir, String name,
-                  List<String> moduleNames,
-                  Map<ModulePath, AnalyseSymbolTable> importedTables) throws IOException {
+                  List<String> moduleNames) throws IOException {
         var ext = factory.extension();
         var src = dir.resolve(name + ext);
         try (var w = Files.newBufferedWriter(src, UTF_8)) {
             var gen = factory.create(ast, w, false, debug);
-            if (gen instanceof CGenerator cg) cg.importedTables(importedTables);
             gen.write();
         }
         var header = dir.resolve(name + ".h");
         try (var w = Files.newBufferedWriter(header, UTF_8)) {
             var gen = factory.create(ast, w, true, debug);
-            if (gen instanceof CGenerator cg) cg.importedTables(importedTables);
             gen.write();
         }
         moduleNames.add(name);

@@ -12,7 +12,6 @@ import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.lit.Literal;
 import org.cossbow.feng.ast.lit.NilLiteral;
 import org.cossbow.feng.ast.lit.StringLiteral;
-import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
@@ -47,8 +46,6 @@ public class CGenerator implements Generator {
     private final boolean header;   // true = header file, false = source file
     private final boolean debug;
     private final boolean memchk;   // enables FENG_DEBUG_MEMORY
-    public Set<String> testFilter;
-    private Map<ModulePath, AnalyseSymbolTable> importedTables;
 
     public CGenerator(AnalyseSymbolTable table,
                       Appendable out, boolean header,
@@ -64,13 +61,6 @@ public class CGenerator implements Generator {
                       Appendable out,
                       boolean debug) {
         this(table, out, false, debug);
-    }
-
-    /**
-     * Provide access to imported modules' symbol tables for cross-module generic function lookup.
-     */
-    public void importedTables(Map<ModulePath, AnalyseSymbolTable> importedTables) {
-        this.importedTables = importedTables;
     }
 
     // ---- Factory ----
@@ -2378,7 +2368,12 @@ public class CGenerator implements Generator {
     // ---- literals ----
 
     private CGenerator write(IntegerLiteral e) {
-        write(e.value().toString(e.radix()));
+        switch (e.radix()) {
+            case HEX -> write("0x");
+            case OCT -> write("0");
+            case BIN -> write("0b");
+        }
+        write(e.toString());
         if (e.value().bitLength() >= 64) {
             write("ULL");
         }
