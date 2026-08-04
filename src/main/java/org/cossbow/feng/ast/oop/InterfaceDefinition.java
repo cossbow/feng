@@ -121,6 +121,7 @@ public class InterfaceDefinition extends ObjectDefinition {
                 new Symbol(new Identifier("Writer")),
                 TypeParameters.empty(), methods, new SymbolMap<>(),
                 new MacroTable());
+        WriterType.allMethods.addAll(methods);
         WriterType.builtin(true);
     }
 
@@ -142,6 +143,7 @@ public class InterfaceDefinition extends ObjectDefinition {
                 new Symbol(new Identifier("Writable")),
                 TypeParameters.empty(), methods, new SymbolMap<>(),
                 new MacroTable());
+        WritableType.allMethods.addAll(methods);
         WritableType.builtin(true);
     }
 
@@ -154,10 +156,12 @@ public class InterfaceDefinition extends ObjectDefinition {
                 new ParameterSet(ZERO, List.of(new FixedParameter(ZERO,
                         StringLiteral.buffer(ZERO, PHANTOM, false)))),
                 Primitive.INT.declarer()));
+        methods.add(read.name(), read);
         ReaderType = new InterfaceDefinition(ZERO, Modifier.empty(),
                 new Symbol(new Identifier("Reader")),
                 TypeParameters.empty(), methods, new SymbolMap<>(),
                 new MacroTable());
+        ReaderType.allMethods.addAll(methods);
         ReaderType.builtin(true);
     }
 
