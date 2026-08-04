@@ -42,14 +42,12 @@ public class Compiler {
 
     private final Generator.Factory factory;
     private boolean debug;
+    private boolean asan;
     private boolean test;
     private Set<String> testFilter = Set.of();
     private String pkg;
     private Map<String, String> lib = Map.of();
     private Build build = Build.MAKE;
-
-    private boolean asan = Boolean.parseBoolean(
-            System.getProperty("feng.asan"));
 
     public Compiler(Generator.Factory factory) {
         this.factory = CommonUtil.required(factory);
@@ -58,6 +56,11 @@ public class Compiler {
     public Compiler debug(boolean debug) {
         this.debug = debug;
         if (debug) ErrorUtil.setTraceError(true);
+        return this;
+    }
+
+    public Compiler asan(boolean asan) {
+        this.asan = asan;
         return this;
     }
 
@@ -468,7 +471,7 @@ public class Compiler {
         }
 
         var moreFlags = asan ? " -fsanitize=address -fno-omit-frame-pointer" : "";
-        if (!debug) moreFlags += " -O2";
+        if (!debug) moreFlags += " -g -O2";
 
         try (var w = Files.newBufferedWriter(dir.resolve("Makefile"), UTF_8)) {
             w.write("# Makefile for Fēng generated " + (isC ? "C" : "C++") + " code\n");

@@ -289,6 +289,11 @@ public class CGenerator implements Generator {
             write("static inline void ").write(ck).write("(")
                     .write(cd.symbol()).write(" **p) {").indent();
             write("if (*p && Feng$dec(*p)) {").indent();
+            // resource free macro first (if exists) — custom cleanup
+            // (e.g. linked-list traversal) must run before fields are released
+            cd.resourceFree().use(rf -> {
+                write(cd.symbol()).write(rf.name()).write("(*p)").endStmt();
+            });
             // cascade: release all strong-ref fields in class hierarchy
             for (var cf : cd.allFields().values()) {
                 var ft = cf.type();
@@ -298,10 +303,6 @@ public class CGenerator implements Generator {
                 write(fck != null ? fck : "Feng$cleanup_sref")
                         .write("(&(*p)->").write(cf.name()).write(")").endStmt();
             }
-            // resource free (if exists)
-            cd.resourceFree().use(rf -> {
-                write(cd.symbol()).write(rf.name()).write("(*p)").endStmt();
-            });
             write("Feng$free(*p)").endStmt();
             dedent().write('}').newLine();
             dedent().write('}').newLine();
@@ -328,6 +329,11 @@ public class CGenerator implements Generator {
             write("static inline void ").write(ck).write("(")
                     .writeMangledName(dt).write(" **p) {").indent();
             write("if (*p && Feng$dec(*p)) {").indent();
+            // resource free macro first (if exists) — custom cleanup
+            // (e.g. linked-list traversal) must run before fields are released
+            cd.resourceFree().use(rf -> {
+                writeMangledName(dt).write(rf.name()).write("(*p)").endStmt();
+            });
             for (var cf : cd.allFields().values()) {
                 var ft = resolveFromMap(cf.type(), buildTypeMap(cd.generic(), dt.generic()));
                 var fr = ft.maybeRefer();
@@ -336,9 +342,6 @@ public class CGenerator implements Generator {
                 write(fck != null ? fck : "Feng$cleanup_sref")
                         .write("(&(*p)->").write(cf.name()).write(")").endStmt();
             }
-            cd.resourceFree().use(rf -> {
-                writeMangledName(dt).write(rf.name()).write("(*p)").endStmt();
-            });
             write("Feng$free(*p)").endStmt();
             dedent().write('}').newLine();
             dedent().write('}').newLine();
@@ -2247,15 +2250,19 @@ public class CGenerator implements Generator {
     }
 
     private CGenerator write(IndexOfExpression e) {
+        var st = e.subject().resultType.must();
         write(e.subject());
-        write(".$values[").write(e.index()).write(']');
-        return this;
-    }
-
-    private CGenerator index(
-            PrimaryExpression subject, Expression index) {
-        write(subject);
-        write(".$values[").write(index).write(']');
+        write(".$values[Feng$checkIndex(").write(e.index()).write(',');
+        if (st instanceof ArrayTypeDeclarer atd && atd.refer().none()) {
+            // fixed-length array: compile-time bound
+            write(atd.len());
+        } else {
+            // variable-length array reference: runtime bound
+            write(e.subject()).write(".$length");
+        }
+        write(", (Uint64)(uintptr_t)&&_feng_fn_label, ");
+        write(e.pos().start() != null ? e.pos().start().getLine() : 0);
+        write(")]");
         return this;
     }
 
@@ -2537,16 +2544,32 @@ public class CGenerator implements Generator {
         while (cur != null && cur != ClassDefinition.ObjectClass) {
             var ancCur = cur;  // capture for lambda
             ancCur.impl().each((sym, ifaceDt) -> {
-                var key = sym.name();
-                // Already implemented by a child class
-                if (result.containsKey(key)) return;
-                var resolved = resolveAncestorIface(cd, ancCur, ifaceDt);
-                if (resolved != null) result.put(key, resolved);
+                addIfaceWithSupers(result, cd, ancCur, ifaceDt);
             });
             if (cur.parent().none()) break;
             cur = cur.parent().must();
         }
         return result;
+    }
+
+    /**
+     * Add an interface and all its parent interfaces (transitively) to the result map.
+     * Parent interfaces share the same vtable offset as the child interface.
+     */
+    private void addIfaceWithSupers(LinkedHashMap<Identifier, DerivedType> result,
+                                     ClassDefinition cd, ClassDefinition anc,
+                                     DerivedType ifaceDt) {
+        var key = ((InterfaceDefinition) ifaceDt.def()).symbol().name();
+        if (result.containsKey(key)) return;
+        var resolved = resolveAncestorIface(cd, anc, ifaceDt);
+        if (resolved == null) return;
+        result.put(key, resolved);
+
+        // also add parent interfaces (e.g. J extends I → add I to ifaces)
+        var ifaceDef = (InterfaceDefinition) ifaceDt.def();
+        for (var superDt : ifaceDef.supers()) {
+            addIfaceWithSupers(result, cd, anc, superDt);
+        }
     }
 
     /**
@@ -2787,7 +2810,20 @@ public class CGenerator implements Generator {
     }
 
     private CGenerator write(IndexOperand e) {
-        return index(e.subject(), e.index());
+        var st = e.subject().resultType.must();
+        write(e.subject());
+        write(".$values[Feng$checkIndex(").write(e.index()).write(',');
+        if (st instanceof ArrayTypeDeclarer atd && atd.refer().none()) {
+            // fixed-length array: compile-time bound
+            write(atd.len());
+        } else {
+            // variable-length array reference: runtime bound
+            write(e.subject()).write(".$length");
+        }
+        write(", (Uint64)(uintptr_t)&&_feng_fn_label, ");
+        write(e.pos().start() != null ? e.pos().start().getLine() : 0);
+        write(")]");
+        return this;
     }
 
     private CGenerator write(TupleOperand e) {
@@ -3377,7 +3413,14 @@ public class CGenerator implements Generator {
                     .write(" Feng$meta_").write(id.symbol()).write(" = {").indent();
             write(".base = {").indent();
             write(".instance_size = 0,").newLine();
-            write(".super = NULL,").newLine();
+            // set super for interfaces that extend others (e.g. J extends I)
+            if (id.supers().isEmpty()) {
+                write(".super = NULL,").newLine();
+            } else {
+                var superDt = id.supers().getFirst();
+                write(".super = (const Feng$Meta*)&Feng$meta_")
+                        .write(ifaceKey(superDt)).write(".base,").newLine();
+            }
             write(".iface_count = 0,").newLine();
             write(".ifaces = NULL,").newLine();
             write(".destroy = NULL").newLine();

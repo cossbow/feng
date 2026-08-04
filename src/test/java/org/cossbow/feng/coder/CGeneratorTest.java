@@ -8,7 +8,7 @@ public class CGeneratorTest extends GeneratorTest {
     protected Compiler compiler(String pkg) {
         var c = new Compiler(CGenerator.FACTORY);
         c.pkg(pkg);
-        c.debug(true);
+        c.debug(true).asan(true);
         c.buildSystem(Compiler.Build.MAKE);
         c.lib(Map.of("std", "std"));
         return c;

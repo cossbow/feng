@@ -1,13 +1,23 @@
-import std$bytes;
-import std$string;
 
-func test(n int) {
-    var b bytes$BufferWriter;
-    var s = string$fromBytes("feng");
-    format(b, "Hello {}!\n", s);
-    var r = b.copy();
+class NilWriter (Writer) {
+    var buf [*!]byte;
+    var size int;
+    func write(data [&!#]byte, offset int, length int) int {
+        size = length;
+        return length;
+    }
 }
 
-func main(args[&!#][*!#]byte) {
-    test(15);
+class Buffer (Writable) {
+    const data [*!#]byte;
+    func write#(w &!Writer) int {
+        return w.write(data,0,data.length);
+    }
+}
+
+func main() {
+    var b NilWriter = {buf=new([64]byte)};
+    var s Buffer = {data="feng"};
+    format(b, "Hello {}!\n", s);
+    assert(b.size == 5);
 }

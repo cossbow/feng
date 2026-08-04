@@ -18,7 +18,8 @@ func test(n int) {
     *a = *b;
     i = a.id;
     use(a,i);
-    var j = new(int,n);
+    var j = new(int);
+    *j = n;
     use(a,j);
 }
 

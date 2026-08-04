@@ -4,7 +4,7 @@ class A {
 func make(n int) *A {
     if (n<1) return nil;
     var a = new(A, {n=new([4]*A)});
-    for(var i=0; i<n; i+=1) {
+    for(var i=0; i<n && i<4; i+=1) {
         a.n[i] = make(n-1);
     }
     return a;
@@ -16,5 +16,5 @@ func test(n int) {
 
 func main(args [&!#][*!#]byte) {
     test(2);
-	test(21);
+	test(3);
 }

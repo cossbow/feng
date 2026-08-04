@@ -75,6 +75,7 @@ public class CompilerMain {
         };
         var c = new Compiler(factory);
         c.debug(debug);
+        c.asan(Boolean.parseBoolean(System.getProperty("feng.asan")));
         c.test(test).testFilter(testNames);
         c.buildSystem(build);
         c.pkg(pkg);

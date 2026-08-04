@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
 	{
 #ifdef FENG_MAIN_HAS_ARGS
 		Feng$ArraySRef_ArraySRef_Byte list FENG$DEC(Feng$cleanup_arr_ArraySRef_Byte);
-		list.$values = Feng$alloc(argc*sizeof(void*));
+		list.$values = Feng$alloc(argc*sizeof(Feng$ArraySRef_Byte));
 		list.$length = argc;
 		for (int i = 0; i < argc; ++i) {
 			int64_t len = (int64_t) strlen(argv[i]);

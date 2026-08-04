@@ -2,10 +2,9 @@ package org.cossbow.feng.coder;
 
 import org.cossbow.feng.Compiler;
 import org.cossbow.feng.mod.ModuleParserTest;
-import org.cossbow.feng.util.Command;
 import org.cossbow.feng.util.CommonUtil;
-import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.ResourceUtil;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -26,6 +25,33 @@ public class GeneratorTest {
     abstract
     protected Compiler compiler(String pkg);
 
+    private void exec(Path dir, String name) {
+        // find the actual executable (with or without .exe on Windows)
+        var exe = dir.resolve(name);
+        if (!Files.exists(exe)) {
+            var exeWin = dir.resolve(name + ".exe");
+            if (Files.exists(exeWin)) {
+                exe = exeWin;
+            } else {
+                // library-only compilation (no main), skip execution
+                return;
+            }
+        }
+        try {
+            var pb = new ProcessBuilder(exe.toString())
+                    .directory(dir.toFile())
+                    .redirectErrorStream(true);
+            var p = pb.start();
+            var out = new String(p.getInputStream().readAllBytes());
+            int code = p.waitFor();
+            if (code != 0) {
+                Assertions.fail("execution failed (exit " + code + ")\n" + out);
+            }
+        } catch (IOException | InterruptedException e) {
+            Assertions.fail("execution error: " + e.getMessage());
+        }
+    }
+
     // ---- single-file tests ----
 
     @Test
@@ -39,6 +65,7 @@ public class GeneratorTest {
             var subDir = tempDir.resolve(name);
             Files.createDirectories(subDir);
             compiler(PkgName).compileFile(file, subDir);
+            exec(subDir, PkgName);
         }
     }
 
@@ -51,6 +78,7 @@ public class GeneratorTest {
         var subDir = tempDir.resolve("out");
         Files.createDirectories(subDir);
         c.compileModule(dir.resolve("aaa"), subDir);
+        exec(subDir, PkgName);
     }
 
     @Test
@@ -60,6 +88,7 @@ public class GeneratorTest {
         var subDir = tempDir.resolve("out");
         Files.createDirectories(subDir);
         c.compilePackage(dir, subDir);
+        exec(subDir, PkgName);
     }
 
     // ---- mixed module test (Feng + pure-C) ----
@@ -71,5 +100,6 @@ public class GeneratorTest {
         var subDir = tempDir.resolve("out");
         Files.createDirectories(subDir);
         c.compilePackage(dir, subDir);
+        exec(subDir, "mixed");
     }
 }
