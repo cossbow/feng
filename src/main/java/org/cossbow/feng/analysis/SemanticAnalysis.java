@@ -500,7 +500,7 @@ public class SemanticAnalysis {
 
         if (r.none() && def instanceof PrototypeDefinition pd) {
             var ftd = new NamedFuncTypeDeclarer(td.pos(),
-                    false, td.derivedType(), Lazy.of(pd));
+                    true, td.derivedType(), Lazy.of(pd));
             var pt = td.derivedType().gm().instantiate(pd.prototype());
             ftd.prototype(pt);
             return ftd;

@@ -324,10 +324,10 @@ final class SourceParseVisitor
             case FengParser.BITAND -> PHANTOM;
             default -> unreachable();
         };
-        var required = ctx.required != null;
+        var optional = ctx.optional != null;
         var unmodifiable = ctx.unmodifiable != null;
         return Optional.of(new Refer(posOf(ctx),
-                type, required, unmodifiable));
+                type, !optional, unmodifiable));
     }
 
     @Override
@@ -357,14 +357,14 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitFuncTypeDeclarer(FengParser.FuncTypeDeclarerContext ctx) {
-        var required = ctx.required != null;
+        var optional = ctx.optional != null;
         var pt = this.<Prototype>visitOptional(ctx.prototype());
         if (pt.has())
-            return new AnonFuncTypeDeclarer(posOf(ctx), required, pt.get());
+            return new AnonFuncTypeDeclarer(posOf(ctx), !optional, pt.get());
 
         var dt = (DerivedType) visit(ctx.definedType());
         Objects.requireNonNull(dt);
-        return new NamedFuncTypeDeclarer(posOf(ctx), required, dt);
+        return new NamedFuncTypeDeclarer(posOf(ctx), !optional, dt);
     }
 
     @Override

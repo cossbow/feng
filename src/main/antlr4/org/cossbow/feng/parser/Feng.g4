@@ -332,13 +332,13 @@ definedTypeDeclarer
     : refer? definedType
     ;
 refer
-    : kind=(MUL|BITAND) required=NOT? unmodifiable=HASH?
+    : kind=(MUL|BITAND) optional=QUESTION? unmodifiable=HASH?
     ;
 funcTypeDeclarer
-    : required=NOT? FUNC prototype
+    : optional=QUESTION? FUNC prototype
     // Exists syntax conflicts, so only matching the not-empty,
     // the empty will be matched by definedTypeDeclarer
-    | required=NOT definedType
+    | optional=QUESTION definedType
     ;
 tupleTypeDeclarer
     : '(' typeDeclarer (COMMA typeDeclarer)+ ')'
