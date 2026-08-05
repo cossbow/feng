@@ -14,12 +14,16 @@ class C:B{
 
 func test(n int) {
     var i1 *I = new(A);
+    if (i1 == nil) return;
     i1.run(); // A.run
     var i2 *I = new(B);
+    if (i2 == nil) return;
     i2.run(); // A.run
     var i3 *I = new(C);
+    if (i3 == nil) return;
     i3.run(); // C.run
     var b *B = new(C);
+    if (b == nil) return;
     b.run(); // C.run
 }
 

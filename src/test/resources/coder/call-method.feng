@@ -10,7 +10,9 @@ class A{
 }
 
 func test(n int) {
-    new(A).run();
+    var a = new(A);
+    if (a == nil) return;
+    a.run();
 }
 
 func main(args [&!#][*!#]byte) {

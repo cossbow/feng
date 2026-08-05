@@ -12,8 +12,8 @@ func object1() {
 
 func array1() {
     {
-        var a *A = new(B, {idx=new(int)});
-        var aa [*]*A = new([2]*A);
+        var a *!A = new(B, {idx=new(int)});
+        var aa [*!]*A = new([2]*A);
         aa[0] = a;
     }
 }

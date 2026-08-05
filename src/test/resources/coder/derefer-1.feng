@@ -5,20 +5,25 @@ class A {
 }
 
 func use(a &A, i&int) {
+    if (a == nil) return;
+    if (i == nil) return;
     *i = *i * *i;
     *a = {id=(*a).id/(*i)};
 }
 
 func test(n int) {
     var a *A = new(A, {id=n});
+    if (a == nil) return;
     var v = *a;
     var i = v.id;
     var b *A =new(A,{id=n*2});
+    if (b == nil) return;
     i = b.id;
     *a = *b;
     i = a.id;
     use(a,i);
     var j = new(int);
+    if (j == nil) return;
     *j = n;
     use(a,j);
 }

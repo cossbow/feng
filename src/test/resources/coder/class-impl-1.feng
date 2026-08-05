@@ -11,7 +11,9 @@ class A (I) {
 
 func test(n int) {
     var i *I = new(A);
+    if (i == nil) return;
     i = i.get();
+    if (i == nil) return;
     i = i .get();
 }
 

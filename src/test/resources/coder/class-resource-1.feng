@@ -9,12 +9,13 @@ class List {
 
     func add(v int) {
         var n = new(Node, {v=v});
-        if (head == nil) {
+        var h = head;
+        if (h == nil) {
             head = n;
             return;
         }
-        n.next = head;
-        head.prev = n;
+        n.next = h;
+        h.prev = n;
         head = n;
     }
 
@@ -34,7 +35,9 @@ func test(n int) {
         list.add(i+100);
     }
 
-    for(var c *Node=list.head; c!=nil; c=c.next) {
+    var c = list.head;
+    for (c != nil) {
+        c = c.next;
     }
 }
 

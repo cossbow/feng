@@ -17,6 +17,7 @@ func main(args [&!#][*!#]byte) {
         task();
     } catch (o *!#Exception) {
         var e = o?(*#MyException);
+        if (e == nil) return;
         var l = e.line;
     }
 }

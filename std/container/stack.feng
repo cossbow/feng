@@ -17,18 +17,18 @@ export func newStack`T`() *Stack`T` {
 
 // ===== core =====
 
-export func stackPush`T`(s *Stack`T`, e T) {
+export func stackPush`T`(s *!Stack`T`, e T) {
     vectorAppend`T`(s.list, e);
 }
 
-export func stackPop`T`(s *Stack`T`) T {
+export func stackPop`T`(s *!Stack`T`) T {
     if (vectorIsEmpty`T`(s.list)) {
         throw new(error$IllegalStateException);
     }
     return vectorRemoveLast`T`(s.list);
 }
 
-export func stackPeek`T`(s *Stack`T`) T {
+export func stackPeek`T`(s *!Stack`T`) T {
     if (vectorIsEmpty`T`(s.list)) {
         throw new(error$IllegalStateException);
     }
@@ -37,14 +37,14 @@ export func stackPeek`T`(s *Stack`T`) T {
 
 // ===== properties =====
 
-export func stackSize`T`(s *Stack`T`) int {
+export func stackSize`T`(s *!Stack`T`) int {
     return vectorLength`T`(s.list);
 }
 
-export func stackIsEmpty`T`(s *Stack`T`) bool {
+export func stackIsEmpty`T`(s *!Stack`T`) bool {
     return vectorIsEmpty`T`(s.list);
 }
 
-export func stackClear`T`(s *Stack`T`) {
+export func stackClear`T`(s *!Stack`T`) {
     vectorClear`T`(s.list);
 }

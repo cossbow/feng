@@ -58,7 +58,9 @@ func test(n int) {
         var i2 = make(0).clone();
         make(0).get(1);
         make(0).clone();
-        create(n).r.see();
+        var c = create(n);
+        if (c == nil) return;
+        c.r.see();
     }
     {
         var i1 = new(S, {id=-1}).get(1);
@@ -74,8 +76,10 @@ func test(n int) {
     }
     {
         var v1= make(n).id;
-        var v2= create(n).r.id;
-        var v3= create(n).r.s.id;
+        var c = create(n);
+        if (c == nil) return;
+        var v2= c.r.id;
+        var v3= c.r.s.id;
     }
     {
         make(0).id = 1;

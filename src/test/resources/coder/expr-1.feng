@@ -23,6 +23,7 @@ func block1(n int) {
         var r2 = n > 4 ? new(A,{id=n+1}) : new(B,{id=n-1});
         r2
     };
+    if (r == nil) return;
     r.run();
 }
 

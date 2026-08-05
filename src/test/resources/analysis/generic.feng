@@ -32,10 +32,10 @@ class BigBox`V` : Box`V` {
 
 class Node`T` {
     var t T;
-    var n *Node`T`;
-    var x *Box`T`;
-    var y *Box`*Box`T``;
-    var p *Pair`int, T`;
+    var n *!Node`T`;
+    var x *!Box`T`;
+    var y *!Box`*!Box`T``;
+    var p *!Pair`int, T`;
 }
 
 func make`T`(t T) T {
@@ -47,31 +47,31 @@ class Pair`L, R`{
     var r R;
 }
 
-func use(a *Node`*int`) {
-    var n *Node`*int` = a.n;
+func use(a *!Node`*!int`) {
+    var n *!Node`*!int` = a.n;
     if(n==nil) n=a;
-    var b1 *Box`*int` = a.x;
-    var b2 *Box`*Box`*int`` = a.y;
-    var t *int = a.p.r;
+    var b1 *!Box`*!int` = a.x;
+    var b2 *!Box`*!Box`*!int`` = a.y;
+    var t *!int = a.p.r;
     *t = a.p.l;
-    var v *int = a.t;
+    var v *!int = a.t;
 
-    const p1 &Box`*int` = b1;
+    const p1 &!Box`*!int` = b1;
     v=p1.change(v);
-    const i1 &I`*int` = b1;
+    const i1 &!I`*!int` = b1;
     i1.set(v);
 }
 
 func test(i int) {
-    var a *A = make`*A`(new(A,{id=i}));
-    var p = new(Pair`int,*int`,{r=new(int, i)});
-    var n = new(Node`*int`);
+    var a *!A = make`*!A`(new(A,{id=i}));
+    var p = new(Pair`int,*!int`,{r=new(int, i)});
+    var n = new(Node`*!int`);
     n.p=p;
-    use(new(Node`*int`, {
+    use(new(Node`*!int`, {
         t=new(int),
-        n=new(Node`*int`),
-        x=new(Box`*int`),
-        y=new(Box`*Box`*int``, {v=new(BigBox`*int`)}),
+        n=new(Node`*!int`),
+        x=new(Box`*!int`),
+        y=new(Box`*!Box`*!int``, {v=new(BigBox`*!int`)}),
         p=p
     }));
 }

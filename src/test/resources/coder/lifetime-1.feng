@@ -2,7 +2,7 @@
 class A {
     var id int;
     var n *A;
-    var cb func();
+    var cb !func();
     func run() {
         id = 0;
     }
@@ -14,11 +14,11 @@ class A {
 func aaa() {
 }
 
-func make(n int) *A{
+func make(n int) *!A{
     var r= new(A, {id=n+11, cb=aaa, n=new(A)});
     return r;
 }
-func alloc(n int) [*]int{
+func alloc(n int) [*!]int{
     return new([n]int);
 }
 func arr(n int) [2]A{

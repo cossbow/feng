@@ -1,7 +1,7 @@
 import std$map m;
 
 
-func intHashing(n &m$Node`int,int`) int {
+func intHashing(n &!m$Node`int,int`) int {
     return n.key;
 }
 

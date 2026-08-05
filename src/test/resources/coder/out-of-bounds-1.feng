@@ -1,0 +1,61 @@
+
+func idx(i int) int {
+    return i;
+}
+
+func test1() {
+    var a = new([10]int);
+    try {
+        a[idx(-1)] = 1;
+        assert(false);
+    } catch (e *!#OutOfBoundsException) {
+    }
+}
+func test2() {
+    var a = new([10]int);
+    try {
+        a[idx(10)] = 1;
+        assert(false);
+    } catch (e *!#OutOfBoundsException) {
+    }
+}
+func test3() {
+    var a = new([10]int);
+    for (var i=0;i<10;i+=1) {
+        a[idx(i)] = 1;
+    }
+}
+
+func test4() {
+    var a [10]int;
+    try {
+        a[idx(-1)] = 1;
+        assert(false);
+    } catch (e *!#OutOfBoundsException) {
+    }
+}
+func test5() {
+    var a [10]int;
+    try {
+        a[idx(10)] = 1;
+        assert(false);
+    } catch (e *!#OutOfBoundsException) {
+    }
+}
+func test6() {
+    var a [10]int;
+    for (var i=0;i<10;i+=1) {
+        a[idx(i)] = 1;
+    }
+}
+
+
+func main() {
+    test1();
+    test2();
+    test3();
+
+    test4();
+    test5();
+    test6();
+}

@@ -58,24 +58,32 @@ class Pair`L, R`{
 }
 
 func use(a *Node`*int`) {
+    if (a == nil) return;
     var n *Node`*int` = a.n;
     if(n==nil) n=a;
     var b1 *Box`*int` = a.x;
     var b2 *Box`*Box`*int`` = a.y;
-    var t *int = a.p.r;
-    *t = a.p.l;
+    var p = a.p;
+    if (p == nil) return;
+    var t *int = p.r;
+    if (t == nil) return;
+    *t = p.l;
     var v *int = a.t;
 
     const p1 &Box`*int` = b1;
+    if (p1 == nil) return;
     v=p1.change(v);
     const i1 &I`*int` = b1;
+    if (i1 == nil) return;
     i1.set(v);
 }
 
 func test(i int) {
     var a *A = make`*A`(new(A,{id=i}));
+    if (a == nil) return;
     var p = new(Pair`int,*int`,{r=new(int, i)});
     var n = new(Node`*int`);
+    if (n == nil) return;
     n.p=p;
     use(new(Node`*int`, {
         t=new(int),

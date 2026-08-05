@@ -106,8 +106,8 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testClassInherit3() {
-        checkSucc("class A{ var id int; } class B:A{} func f(b *B) { b.id = 0; }");
-        checkSucc("class A{ func go() {} } class B:A{} func f(b *B) { b.go(); }");
+        checkSucc("class A{ var id int; } class B:A{} func f(b *!B) { b.id = 0; }");
+        checkSucc("class A{ func go() {} } class B:A{} func f(b *!B) { b.go(); }");
         checkSucc("class A{ var id int; } class B:A{} func f() {var b B; var v = b.id; }");
         checkSucc("class A{ func go() {} } class B:A{} func f() {var b B; b.go(); }");
     }
@@ -245,9 +245,9 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testInterfaceMethod1() {
-//        checkSucc("interface A{ run(); } func f(a *A) { a.run(); }");
-        checkSucc("interface A{ run(); } interface B{A;} func f(a *B) { a.run(); }");
-//        checkSucc("interface A{ run(); } interface B{A;} interface C{B;} func f(a *C) { a.run(); }");
+        checkSucc("interface A{ run(); } func f(a *!A) { a.run(); }");
+        checkSucc("interface A{ run(); } interface B{A;} func f(a *!B) { a.run(); }");
+        checkSucc("interface A{ run(); } interface B{A;} interface C{B;} func f(a *!C) { a.run(); }");
     }
 
     @Test
@@ -380,8 +380,8 @@ public class SemanticAnalysisTest {
     @Test
     public void testClassField4() {
         checkFail("class A { var id int; } func set(a A) { a.id = 0; }");
-        checkSucc("class A { var id int; } func set(a *A) { a.id = 0; }");
-        checkFail("class A { const id int; } func set(a *A) { a.id = 0; }");
+        checkSucc("class A { var id int; } func set(a *!A) { a.id = 0; }");
+        checkFail("class A { const id int; } func set(a *!A) { a.id = 0; }");
     }
 
     @Test
@@ -581,20 +581,21 @@ public class SemanticAnalysisTest {
     @Test
     public void testAssignValue7() {
         var def = "class A{ var a *A; } ";
-        checkSucc(def + "func f() { var a *A =new(A); a.a = a; }");
-        checkFail(def + "func f() { var a *A =new(A, {a=a}); }");
+        checkSucc(def + "func f() { var a *!A =new(A); a.a = a; }");
+        checkFail(def + "func f() { var a *!A =new(A, {a=a}); }");
     }
 
     @Test
     public void testAssignValue8() {
         var d = "class A{var v1 int; const v2 int;} ";
-        checkSucc(d + "func f(o *Object){ o?(*A).v1 = 0; }");
-        checkFail(d + "func f(o *Object){ o?(*A).v2 = 0; }");
+        // can't dereference optional reference
+//        checkSucc(d + "func f(o *Object){ o?(*A).v1 = 0; }");
+//        checkFail(d + "func f(o *Object){ o?(*A).v2 = 0; }");
 
         checkSucc(d + "func f(){ var ar [2]A; ar[0].v1 = 0; }");
         checkFail(d + "func f(){ const ar [2]A; ar[0].v1 = 0; }");
 
-        checkSucc(d + "func f(g func()*A){ g().v1 = 0; }");
+        checkSucc(d + "func f(g func()*!A){ g().v1 = 0; }");
         checkFail(d + "func f(g func()A){ g().v1 = 0; }");
 
     }
@@ -614,19 +615,19 @@ public class SemanticAnalysisTest {
     @Test
     public void testOperand2() {
         var d = "class A {var id int;} class B {var a A;}";
-        checkSucc(d + "func f(a*A) { a.id = 1; }");
-        checkFail(d + "func f(a*A) { a.id = false; }");
-        checkFail(d + "func f(a*A) { a.index = 1; }");
+        checkSucc(d + "func f(a*!A) { a.id = 1; }");
+        checkFail(d + "func f(a*!A) { a.id = false; }");
+        checkFail(d + "func f(a*!A) { a.index = 1; }");
 
-        checkSucc(d + "func f(b*B) { b.a.id = 1; }");
-        checkFail(d + "func f(b*B) { b.a.id = false; }");
-        checkFail(d + "func f(b*B) { b.a.index = 1; }");
+        checkSucc(d + "func f(b*!B) { b.a.id = 1; }");
+        checkFail(d + "func f(b*!B) { b.a.id = false; }");
+        checkFail(d + "func f(b*!B) { b.a.index = 1; }");
 
-        checkFail(d + "func f(a *#A) { a.id = 1; }");
-        checkFail(d + "func f(b *#B) { b.a.id = 1; }");
+        checkFail(d + "func f(a *!#A) { a.id = 1; }");
+        checkFail(d + "func f(b *!#B) { b.a.id = 1; }");
 
-        d = "class A {var id int;} class B {var a *A;}";
-        checkSucc(d + "func f(b *#B) { b.a.id = 1; }");
+        d = "class A {var id int;} class B {var a *!A;}";
+        checkSucc(d + "func f(b *!#B) { b.a.id = 1; }");
     }
 
     @Test
@@ -635,86 +636,86 @@ public class SemanticAnalysisTest {
         checkFail("func f(i int){ var a [2]int; a[i] = false;}");
         checkFail("func f(i int){ var a int; a[i] = false;}");
 
-        checkSucc("func f(i int){ var a [*]int; a[i] = 1;}");
-        checkFail("func f(i int){ var a [*]int; a[i] = false;}");
+        checkSucc("func f(i int, a [*!]int){ a[i] = 1;}");
+        checkFail("func f(i int, a [*!]int){ a[i] = false;}");
 
-        checkSucc("func f(i,j int){ var a [*][*]int; a[i][j] = 1;}");
-        checkSucc("func f(i,j int){ var a [*#][*]int; a[i][j] = 1;}");
-        checkFail("func f(i,j int){ var a [*][*#]int; a[i][j] = 1;}");
+        checkSucc("func f(i,j int, a [*!][*!]int){ a[i][j] = 1;}");
+        checkSucc("func f(i,j int, a [*!#][*!]int){ a[i][j] = 1;}");
+        checkFail("func f(i,j int, a [*!][*!#]int){ a[i][j] = 1;}");
     }
 
     @Test
     public void testOperand4() {
-        checkSucc("func f(i *int){ *i = 0;}");
-        checkFail("func f(i *#int){ *i = 0;}");
+        checkSucc("func f(i *!int){ *i = 0;}");
+        checkFail("func f(i *!#int){ *i = 0;}");
 
-        var d = "class A{var id int; var p *A; var c *#A;} ";
-        checkSucc(d + "func f(i *A){ *i = {id=0};}");
-        checkFail(d + "func f(i *#A){ *i = {id=0};}");
-        checkSucc(d + "func f(i *A){ *i.p = {id=0};}");
-        checkSucc(d + "func f(i *#A){ *i.p = {id=0};}");
-        checkFail(d + "func f(i *A){ *i.c = {id=0};}");
+        var d = "class A{var id int; var p *!A; var c *!#A;} ";
+        checkSucc(d + "func f(i *!A){ *i = {id=0};}");
+        checkFail(d + "func f(i *!#A){ *i = {id=0};}");
+        checkSucc(d + "func f(i *!A){ *i.p = {id=0};}");
+        checkSucc(d + "func f(i *!#A){ *i.p = {id=0};}");
+        checkFail(d + "func f(i *!A){ *i.c = {id=0};}");
 
-        checkSucc("func f(a,b *int)int{return *a+*a;}");
-        checkSucc("func f(a,b *int)int{return *a-*a;}");
-        checkSucc("func f(a,b *int)int{return *a**a;}");
-        checkSucc("func f(a,b *int)int{return *a/*a;}");
-        checkSucc("func f(a,b *int)int{return *a%*a;}");
+        checkSucc("func f(a,b *!int)int{return *a+*a;}");
+        checkSucc("func f(a,b *!int)int{return *a-*a;}");
+        checkSucc("func f(a,b *!int)int{return *a**a;}");
+        checkSucc("func f(a,b *!int)int{return *a/*a;}");
+        checkSucc("func f(a,b *!int)int{return *a%*a;}");
     }
 
     @Test
     public void testOperand5() {
-        var d = "class A{var id int;} class B {var a1 *A; var a2 *#A; } ";
-        checkSucc(d + "func f(a *A) { a.id = 1; }");
-        checkFail(d + "func f(a *A) { a.id = false; }");
-        checkFail(d + "func f(a *#A) { a.id = false; }");
+        var d = "class A{var id int;} class B {var a1 *!A; var a2 *!#A; } ";
+        checkSucc(d + "func f(a *!A) { a.id = 1; }");
+        checkFail(d + "func f(a *!A) { a.id = false; }");
+        checkFail(d + "func f(a *!#A) { a.id = false; }");
 
-        checkSucc(d + "func f(b *B) { b.a1.id = 1; }");
-        checkFail(d + "func f(b *B) { b.a2.id = 1; }");
+        checkSucc(d + "func f(b *!B) { b.a1.id = 1; }");
+        checkFail(d + "func f(b *!B) { b.a2.id = 1; }");
 
-        checkSucc(d + "func f(b *#B) { b.a1.id = 1; }");
-        checkFail(d + "func f(b *#B) { b.a2.id = 1; }");
+        checkSucc(d + "func f(b *!#B) { b.a1.id = 1; }");
+        checkFail(d + "func f(b *!#B) { b.a2.id = 1; }");
     }
 
     @Test
     public void testOperand6() {
-        var d = "class A{var id int;} class B {var a1 *A; var a2 *#A; } ";
-        d += "class C {var b *B;} ";
-        checkSucc(d + "func f(a [*]A) { a[0].id = 1; }");
-        checkFail(d + "func f(a [*#]A) { a[0].id = 1; }");
+        var d = "class A{var id int;} class B {var a1 *!A; var a2 *!#A; } ";
+        d += "class C {var b *!B;} ";
+        checkSucc(d + "func f(a [*!]A) { a[0].id = 1; }");
+        checkFail(d + "func f(a [*!#]A) { a[0].id = 1; }");
 
-        checkSucc(d + "func f(a [*]*A) { a[0].id = 1; }");
-        checkSucc(d + "func f(a [*#]*A) { a[0].id = 1; }");
+        checkSucc(d + "func f(a [*!]*!A) { a[0].id = 1; }");
+        checkSucc(d + "func f(a [*!#]*!A) { a[0].id = 1; }");
 
-        checkSucc(d + "func f(b [*]*B) { b[0].a1.id = 1; }");
-        checkFail(d + "func f(b [*]*B) { b[0].a2.id = 1; }");
-        checkSucc(d + "func f(b [*#]*B) { b[0].a1.id = 1; }");
-        checkSucc(d + "func f(b [*]*#B) { b[0].a1.id = 1; }");
+        checkSucc(d + "func f(b [*!]*!B) { b[0].a1.id = 1; }");
+        checkFail(d + "func f(b [*!]*!B) { b[0].a2.id = 1; }");
+        checkSucc(d + "func f(b [*!#]*!B) { b[0].a1.id = 1; }");
+        checkSucc(d + "func f(b [*!]*!#B) { b[0].a1.id = 1; }");
 
-        checkSucc(d + "func f3(c *#C) {c.b.a1.id=1;}");
+        checkSucc(d + "func f3(c *!#C) {c.b.a1.id=1;}");
     }
 
     @Test
     public void testOperand7() {
         var d = "class A{var id int;} ";
         checkFail(d + "func f(g func()A) {g().id=0;}");
-        checkSucc(d + "func f(g func()*A) {g().id=0;}");
-        checkFail(d + "func f(g func()*#A) {g().id=0;}");
+        checkSucc(d + "func f(g func()*!A) {g().id=0;}");
+        checkFail(d + "func f(g func()*!#A) {g().id=0;}");
 
         checkFail(d + "func f(g func()A) { {var a A; a}.id=0;}");
-        checkSucc(d + "func f(g func()A) { {var a *A; a}.id=0;}");
-        checkFail(d + "func f(g func()A) { {var a *#A; a}.id=0;}");
+        checkSucc(d + "func f(g func()A) { {var a *!A=new(A); a}.id=0;}");
+        checkFail(d + "func f(g func()A) { {var a *!#A=new(A); a}.id=0;}");
     }
 
     @Test
     public void testOperand8() {
         var d = "class A{var id int; const vv int;} ";
-        checkSucc(d + "func f(a *Object) {a?(*A).id=0;}");
-        checkFail(d + "func f(a *Object) {a?(*A).vv=0;}");
-        checkFail(d + "func f(a *Object) {a?(*#A).id=0;}");
+        checkSucc(d + "func f(a *!A) {a.id=0;}");
+        checkFail(d + "func f(a *!A) {a.vv=0;}");
+        checkFail(d + "func f(a *!#A) {a.id=0;}");
 
-        checkSucc(d + "func f(a [*]*Object) {a[0]?(*A).id=0;}");
-        checkFail(d + "func f(a [*]*Object) {a[0]?(*#A).id=0;}");
+        checkSucc(d + "func f(a [*!]*!A) {a[0].id=0;}");
+        checkFail(d + "func f(a [*!]*!#A) {a[0].id=0;}");
     }
 
     @Test
@@ -1094,9 +1095,9 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testIndexExpression1() {
-        checkSucc("func f(a [*]int){var v=a[0];}");
-        checkFail("func f(a [*]int){var v=a[true];}");
-        checkFail("func f(a [*]int, i bool){var v=a[i];}");
+        checkSucc("func f(a [*!]int){var v=a[0];}");
+        checkFail("func f(a [*!]int){var v=a[true];}");
+        checkFail("func f(a [*!]int, i bool){var v=a[i];}");
         checkFail("func f(a int){var v=a[0];}");
         var d = "class C{} ";
         checkFail(d + "func f(a A){var v=a[0];}");
@@ -1105,8 +1106,8 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testIndexExpression2() {
-        checkSucc("func f(a [*]int){var v=a[%d];}".formatted(Long.MAX_VALUE));
-        checkFail("func f(a [*]int){var v=a[-1];}");
+        checkSucc("func f(a [*!]int){var v=a[%d];}".formatted(Long.MAX_VALUE));
+        checkFail("func f(a [*!]int){var v=a[-1];}");
         checkSucc("func f(a [4]int){var v=a[3];}");
         checkFail("func f(a [4]int){var v=a[4];}");
 
@@ -1223,16 +1224,16 @@ public class SemanticAnalysisTest {
     @Test
     public void testDereferExpression1() {
         var d = "struct A{} class B{} interface C{}";
-        checkSucc(d + "func f(a*int){var v int = *a;}");
-        checkFail(d + "func f(a*int){var v int = a;}");
-        checkSucc(d + "func f(a*A){var v A = *a;}");
-        checkFail(d + "func f(a*A){var v A = a;}");
-        checkSucc(d + "func f(a*B){var v B = *a;}");
-        checkFail(d + "func f(a*B){var v B = a;}");
-        checkFail(d + "func f(a*C){var v = *a;}");
+        checkSucc(d + "func f(a*!int){var v int = *a;}");
+        checkFail(d + "func f(a*!int){var v int = a;}");
+        checkSucc(d + "func f(a*!A){var v A = *a;}");
+        checkFail(d + "func f(a*!A){var v A = a;}");
+        checkSucc(d + "func f(a*!B){var v B = *a;}");
+        checkFail(d + "func f(a*!B){var v B = a;}");
+        checkFail(d + "func f(a*!C){var v = *a;}");
 
-        checkFail(d + "func f(a [*]int){var v = *a;}");
-        checkFail(d + "func f(a [*]A){var v = *a;}");
+        checkFail(d + "func f(a [*!]int){var v = *a;}");
+        checkFail(d + "func f(a [*!]A){var v = *a;}");
         checkFail(d + "func f(a int){var v = *a;}");
         checkFail(d + "func f(a A){var v = *a;}");
 
@@ -1243,16 +1244,16 @@ public class SemanticAnalysisTest {
     @Test
     public void testDereferExpression2() {
         for (var op : BinaryOperator.SetMath) {
-            checkSucc("func f(a,b *int){var v int = *a %s *b; }".formatted(op));
+            checkSucc("func f(a,b *!int){var v int = *a %s *b; }".formatted(op));
         }
         for (var op : BinaryOperator.SetBits) {
-            checkSucc("func f(a,b *int){var v int = *a %s *b; }".formatted(op));
+            checkSucc("func f(a,b *!int){var v int = *a %s *b; }".formatted(op));
         }
         for (var op : BinaryOperator.SetRel) {
-            checkSucc("func f(a,b *int){var v bool = *a %s *b; }".formatted(op));
+            checkSucc("func f(a,b *!int){var v bool = *a %s *b; }".formatted(op));
         }
         for (var op : UnaryOperator.values()) {
-            checkSucc("func f(a *int){var v int = %s *a; }".formatted(op));
+            checkSucc("func f(a *!int){var v int = %s *a; }".formatted(op));
         }
     }
 
@@ -1300,11 +1301,11 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testConditionalExpression4() {
-        checkSucc("func f(a,b *int){const v &int = *a>*b ? a : b; }");
-        checkFail("func f(a,b *int){const v &int = *a>*b ? *a : b; }");
-        checkFail("func f(a,b *int){const v &int = *a>*b ? a : *b; }");
+        checkSucc("func f(a,b *!int){const v &int = *a>*b ? a : b; }");
+        checkFail("func f(a,b *!int){const v &int = *a>*b ? *a : b; }");
+        checkFail("func f(a,b *!int){const v &int = *a>*b ? a : *b; }");
 
-        checkSucc("func f(a int, b*int){const v &#int = a>*b ? a : b; }");
+        checkSucc("func f(a int, b*!int){const v &#int = a>*b ? a : b; }");
     }
 
 
@@ -1472,36 +1473,36 @@ public class SemanticAnalysisTest {
     @Test
     public void testConstValue3() {
         var d = "class A{var id int;} ";
-        checkSucc(d + "func f(a *A){a.id+=2;}");
+        checkSucc(d + "func f(a *!A){a.id+=2;}");
         checkFail(d + "func f(a  A){a.id+=2;}");
     }
 
     @Test
     public void testConstValue4() {
-        var d = "class A{var id int;} class B{var a *A;}";
-        checkSucc(d + "func f(b *B){b.a.id+=2;}");
+        var d = "class A{var id int;} class B{var a *!A;}";
+        checkSucc(d + "func f(b *!B){b.a.id+=2;}");
         checkSucc(d + "func f(b  B){b.a.id+=2;}");
     }
 
     @Test
     public void testConstValue5() {
         var d = "class A{var id int;} class B{var a A;}";
-        checkSucc(d + "func f(b *B){b.a.id+=2;}");
+        checkSucc(d + "func f(b *!B){b.a.id+=2;}");
         checkFail(d + "func f(b  B){b.a.id+=2;}");
     }
 
     @Test
     public void testConstValue6() {
         var d = "struct A{id int;} class B{var a A;}";
-        checkSucc(d + "func f(b *B){b.a.id+=2;}");
+        checkSucc(d + "func f(b *!B){b.a.id+=2;}");
         checkFail(d + "func f(b  B){b.a.id+=2;}");
     }
 
     @Test
     public void testConstValue7() {
-        var d = "struct A{id int;} class B{var a *A;}";
-        checkSucc(d + "func f(b *B){b.a.id+=2;}");
-        checkSucc(d + "func f(b &B){b.a.id+=2;}");
+        var d = "struct A{id int;} class B{var a *!A;}";
+        checkSucc(d + "func f(b *!B){b.a.id+=2;}");
+        checkSucc(d + "func f(b &!B){b.a.id+=2;}");
         checkSucc(d + "func f(b  B){b.a.id+=2;}");
     }
 
@@ -1510,17 +1511,16 @@ public class SemanticAnalysisTest {
         var d = "struct A{id int;} struct B{a A;} ";
         checkFail(d + "func f(b B){b.a.id+=2;}");
 
-        checkSucc(d + "func f(b *B){b.a.id+=2;}");
-        checkSucc(d + "func f(b &B){b.a.id+=2;}");
+        checkSucc(d + "func f(b *!B){b.a.id+=2;}");
+        checkSucc(d + "func f(b &!B){b.a.id+=2;}");
 
-        checkSucc(d + "func f(b *B){var i int = -b.a.id;}");
+        checkSucc(d + "func f(b *!B){var i int = -b.a.id;}");
     }
 
     @Test
     public void testConstValue9() {
         var d = "struct S{tag int;} class C{var id int;} ";
         checkSucc(d + "func f(){new(C).id=1;}");
-        checkSucc(d + "func f(c*C){c?(*C).id=1;}");
         checkSucc(d + "func f(){new([5]S)[2].tag=1;}");
         checkFail(d + "func f(){[5][2]=1;}");
         checkFail(d + "func f(){{id=2}.id=1;}");
@@ -1656,8 +1656,8 @@ public class SemanticAnalysisTest {
     @Test
     public void testMethodEscaped2() {
         var d = "class A { func run*() {} } ";
-        checkSucc(d + "func f(a *A){ a.run(); }");
-        checkFail(d + "func f(a &A){ a.run(); }");
+        checkSucc(d + "func f(a *!A){ a.run(); }");
+        checkFail(d + "func f(a &!A){ a.run(); }");
         checkFail(d + "func f(){ var a A; a.run(); }");
     }
 
@@ -1754,10 +1754,10 @@ public class SemanticAnalysisTest {
         checkSucc("class A{var id int; func run(){*this={id=1};}}");
         checkFail("class A{var id int; func run#(){*this={id=1};}}");
 
-        checkSucc("class A{var id *int; func run(){*id=1;}}");
-        checkSucc("class A{var id *int; func run#(){*id=1;}}");
-        checkSucc("class A{var id *int; func run(){*this.id=1;}}");
-        checkSucc("class A{var id *int; func run#(){*this.id=1;}}");
+        checkSucc("class A{var id *!int; func run(){*id=1;}}");
+        checkSucc("class A{var id *!int; func run#(){*id=1;}}");
+        checkSucc("class A{var id *!int; func run(){*this.id=1;}}");
+        checkSucc("class A{var id *!int; func run#(){*this.id=1;}}");
 
         checkSucc("class A{func a() {} func b(){a();}}");
         checkSucc("class A{func a#() {} func b(){a();}}");
@@ -1775,11 +1775,11 @@ public class SemanticAnalysisTest {
         checkFail("class A{func run(){}} func f(a A){a.run();}");
         checkSucc("class A{func run#(){}} func f(a A){a.run();}");
 
-        checkSucc("class A{func run(){}} func f(a *A){a.run();}");
-        checkSucc("class A{func run#(){}} func f(a *A){a.run();}");
+        checkSucc("class A{func run(){}} func f(a *!A){a.run();}");
+        checkSucc("class A{func run#(){}} func f(a *!A){a.run();}");
 
-        checkSucc("class A{func run#(){}} func f(a *#A){a.run();}");
-        checkFail("class A{func run(){}} func f(a *#A){a.run();}");
+        checkSucc("class A{func run#(){}} func f(a *!#A){a.run();}");
+        checkFail("class A{func run(){}} func f(a *!#A){a.run();}");
     }
 
     @Test
@@ -1832,9 +1832,9 @@ public class SemanticAnalysisTest {
         checkSucc("func f(a,b *int){if(a!=nil&&b!=nil){var x *!int = a;var y *!int = b;} }");
         checkFail("func f(a,b *int){if(a!=nil&&b==nil){var x *!int = a;var y *!int = b;} }");
         checkSucc("func f(a,b *int){if(a!=nil&&b==nil){var x *!int = a;} }");
-        checkFail("func f(a,b *int){if(a!=nil&&(b!=nil||*b>0)){var x *!int = a;var y *!int = b;} }");
-        checkSucc("func f(a,b *int){if(a!=nil&&(b!=nil||*b>0)){var x *!int = a;} }");
-        checkFail("func f(a,b *int){if(a!=nil&&b!=nil||*b>0){var x *!int = a;} }");
+        checkFail("func f(a,b *int, c int){if(a!=nil&&(b!=nil||c>0)){var x *!int = a;var y *!int = b;} }");
+        checkSucc("func f(a,b *int, c int){if(a!=nil&&(b!=nil||c>0)){var x *!int = a;} }");
+        checkFail("func f(a,b *int, c int){if(a!=nil&&b!=nil||c>0){var x *!int = a;} }");
 
         checkFail("func f(a,b *int){if(a==nil||b==nil){var x *!int = a;} }");
         checkSucc("func f(a,b *int){if(!(a==nil||b==nil)){var x *!int = a;} }");
@@ -2045,17 +2045,17 @@ public class SemanticAnalysisTest {
         checkFail(d + "func f(c func(a &I), r R) { c(r.b); }");
 
 
-        checkSucc(d + "func f(c func(a &B), r *R) { c(r.b); }");
-        checkSucc(d + "func f(c func(a &A), r *R) { c(r.b); }");
-        checkSucc(d + "func f(c func(a &I), r *R) { c(r.b); }");
+        checkSucc(d + "func f(c func(a &B), r *!R) { c(r.b); }");
+        checkSucc(d + "func f(c func(a &A), r *!R) { c(r.b); }");
+        checkSucc(d + "func f(c func(a &I), r *!R) { c(r.b); }");
 
         checkFail(d + "func f(c func(a &B), r R) { c(r.b); }");
         checkFail(d + "func f(c func(a &A), r R) { c(r.b); }");
         checkFail(d + "func f(c func(a &I), r R) { c(r.b); }");
 
-        checkSucc(d + "func f(c func(a &B), r &R) { c(r.b); }");
-        checkSucc(d + "func f(c func(a &A), r &R) { c(r.b); }");
-        checkSucc(d + "func f(c func(a &I), r &R) { c(r.b); }");
+        checkSucc(d + "func f(c func(a &B), r &!R) { c(r.b); }");
+        checkSucc(d + "func f(c func(a &A), r &!R) { c(r.b); }");
+        checkSucc(d + "func f(c func(a &I), r &!R) { c(r.b); }");
 
     }
 
@@ -2066,35 +2066,35 @@ public class SemanticAnalysisTest {
         checkSucc(d + "func f(c func(a &A)) { var r R;c(r.b); }");
         checkSucc(d + "func f(c func(a &I)) { var r R;c(r.b); }");
 
-        checkSucc(d + "func f(c func(a &B), r *R) { c(r.b); }");
-        checkSucc(d + "func f(c func(a &A), r *R) { c(r.b); }");
-        checkSucc(d + "func f(c func(a &I), r *R) { c(r.b); }");
+        checkSucc(d + "func f(c func(a &B), r *!R) { c(r.b); }");
+        checkSucc(d + "func f(c func(a &A), r *!R) { c(r.b); }");
+        checkSucc(d + "func f(c func(a &I), r *!R) { c(r.b); }");
 
-        checkSucc(d + "func f(c func(a &B), r &R) { c(r.b); }");
-        checkSucc(d + "func f(c func(a &A), r &R) { c(r.b); }");
-        checkSucc(d + "func f(c func(a &I), r &R) { c(r.b); }");
+        checkSucc(d + "func f(c func(a &B), r &!R) { c(r.b); }");
+        checkSucc(d + "func f(c func(a &A), r &!R) { c(r.b); }");
+        checkSucc(d + "func f(c func(a &I), r &!R) { c(r.b); }");
     }
 
     @Test
     public void testPhantomField1() {
         var d = "struct R{s S;} struct S{v int8;} class C{var r R;} ";
-        checkSucc(d + "func f(c *C){const s &S = c.r.s;}");
-        checkFail(d + "func f(c *C){const s &int16 = c.r.s;}");
+        checkSucc(d + "func f(c *!C){const s &S = c.r.s;}");
+        checkFail(d + "func f(c *!C){const s &int16 = c.r.s;}");
     }
 
     @Test
     public void testPhantomField2() {
         var d = "class R{var s S;} class S{var v int8;} class C{var r R;} ";
-        checkSucc(d + "func f(c *C){const s &S = c.r.s;}");
-        checkFail(d + "func f(c *C){const s &int16 = c.r.s;}");
+        checkSucc(d + "func f(c *!C){const s &S = c.r.s;}");
+        checkFail(d + "func f(c *!C){const s &int16 = c.r.s;}");
     }
 
     @Test
     public void testPhantomField3() {
         var d = "interface I{} interface J{I;} class R{const j *J;} ";
-        checkSucc(d + "func f(r *R){ const i &I = r.j; }");
+        checkSucc(d + "func f(r *!R){ const i &I = r.j; }");
         d = d + "class T{var r R;}";
-        checkSucc(d + "func f(t *T){ const i &I = t.r.j; }");
+        checkSucc(d + "func f(t *!T){ const i &I = t.r.j; }");
     }
 
     @Test
@@ -2113,10 +2113,10 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testPhantomArray1() {
-        var d = "class A{} class B{var ar [4]A; const sz [*]A;} ";
-        checkSucc(d + "func f(b *B) { const a &A = b.ar[0]; }");
+        var d = "class A{} class B{var ar [4]A; const sz [*!]A;} ";
+        checkSucc(d + "func f(b *!B) { const a &A = b.ar[0]; }");
         checkFail(d + "func f(b B) { const a &A = b.ar[0]; }");
-        checkSucc(d + "func f(b *B) { const a &A = b.sz[0]; }");
+        checkSucc(d + "func f(b *!B) { const a &A = b.sz[0]; }");
         checkSucc(d + "func f(b B) { const a &A = b.sz[0]; }");
     }
 
@@ -2149,10 +2149,10 @@ public class SemanticAnalysisTest {
         String[] elements = {"int", "[3]int", "*int", "S", "[1]S", "[*]S",
                 "C", "*C", "[3]C", "[*]C", "[5]*C", "[*]*C"};
         for (var e : elements) {
-            checkSucc(d + "class T{var f [3]%s;} func m(t *T){ const r [&]%s = t.f; }".formatted(e, e));
-            checkFail(d + "class T{const f [3]%s;} func m(t *T){ const r [&]%s = t.f; }".formatted(e, e));
-            checkFail(d + "class T{var f [*]%s;} func m(t *T){ const r [&]%s = t.f; }".formatted(e, e));
-            checkSucc(d + "class T{const f [*]%s;} func m(t *T){ const r [&]%s = t.f; }".formatted(e, e));
+            checkSucc(d + "class T{var f [3]%s;} func m(t *!T){ const r [&]%s = t.f; }".formatted(e, e));
+            checkFail(d + "class T{const f [3]%s;} func m(t *!T){ const r [&]%s = t.f; }".formatted(e, e));
+            checkFail(d + "class T{var f [*]%s;} func m(t *!T){ const r [&]%s = t.f; }".formatted(e, e));
+            checkSucc(d + "class T{const f [*]%s;} func m(t *!T){ const r [&]%s = t.f; }".formatted(e, e));
         }
     }
 
@@ -2239,8 +2239,8 @@ public class SemanticAnalysisTest {
 
     @Test
     public void testArray7() {
-        checkSucc("func t(s [*]int) { s[0] = s[1]; }");
-        checkSucc("func t(s [*]int, i int) { s[i] = s[1]; }");
+        checkSucc("func t(s [*!]int) { s[0] = s[1]; }");
+        checkSucc("func t(s [*!]int, i int) { s[i] = s[1]; }");
         checkFail("func t(s int) { s[0] = s[1]; }");
         checkFail("func t(s [4]int) { s[0] = s[1]; }");
     }
@@ -2300,7 +2300,7 @@ public class SemanticAnalysisTest {
         checkFail(d + "func f(s [*]*A){var r [*]*I = s;}");
         checkFail(d + "func f(s [&]*A){var r [&]*I = s;}");
 
-        checkSucc(d + "func f(s [&]*A){var r [3]*I; r[2] = s[0];}");
+        checkSucc(d + "func f(s [&!]*A){var r [3]*I; r[2] = s[0];}");
     }
 
     @Test
@@ -2544,12 +2544,12 @@ public class SemanticAnalysisTest {
     @Test
     public void testStructRefer4() {
         var d = "struct A{a1 int32;} struct B{b1 int16;} struct C{c1 int64;} class T{var d A;} ";
-        checkSucc(d + "func f(a *A){const s &int32 = a.a1; }");
-        checkSucc(d + "func f(a *A){const s &int16 = a.a1; }");
-        checkFail(d + "func f(a *A){const s &int64 = a.a1; }");
+        checkSucc(d + "func f(a *!A){const s &int32 = a.a1; }");
+        checkSucc(d + "func f(a *!A){const s &int16 = a.a1; }");
+        checkFail(d + "func f(a *!A){const s &int64 = a.a1; }");
 
-        checkSucc(d + "func f(t *T){const s &B = t.d; }");
-        checkFail(d + "func f(t *T){const s &C = t.d; }");
+        checkSucc(d + "func f(t *!T){const s &B = t.d; }");
+        checkFail(d + "func f(t *!T){const s &C = t.d; }");
     }
 
     @Test
@@ -2593,8 +2593,8 @@ public class SemanticAnalysisTest {
     @Test
     public void testStructField5() {
         var def = "struct R{ id int; } ";
-        checkSucc(def + "func f(r *R) { r.id = 1; }");
-        checkSucc(def + "func f(r *R) { var v = r.id; }");
+        checkSucc(def + "func f(r *!R) { r.id = 1; }");
+        checkSucc(def + "func f(r *!R) { var v = r.id; }");
         checkSucc(def + "func f() { var r R; r.id = 1; }");
         checkFail(def + "func f(r R) { r.id = 1; }");
     }
@@ -2956,11 +2956,11 @@ public class SemanticAnalysisTest {
     @Test
     public void testStatementAssignment() {
         var def = "class A{ var id int; }";
-        checkSucc(def + "func f(a *A) { var v int; v,a.id = 1,2; }");
-        checkFail(def + "func f(a *A) { var v int; v,a.id = 1; }");
-        checkFail(def + "func f(a *A) { var v int; v,a.id = 1,2,3; }");
-        checkSucc(def + "func f(a *A, r [*]int) { var v int; v,a.id,r[2] = 1,2,3; }");
-        checkFail(def + "func f(a *A) { a.type=2; }");
+        checkSucc(def + "func f(a *!A) { var v int; v,a.id = 1,2; }");
+        checkFail(def + "func f(a *!A) { var v int; v,a.id = 1; }");
+        checkFail(def + "func f(a *!A) { var v int; v,a.id = 1,2,3; }");
+        checkSucc(def + "func f(a *!A, r [*!]int) { var v int; v,a.id,r[2] = 1,2,3; }");
+        checkFail(def + "func f(a *!A) { a.type=2; }");
         checkFail(def + "func f() { var a int; a.id=1; }");
         checkFail(def + "func f() { var a int; a[0]=1; }");
     }
@@ -3307,32 +3307,32 @@ public class SemanticAnalysisTest {
         checkSucc(d + "func f(i int) { var a A`int`; a.t = i; }");
         checkFail(d + "func f(i bool) { var a A`int`; a.t = i; }");
 
-        checkSucc(d + "func f(a *A`int`) { var v int = a.t; }");
-        checkFail(d + "func f(a *A`int`) { var v bool = a.t; }");
-        checkSucc(d + "func f(i int, a *A`int`) { a.t = i; }");
-        checkFail(d + "func f(i bool, a *A`int`) { a.t = i; }");
-        checkSucc(d + "func f(a *A`*int`) {a.t = new(int);}");
-        checkFail(d + "func f(a *A`*int`) {a.t = new(bool);}");
+        checkSucc(d + "func f(a *!A`int`) { var v int = a.t; }");
+        checkFail(d + "func f(a *!A`int`) { var v bool = a.t; }");
+        checkSucc(d + "func f(i int, a *!A`int`) { a.t = i; }");
+        checkFail(d + "func f(i bool, a *!A`int`) { a.t = i; }");
+        checkSucc(d + "func f(a *!A`*!int`) {a.t = new(int);}");
+        checkFail(d + "func f(a *!A`*!int`) {a.t = new(bool);}");
     }
 
     @Test
     public void testGenericImplType2() {
         var d = "class A`T`{var t T; func get() T{return t;}} ";
-        checkSucc(d + "func f(a *A`int`) {var i int= a.get();}");
-        checkFail(d + "func f(a *A`int`) {var i bool= a.get();}");
+        checkSucc(d + "func f(a *!A`int`) {var i int= a.get();}");
+        checkFail(d + "func f(a *!A`int`) {var i bool= a.get();}");
 
         d = "class A`T`{var t T; func set(t T) {this.t=t;}} ";
-        checkSucc(d + "func f(a *A`int`) {var i=0; a.set(i);}");
-        checkFail(d + "func f(a *A`int`) {var i=false; a.set(i);}");
+        checkSucc(d + "func f(a *!A`int`) {var i=0; a.set(i);}");
+        checkFail(d + "func f(a *!A`int`) {var i=false; a.set(i);}");
 
         d = "class A`T`{var t T; func set(t T){this.t=t;} func get() T{return t;}}";
-        checkSucc(d + "func f(a *A`*int`) {a.set(a.get());}");
-        checkSucc(d + "func f(a *A`*int`) {a.set(a.get());}");
+        checkSucc(d + "func f(a *!A`*!int`) {a.set(a.get());}");
+        checkSucc(d + "func f(a *!A`*!int`) {a.set(a.get());}");
 
         d = "class A`T`{var t T; func set(t T){this.t=t;} func init() {var t T; set(t);}}";
-        checkSucc(d + "func f(a *A`int`) {a.init();}");
-        checkSucc(d + "func f(a *A`*int`) {a.init();}");
-        checkFail(d + "func f(a *A`&int`) {a.init();}");
+        checkSucc(d + "func f(a *!A`int`) {a.init();}");
+        checkSucc(d + "func f(a *!A`*!int`) {a.init();}");
+        checkFail(d + "func f(a *!A`&!int`) {a.init();}");
     }
 
     @Test
@@ -3350,24 +3350,24 @@ public class SemanticAnalysisTest {
     @Test
     public void testGenericImplType4() {
         var d = "class A`T`{var v T; func m`E`()A`E`{return {};}}";
-        checkSucc(d + "func f(a *A`int`){var b=a.m`bool`(); b.v=true;}");
+        checkSucc(d + "func f(a *!A`int`){var b=a.m`bool`(); b.v=true;}");
         d = "class A`T`{var v T; func m`E`(e E){}}";
-        checkSucc(d + "func f(a *A`int`){a.m`bool`(true);}");
+        checkSucc(d + "func f(a *!A`int`){a.m`bool`(true);}");
     }
 
     @Test
     public void testGenericImplType5() {
         var d = "class A`T`{var t T; var c func();} ";
-        checkSucc(d + "func f(a *A`int`){var v = a.t;}");
-        checkFail(d + "func f(a *A`int`){var v = a.t`bool`;}");
-        checkFail(d + "func f(a *A`int`){a.c`bool`();}");
+        checkSucc(d + "func f(a *!A`int`){var v = a.t;}");
+        checkFail(d + "func f(a *!A`int`){var v = a.t`bool`;}");
+        checkFail(d + "func f(a *!A`int`){a.c`bool`();}");
         d = "enum E{A,B,}";
         checkSucc(d + "func f() {var e = E.A;}");
         checkFail(d + "func f() {var e = E.A`int`;}");
         checkFail(d + "func f() {var e = E.A.value`int`;}");
 
-        checkSucc("func f(a [*]int){var i = a.length;}");
-        checkFail("func f(a [*]int){var i = a.length`int`;}");
+        checkSucc("func f(a [*!]int){var i = a.length;}");
+        checkFail("func f(a [*!]int){var i = a.length`int`;}");
 
         checkSucc("func f(a int){var i = a;}");
         checkFail("func f(a int){var i = a`int`;}");
@@ -3460,8 +3460,8 @@ public class SemanticAnalysisTest {
         checkSucc(d + "func f(n int){ c(A`int,bool`{}); }");
 
         d = "class A{func c`T1,T2`(t1 T1, t2 T2){}} ";
-        checkSucc(d + "func f(n int, a *A){ a.c`int,bool`(n,false); }");
-        checkSucc(d + "func f(n int, a *A){ a.c(n,false); }");
+        checkSucc(d + "func f(n int, a *!A){ a.c`int,bool`(n,false); }");
+        checkSucc(d + "func f(n int, a *!A){ a.c(n,false); }");
     }
 
     @Test
@@ -3575,18 +3575,18 @@ public class SemanticAnalysisTest {
         checkFail(d + "func f() { var a *A; a[0] = 0; }");
 
         d = "class A{ macro index get(index int) bool { true } } ";
-        checkSucc(d + "func f() { var a A; var v = a[0]; }");
-        checkSucc(d + "func f() { var a *A; var v = a[0]; }");
+        checkSucc(d + "func f(a A) { var v = a[0]; }");
+        checkSucc(d + "func f(a *!A) { var v = a[0]; }");
 
         d = "class A{ macro index set(index int, value bool) {} } ";
         checkSucc(d + "func f() { var a A; a[0] = true; }");
-        checkSucc(d + "func f() { var a *A; a[0] = true; }");
+        checkSucc(d + "func f() { var a =new(A); a[0] = true; }");
     }
 
     //
 
     static void parseSample(File file) {
-        System.out.printf("[test]%s.feng\n", file.getName());
+        System.out.printf("[test]%s\n", file.getName());
         var parser = new SourceParser(UTF_8);
         var src = parser.parse(file.toPath());
         new SemanticAnalysis(src.table()).analyse();

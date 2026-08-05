@@ -120,8 +120,8 @@ class BitSet {
     // ===== set operations =====
 
     // this = this & other
-    export func and(other *BitSet) {
-        if (other == nil) {
+    export func and(other *!BitSet) {
+        if (other.bits == nil) {
             return;
         }
         if (bits == nil) {
@@ -140,10 +140,7 @@ class BitSet {
     }
 
     // this = this | other
-    export func or(other *BitSet) {
-        if (other == nil) {
-            return;
-        }
+    export func or(other *!BitSet) {
         if (other.bits == nil) {
             return;
         }
@@ -168,10 +165,7 @@ class BitSet {
     }
 
     // this = this ~ other  (XOR)
-    export func xor(other *BitSet) {
-        if (other == nil) {
-            return;
-        }
+    export func xor(other *!BitSet) {
         if (other.bits == nil) {
             return;
         }
@@ -195,10 +189,7 @@ class BitSet {
     }
 
     // this = this & !other
-    export func andNot(other *BitSet) {
-        if (other == nil) {
-            return;
-        }
+    export func andNot(other *!BitSet) {
         if (bits == nil) {
             return;
         }

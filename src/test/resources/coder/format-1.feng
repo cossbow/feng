@@ -19,5 +19,5 @@ func main() {
     var b NilWriter = {buf=new([64]byte)};
     var s Buffer = {data="feng"};
     format(b, "Hello {}!\n", s);
-    assert(b.size == 5);
+    assert(b.size == 3);
 }

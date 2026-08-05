@@ -4,14 +4,20 @@ class A {
 func make(n int) *A {
     if (n<1) return nil;
     var a = new(A, {n=new([4]*A)});
+    if (a == nil) return nil;
+    var an = a.n;
+    if (an == nil) return nil;
     for(var i=0; i<n && i<4; i+=1) {
-        a.n[i] = make(n-1);
+        an[i] = make(n-1);
     }
     return a;
 }
 func test(n int) {
     var a = make(n);
-    var r = a.n[0];
+    if (a == nil) return;
+    var an = a.n;
+    if (an == nil) return;
+    var r = an[0];
 }
 
 func main(args [&!#][*!#]byte) {

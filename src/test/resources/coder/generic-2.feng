@@ -45,10 +45,13 @@ func make`T`(t T) *Box`T` {
 func test(n int) {
     var i int;
     var b  = make`int`(n);
+    if (b == nil) return;
     b.set(n+1);
     var bb = new(BigBox`int`,{v=n+11});
+    if (bb == nil) return;
     i = bb.change(n+33);
     var sb = new(SealedBox`int`,{v=n*2});
+    if (sb == nil) return;
     i = sb.fetch();
     var yes Pair`int,bool` = sb.map`bool`(true);
     i = sb.get();

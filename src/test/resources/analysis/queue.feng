@@ -53,7 +53,9 @@ func test(n int) int {
     var c = 0;
     for (!queue.isEmpty()) {
         var v = queue.poll()?(*Data);
-        c += v.value;
+        if (v != nil) {
+            c += v.value;
+        }
     }
     return c;
 }

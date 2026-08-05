@@ -66,16 +66,21 @@ func test(n int) {
     var i int;
     {
         var a = alloc`int`(n+11);
+        if (a == nil) return;
         i = a[0];
         var b = new([11]int, a);
     }
     {
         var a = alloc`*int`(new(int, n+13));
-        i = *a[0];
+        if (a == nil) return;
+        var e = a[0];
+        if (e == nil) return;
+        i = *e;
         var b = new([13]*int, a);
     }
     {
         var a = make`int`(n+111);
+        if (a == nil) return;
         i = a[0].get();
     }
     {
@@ -84,30 +89,36 @@ func test(n int) {
     }
     {
         var a = alloc`Pair`int,bool``({r=true,l=202});
+        if (a == nil) return;
         var l int = a[0].l;
     }
     {
         var p Pair`int,bool` = {r=true,l=302};
         var p1 = new(Pair`int,bool`, {r=false,l=57});
         var a = make`Pair`int,bool``({r=true,l=203});
+        if (a == nil) return;
         i = a[0].v.l;
     }
     {
         var c Car = {id=21,sp=3.14};
         var p = new(Car, {id=21,sp=3.14});
         var bc = new(Box`Car`, {v={id=24,sp=3.1415}});
+        if (bc == nil) return;
         i = bc.v.id;
     }
     {
         var a = new([2]SealedBox`Box`int``, [{v={v=1}}]);
+        if (a == nil) return;
         var f = a[0].map`float`(7.00001);
     }
     {
         var a = new([2]SealedBox`Box`int``, [{v={v=1}}]);
+        if (a == nil) return;
         var f = a[0].map(7.00001);
     }
     {
         var a = new([2]*SealedBox`Box`int``, [nil]);
+        if (a == nil) return;
         a[0] = new(SealedBox`Box`int``, {v={v=1}});
     }
     {

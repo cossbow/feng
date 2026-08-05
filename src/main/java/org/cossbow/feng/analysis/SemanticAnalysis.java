@@ -3719,6 +3719,7 @@ public class SemanticAnalysis {
         if (!(g.b() instanceof FuncTypeDeclarer td))
             return semantic("%s not callable: %s",
                     e.callee(), e.pos());
+        checkOptional(g.a());
 
         var p = td.prototype();
         var gm = GenericMap.EMPTY;
@@ -4191,10 +4192,9 @@ public class SemanticAnalysis {
 
     private void checkOptional(Expression e) {
         var t = e.resultType.must();
-        if (t.maybeRefer().match(r -> !r.required()))
-            warn("need to check nil before use '%s': %s",
-                    e, e.pos());
-
+        if (t.required() || ifMarkNonNil(e)) return;
+        ErrorUtil.semantic("must check nil before use '%s': %s",
+                e, e.pos());
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(MemberOfExpression e) {

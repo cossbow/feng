@@ -19,7 +19,7 @@ class File (Writer,Reader) {
     }
 
     export
-    func read(buf [&!]byte) int {
+    func read#(buf [&!]byte) int {
         var n = fread(buf.values, 1, uint64(buf.length), fp);
         if (n <= 0) {
             return -1;

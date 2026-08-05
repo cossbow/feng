@@ -25,6 +25,7 @@ func defaultHash`T`(k T) T {
 
 func testHashmap(n int) {
     var map = aad$newHashmap`int,int`(defaultHash`int`);
+    if (map == nil) return;
     for(var i=0;i<n;i+=1) {
         map.set(i, i+100);
     }
@@ -36,7 +37,8 @@ func testHashmap(n int) {
     if (var r=map.get(101); r.1){}
 }
 
-func intHashing(n &m$Node`int,int`) int {
+func intHashing(n &!m$Node`int,int`) int {
+    if (n == nil) return 0;
     return n.key;
 }
 

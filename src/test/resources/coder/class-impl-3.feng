@@ -19,43 +19,59 @@ func get() *Object {
 func test(n int) {
     {
         var o *Object = new(B);
+        if (o == nil) return;
         var a = o?(*A);
+        if (a == nil) return;
         a.run();
         var b = o?(*B);
+        if (b == nil) return;
         b.run();
         {
             var a = b?(*A);
+            if (a == nil) return;
             a.run();
         }
         var i = o?(*I);
+        if (i == nil) return;
         i.run();
         var j = o?(*J);
+        if (j == nil) return;
         j.run();
         {
             const o1 &Object = o;
             const a = o1?(&A);
+            if (a == nil) return;
             a.run();
             const b = o1?(&B);
+            if (b == nil) return;
             b.run();
             {
                 const a = b?(&A);
+                if (a == nil) return;
                 a.run();
             }
             const i = o1?(&I);
+            if (i == nil) return;
             i.run();
             const j = o1?(&J);
+            if (j == nil) return;
             j.run();
         }
     }
     {
         var o *Object = get();
+        if (o == nil) return;
         var a = get()?(*A);
+        if (a == nil) return;
         a.run();
         var b = get()?(*B);
+        if (b == nil) return;
         b.run();
         var i = get()?(*I);
+        if (i == nil) return;
         i.run();
         var j = get()?(*J);
+        if (j == nil) return;
         j.run();
     }
 
