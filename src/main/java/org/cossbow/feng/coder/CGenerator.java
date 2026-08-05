@@ -120,6 +120,9 @@ public class CGenerator implements Generator {
     private boolean insideTryFinally = false;
     // exception handling: nesting counter for unique finally labels
     private int tryFinallyDepth = 0;
+    // loop labels: maps each ForStatement to its (continue, break) C labels
+    private final Map<ForStatement, Groups.G2<Label, Label>>
+            loopLabels = new HashMap<>();
 
     // ---- dedup / deferred emission ----
     // Types and functions needed by code are registered first, then emitted
@@ -2871,11 +2874,13 @@ public class CGenerator implements Generator {
     }
 
     private CGenerator write(BreakStatement s) {
-        return write("break").endStmt();
+        var g = loopLabels.get(s.target.must());
+        return write("goto ").write(g.b()).endStmt();
     }
 
     private CGenerator write(ContinueStatement s) {
-        return write("continue").endStmt();
+        var g = loopLabels.get(s.target.must());
+        return write("goto ").write(g.a()).endStmt();
     }
 
     private CGenerator write(CallStatement e) {
@@ -2896,6 +2901,10 @@ public class CGenerator implements Generator {
     }
 
     private CGenerator write(ConditionalForStatement fs) {
+        var lg = Groups.g2(
+                new Label(new Identifier("loopNext")),
+                new Label(new Identifier("loopExit")));
+        loopLabels.put(fs, lg);
         write('{').indent();
         fs.initializer().use(this::write);
         write("for(;;) {").indent();
@@ -2904,8 +2913,10 @@ public class CGenerator implements Generator {
         dedent().write("}else{").indent();
         write("break").endStmt();
         dedent().write('}').newLine();
+        write(lg.a()).write(":").endStmt();
         fs.updater().use(this::write);
         dedent().write('}').newLine();
+        write(lg.b()).write(":").endStmt();
         dedent().write('}').newLine();
         return this;
     }
