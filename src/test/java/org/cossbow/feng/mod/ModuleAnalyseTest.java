@@ -6,6 +6,7 @@ import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.parser.SourceParser;
 import org.cossbow.feng.util.BufferOutputStream;
+import org.cossbow.feng.util.ErrorUtil;
 import org.junit.jupiter.api.Test;
 
 import java.io.BufferedWriter;
@@ -35,9 +36,11 @@ public class ModuleAnalyseTest {
         return src.table();
     }
 
-    public static DAGGraph<FModule> analyseModule() {
+    DAGGraph<FModule> analyseModule() {
         var m = ModuleParserTest.parseModule();
-        new ModuleAnalysis().analyse(m);
+        var ma = new ModuleAnalysis();
+        ma.analyse(m);
+        ErrorUtil.reportError(ma.errors());
         return m;
     }
 
@@ -52,7 +55,9 @@ public class ModuleAnalyseTest {
 
     public static DAGGraph<FModule> analysePackage() throws IOException {
         var dag = ModuleParserTest.parsePackage();
-        new ModuleAnalysis().analyse(dag);
+        var ma = new ModuleAnalysis();
+        ma.analyse(dag);
+        ErrorUtil.reportError(ma.errors());
         return dag;
     }
 
@@ -68,6 +73,8 @@ public class ModuleAnalyseTest {
     @Test
     public void testLibrary() throws IOException {
         var dag = ModuleParserTest.withLibrary();
-        new ModuleAnalysis().analyse(dag);
+        var ma = new ModuleAnalysis();
+        ma.analyse(dag);
+        ErrorUtil.reportError(ma.errors());
     }
 }

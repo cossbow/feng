@@ -9,6 +9,7 @@ import org.cossbow.feng.ast.proc.FixedParameter;
 import org.cossbow.feng.coder.CppGenerator;
 import org.cossbow.feng.coder.Generator;
 import org.cossbow.feng.dag.DAGGraph;
+import org.cossbow.feng.err.SemanticException;
 import org.cossbow.feng.mod.ModuleAnalysis;
 import org.cossbow.feng.mod.ModuleParser;
 import org.cossbow.feng.util.Command;
@@ -202,7 +203,9 @@ public class Compiler {
     public void compile(DAGGraph<FModule> dag, Path dir)
             throws IOException {
         var moduleNames = new ArrayList<String>();
-        new ModuleAnalysis(test).analyse(dag);
+        var ma = new ModuleAnalysis(test);
+        ma.analyse(dag);
+        ErrorUtil.reportError(ma.errors());
         factory.copyBaseHeader(dir);
 
         // Collect all C source files from all modules

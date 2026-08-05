@@ -6,7 +6,7 @@ import org.cossbow.feng.analysis.GlobalSymbolContext;
 import org.cossbow.feng.analysis.AnonFuncNormalizer;
 import org.cossbow.feng.analysis.Monomorphization;
 import org.cossbow.feng.analysis.RelayLowering;
-import org.cossbow.feng.analysis.SemanticAnalysis;
+import org.cossbow.feng.analysis.SemanticAnalyzer;
 import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.dag.DAGGraph;
@@ -19,7 +19,9 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -27,6 +29,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class ModuleAnalysis {
     // In test model
     private final boolean test;
+    private final List<String> errors = new ArrayList<>();
 
     public ModuleAnalysis(boolean test) {
         this.test = test;
@@ -34,6 +37,10 @@ public class ModuleAnalysis {
 
     public ModuleAnalysis() {
         this(false);
+    }
+
+    public List<String> errors() {
+        return errors;
     }
 
     private ParseSymbolTable buildMetadata(FModule m) {
@@ -55,6 +62,15 @@ public class ModuleAnalysis {
         }
     }
 
+    private AnalyseSymbolTable analyse(
+            ParseSymbolTable table, GlobalSymbolContext context) {
+        var analyzer = new SemanticAnalyzer(
+                table, context, test);
+        var ast = analyzer.analyse();
+        errors.addAll(analyzer.errors());
+        return ast;
+    }
+
     public void analyse(DAGGraph<FModule> modules) {
         var tabMap = modules.stream().collect(
                 Collectors.toMap(FModule::path, FModule::table));
@@ -74,8 +90,7 @@ public class ModuleAnalysis {
             }
 
             var context = new GlobalSymbolContext(imports, m.table());
-            var ast = new SemanticAnalysis(
-                    m.table(), context, test).analyse();
+            var ast = analyse(m.table(), context);
             ast.module.set(m);
 
             // AST lowering: insert temporary variables for
@@ -109,9 +124,7 @@ public class ModuleAnalysis {
 
     public AnalyseSymbolTable analyse(FModule module) {
         var context = new GlobalSymbolContext(module.table());
-        var ast = new SemanticAnalysis(
-                module.table(), context, test)
-                .analyse();
+        var ast = analyse(module.table(), context);
         ast.module.set(module);
 
         // AST lowering: insert temporary variables for

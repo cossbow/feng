@@ -2,6 +2,7 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.parser.BaseParseTest;
+import org.cossbow.feng.util.ErrorUtil;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -20,7 +21,9 @@ public class SemanticAnalysisMain {
     static void checkSucc(String file) {
         System.out.printf("[check]>>> %s\n", file);
         var src = doParse(file);
-        new SemanticAnalysis(src.table()).analyse();
+        var analyzer = new SemanticAnalyzer(src.table());
+        analyzer.analyse();
+        ErrorUtil.reportError(analyzer.errors());
     }
 
     public static void main(String[] args) {

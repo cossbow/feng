@@ -2,11 +2,10 @@ package org.cossbow.feng.lsp;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
-import org.cossbow.feng.analysis.SemanticAnalysis;
+import org.cossbow.feng.analysis.SemanticAnalyzer;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.err.SemanticException;
 import org.cossbow.feng.parser.FengLexer;
 import org.cossbow.feng.parser.FengParser;
 import org.cossbow.feng.parser.ParseSymbolTable;
@@ -93,11 +92,13 @@ public class FengAnalyzer {
         // Semantic analysis (catch semantic errors)
         var semanticErrors = new ArrayList<String>();
         if (source != null) {
+            var analyzer = new SemanticAnalyzer(source.table());
             try {
-                new SemanticAnalysis(source.table()).analyse();
+                analyzer.analyse();
             } catch (Exception e) {
                 semanticErrors.add(e.getMessage());
             }
+            semanticErrors.addAll(analyzer.errors());
         }
 
         var result = new AnalyzeResult(source, errorCollector.errors(), semanticErrors);

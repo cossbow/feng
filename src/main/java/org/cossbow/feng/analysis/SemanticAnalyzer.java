@@ -45,7 +45,7 @@ import static org.cossbow.feng.ast.dcl.ReferKind.STRONG;
 import static org.cossbow.feng.util.CommonUtil.subtract;
 import static org.cossbow.feng.util.ErrorUtil.*;
 
-public class SemanticAnalysis {
+public class SemanticAnalyzer {
     private final ParseSymbolTable table;
     private final StackedContext context;
     private final boolean test;
@@ -56,8 +56,9 @@ public class SemanticAnalysis {
     private final DedupCache<StringLiteral> stringCache;
     // The current tool class has some states, so it cannot be reused
     private boolean used;
+    private final List<String> errors = new ArrayList<>();
 
-    public SemanticAnalysis(ParseSymbolTable table,
+    public SemanticAnalyzer(ParseSymbolTable table,
                             SymbolContext root, boolean test) {
         this.table = table;
         this.context = new StackedContext(root);
@@ -65,8 +66,12 @@ public class SemanticAnalysis {
         this.test = test;
     }
 
-    public SemanticAnalysis(ParseSymbolTable table) {
+    public SemanticAnalyzer(ParseSymbolTable table) {
         this(table, new GlobalSymbolContext(table), false);
+    }
+
+    public List<String> errors() {
+        return errors;
     }
 
     //
@@ -4193,8 +4198,7 @@ public class SemanticAnalysis {
     private void checkOptional(Expression e) {
         var t = e.resultType.must();
         if (t.required() || ifMarkNonNil(e)) return;
-        ErrorUtil.semantic("must check nil before use '%s': %s",
-                e, e.pos());
+        errors.add("must check nil before use '%s': %s".formatted(e, e.pos()));
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(MemberOfExpression e) {

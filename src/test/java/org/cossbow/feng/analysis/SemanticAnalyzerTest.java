@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.UnaryOperator;
 import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.err.SemanticException;
 import org.cossbow.feng.parser.BaseParseTest;
+import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.parser.SourceParser;
 import org.cossbow.feng.util.Constants;
 import org.cossbow.feng.util.ErrorUtil;
@@ -19,11 +20,17 @@ import java.util.List;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.cossbow.feng.util.CommonUtil.required;
 
-public class SemanticAnalysisTest {
+public class SemanticAnalyzerTest {
 
     @BeforeAll
     static void init() {
         ErrorUtil.setTraceError(true);
+    }
+
+    void analyze(ParseSymbolTable table) {
+        var analyzer = new SemanticAnalyzer(table);
+        analyzer.analyse();
+        ErrorUtil.reportError(analyzer.errors());
     }
 
     void checkSucc(String code) {
@@ -31,7 +38,7 @@ public class SemanticAnalysisTest {
         System.out.println(code);
         System.out.println("<<<");
         var src = BaseParseTest.doParseFile(code);
-        new SemanticAnalysis(src.table()).analyse();
+        analyze(src.table());
     }
 
     void checkFail(String code) {
@@ -3585,11 +3592,11 @@ public class SemanticAnalysisTest {
 
     //
 
-    static void parseSample(File file) {
+    void parseSample(File file) {
         System.out.printf("[test]%s\n", file.getName());
         var parser = new SourceParser(UTF_8);
         var src = parser.parse(file.toPath());
-        new SemanticAnalysis(src.table()).analyse();
+        analyze(src.table());
     }
 
     @Test

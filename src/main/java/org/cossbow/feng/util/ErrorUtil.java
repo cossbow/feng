@@ -7,6 +7,7 @@ import org.cossbow.feng.err.SyntaxException;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.List;
 
 final
 public class ErrorUtil {
@@ -58,8 +59,13 @@ public class ErrorUtil {
         throw new ModuleException(fmt.formatted(arg));
     }
 
-    public static <T> T binExpr(Position pos) {
-        return semantic("operands of binary-expression must same type: %s", pos);
+    public static void reportError(List<String> errors) {
+        if (errors.isEmpty()) return;
+        for (var er : errors) {
+            System.err.println(er);
+        }
+        ErrorUtil.semantic("got %d errors, please check.",
+                errors.size());
     }
 
     public static <T> T duplicate(Entity entity, Entity old) throws SemanticException {
