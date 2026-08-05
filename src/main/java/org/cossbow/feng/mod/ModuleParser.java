@@ -216,11 +216,16 @@ public class ModuleParser {
         }
         var edges = new ArrayList<Groups.G2<FModule, FModule>>();
         for (var fm : modules.values()) {
+            var imports = new ArrayList<>(fm.imports());
             for (var i : fm.imports()) {
                 var dep = modules.get(i);
-                if (dep == null) continue;
+                if (dep == null) {
+                    imports.remove(i);
+                    continue;
+                }
                 edges.add(Groups.g2(dep, fm));
             }
+            fm.imports(imports);
         }
         return DAGUtil.make(modules.values(), edges);
     }

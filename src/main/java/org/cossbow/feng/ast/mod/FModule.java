@@ -9,7 +9,7 @@ import java.util.List;
 
 public class FModule {
     private final ModulePath path;
-    private final List<ModulePath> imports;
+    private List<ModulePath> imports;
     private final ParseSymbolTable table;
     private List<Path> cSources = List.of();
     private List<Path> headerFiles = List.of();
@@ -30,6 +30,10 @@ public class FModule {
 
     public List<ModulePath> imports() {
         return imports;
+    }
+
+    public void imports(List<ModulePath> imports) {
+        this.imports = imports;
     }
 
     public ParseSymbolTable table() {
