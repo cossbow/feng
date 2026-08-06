@@ -125,7 +125,7 @@ public class ClassParseTest extends BaseParseTest {
                     Assertions.assertTrue(t.derivedType().generic().isEmpty());
                     var ref = t.refer().get();
                     Assertions.assertSame(STRONG, ref.kind());
-                    Assertions.assertFalse(ref.required());
+                    Assertions.assertTrue(ref.required());
                 }
             }
         }

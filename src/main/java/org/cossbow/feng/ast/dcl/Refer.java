@@ -76,7 +76,7 @@ public class Refer extends Entity {
     public String toString() {
         var s = new StringBuilder(4);
         s.append(kind.symbol);
-        if (required) s.append('!');
+        if (!required) s.append('?');
         if (unmodifiable) s.append('#');
         return s.toString();
     }

@@ -2005,9 +2005,11 @@ public class SemanticAnalyzer {
             return;
         }
 
-        var vt = a.value().resultType.must();
-        if (vt.required()) return;
-        context.delNotNil(v);
+        if (isNonNil(a.value())) {
+            context.setNotNil(v);
+        } else {
+            context.delNotNil(v);
+        }
     }
 
     private void index2Call(Assignment a) {
@@ -2097,6 +2099,9 @@ public class SemanticAnalyzer {
                 return;
             }
             v.type().set(vt);
+        }
+        if (isNonNil(g.a())) {
+            setNilState(Set.of(v));
         }
     }
 
@@ -2365,6 +2370,7 @@ public class SemanticAnalyzer {
         if (e instanceof CheckNilExpression cne) {
             if (cne.subject() instanceof VariableExpression ve) {
                 var v = ve.variable();
+                if (v.global()) return Set.of();
                 if (cne.nil()) {
                     return yes ? Set.of() : Set.of(v);
                 } else {
@@ -2389,13 +2395,21 @@ public class SemanticAnalyzer {
     }
 
     private boolean ifMarkNonNil(Expression e) {
-        if (e instanceof VariableExpression ve)
+        if (e instanceof VariableExpression ve) {
+            if (ve.variable().global()) return false;
             return context.isNotNil(ve.variable());
+        }
 
         if (e instanceof ParenExpression ve)
             return ifMarkNonNil(ve.child());
 
         return false;
+    }
+
+    private boolean isNonNil(Expression e) {
+        var t = e.resultType.must();
+        if (t.required()) return true;
+        return ifMarkNonNil(e);
     }
 
     private Statement analyse(IfStatement e) {

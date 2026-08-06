@@ -7,7 +7,7 @@ import org.cossbow.feng.util.Optional;
 /**
  * Declaration types of variables, parameters, and fields.
  * <p>
- * Exsample declaration with type {@code int}:
+ * Example declaration with type {@code int}:
  * <p>
  * variable {@code var a int}.
  * <p>
@@ -108,7 +108,7 @@ public class TypeDeclarer extends Entity {
 
     /**
      * check required
-     * 1. required attrubite of reference
+     * 1. required attribute of reference
      * 2. true if it's value-type
      */
     public boolean required() {

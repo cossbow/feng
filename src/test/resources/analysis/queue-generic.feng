@@ -5,7 +5,7 @@ class Result`E`{
 }
 
 class Node`E` {
-    var next *Node`E`;
+    var next *?Node`E`;
     var value E;
 }
 
@@ -14,7 +14,7 @@ func newNode`E`(value E) *Node`E` {
 }
 
 class Queue`E` {
-    var head, tail *Node`E`;
+    var head, tail *?Node`E`;
 
     func push(value E) {
         var t = tail;
@@ -65,6 +65,6 @@ func test(n int) int {
 
 
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(15);
 }

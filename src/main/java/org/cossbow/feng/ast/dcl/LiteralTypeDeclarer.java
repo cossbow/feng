@@ -3,8 +3,6 @@ package org.cossbow.feng.ast.dcl;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.lit.*;
 
-import java.util.Objects;
-
 /**
  * The internal type of the compiler cannot be defined syntactically.
  * <p>
@@ -39,10 +37,9 @@ public class LiteralTypeDeclarer extends TypeDeclarer {
         return literal instanceof NilLiteral;
     }
 
-    public boolean isString() {
-        return literal instanceof StringLiteral;
+    public boolean required() {
+        return !isNil();
     }
-
 
     @Override
     public boolean equals(Object o) {

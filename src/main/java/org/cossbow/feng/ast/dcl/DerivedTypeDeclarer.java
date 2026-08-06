@@ -99,11 +99,6 @@ public class DerivedTypeDeclarer extends TypeDeclarer
     @Override
     public String toString() {
         if (refer.none()) return derivedType.toString();
-        var sb = new StringBuilder(16);
-        sb.append(refer.get().kind().symbol);
-        if (refer.get().required()) sb.append('!');
-        if (refer.get().unmodifiable()) sb.append('#');
-        sb.append(derivedType.toString());
-        return sb.toString();
+        return refer.get() + derivedType.toString();
     }
 }

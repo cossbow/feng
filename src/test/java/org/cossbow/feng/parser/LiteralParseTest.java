@@ -2,6 +2,7 @@ package org.cossbow.feng.parser;
 
 import org.cossbow.feng.ast.expr.LiteralExpression;
 import org.cossbow.feng.ast.lit.*;
+import org.cossbow.feng.ast.lit.IntegerLiteral.Radix;
 import org.cossbow.feng.ast.stmt.AssignmentsStatement;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -25,46 +26,46 @@ public class LiteralParseTest extends BaseParseTest {
         for (int i = 0; i < N; i++) {
             var s = Integer.toString(i, 10);
             var dec = (IntegerLiteral) parseLiteral(s);
-            Assertions.assertSame(10, dec.radix());
+            Assertions.assertSame(Radix.DEC, dec.radix());
             Assertions.assertEquals(new BigInteger(s), dec.value());
         }
 
         for (int i = 0; i < N; i++) {
             var s = Integer.toHexString(i);
             var hex = (IntegerLiteral) parseLiteral("0x" + s);
-            Assertions.assertSame(16, hex.radix());
+            Assertions.assertSame(Radix.HEX, hex.radix());
             Assertions.assertEquals(new BigInteger(s, 16), hex.value());
         }
         for (int i = 0; i < N; i++) {
             var s = Integer.toHexString(i).toUpperCase();
             var hex = (IntegerLiteral) parseLiteral("0X" + s);
-            Assertions.assertSame(16, hex.radix());
+            Assertions.assertSame(Radix.HEX, hex.radix());
             Assertions.assertEquals(new BigInteger(s, 16), hex.value());
         }
 
         for (int i = 0; i < N; i++) {
             var s = Integer.toOctalString(i);
             var oct = (IntegerLiteral) parseLiteral("0o" + s);
-            Assertions.assertSame(8, oct.radix());
+            Assertions.assertSame(Radix.OCT, oct.radix());
             Assertions.assertEquals(new BigInteger(s, 8), oct.value());
         }
         for (int i = 0; i < N; i++) {
             var s = Integer.toOctalString(i).toUpperCase();
             var oct = (IntegerLiteral) parseLiteral("0O" + s);
-            Assertions.assertSame(8, oct.radix());
+            Assertions.assertSame(Radix.OCT, oct.radix());
             Assertions.assertEquals(new BigInteger(s, 8), oct.value());
         }
 
         for (int i = 0; i < N; i++) {
             var s = Integer.toBinaryString(i);
             var oct = (IntegerLiteral) parseLiteral("0b" + s);
-            Assertions.assertSame(2, oct.radix());
+            Assertions.assertSame(Radix.BIN, oct.radix());
             Assertions.assertEquals(new BigInteger(s, 2), oct.value());
         }
         for (int i = 0; i < N; i++) {
             var s = Integer.toBinaryString(i).toUpperCase();
             var oct = (IntegerLiteral) parseLiteral("0B" + s);
-            Assertions.assertSame(2, oct.radix());
+            Assertions.assertSame(Radix.BIN, oct.radix());
             Assertions.assertEquals(new BigInteger(s, 2), oct.value());
         }
     }

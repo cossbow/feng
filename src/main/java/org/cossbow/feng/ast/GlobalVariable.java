@@ -19,6 +19,10 @@ public class GlobalVariable extends Variable {
         return symbol;
     }
 
+    @Override
+    public boolean global() {
+        return true;
+    }
 
     //
 

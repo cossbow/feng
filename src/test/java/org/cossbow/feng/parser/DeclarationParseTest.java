@@ -80,7 +80,7 @@ public class DeclarationParseTest extends BaseParseTest {
             Assertions.assertTrue(v.value().none());
         }
         {
-            var dcl = parseLocalDecl("var u *User");
+            var dcl = parseLocalDecl("var u *?User");
             var v = dcl.variables().getFirst();
             var td = (DerivedTypeDeclarer) v.type().must();
             var ref = td.refer().get();
@@ -88,7 +88,7 @@ public class DeclarationParseTest extends BaseParseTest {
             Assertions.assertFalse(ref.required());
         }
         {
-            var dcl = parseLocalDecl("var u *!User");
+            var dcl = parseLocalDecl("var u *User");
             var v = dcl.variables().getFirst();
             var td = (DerivedTypeDeclarer) v.type().must();
             var ref = td.refer().get();
@@ -96,7 +96,7 @@ public class DeclarationParseTest extends BaseParseTest {
             Assertions.assertTrue(ref.required());
         }
         {
-            var dcl = parseLocalDecl("const u &User");
+            var dcl = parseLocalDecl("const u &?User");
             var v = dcl.variables().getFirst();
             var td = (DerivedTypeDeclarer) v.type().must();
             var ref = td.refer().get();
@@ -104,7 +104,7 @@ public class DeclarationParseTest extends BaseParseTest {
             Assertions.assertFalse(ref.required());
         }
         {
-            var dcl = parseLocalDecl("const u &!User");
+            var dcl = parseLocalDecl("const u &User");
             var v = dcl.variables().getFirst();
             var td = (DerivedTypeDeclarer) v.type().must();
             var ref = td.refer().get();
@@ -162,11 +162,11 @@ public class DeclarationParseTest extends BaseParseTest {
             Assertions.assertTrue(td.length().none());
             Assertions.assertTrue(td.refer().must().isKind(STRONG));
             Assertions.assertFalse(td.refer().must().unmodifiable());
-            Assertions.assertFalse(td.refer().must().required());
+            Assertions.assertTrue(td.refer().must().required());
         }
         {
             var len = randInt(1, 16);
-            var dcl = parseLocalDecl("var a [%s][&!]Host".formatted(len));
+            var dcl = parseLocalDecl("var a [%s][&]Host".formatted(len));
             var v = dcl.variables().getFirst();
             var td = (ArrayTypeDeclarer) v.type().must();
             Assertions.assertEquals(len, integer(td.length().must()).value());

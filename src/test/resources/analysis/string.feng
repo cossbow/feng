@@ -17,24 +17,18 @@ class String {
     func char(index int) int32 {
         if (CharEncoding.ASCII == cc) {
             const s [&]uint8 = value;
-            if (s == nil) return 0;
             return int32(s[index]);
         }
         const s [&]uint16 = value;
-        if (s == nil) return 0;
         return int32(s[index]);
     }
 
     func len() int {
-        var v = value;
-        if (v == nil) return 0;
-        return v.length << cc.id;
+        return value.length << cc.id;
     }
 
     func isEmpty() bool {
-        var v = value;
-        if (v == nil) return true;
-        return v.length == 0;
+        return value.length == 0;
     }
 
 }

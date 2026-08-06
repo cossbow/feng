@@ -27,6 +27,7 @@ public class SemanticAnalysisMain {
     }
 
     public static void main(String[] args) {
+        ErrorUtil.setTraceError(true);
         for (var a : args) {
             checkSucc(a);
         }

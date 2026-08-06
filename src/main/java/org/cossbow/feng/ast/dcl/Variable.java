@@ -95,6 +95,9 @@ public class Variable extends Entity
         return id;
     }
 
+    public boolean global() {
+        return false;
+    }
 
     //
 

@@ -96,7 +96,7 @@ public class ExpressionParseTest extends BaseParseTest {
     public void testIs() {
         var name = randVarSymbol(8);
         var typeName = randTypeSymbol(16);
-        var expr = (IsExpression) parseExpr("%s?(*%s)".formatted(name, typeName));
+        var expr = (IsExpression) parseExpr("%s?(*?%s)".formatted(name, typeName));
         Assertions.assertEquals(name, varName(expr.subject()));
         var type = expr.type();
         Assertions.assertEquals(typeName, type.derivedType().symbol());
