@@ -2125,11 +2125,64 @@ public class CGenerator implements Generator {
 
     private CGenerator visitNewArray(NewArrayType t, NewExpression e) {
         var elemKey = typeKey(t.element());
-        // return array strong ref struct: {$values, $length}
-        write("(Feng$ArraySRef_").write(elemKey).write("){");
-        write('(').write(t.element()).write(" *)Feng$alloc(");
-        write(t.length()).write("*sizeof(").write(t.element()).write(")), ");
-        write(t.length()).write('}');
+
+        e.arg().use(a -> {
+            // has init arg: use statement expression (same pattern as visitNewDefined)
+            write("({ Feng$ArraySRef_").write(elemKey)
+                    .write(" _a = {(").write(t.element())
+                    .write(" *)Feng$alloc(").write(t.length())
+                    .write("*sizeof(").write(t.element()).write(")), ")
+                    .write(t.length()).write("}; ");
+
+            if (a instanceof ArrayExpression ae) {
+                // init with explicit values: assign each element with proper type conversion
+                int i = 0;
+                for (var v : ae.elements()) {
+                    write("_a.$values[").write(String.valueOf(i)).write("] = ");
+                    writeValue(v, t.element());
+                    write("; ");
+                    i++;
+                }
+            } else {
+                // copy from another array: evaluate source once
+                var srcType = a.resultType.must();
+                write(srcType).write(" _src = ").write(a).write("; ");
+                var elemType = t.element();
+                var isStrongRef = elemType.maybeRefer().match(r -> r.isKind(STRONG));
+
+                if (srcType instanceof ArrayTypeDeclarer atd && atd.refer().none()) {
+                    // fixed-length source: $values is inline array, length known at compile time
+                    var srcLen = String.valueOf(atd.len());
+                    if (isStrongRef) {
+                        write("for (Int64 _i = 0; _i < _a.$length && _i < ").write(srcLen)
+                                .write("; _i++) _a.$values[_i] = Feng$inc(_src.$values[_i]); ");
+                    } else {
+                        write("memcpy(_a.$values, _src.$values, ")
+                                .write("(_a.$length < ").write(srcLen).write(" ? _a.$length : ").write(srcLen).write(") ")
+                                .write("*sizeof(").write(elemType).write(")); ");
+                    }
+                } else {
+                    // dynamic source: $values is pointer, $length is a runtime field
+                    if (isStrongRef) {
+                        write("for (Int64 _i = 0; _i < _a.$length && _i < _src.$length; _i++) ")
+                                .write("_a.$values[_i] = Feng$inc(_src.$values[_i]); ");
+                    } else {
+                        write("memcpy(_a.$values, _src.$values, ")
+                                .write("(_a.$length < _src.$length ? _a.$length : _src.$length) ")
+                                .write("*sizeof(").write(elemType).write(")); ");
+                    }
+                }
+            }
+
+            write("_a; })");
+        }, () -> {
+            // no arg: simple compound literal (current behavior)
+            write("(Feng$ArraySRef_").write(elemKey).write("){");
+            write('(').write(t.element()).write(" *)Feng$alloc(");
+            write(t.length()).write("*sizeof(").write(t.element()).write(")), ");
+            write(t.length()).write('}');
+        });
+
         return this;
     }
 
