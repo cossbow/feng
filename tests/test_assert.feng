@@ -13,7 +13,7 @@ func testAssertPass() {
 func testAssertFail() {
     try {
         assert(1 < 0);  // deliberately false
-    } catch(e *!#AssertException) {
+    } catch(e *#AssertException) {
         // expected
     }
 }

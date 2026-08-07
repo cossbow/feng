@@ -1,0 +1,62 @@
+import std$testing;
+import std$hash;
+
+@Test
+func testCrc32Empty() {
+    var h = hash$newCrc32();
+    var buf [4]byte;
+    h.sum(buf);
+    testing$assertTrue(buf[0] == 0);
+    testing$assertTrue(buf[1] == 0);
+    testing$assertTrue(buf[2] == 0);
+    testing$assertTrue(buf[3] == 0);
+}
+
+@Test
+func testCrc32Hello() {
+    var h = hash$newCrc32();
+    var data [5]byte = [104, 101, 108, 108, 111];  // "hello"
+    h.write(data);
+    var buf [4]byte;
+    h.sum(buf);
+    // CRC32("hello") = 0x3610a686
+    testing$assertTrue(buf[0] == 54);
+    testing$assertTrue(buf[1] == 16);
+    testing$assertTrue(buf[2] == 166);
+    testing$assertTrue(buf[3] == 134);
+}
+
+@Test
+func testCrc32Digits() {
+    var h = hash$newCrc32();
+    var data [9]byte = [49,50,51,52,53,54,55,56,57];  // "123456789"
+    h.write(data);
+    var buf [4]byte;
+    h.sum(buf);
+    // CRC32("123456789") = 0xcbf43926
+    testing$assertTrue(buf[0] == 203);
+    testing$assertTrue(buf[1] == 244);
+    testing$assertTrue(buf[2] == 57);
+    testing$assertTrue(buf[3] == 38);
+}
+
+@Test
+func testCrc32Reset() {
+    var h = hash$newCrc32();
+    var data [9]byte = [49,50,51,52,53,54,55,56,57];
+    h.write(data);
+    h.reset();
+    h.write(data);
+    var buf [4]byte;
+    h.sum(buf);
+    testing$assertTrue(buf[0] == 203);
+    testing$assertTrue(buf[1] == 244);
+    testing$assertTrue(buf[2] == 57);
+    testing$assertTrue(buf[3] == 38);
+}
+
+@Test
+func testCrc32Size() {
+    var h = hash$newCrc32();
+    testing$assertTrue(h.size() == 4);
+}

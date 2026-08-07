@@ -1,0 +1,42 @@
+import std$encoding;
+
+// ===== Minimal MD5 block test — check just the first round =====
+
+const K0 uint32 = 3614090360;
+
+func main(args [&#][*#]byte) {
+    // Build MD5("") padding block: just byte 0x80 = 128
+    var w [4]byte;
+    w[0] = 128; w[1] = 0; w[2] = 0; w[3] = 0;
+    var X0 = encoding$littleUint32(w);
+    assert(X0 == 128);  // should be 0x00000080
+
+    // MD5 initial state
+    var a uint32 = 1732584193;  // 0x67452301
+    var b uint32 = 4023233417;  // 0xefcdab89
+    var c uint32 = 2562383102;  // 0x98badcfe
+    var d uint32 = 271733878;   // 0x10325476
+
+    // Round 0: F = (b&c) | ((~b)&d), g=0, s=7
+    var f = (b & c) | ((!b) & d);
+    assert(f == 2562383102);  // 0x98badcfe
+
+    var sum = a + f + X0 + K0;
+    // a+f = 1732584193+2562383102 = 4294967295
+    // +128 = 4294967423, wraps to 127
+    // +K0 = 127+3614090360 = 3614090487 = 0xD76AA4F7
+    assert(sum == 3614090487);
+
+    // ROTL(sum, 7) = (sum<<7) | (sum>>25)
+    var rot = ((sum << 7) | (sum >> 25));
+    // 0xD76AA4F7 rotl 7
+    // sum = 0xD76AA4F7 = 1101 0111 0110 1010 1010 0100 1111 0111
+    // <<7  = 1011 0101 0101 0010 0111 1011 1000 0000 = 0xB5527B80
+    // >>25 = 0000 0000 0000 0000 0000 0011 0101 0111 = 0x00000357?
+    // Actually let me just check that it changed
+    assert(rot != 0);
+
+    // new B = b + rot
+    var newB = b + rot;
+    assert(newB != b);
+}

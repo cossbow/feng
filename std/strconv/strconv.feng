@@ -3,7 +3,7 @@ import std$error;
 
 // Parse a signed integer from byte sequence.
 // Returns (value, ok). ok is false if parsing fails.
-export func parseInt(s [&!#]byte) (int, bool) {
+export func parseInt(s [&#]byte) (int, bool) {
     if (s.length == 0) { return (0, false); }
     var i = 0;
     var neg = false;
@@ -28,7 +28,7 @@ export func parseInt(s [&!#]byte) (int, bool) {
 }
 
 // Parse a 64-bit signed integer from byte sequence.
-export func parseInt64(s [&!#]byte) (int64, bool) {
+export func parseInt64(s [&#]byte) (int64, bool) {
     if (s.length == 0) { return (0, false); }
     var i = 0;
     var neg = false;
@@ -53,7 +53,7 @@ export func parseInt64(s [&!#]byte) (int64, bool) {
 }
 
 // Parse an unsigned integer from byte sequence.
-export func parseUint(s [&!#]byte) (uint, bool) {
+export func parseUint(s [&#]byte) (uint, bool) {
     if (s.length == 0) { return (0, false); }
     var i = 0;
     var v = s[0];
@@ -73,7 +73,7 @@ export func parseUint(s [&!#]byte) (uint, bool) {
 }
 
 // Parse a 64-bit unsigned integer from byte sequence.
-export func parseUint64(s [&!#]byte) (uint64, bool) {
+export func parseUint64(s [&#]byte) (uint64, bool) {
     if (s.length == 0) { return (0, false); }
     var i = 0;
     var v = s[0];
@@ -94,7 +94,7 @@ export func parseUint64(s [&!#]byte) (uint64, bool) {
 
 // Parse a float64 from byte sequence.
 // Supports optional sign, integer part, decimal point, and fractional part.
-export func parseFloat64(s [&!#]byte) (float, bool) {
+export func parseFloat64(s [&#]byte) (float, bool) {
     if (s.length == 0) { return (0.0, false); }
     var i = 0;
     var neg = false;
@@ -139,7 +139,7 @@ export func parseFloat64(s [&!#]byte) (float, bool) {
 
 // Parse a boolean from byte sequence.
 // Accepts "true" (case-sensitive) for true, "false" (case-sensitive) for false.
-export func parseBool(s [&!#]byte) (bool, bool) {
+export func parseBool(s [&#]byte) (bool, bool) {
     // "true" = [116, 114, 117, 101]
     if (s.length == 4 && s[0] == 116 && s[1] == 114 && s[2] == 117 && s[3] == 101) {
         return (true, true);
@@ -153,7 +153,7 @@ export func parseBool(s [&!#]byte) (bool, bool) {
 
 // ----- must* variants that throw ParseException on failure -----
 
-export func mustParseInt(s [&!#]byte) int {
+export func mustParseInt(s [&#]byte) int {
     var r = parseInt(s);
     if (!r.1) {
         throw new(error$ParseException);
@@ -161,7 +161,7 @@ export func mustParseInt(s [&!#]byte) int {
     return r.0;
 }
 
-export func mustParseInt64(s [&!#]byte) int64 {
+export func mustParseInt64(s [&#]byte) int64 {
     var r = parseInt64(s);
     if (!r.1) {
         throw new(error$ParseException);
@@ -169,7 +169,7 @@ export func mustParseInt64(s [&!#]byte) int64 {
     return r.0;
 }
 
-export func mustParseUint(s [&!#]byte) uint {
+export func mustParseUint(s [&#]byte) uint {
     var r = parseUint(s);
     if (!r.1) {
         throw new(error$ParseException);
@@ -177,7 +177,7 @@ export func mustParseUint(s [&!#]byte) uint {
     return r.0;
 }
 
-export func mustParseUint64(s [&!#]byte) uint64 {
+export func mustParseUint64(s [&#]byte) uint64 {
     var r = parseUint64(s);
     if (!r.1) {
         throw new(error$ParseException);
@@ -185,7 +185,7 @@ export func mustParseUint64(s [&!#]byte) uint64 {
     return r.0;
 }
 
-export func mustParseFloat64(s [&!#]byte) float {
+export func mustParseFloat64(s [&#]byte) float {
     var r = parseFloat64(s);
     if (!r.1) {
         throw new(error$ParseException);
@@ -193,7 +193,7 @@ export func mustParseFloat64(s [&!#]byte) float {
     return r.0;
 }
 
-export func mustParseBool(s [&!#]byte) bool {
+export func mustParseBool(s [&#]byte) bool {
     var r = parseBool(s);
     if (!r.1) {
         throw new(error$ParseException);

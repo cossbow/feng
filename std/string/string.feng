@@ -3,47 +3,51 @@ import std$error;
 
 export
 class String (Writable) {
-    const value [*#]byte;
+    const value [*?#]byte;
 
     export
-    func bytes#() [*#]byte {
+    func bytes#() [*?#]byte {
         return value;
     }
 
     export
     func byteLength() int {
-        if (value == nil) return 0;
-        return value.length;
+        var v = value;
+        if (v == nil) return 0;
+        return v.length;
     }
 
     export
     func runeCount() int {
-        if (value == nil) return 0;
-        const v [&#]byte = value;
+        var v = value;
+        if (v == nil) return 0;
         return utf8$runeLen(v);
     }
 
     export
     func isEmpty() bool {
-        return value == nil || value.length == 0;
+        var v = value;
+        return v == nil || v.length == 0;
     }
 
     // Lexicographic comparison by byte values.
     // Returns negative if this < rhs, 0 if equal, positive if this > rhs.
     export
     func compare(rhs String) int {
-        if (value == nil) {
-            if (rhs.value == nil) { return 0; }
+        var v = value;
+        var rv = rhs.value;
+        if (v == nil) {
+            if (rv == nil) { return 0; }
             return -1;
         }
-        if (rhs.value == nil) { return 1; }
-        var len = value.length < rhs.value.length ? value.length : rhs.value.length;
+        if (rv == nil) { return 1; }
+        var len = v.length < rv.length ? v.length : rv.length;
         for (var i = 0; i < len; i += 1) {
-            if (value[i] != rhs.value[i]) {
-                return int(value[i]) - int(rhs.value[i]);
+            if (v[i] != rv[i]) {
+                return int(v[i]) - int(rv[i]);
             }
         }
-        return value.length - rhs.value.length;
+        return v.length - rv.length;
     }
 
     export
@@ -53,20 +57,22 @@ class String (Writable) {
 
     export
     func concat(other String) String {
-        if (value == nil) { return other; }
-        if (other.value == nil) {
-            var n = value.length;
+        var v = value;
+        var ov = other.value;
+        if (v == nil) { return other; }
+        if (ov == nil) {
+            var n = v.length;
             var buf = new([n]byte);
-            for (var i = 0; i < n; i += 1) { buf[i] = value[i]; }
+            for (var i = 0; i < n; i += 1) { buf[i] = v[i]; }
             return {value=buf};
         }
-        var n = value.length + other.value.length;
+        var n = v.length + ov.length;
         var buf = new([n]byte);
-        for (var i = 0; i < value.length; i += 1) {
-            buf[i] = value[i];
+        for (var i = 0; i < v.length; i += 1) {
+            buf[i] = v[i];
         }
-        for (var i = 0; i < other.value.length; i += 1) {
-            buf[value.length + i] = other.value[i];
+        for (var i = 0; i < ov.length; i += 1) {
+            buf[v.length + i] = ov[i];
         }
         return {value=buf};
     }
@@ -75,8 +81,8 @@ class String (Writable) {
     // Returns -1 if not found.
     export
     func indexOf(ch int32) int {
-        if (value == nil) { return -1; }
-        const v [&#]byte = value;
+        var v = value;
+        if (v == nil) { return -1; }
         var i = 0;
         var len = v.length;
         for (i < len) {
@@ -91,14 +97,16 @@ class String (Writable) {
     // Returns -1 if not found.
     export
     func indexOfStr(sub String) int {
-        if (value == nil || sub.value == nil) { return -1; }
-        var subLen = sub.value.length;
+        var v = value;
+        var sv = sub.value;
+        if (v == nil || sv == nil) { return -1; }
+        var subLen = sv.length;
         if (subLen == 0) { return 0; }
-        var end = value.length - subLen;
+        var end = v.length - subLen;
         for (var i = 0; i <= end; i += 1) {
             var match = true;
             for (var j = 0; j < subLen; j += 1) {
-                if (value[i + j] != sub.value[j]) {
+                if (v[i + j] != sv[j]) {
                     match = false;
                     break;
                 }
@@ -115,21 +123,25 @@ class String (Writable) {
 
     export
     func startsWith(prefix String) bool {
-        if (value == nil || prefix.value == nil) { return prefix.value == nil; }
-        if (prefix.value.length > value.length) { return false; }
-        for (var i = 0; i < prefix.value.length; i += 1) {
-            if (value[i] != prefix.value[i]) { return false; }
+        var v = value;
+        var pv = prefix.value;
+        if (v == nil || pv == nil) { return pv == nil; }
+        if (pv.length > v.length) { return false; }
+        for (var i = 0; i < pv.length; i += 1) {
+            if (v[i] != pv[i]) { return false; }
         }
         return true;
     }
 
     export
     func endsWith(suffix String) bool {
-        if (value == nil || suffix.value == nil) { return suffix.value == nil; }
-        if (suffix.value.length > value.length) { return false; }
-        var start = value.length - suffix.value.length;
-        for (var i = 0; i < suffix.value.length; i += 1) {
-            if (value[start + i] != suffix.value[i]) { return false; }
+        var v = value;
+        var sv = suffix.value;
+        if (v == nil || sv == nil) { return sv == nil; }
+        if (sv.length > v.length) { return false; }
+        var start = v.length - sv.length;
+        for (var i = 0; i < sv.length; i += 1) {
+            if (v[start + i] != sv[i]) { return false; }
         }
         return true;
     }
@@ -141,15 +153,16 @@ class String (Writable) {
         if (start < 0 || end < 0 || start > end) {
             throw new(error$IllegalArgumentException);
         }
-        if (value == nil || end == 0) { return EMPTY; }
+        var v = value;
+        if (v == nil || end == 0) { return EMPTY; }
         var e = end;
-        if (e > value.length) { e = value.length; }
+        if (e > v.length) { e = v.length; }
         var s = start;
         if (s >= e) { return EMPTY; }
         var n = e - s;
         var buf = new([n]byte);
         for (var i = 0; i < n; i += 1) {
-            buf[i] = value[s + i];
+            buf[i] = v[s + i];
         }
         return {value=buf};
     }
@@ -159,7 +172,8 @@ class String (Writable) {
     export
     func rune(index int) int32 {
         if (index < 0) { throw new(OutOfBoundsException); }
-        const v [&#]byte = value;
+        var v = value;
+        if (v == nil) { throw new(OutOfBoundsException); }
         var i = 0;
         var count = 0;
         var len = v.length;
@@ -179,24 +193,26 @@ class String (Writable) {
     // Returns a dynamic array of substrings.
     export
     func split(sep String) [*]String {
-        if (value == nil) { return new([1]String); }
-        if (sep.value == nil || sep.value.length == 0) {
+        var v = value;
+        var sv = sep.value;
+        if (v == nil) { return new([1]String); }
+        if (sv == nil || sv.length == 0) {
             var r = new([1]String);
-            var buf = new([value.length]byte);
-            for (var i = 0; i < value.length; i += 1) {
-                buf[i] = value[i];
+            var buf = new([v.length]byte);
+            for (var i = 0; i < v.length; i += 1) {
+                buf[i] = v[i];
             }
             r[0] = {value=buf};
             return r;
         }
         // Count separators
-        var sepLen = sep.value.length;
+        var sepLen = sv.length;
         var count = 0;
         var pos = 0;
-        for (pos + sepLen <= value.length) {
+        for (pos + sepLen <= v.length) {
             var match = true;
             for (var j = 0; j < sepLen; j += 1) {
-                if (value[pos + j] != sep.value[j]) {
+                if (v[pos + j] != sv[j]) {
                     match = false;
                     break;
                 }
@@ -213,10 +229,10 @@ class String (Writable) {
         var idx = 0;
         var start = 0;
         pos = 0;
-        for (pos + sepLen <= value.length) {
+        for (pos + sepLen <= v.length) {
             var match = true;
             for (var j = 0; j < sepLen; j += 1) {
-                if (value[pos + j] != sep.value[j]) {
+                if (v[pos + j] != sv[j]) {
                     match = false;
                     break;
                 }
@@ -227,7 +243,7 @@ class String (Writable) {
                     var n = pos - start;
                     var buf = new([n]byte);
                     for (var k = 0; k < n; k += 1) {
-                        buf[k] = value[start + k];
+                        buf[k] = v[start + k];
                     }
                     result[idx] = {value=buf};
                 } else {
@@ -241,11 +257,11 @@ class String (Writable) {
             }
         }
         // Last part
-        if (start < value.length) {
-            var n = value.length - start;
+        if (start < v.length) {
+            var n = v.length - start;
             var buf = new([n]byte);
             for (var k = 0; k < n; k += 1) {
-                buf[k] = value[start + k];
+                buf[k] = v[start + k];
             }
             result[idx] = {value=buf};
         } else {
@@ -257,17 +273,20 @@ class String (Writable) {
     // Replace all occurrences of oldStr with newStr.
     export
     func replace(oldStr, newStr String) String {
-        if (value == nil) { return EMPTY; }
-        if (oldStr.value == nil || oldStr.value.length == 0) { return {value=value}; }
+        var v = value;
+        var ov = oldStr.value;
+        var nv = newStr.value;
+        if (v == nil) { return EMPTY; }
+        if (ov == nil || ov.length == 0) { return {value=v}; }
         // First, count occurrences to allocate result
-        var oldLen = oldStr.value.length;
+        var oldLen = ov.length;
         var count = 0;
-        var end = value.length - oldLen;
+        var end = v.length - oldLen;
         var i = 0;
         for (i <= end) {
             var match = true;
             for (var j = 0; j < oldLen; j += 1) {
-                if (value[i + j] != oldStr.value[j]) {
+                if (v[i + j] != ov[j]) {
                     match = false;
                     break;
                 }
@@ -279,40 +298,40 @@ class String (Writable) {
                 i += 1;
             }
         }
-        if (count == 0) { return {value=value}; }
+        if (count == 0) { return {value=v}; }
         // Allocate result buffer
         var nLen int = 0;
-        if (newStr.value != nil) { nLen = newStr.value.length; }
-        var resultLen = value.length - count * oldLen + count * nLen;
+        if (nv != nil) { nLen = nv.length; }
+        var resultLen = v.length - count * oldLen + count * nLen;
         var buf = new([resultLen]byte);
         var wi = 0;
         var ri = 0;
         for (ri <= end) {
             var match = true;
             for (var j = 0; j < oldLen; j += 1) {
-                if (value[ri + j] != oldStr.value[j]) {
+                if (v[ri + j] != ov[j]) {
                     match = false;
                     break;
                 }
             }
             if (match) {
                 // Write newStr
-                if (newStr.value != nil) {
+                if (nv != nil) {
                     for (var j = 0; j < nLen; j += 1) {
-                        buf[wi] = newStr.value[j];
+                        buf[wi] = nv[j];
                         wi += 1;
                     }
                 }
                 ri += oldLen;
             } else {
-                buf[wi] = value[ri];
+                buf[wi] = v[ri];
                 wi += 1;
                 ri += 1;
             }
         }
         // Copy remaining
-        for (ri < value.length) {
-            buf[wi] = value[ri];
+        for (ri < v.length) {
+            buf[wi] = v[ri];
             wi += 1;
             ri += 1;
         }
@@ -322,18 +341,19 @@ class String (Writable) {
     // Trim leading and trailing ASCII whitespace (space, tab, newline, carriage return).
     export
     func trim() String {
-        if (value == nil || value.length == 0) { return EMPTY; }
+        var v = value;
+        if (v == nil || v.length == 0) { return EMPTY; }
         var start = 0;
-        var end = value.length;
+        var end = v.length;
         // Trim left
         for (start < end) {
-            var c = value[start];
+            var c = v[start];
             if (c != 32 && c != 9 && c != 10 && c != 13) { break; }
             start += 1;
         }
         // Trim right
         for (end > start) {
-            var c = value[end - 1];
+            var c = v[end - 1];
             if (c != 32 && c != 9 && c != 10 && c != 13) { break; }
             end -= 1;
         }
@@ -341,7 +361,7 @@ class String (Writable) {
         var n = end - start;
         var buf = new([n]byte);
         for (var i = 0; i < n; i += 1) {
-            buf[i] = value[start + i];
+            buf[i] = v[start + i];
         }
         return {value=buf};
     }
@@ -349,10 +369,11 @@ class String (Writable) {
     // Convert ASCII uppercase letters to lowercase.
     export
     func toLower() String {
-        if (value == nil) { return EMPTY; }
-        var buf = new([value.length]byte);
-        for (var i = 0; i < value.length; i += 1) {
-            var c = value[i];
+        var v = value;
+        if (v == nil) { return EMPTY; }
+        var buf = new([v.length]byte);
+        for (var i = 0; i < v.length; i += 1) {
+            var c = v[i];
             if (c >= 65 && c <= 90) {  // 'A'..'Z'
                 buf[i] = byte(int(c) + 32);
             } else {
@@ -365,10 +386,11 @@ class String (Writable) {
     // Convert ASCII lowercase letters to uppercase.
     export
     func toUpper() String {
-        if (value == nil) { return EMPTY; }
-        var buf = new([value.length]byte);
-        for (var i = 0; i < value.length; i += 1) {
-            var c = value[i];
+        var v = value;
+        if (v == nil) { return EMPTY; }
+        var buf = new([v.length]byte);
+        for (var i = 0; i < v.length; i += 1) {
+            var c = v[i];
             if (c >= 97 && c <= 122) {  // 'a'..'z'
                 buf[i] = byte(int(c) - 32);
             } else {
@@ -380,8 +402,8 @@ class String (Writable) {
 
     // Writable implementation
     export
-    func write#(w &!Writer) int {
-        const v [&#]byte = value;
+    func write#(w &Writer) int {
+        var v = value;
         if (v == nil) return 0;
         w.write(v, 0, v.length);
         return v.length;
@@ -402,24 +424,27 @@ func fromBytes(data [*#]byte) String {
 
 // Join an array of Strings with a separator.
 export
-func join(parts [&!#]String, sep String) String {
+func join(parts [&#]String, sep String) String {
+    var sepv = sep.value;
     if (parts.length == 0) { return EMPTY; }
     if (parts.length == 1) {
         var s = parts[0];
-        if (s.value == nil) { return EMPTY; }
-        var buf = new([s.value.length]byte);
-        for (var i = 0; i < s.value.length; i += 1) {
-            buf[i] = s.value[i];
+        var sv = s.value;
+        if (sv == nil) { return EMPTY; }
+        var buf = new([sv.length]byte);
+        for (var i = 0; i < sv.length; i += 1) {
+            buf[i] = sv[i];
         }
         return {value=buf};
     }
     // Calculate total length
     var sepLen = 0;
-    if (sep.value != nil) { sepLen = sep.value.length; }
+    if (sepv != nil) { sepLen = sepv.length; }
     var totalLen = 0;
     for (var i = 0; i < parts.length; i += 1) {
         var s = parts[i];
-        if (s.value != nil) { totalLen += s.value.length; }
+        var sv = s.value;
+        if (sv != nil) { totalLen += sv.length; }
     }
     totalLen += sepLen * (parts.length - 1);
     // Build result
@@ -427,15 +452,16 @@ func join(parts [&!#]String, sep String) String {
     var pos = 0;
     for (var i = 0; i < parts.length; i += 1) {
         var s = parts[i];
-        if (s.value != nil) {
-            for (var j = 0; j < s.value.length; j += 1) {
-                buf[pos] = s.value[j];
+        var sv = s.value;
+        if (sv != nil) {
+            for (var j = 0; j < sv.length; j += 1) {
+                buf[pos] = sv[j];
                 pos += 1;
             }
         }
-        if (i < parts.length - 1 && sep.value != nil) {
+        if (i < parts.length - 1 && sepv != nil) {
             for (var j = 0; j < sepLen; j += 1) {
-                buf[pos] = sep.value[j];
+                buf[pos] = sepv[j];
                 pos += 1;
             }
         }

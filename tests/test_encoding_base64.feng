@@ -1,0 +1,117 @@
+import std$testing;
+import std$encoding;
+
+@Test
+func testBase64EncodeEmpty() {
+    var src [0]byte;
+    var dst [0]byte;
+    var n = encoding$base64EncodeTo(dst, src);
+    testing$assertTrue(n == 0);
+}
+
+@Test
+func testBase64EncodeSingle() {
+    var src [1]byte = [102];
+    var dst [4]byte;
+    encoding$base64EncodeTo(dst, src);
+    testing$assertTrue(dst[0] == 90);
+    testing$assertTrue(dst[1] == 103);
+    testing$assertTrue(dst[2] == 61);
+    testing$assertTrue(dst[3] == 61);
+}
+
+@Test
+func testBase64EncodeTwo() {
+    var src [2]byte = [102, 111];
+    var dst [4]byte;
+    encoding$base64EncodeTo(dst, src);
+    testing$assertTrue(dst[0] == 90);
+    testing$assertTrue(dst[1] == 109);
+    testing$assertTrue(dst[2] == 56);
+    testing$assertTrue(dst[3] == 61);
+}
+
+@Test
+func testBase64EncodeThree() {
+    var src [3]byte = [102, 111, 111];
+    var dst [4]byte;
+    encoding$base64EncodeTo(dst, src);
+    testing$assertTrue(dst[0] == 90);
+    testing$assertTrue(dst[1] == 109);
+    testing$assertTrue(dst[2] == 57);
+    testing$assertTrue(dst[3] == 118);
+}
+
+@Test
+func testBase64EncodeFoobar() {
+    var src [6]byte = [102, 111, 111, 98, 97, 114];
+    var dst [8]byte;
+    encoding$base64EncodeTo(dst, src);
+    testing$assertTrue(dst[0] == 90);  testing$assertTrue(dst[1] == 109);
+    testing$assertTrue(dst[2] == 57);  testing$assertTrue(dst[3] == 118);
+    testing$assertTrue(dst[4] == 89);  testing$assertTrue(dst[5] == 109);
+    testing$assertTrue(dst[6] == 70);  testing$assertTrue(dst[7] == 121);
+}
+
+@Test
+func testBase64DecodeEmpty() {
+    var src [0]byte;
+    var r = encoding$base64Decode(src);
+    var ok = r.1;
+    testing$assertTrue(ok);
+    var data = r.0;
+    var d = data;
+    if (d == nil) { return; }
+    testing$assertTrue(d.length == 0);
+}
+
+@Test
+func testBase64DecodeSingle() {
+    var src [4]byte = [90, 103, 61, 61];
+    var r = encoding$base64Decode(src);
+    var ok = r.1;
+    testing$assertTrue(ok);
+    var data = r.0;
+    var d = data;
+    if (d == nil) { return; }
+    testing$assertTrue(d.length == 1);
+    testing$assertTrue(d[0] == 102);
+}
+
+@Test
+func testBase64DecodeThree() {
+    var src [4]byte = [90, 109, 57, 118];
+    var r = encoding$base64Decode(src);
+    var ok = r.1;
+    testing$assertTrue(ok);
+    var data = r.0;
+    var d = data;
+    if (d == nil) { return; }
+    testing$assertTrue(d.length == 3);
+    testing$assertTrue(d[0] == 102);
+    testing$assertTrue(d[1] == 111);
+    testing$assertTrue(d[2] == 111);
+}
+
+@Test
+func testBase64DecodeInvalid() {
+    var src [4]byte = [33, 33, 33, 33];
+    var r = encoding$base64Decode(src);
+    var ok = r.1;
+    testing$assertFalse(ok);
+}
+
+@Test
+func testBase64RoundTrip() {
+    var src [5]byte = [1, 2, 3, 4, 5];
+    var encLen = ((src.length + 2) / 3) * 4;
+    var enc [8]byte;
+    encoding$base64EncodeTo(enc, src);
+    var dec [5]byte;
+    var r = encoding$base64DecodeTo(dec, enc);
+    var ok = r.1;
+    testing$assertTrue(ok);
+    for (var i = 0; i < src.length; i += 1) {
+        testing$assertTrue(dec[i] == src[i]);
+    }
+}

@@ -1,0 +1,183 @@
+// ===== SHA-256 hash (FIPS 180-4) =====
+// 256-bit output.
+
+import std$encoding;
+
+const sha256H0 uint32 = 0x6a09e667;
+const sha256H1 uint32 = 0xbb67ae85;
+const sha256H2 uint32 = 0x3c6ef372;
+const sha256H3 uint32 = 0xa54ff53a;
+const sha256H4 uint32 = 0x510e527f;
+const sha256H5 uint32 = 0x9b05688c;
+const sha256H6 uint32 = 0x1f83d9ab;
+const sha256H7 uint32 = 0x5be0cd19;
+
+const sha256K [64]uint32 = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
+    0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+    0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+    0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+    0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
+    0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
+    0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+    0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+];
+
+func shaCh(x, y, z uint32) uint32 { return (x & y) ~ ((!x) & z); }
+func shaMaj(x, y, z uint32) uint32 { return (x & y) ~ (x & z) ~ (y & z); }
+func shaSigma0(x uint32) uint32 { return ((x>>2)|(x<<30)) ~ ((x>>13)|(x<<19)) ~ ((x>>22)|(x<<10)); }
+func shaSigma1(x uint32) uint32 { return ((x>>6)|(x<<26)) ~ ((x>>11)|(x<<21)) ~ ((x>>25)|(x<<7)); }
+func shaSig0Small(x uint32) uint32 { return ((x>>7)|(x<<25)) ~ ((x>>18)|(x<<14)) ~ (x>>3); }
+func shaSig1Small(x uint32) uint32 { return ((x>>17)|(x<<15)) ~ ((x>>19)|(x<<13)) ~ (x>>10); }
+
+func read4be(block [&#]byte, off int) [4]byte {
+    var w [4]byte;
+    w[0] = block[off]; w[1] = block[off+1];
+    w[2] = block[off+2]; w[3] = block[off+3];
+    return w;
+}
+
+func write4be(dst [&]byte, off int, v uint32) {
+    var w [4]byte;
+    encoding$putBigUint32(w, v);
+    dst[off] = w[0]; dst[off+1] = w[1];
+    dst[off+2] = w[2]; dst[off+3] = w[3];
+}
+
+func write8be(dst [&]byte, off int, v uint64) {
+    var w [8]byte;
+    encoding$putBigUint64(w, v);
+    for (var i = 0; i < 8; i += 1) { dst[off+i] = w[i]; }
+}
+
+class Sha256 (Hash) {
+    var h [8]uint32;
+    var buf [64]byte;
+    var len uint64;
+    var nx int;
+
+    func block(block [&#]byte) {
+        var W [64]uint32;
+        for (var i = 0; i < 16; i += 1) {
+            var w [4]byte;
+            var off = i * 4;
+            w[0] = block[off]; w[1] = block[off+1]; w[2] = block[off+2]; w[3] = block[off+3];
+            W[i] = encoding$bigUint32(w);
+        }
+        for (var i = 16; i < 64; i += 1) {
+            W[i] = shaSig1Small(W[i-2]) + W[i-7] + shaSig0Small(W[i-15]) + W[i-16];
+        }
+        var a = h[0]; var b = h[1]; var c = h[2]; var d = h[3];
+        var e = h[4]; var f = h[5]; var g = h[6]; var hv = h[7];
+        for (var i = 0; i < 64; i += 1) {
+            var t1 = hv + shaSigma1(e) + shaCh(e, f, g) + sha256K[i] + W[i];
+            var t2 = shaSigma0(a) + shaMaj(a, b, c);
+            hv = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+        }
+        h[0] = h[0] + a; h[1] = h[1] + b; h[2] = h[2] + c; h[3] = h[3] + d;
+        h[4] = h[4] + e; h[5] = h[5] + f; h[6] = h[6] + g; h[7] = h[7] + hv;
+    }
+
+    export func write(data [&#]byte) int {
+        for (var i = 0; i < data.length; i += 1) {
+            buf[nx] = data[i]; nx += 1; len += 1;
+            if (nx == 64) { block(buf); nx = 0; }
+        }
+        return data.length;
+    }
+
+    export func sum(out [&]byte) int {
+        var hh [8]uint32;
+        hh[0] = h[0]; hh[1] = h[1]; hh[2] = h[2]; hh[3] = h[3];
+        hh[4] = h[4]; hh[5] = h[5]; hh[6] = h[6]; hh[7] = h[7];
+        var totalBits = len * 8;  // original message bits
+        var tnx = nx;
+        var tbuf [64]byte;
+        for (var i = 0; i < nx; i += 1) { tbuf[i] = buf[i]; }
+        tbuf[tnx] = 128; tnx += 1;
+        if (tnx > 56) {
+            for (var i = tnx; i < 64; i += 1) { tbuf[i] = 0; }
+            var W [64]uint32;
+            for (var i = 0; i < 16; i += 1) {
+                var w [4]byte; var off = i*4;
+                w[0]=tbuf[off]; w[1]=tbuf[off+1]; w[2]=tbuf[off+2]; w[3]=tbuf[off+3];
+                W[i]=encoding$bigUint32(w);
+            }
+            for (var i = 16; i < 64; i += 1) {
+                W[i] = shaSig1Small(W[i-2]) + W[i-7] + shaSig0Small(W[i-15]) + W[i-16];
+            }
+            var a = hh[0]; var bb = hh[1]; var c = hh[2]; var d = hh[3];
+            var e = hh[4]; var f = hh[5]; var g = hh[6]; var hv = hh[7];
+            for (var i = 0; i < 64; i += 1) {
+                var t1 = hv + shaSigma1(e) + shaCh(e, f, g) + sha256K[i] + W[i];
+                var t2 = shaSigma0(a) + shaMaj(a, bb, c);
+                hv = g; g = f; f = e; e = d + t1; d = c; c = bb; bb = a; a = t1 + t2;
+            }
+            hh[0] = hh[0] + a; hh[1] = hh[1] + bb; hh[2] = hh[2] + c; hh[3] = hh[3] + d;
+            hh[4] = hh[4] + e; hh[5] = hh[5] + f; hh[6] = hh[6] + g; hh[7] = hh[7] + hv;
+            tnx = 0;
+        }
+        for (var i = tnx; i < 56; i += 1) { tbuf[i] = 0; }
+        var w8 [8]byte;
+        encoding$putBigUint64(w8, totalBits);
+        for (var i = 0; i < 8; i += 1) { tbuf[56+i] = w8[i]; }
+        var W [64]uint32;
+        for (var i = 0; i < 16; i += 1) {
+            var w [4]byte; var off = i*4;
+            w[0]=tbuf[off]; w[1]=tbuf[off+1]; w[2]=tbuf[off+2]; w[3]=tbuf[off+3];
+            W[i]=encoding$bigUint32(w);
+        }
+        for (var i = 16; i < 64; i += 1) {
+            W[i] = shaSig1Small(W[i-2]) + W[i-7] + shaSig0Small(W[i-15]) + W[i-16];
+        }
+        var a = hh[0]; var bb = hh[1]; var c = hh[2]; var d = hh[3];
+        var e = hh[4]; var f = hh[5]; var g = hh[6]; var hv = hh[7];
+        for (var i = 0; i < 64; i += 1) {
+            var t1 = hv + shaSigma1(e) + shaCh(e, f, g) + sha256K[i] + W[i];
+            var t2 = shaSigma0(a) + shaMaj(a, bb, c);
+            hv = g; g = f; f = e; e = d + t1; d = c; c = bb; bb = a; a = t1 + t2;
+        }
+        hh[0] = hh[0] + a; hh[1] = hh[1] + bb; hh[2] = hh[2] + c; hh[3] = hh[3] + d;
+        hh[4] = hh[4] + e; hh[5] = hh[5] + f; hh[6] = hh[6] + g; hh[7] = hh[7] + hv;
+        var ow [4]byte;
+        encoding$putBigUint32(ow, hh[0]);
+        out[0]=ow[0]; out[1]=ow[1]; out[2]=ow[2]; out[3]=ow[3];
+        encoding$putBigUint32(ow, hh[1]);
+        out[4]=ow[0]; out[5]=ow[1]; out[6]=ow[2]; out[7]=ow[3];
+        encoding$putBigUint32(ow, hh[2]);
+        out[8]=ow[0]; out[9]=ow[1]; out[10]=ow[2]; out[11]=ow[3];
+        encoding$putBigUint32(ow, hh[3]);
+        out[12]=ow[0]; out[13]=ow[1]; out[14]=ow[2]; out[15]=ow[3];
+        encoding$putBigUint32(ow, hh[4]);
+        out[16]=ow[0]; out[17]=ow[1]; out[18]=ow[2]; out[19]=ow[3];
+        encoding$putBigUint32(ow, hh[5]);
+        out[20]=ow[0]; out[21]=ow[1]; out[22]=ow[2]; out[23]=ow[3];
+        encoding$putBigUint32(ow, hh[6]);
+        out[24]=ow[0]; out[25]=ow[1]; out[26]=ow[2]; out[27]=ow[3];
+        encoding$putBigUint32(ow, hh[7]);
+        out[28]=ow[0]; out[29]=ow[1]; out[30]=ow[2]; out[31]=ow[3];
+        return 32;
+    }
+
+    export func reset() {
+        h[0] = sha256H0; h[1] = sha256H1; h[2] = sha256H2; h[3] = sha256H3;
+        h[4] = sha256H4; h[5] = sha256H5; h[6] = sha256H6; h[7] = sha256H7;
+        len = 0; nx = 0;
+    }
+
+    export func size() int { return 32; }
+}
+
+export func newSha256() *Hash {
+    var h = new(Sha256);
+    h.reset();
+    return h;
+}

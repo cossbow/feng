@@ -1,0 +1,103 @@
+import std$testing;
+import std$encoding;
+
+@Test
+func testHexEncodeEmpty() {
+    var src [0]byte;
+    var dst [0]byte;
+    var n = encoding$hexEncodeTo(dst, src);
+    testing$assertTrue(n == 0);
+}
+
+@Test
+func testHexEncodeSingle() {
+    var src [1]byte = [102];
+    var dst [2]byte;
+    encoding$hexEncodeTo(dst, src);
+    testing$assertTrue(dst[0] == 54);
+    testing$assertTrue(dst[1] == 54);
+}
+
+@Test
+func testHexEncodeMulti() {
+    var src [2]byte = [102, 111];
+    var dst [4]byte;
+    encoding$hexEncodeTo(dst, src);
+    testing$assertTrue(dst[0] == 54); testing$assertTrue(dst[1] == 54);
+    testing$assertTrue(dst[2] == 54); testing$assertTrue(dst[3] == 102);
+}
+
+@Test
+func testHexEncodeHello() {
+    var src [5]byte = [104, 101, 108, 108, 111];
+    var dst [10]byte;
+    encoding$hexEncodeTo(dst, src);
+    testing$assertTrue(dst[0] == 54); testing$assertTrue(dst[1] == 56);
+    testing$assertTrue(dst[2] == 54); testing$assertTrue(dst[3] == 53);
+    testing$assertTrue(dst[4] == 54); testing$assertTrue(dst[5] == 99);
+    testing$assertTrue(dst[8] == 54); testing$assertTrue(dst[9] == 102);
+}
+
+@Test
+func testHexEncodeMinMax() {
+    var src [2]byte = [0, 255];
+    var dst [4]byte;
+    encoding$hexEncodeTo(dst, src);
+    testing$assertTrue(dst[0] == 48); testing$assertTrue(dst[1] == 48);
+    testing$assertTrue(dst[2] == 102); testing$assertTrue(dst[3] == 102);
+}
+
+@Test
+func testHexDecodeEmpty() {
+    var src [0]byte;
+    var r = encoding$hexDecode(src);
+    var ok = r.1;
+    testing$assertTrue(ok);
+    var data = r.0;
+    var d = data;
+    if (d == nil) { return; }
+    testing$assertTrue(d.length == 0);
+}
+
+@Test
+func testHexDecodeSingle() {
+    var src [2]byte = [54, 54];
+    var r = encoding$hexDecode(src);
+    var ok = r.1;
+    testing$assertTrue(ok);
+    var data = r.0;
+    var d = data;
+    if (d == nil) { return; }
+    testing$assertTrue(d.length == 1);
+    testing$assertTrue(d[0] == 102);
+}
+
+@Test
+func testHexDecodeOddLength() {
+    var src [1]byte = [97];
+    var r = encoding$hexDecode(src);
+    var ok = r.1;
+    testing$assertFalse(ok);
+}
+
+@Test
+func testHexDecodeInvalidChar() {
+    var src [2]byte = [103, 48];
+    var r = encoding$hexDecode(src);
+    var ok = r.1;
+    testing$assertFalse(ok);
+}
+
+@Test
+func testHexRoundTrip() {
+    var src [3]byte = [0, 128, 255];
+    var enc [6]byte;
+    encoding$hexEncodeTo(enc, src);
+    var dec [3]byte;
+    var r = encoding$hexDecodeTo(dec, enc);
+    var ok = r.1;
+    testing$assertTrue(ok);
+    testing$assertTrue(dec[0] == 0);
+    testing$assertTrue(dec[1] == 128);
+    testing$assertTrue(dec[2] == 255);
+}

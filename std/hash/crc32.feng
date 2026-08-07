@@ -1,0 +1,55 @@
+// ===== CRC32 (IEEE 802.3) =====
+//
+// IEEE polynomial: 0xEDB88320. Lookup table generated at runtime.
+
+import std$encoding;
+
+// Lazy-initialized lookup table
+var crc32Table [256]uint32;
+var crc32TableReady bool = false;
+
+func ensureTable() {
+    if (crc32TableReady) { return; }
+    crc32TableReady = true;
+    for (var i = 0; i < 256; i += 1) {
+        var crc = uint32(i);
+        for (var j = 0; j < 8; j += 1) {
+            if ((crc & 1) != 0) {
+                crc = (crc >> 1) ~ 0xedb88320;
+            } else {
+                crc = crc >> 1;
+            }
+        }
+        crc32Table[i] = crc;
+    }
+}
+
+class Crc32 (Hash) {
+    var crc uint32;
+
+    export func write(data [&#]byte) int {
+        ensureTable();
+        for (var i = 0; i < data.length; i += 1) {
+            crc = crc32Table[(crc ~ uint32(data[i])) & 255] ~ (crc >> 8);
+        }
+        return data.length;
+    }
+
+    export func sum(b [&]byte) int {
+        var result = crc ~ 0xffffffff;
+        encoding$putBigUint32(b, result);
+        return 4;
+    }
+
+    export func reset() {
+        crc = 0xffffffff;
+    }
+
+    export func size() int {
+        return 4;
+    }
+}
+
+export func newCrc32() *Hash {
+    return new(Crc32, {crc=0xffffffff});
+}

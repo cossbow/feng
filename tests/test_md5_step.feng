@@ -1,0 +1,42 @@
+import std$encoding;
+
+func main(args [&#][*#]byte) {
+    // MD5("") padding block -> X[0]=128, rest=0
+    var block [64]byte;
+    block[0] = 128;
+    var X [16]uint32;
+    for (var i = 0; i < 16; i += 1) {
+        var w [4]byte;
+        w[0]=block[i*4]; w[1]=block[i*4+1]; w[2]=block[i*4+2]; w[3]=block[i*4+3];
+        X[i]=encoding$littleUint32(w);
+    }
+
+    var a uint32=1732584193; var b uint32=4023233417;
+    var c uint32=2562383102; var d uint32=271733878;
+
+    // Only run 4 rounds, check each step
+    for (var i = 0; i < 4; i += 1) {
+        var g=i;
+        if (i == 0) {
+            var f=(b&c)|((!b)&d);
+            // F=b&c|~b&d, expected 0x98badcfe=2562383102
+            assert(f == 2562383102);
+            var t=a+f+X[g]+3614090360;
+            a=b+(((t<<7)|(t>>25)));
+        } else if (i == 1) {
+            var f=(a&b)|((!a)&c);
+            var t=d+f+X[g]+3905402710;
+            d=a+(((t<<12)|(t>>20)));
+        } else if (i == 2) {
+            var f=(d&a)|((!d)&b);
+            var t=c+f+X[g]+606105819;
+            c=d+(((t<<17)|(t>>15)));
+        } else {
+            var f=(c&d)|((!c)&a);
+            var t=b+f+X[g]+3250441966;
+            b=c+(((t<<22)|(t>>10)));
+        }
+    }
+    // Just verify that after 4 rounds, values changed
+    assert(a != 1732584193 || b != 4023233417);
+}

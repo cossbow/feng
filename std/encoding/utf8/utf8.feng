@@ -70,7 +70,7 @@ export func decodeRune(s [&#]byte, offset int) (int32, int) {
 // Encode a rune into the buffer starting at offset.
 // Returns the number of bytes written.
 // Caller must ensure the buffer has enough space (max 4 bytes).
-export func encodeRune(buf [&!]uint8, offset int, r int32) int {
+export func encodeRune(buf [&]uint8, offset int, r int32) int {
     if (r < 128) {
         buf[offset] = uint8(r);
         return 1;

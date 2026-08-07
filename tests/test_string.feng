@@ -153,7 +153,7 @@ func testRuneException() {
     var s = string$fromUtf8("你好");
     try {
         s.rune(10);  // out of bounds
-    } catch(e *!#OutOfBoundsException) {
+    } catch(e *#OutOfBoundsException) {
         // expected
     }
 }
@@ -163,7 +163,7 @@ func testSubstringException() {
     var s = string$fromUtf8("hello");
     try {
         s.substring(5, 2);  // start > end
-    } catch(e *!#error$IllegalArgumentException) {
+    } catch(e *#error$IllegalArgumentException) {
         // expected
     }
 }

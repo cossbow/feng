@@ -22,12 +22,19 @@ func defaultHash`T`(k T) T {
     return (k);
 }
 
-func intHashing(n &m$Node`int,int`) int {
+func intHash(n &#m$Node`int,int`) int {
     return n.key;
 }
+func intEq(a,b &#m$Node`int,int`) bool {
+    return a.key==b.key;
+}
+const intHashing m$Hashing`int,int` = {
+    hash=intHash,
+    equal=intEq
+};
 
 func testMap(n int) {
-    var map = m$newHashmap`int,int`(intHashing);
+    var map = m$newHashmap(intHashing);
     for(var i=0;i<n;i+=1) {
         map.set(i, i+100);
     }

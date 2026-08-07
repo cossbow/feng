@@ -1,0 +1,68 @@
+import std$testing;
+import std$hash;
+
+@Test
+func testFnvEmpty() {
+    var h = hash$newFnv();
+    var buf [8]byte;
+    h.sum(buf);
+    // FNV-1a("") = 0xcbf29ce484222325
+    testing$assertTrue(buf[0] == 203);
+    testing$assertTrue(buf[1] == 242);
+    testing$assertTrue(buf[2] == 156);
+    testing$assertTrue(buf[3] == 228);
+    testing$assertTrue(buf[4] == 132);
+    testing$assertTrue(buf[5] == 34);
+    testing$assertTrue(buf[6] == 35);
+    testing$assertTrue(buf[7] == 37);
+}
+
+@Test
+func testFnvHello() {
+    var h = hash$newFnv();
+    var data [5]byte = [104, 101, 108, 108, 111];  // "hello"
+    h.write(data);
+    var buf [8]byte;
+    h.sum(buf);
+    // FNV-1a("hello") = 0xa430d84680aabd0b
+    testing$assertTrue(buf[0] == 164);
+    testing$assertTrue(buf[1] == 48);
+    testing$assertTrue(buf[2] == 216);
+    testing$assertTrue(buf[3] == 70);
+    testing$assertTrue(buf[4] == 128);
+    testing$assertTrue(buf[5] == 170);
+    testing$assertTrue(buf[6] == 189);
+    testing$assertTrue(buf[7] == 11);
+}
+
+@Test
+func testFnvSingleChar() {
+    var h = hash$newFnv();
+    var data [1]byte = [97];  // "a"
+    h.write(data);
+    var buf [8]byte;
+    h.sum(buf);
+    // FNV-1a("a") = 0xaf63dc4c8601ec8c
+    testing$assertTrue(buf[0] == 175);
+    testing$assertTrue(buf[7] == 140);
+}
+
+@Test
+func testFnvReset() {
+    var h = hash$newFnv();
+    var data [3]byte = [97, 98, 99];  // "abc"
+    h.write(data);
+    h.reset();
+    var data2 [5]byte = [104, 101, 108, 108, 111];  // "hello"
+    h.write(data2);
+    var buf [8]byte;
+    h.sum(buf);
+    testing$assertTrue(buf[0] == 164);
+    testing$assertTrue(buf[7] == 11);
+}
+
+@Test
+func testFnvSize() {
+    var h = hash$newFnv();
+    testing$assertTrue(h.size() == 8);
+}

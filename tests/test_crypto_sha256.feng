@@ -1,0 +1,19 @@
+import std$testing;
+import std$hash;
+
+@Test
+func testSha256Empty() {
+    var h = hash$newSha256();
+    var empty [0]byte;
+    h.write(empty);
+    var buf [32]byte;
+    h.sum(buf);
+    testing$assertTrue(buf[0] == 227);
+    testing$assertTrue(buf[31] == 85);
+}
+
+@Test
+func testSha256Size() {
+    var h = hash$newSha256();
+    testing$assertTrue(h.size() == 32);
+}

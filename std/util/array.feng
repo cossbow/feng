@@ -1,6 +1,6 @@
 
 export
-func copy`T`(src [&!#]T, dst [&!]T, len int) {
+func copy`T`(src [&#]T, dst [&]T, len int) {
     var size = dst.length<=len?dst.length:len;
     size = src.length<=len?src.length:len;
     for (var i=0; i<size; i+=1) {
@@ -10,7 +10,7 @@ func copy`T`(src [&!#]T, dst [&!]T, len int) {
 
 // Compare two array slices for equality.
 export
-func equal`T`(a [&!#]T, b [&!#]T) bool {
+func equal`T`(a [&#]T, b [&#]T) bool {
     if (a.length != b.length) {
         return false;
     }
@@ -24,7 +24,7 @@ func equal`T`(a [&!#]T, b [&!#]T) bool {
 
 // Fill an array slice with a value.
 export
-func fill`T`(dst [&!]T, value T) {
+func fill`T`(dst [&]T, value T) {
     for (var i = 0; i < dst.length; i += 1) {
         dst[i] = value;
     }
@@ -32,7 +32,7 @@ func fill`T`(dst [&!]T, value T) {
 
 // Reverse array elements in place.
 export
-func reverse`T`(arr [&!]T) {
+func reverse`T`(arr [&]T) {
     var i = 0;
     var j = arr.length - 1;
     for (i < j) {
@@ -47,7 +47,7 @@ func reverse`T`(arr [&!]T) {
 // Find the first index of a value in the array slice.
 // Returns -1 if not found.
 export
-func indexOf`T`(arr [&!#]T, value T) int {
+func indexOf`T`(arr [&#]T, value T) int {
     for (var i = 0; i < arr.length; i += 1) {
         if (arr[i] == value) {
             return i;
@@ -58,6 +58,6 @@ func indexOf`T`(arr [&!#]T, value T) int {
 
 // Check whether the array slice contains a value.
 export
-func contains`T`(arr [&!#]T, value T) bool {
+func contains`T`(arr [&#]T, value T) bool {
     return indexOf`T`(arr, value) >= 0;
 }

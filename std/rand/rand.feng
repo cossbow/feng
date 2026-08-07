@@ -74,7 +74,7 @@ func nextFloat() float {
 // ===== Shuffling =====
 
 export
-func shuffle`T`(arr [&!]T) {
+func shuffle`T`(arr [&]T) {
     var n = arr.length;
     for (var i = n - 1; i > 0; i -= 1) {
         var j = int(nextUint64() % uint64(i + 1));

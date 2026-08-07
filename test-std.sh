@@ -37,19 +37,23 @@ function test_all() {
 }
 
 function test_one() {
-    c=$1
-    f=$c
-    if [ "${c##*.}" != "feng" ]; then
+    n=$1
+    c=""
+    if [[ -n "${2}" ]]; then
+        c=" --test-name ${2}"
+    fi
+    f=$n
+    if [ "${n##*.}" != "feng" ]; then
         f="${f}.feng"
     fi
-    td="${out}/tmp-${c}"
+    td="${out}/tmp-${n}"
     mkdir -p ${td}
-    $cmd $args -i tests/${f} -o ${td}
+    $cmd $args ${c} -i tests/${f} -o ${td}
     ${td}/test
 }
 
 if [[ -z "${1}" ]]; then
     test_all
 else
-    test_one "${1}"
+    test_one "${1}" "${2}"
 fi

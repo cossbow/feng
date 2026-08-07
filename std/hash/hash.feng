@@ -1,0 +1,13 @@
+// ===== Hash interface =====
+//
+// Common interface for all hash functions.
+// sum(b) writes the hash into buffer b (must be at least size() bytes).
+// Returns number of bytes written.
+
+export
+interface Hash {
+    write(data [&#]byte) int;
+    sum(b [&]byte) int;
+    reset();
+    size() int;
+}

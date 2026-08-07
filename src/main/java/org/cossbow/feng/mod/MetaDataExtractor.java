@@ -14,11 +14,7 @@ import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassField;
 import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
-import org.cossbow.feng.ast.proc.FixedParameter;
-import org.cossbow.feng.ast.proc.FunctionDefinition;
-import org.cossbow.feng.ast.proc.Prototype;
-import org.cossbow.feng.ast.proc.PrototypeDefinition;
-import org.cossbow.feng.ast.proc.VariadicParameter;
+import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.ErrorUtil;
@@ -148,8 +144,8 @@ public class MetaDataExtractor {
     }
 
     private MetaDataExtractor required(boolean required) {
-        if (required) write('!');
-        return this;
+        if (required) return this;
+        return write('?');
     }
 
     //
@@ -439,6 +435,7 @@ public class MetaDataExtractor {
             case TupleExpression e -> write(e);
             case TupleIndexExpression e -> write(e);
             case VariableExpression e -> write(e);
+            case FunctionExpression e -> write(e);
             case null, default -> unreachable();
         };
     }
@@ -488,6 +485,10 @@ public class MetaDataExtractor {
     private MetaDataExtractor write(VariableExpression e) {
         var v = (GlobalVariable) e.variable();
         return write(v.symbol());
+    }
+
+    private MetaDataExtractor write(FunctionExpression e) {
+        return write(e.func().symbol()).write(e.generic());
     }
 
     //

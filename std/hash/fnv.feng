@@ -1,0 +1,35 @@
+// ===== FNV-1a 64-bit hash =====
+
+import std$encoding;
+
+const fnvOffsetBasis uint64 = 0xcbf29ce484222325;
+const fnvPrime      uint64 = 0x100000001b3;
+
+class FnvHash (Hash) {
+    var h uint64;
+
+    export func write(data [&#]byte) int {
+        for (var i = 0; i < data.length; i += 1) {
+            h = h ~ uint64(data[i]);
+            h = h * fnvPrime;
+        }
+        return data.length;
+    }
+
+    export func sum(b [&]byte) int {
+        encoding$putBigUint64(b, h);
+        return 8;
+    }
+
+    export func reset() {
+        h = fnvOffsetBasis;
+    }
+
+    export func size() int {
+        return 8;
+    }
+}
+
+export func newFnv() *Hash {
+    return new(FnvHash, {h=fnvOffsetBasis});
+}

@@ -5,7 +5,7 @@ import std$error;
 func testThrowCatch() {
     try {
         throw new(error$ParseException);
-    } catch(e *!#error$ParseException) {
+    } catch(e *#error$ParseException) {
         // expected
     }
 }

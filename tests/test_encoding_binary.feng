@@ -1,0 +1,121 @@
+import std$testing;
+import std$encoding;
+
+@Test
+func testBigUint16() {
+    var b [2]byte = [18, 52];  // 0x1234
+    var v = encoding$bigUint16(b);
+    testing$assertTrue(v == 4660);  // 0x1234 = 4660
+}
+
+@Test
+func testBigUint32() {
+    var b [4]byte = [18, 52, 86, 120];  // 0x12345678
+    var v = encoding$bigUint32(b);
+    testing$assertTrue(v == 305419896);  // 0x12345678
+}
+
+@Test
+func testBigUint64() {
+    var b [8]byte = [0, 0, 0, 0, 18, 52, 86, 120];
+    var v = encoding$bigUint64(b);
+    testing$assertTrue(v == 305419896);
+}
+
+@Test
+func testPutBigUint16() {
+    var b [2]byte;
+    encoding$putBigUint16(b, 4660);
+    testing$assertTrue(b[0] == 18);
+    testing$assertTrue(b[1] == 52);
+}
+
+@Test
+func testPutBigUint32() {
+    var b [4]byte;
+    encoding$putBigUint32(b, 305419896);
+    testing$assertTrue(b[0] == 18);
+    testing$assertTrue(b[1] == 52);
+    testing$assertTrue(b[2] == 86);
+    testing$assertTrue(b[3] == 120);
+}
+
+@Test
+func testPutBigUint64() {
+    var b [8]byte;
+    encoding$putBigUint64(b, 305419896);
+    testing$assertTrue(b[4] == 18);
+    testing$assertTrue(b[5] == 52);
+    testing$assertTrue(b[6] == 86);
+    testing$assertTrue(b[7] == 120);
+}
+
+@Test
+func testLittleUint16() {
+    var b [2]byte = [52, 18];
+    var v = encoding$littleUint16(b);
+    testing$assertTrue(v == 4660);
+}
+
+@Test
+func testLittleUint32() {
+    var b [4]byte = [120, 86, 52, 18];
+    var v = encoding$littleUint32(b);
+    testing$assertTrue(v == 305419896);
+}
+
+@Test
+func testLittleUint64() {
+    var b [8]byte = [120, 86, 52, 18, 0, 0, 0, 0];
+    var v = encoding$littleUint64(b);
+    testing$assertTrue(v == 305419896);
+}
+
+@Test
+func testPutLittleUint16() {
+    var b [2]byte;
+    encoding$putLittleUint16(b, 4660);
+    testing$assertTrue(b[0] == 52);
+    testing$assertTrue(b[1] == 18);
+}
+
+@Test
+func testPutLittleUint32() {
+    var b [4]byte;
+    encoding$putLittleUint32(b, 305419896);
+    testing$assertTrue(b[0] == 120);
+    testing$assertTrue(b[1] == 86);
+    testing$assertTrue(b[2] == 52);
+    testing$assertTrue(b[3] == 18);
+}
+
+@Test
+func testPutLittleUint64() {
+    var b [8]byte;
+    encoding$putLittleUint64(b, 305419896);
+    testing$assertTrue(b[0] == 120);
+    testing$assertTrue(b[1] == 86);
+    testing$assertTrue(b[2] == 52);
+    testing$assertTrue(b[3] == 18);
+}
+
+@Test
+func testBigRoundTrip16() {
+    var b [2]byte;
+    encoding$putBigUint16(b, 65535);
+    testing$assertTrue(encoding$bigUint16(b) == 65535);
+}
+
+@Test
+func testBigRoundTrip32() {
+    var b [4]byte;
+    encoding$putBigUint32(b, 3735928559);
+    testing$assertTrue(encoding$bigUint32(b) == 3735928559);
+}
+
+@Test
+func testLittleRoundTrip32() {
+    var b [4]byte;
+    encoding$putLittleUint32(b, 3735928559);
+    testing$assertTrue(encoding$littleUint32(b) == 3735928559);
+}

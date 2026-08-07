@@ -177,7 +177,7 @@ class Time final {
 export
 func now() Time {
     var t Time;
-    const r &!Time = t;
+    const r &Time = t;
     timespec_get(uint64(r), 1);
     return t;
 }

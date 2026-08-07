@@ -1,0 +1,63 @@
+// ===== Hexadecimal encoding/decoding =====
+
+// Encode table: nibble value (0-15) -> hex character (lowercase)
+const hexTable [16]byte = [
+    48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+    97, 98, 99, 100, 101, 102,
+];
+
+export func hexEncodeTo(dst [&]byte, src [&#]byte) int {
+    for (var i = 0; i < src.length; i += 1) {
+        var b = src[i];
+        dst[i * 2] = hexTable[(b >> 4) & 15];
+        dst[i * 2 + 1] = hexTable[b & 15];
+    }
+    return src.length * 2;
+}
+
+export func hexEncode(src [&#]byte) [*]byte {
+    var dst = new([src.length * 2]byte);
+    hexEncodeTo(dst, src);
+    return dst;
+}
+
+// ===== Decode =====
+
+// Decode a single hex character. Returns -1 if invalid.
+func hexValue(c byte) int {
+    if (c >= 48 && c <= 57) { return int(c) - 48; }
+    if (c >= 97 && c <= 102) { return int(c) - 87; }
+    if (c >= 65 && c <= 70) { return int(c) - 55; }
+    return -1;
+}
+
+export func hexDecodeTo(dst [&]byte, src [&#]byte) (int, bool) {
+    if (src.length % 2 != 0) {
+        return (0, false);
+    }
+    for (var i = 0; i < src.length; i += 1) {
+        var h = hexValue(src[i]);
+        if (h < 0) {
+            return (0, false);
+        }
+    }
+    var n = src.length / 2;
+    for (var i = 0; i < n; i += 1) {
+        var hi = hexValue(src[i * 2]);
+        var lo = hexValue(src[i * 2 + 1]);
+        dst[i] = byte((hi << 4) | lo);
+    }
+    return (n, true);
+}
+
+export func hexDecode(src [&#]byte) ([*?]byte, bool) {
+    if (src.length % 2 != 0) {
+        return (nil, false);
+    }
+    var dst = new([src.length / 2]byte);
+    var r = hexDecodeTo(dst, src);
+    if (!r.1) {
+        return (nil, false);
+    }
+    return (dst, true);
+}

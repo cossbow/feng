@@ -9,7 +9,7 @@ func newCapacity(cur, need int) int {
 
 export
 class BufferWriter (Writer) {
-    var buf [*!]byte;
+    var buf [*]byte;
     var len int;
 
     func growIfNeed(need int) {
@@ -29,7 +29,7 @@ class BufferWriter (Writer) {
     }
 
     export
-    func write(data [&!#]byte, offset int, length int) int {
+    func write(data [&#]byte, offset int, length int) int {
         growIfNeed(length);
         for (var i = 0; i < length; i += 1) {
             buf[len] = data[offset + i];
@@ -46,7 +46,7 @@ class BufferWriter (Writer) {
     }
 
     export
-    func get() ([*!#]byte, int) {
+    func get() ([*#]byte, int) {
         return (buf, len);
     }
 
@@ -67,7 +67,7 @@ class BufferWriter (Writer) {
     }
 
     export
-    func copy() [*!#]byte {
+    func copy() [*#]byte {
         var src = buf;
         var dst = new([len]byte);
         util$copy`byte`(src, dst, len);
@@ -86,13 +86,13 @@ func newWriter() BufferWriter {
 }
 
 export
-class BufferReader (Reader) {
-    const buf [*!#]byte;
+class BufferReader {
+    const buf [*#]byte;
     const len int;
     var off int;
 
     export
-    func read(b [&!]byte) int {
+    func read(b [&]byte) int {
         var old = off;
         for (var i=0; off<len && i<b.length; off,i=off+1,i+1) {
             b[i] = buf[off];
@@ -102,7 +102,7 @@ class BufferReader (Reader) {
 
     // Reset to read from new data.
     export
-    func reset(data [*!#]byte, length int) {
+    func reset(data [*#]byte, length int) {
         off = 0;
         // buf and len are const, so reset is done externally by creating new BufferReader
     }

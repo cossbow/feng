@@ -1,0 +1,57 @@
+import std$testing;
+import std$hash;
+
+// Helper: check MD5 hash against expected bytes
+func checkMd5(input [&#]byte, expected [16]byte) {
+    var h = hash$newMd5();
+    h.write(input);
+    var buf [16]byte;
+    h.sum(buf);
+    for (var i = 0; i < 16; i += 1) {
+        testing$assertTrue(buf[i] == expected[i]);
+    }
+}
+
+@Test
+func testMd5Empty() {
+    var expected [16]byte = [212, 29, 140, 217, 143, 0, 178, 4, 233, 128, 9, 152, 236, 248, 66, 126];
+    var empty [0]byte;
+    checkMd5(empty, expected);
+}
+
+@Test
+func testMd5A() {
+    var expected [16]byte = [12, 193, 117, 185, 192, 241, 182, 168, 49, 195, 153, 226, 105, 119, 38, 97];
+    var input [1]byte = [97];
+    checkMd5(input, expected);
+}
+
+@Test
+func testMd5Abc() {
+    var expected [16]byte = [144, 1, 80, 152, 60, 210, 79, 176, 214, 150, 63, 125, 40, 225, 127, 114];
+    var input [3]byte = [97, 98, 99];
+    checkMd5(input, expected);
+}
+
+@Test
+func testMd5Size() {
+    var h = hash$newMd5();
+    testing$assertTrue(h.size() == 16);
+}
+
+// Diagnostic: check that sum() actually writes to the output buffer
+@Test
+func testMd5WritesOutput() {
+    var h = hash$newMd5();
+    var empty [0]byte;
+    h.write(empty);
+    var buf [16]byte;
+    for (var i = 0; i < 16; i += 1) { buf[i] = 255; }
+    h.sum(buf);
+    // After sum(), buf should NOT be all 255
+    var found = false;
+    for (var i = 0; i < 16; i += 1) {
+        if (buf[i] != 255) { found = true; }
+    }
+    testing$assertTrue(found);
+}

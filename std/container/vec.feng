@@ -25,7 +25,7 @@ export func newVectorCap`T`(cap int) *Vector`T` {
     return v;
 }
 
-export func vectorFromArray`T`(src [&!#]T) *Vector`T` {
+export func vectorFromArray`T`(src [&#]T) *Vector`T` {
     var v = newVector`T`();
     vectorAppendAll`T`(v, src);
     return v;
@@ -93,7 +93,7 @@ export func vectorAppend`T`(v *Vector`T`, e T) {
     v.len += 1;
 }
 
-export func vectorAppendAll`T`(v *Vector`T`, src [&!#]T) {
+export func vectorAppendAll`T`(v *Vector`T`, src [&#]T) {
     var srcLen = src.length;
     ensureCapacity`T`(v, srcLen);
     for (var i = 0; i < srcLen; i += 1) {
@@ -194,7 +194,7 @@ export func vectorReverse`T`(v *Vector`T`) {
 
 // ===== bulk =====
 
-export func vectorCopyTo`T`(v *Vector`T`, dst [&!]T) int {
+export func vectorCopyTo`T`(v *Vector`T`, dst [&]T) int {
     var n = v.len;
     if (dst.length < n) {
         n = dst.length;
