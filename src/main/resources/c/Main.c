@@ -36,8 +36,5 @@ int main(int argc, char **argv) {
 		$main();
 #endif
 	}
-#ifdef FENG_DEBUG_MEMORY
-	feng$debug(false);
-#endif
 	return 0;
 }

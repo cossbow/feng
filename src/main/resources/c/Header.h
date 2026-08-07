@@ -28,24 +28,14 @@ typedef bool     Bool;
 
 // ===== reference counting allocation =====
 typedef struct Feng$Header {
-    struct Feng$Header* next;   // debug: linked list
     atomic_int refcnt;
 } Feng$Header;
-
-#ifdef FENG_DEBUG_MEMORY
-static Feng$Header* Feng$debug_list = NULL;
-#include <stdio.h>
-#endif
 
 static inline void* Feng$alloc(int64_t size) {
     void* p = malloc(sizeof(Feng$Header) + size);
     if (!p) abort();
     Feng$Header* fh = (Feng$Header*) p;
     atomic_init(&fh->refcnt, 1);
-#ifdef FENG_DEBUG_MEMORY
-    fh->next = Feng$debug_list;
-    Feng$debug_list = fh;
-#endif
     void* o = ((uint8_t*) p) + sizeof(Feng$Header);
     memset(o, 0, size);
     return o;
@@ -57,9 +47,7 @@ static inline Feng$Header* Feng$headerOf(void* p) {
 
 static inline void Feng$free(void* p) {
     if (!p) return;
-#ifndef FENG_DEBUG_MEMORY
     free(Feng$headerOf(p));
-#endif
 }
 
 static inline void* Feng$inc(void* p) {
@@ -76,11 +64,7 @@ static inline bool Feng$dec(void* p) {
     Feng$Header* fh = Feng$headerOf(p);
     int ref = atomic_fetch_sub(&fh->refcnt, 1) - 1;
     if (ref == 0) return true;
-#ifdef FENG_DEBUG_MEMORY
-    if (ref < 0) false;
-#else
     if (ref < 0) abort();
-#endif
     return false;
 }
 
@@ -241,17 +225,5 @@ static inline int64_t Feng$checkIndex(int64_t i, int64_t bound, Uint64 fn, Uint3
     Feng$throwIndexOutOfBounds(fn, line);
     return -1;
 }
-
-// ===== debug =====
-#ifdef FENG_DEBUG_MEMORY
-static void feng$debug(bool all) {
-    printf("==== see memory stat ====\n");
-    for (Feng$Header* h = Feng$debug_list; h; h = h->next) {
-        int c = atomic_load(&h->refcnt);
-        if (all || c) printf("ref=%d\n", c);
-    }
-    printf("==== end memory stat ====\n");
-}
-#endif
 
 #endif // FENG_C_HEADER_H

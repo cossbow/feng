@@ -159,32 +159,12 @@ static void *Feng$toInstance(Feng$Header *fh) {
 	return (((uint8_t *) fh) + sizeof(Feng$Header));
 }
 
-
-#ifdef FENG_DEBUG_MEMORY
-static std::list<Feng$Header *> objects;
-
-#include <cstdio>
-
-static void feng$debug(bool all) {
-	printf("==== see memory stat ====\n");
-	for (const auto &o: objects) {
-		int c = o->refcnt.load();
-		if (all || c) printf("ref=%d\n", c);
-	}
-	printf("==== end memory stat ====\n");
-}
-
-#endif
-
 static void *Feng$alloc(Int64 size) {
 	void *p = malloc(sizeof(Feng$Header) + size);
 	if (p == nullptr) throw std::bad_alloc();
 
 	Feng$Header *fh = (Feng$Header *) p;
 	fh->refcnt.store(1);
-#ifdef FENG_DEBUG_MEMORY
-	objects.push_back(fh);
-#endif
 	void *o = Feng$toInstance(fh);
 	memset(o, 0, size);
 	return o;
@@ -192,10 +172,8 @@ static void *Feng$alloc(Int64 size) {
 
 template<typename T>
 static void Feng$del(T *p) {
-#ifndef FENG_DEBUG_MEMORY
 	Feng$Header *fh = Feng$headerOf(p);
 	free(fh);
-#endif
 }
 
 template<typename T>

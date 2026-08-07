@@ -19,8 +19,10 @@ import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.dag.DAGGraph;
-import org.cossbow.feng.util.*;
+import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Optional;
+import org.cossbow.feng.util.RepeatList;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -45,7 +47,6 @@ public class CGenerator implements Generator {
     private Appendable out;
     private final boolean header;   // true = header file, false = source file
     private final boolean debug;
-    private final boolean memchk;   // enables FENG_DEBUG_MEMORY
 
     public CGenerator(AnalyseSymbolTable table,
                       Appendable out, boolean header,
@@ -54,7 +55,6 @@ public class CGenerator implements Generator {
         this.out = out;
         this.header = header;
         this.debug = debug;
-        memchk = Boolean.parseBoolean(System.getProperty("feng.memchk"));
     }
 
     public CGenerator(AnalyseSymbolTable table,
@@ -645,7 +645,6 @@ public class CGenerator implements Generator {
             return;
         }
         if (debug) write("#define FENG_DEBUG").newLine();
-        if (memchk) write("#define FENG_DEBUG_MEMORY").newLine();
     }
 
     private void includeHeaders() {
@@ -2613,8 +2612,8 @@ public class CGenerator implements Generator {
      * Parent interfaces share the same vtable offset as the child interface.
      */
     private void addIfaceWithSupers(LinkedHashMap<Identifier, DerivedType> result,
-                                     ClassDefinition cd, ClassDefinition anc,
-                                     DerivedType ifaceDt) {
+                                    ClassDefinition cd, ClassDefinition anc,
+                                    DerivedType ifaceDt) {
         var key = ((InterfaceDefinition) ifaceDt.def()).symbol().name();
         if (result.containsKey(key)) return;
         var resolved = resolveAncestorIface(cd, anc, ifaceDt);
@@ -4538,7 +4537,7 @@ public class CGenerator implements Generator {
             write("static struct { Feng$Header header; struct { Byte $values[")
                     .write(sl.length()).write("]; } array; } ");
             literalString(sl);
-            write(" = {{NULL, 1}, {{");
+            write(" = {{1}, {{");
             for (byte b : sl.value()) write(b).write(',');
             write("}}}").endStmt();
         }
