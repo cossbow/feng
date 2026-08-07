@@ -1907,6 +1907,13 @@ public class SemanticAnalyzerTest {
 
     @Test
     public void testRequire7() {
+        var d = "class A { var id int; var n *?A; } ";
+        checkSucc(d + "func f(a *?A){for(var n=a;n!=nil;n=n.n){}}");
+        checkSucc(d + "func f(a *?A){for(var n=a;n!=nil;n=n.n){n.id=0;}}");
+    }
+
+    @Test
+    public void testRequire8() {
         checkSucc("func f(a*int,b*?int){var r*?int=a; *r=0; }");
         checkFail("func f(a*int,b*?int){var r*?int=b; *r=0; }");
         checkFail("func f(a*int,b*?int){var r*?int=a; r=b; *r=0; }");

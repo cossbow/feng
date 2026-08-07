@@ -2213,10 +2213,6 @@ public class SemanticAnalyzer {
         context.enterScope();
         if (e instanceof ConditionalForStatement ce) {
             analyse(ce);
-            var vars = collectNotNil(ce.condition(), true);
-            setNilState(vars);
-            analyse(e.body());
-            delNilState(vars);
         } else if (e instanceof IterableForStatement ie) {
             analyse(ie);
             analyse(e.body());
@@ -2237,7 +2233,11 @@ public class SemanticAnalyzer {
         if (cg.a() instanceof LiteralExpression le)
             e.cond().set((BoolLiteral) le.literal());
 
+        var vars = collectNotNil(e.condition(), true);
+        setNilState(vars);
+        analyse(e.body());
         analyse(e.updater());
+        delNilState(vars);
         return e;
     }
 
