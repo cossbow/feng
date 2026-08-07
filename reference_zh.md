@@ -86,12 +86,12 @@ func sample() {
 ## main函数
 
 main函数是可执行程序的入口函数，这个和其他语言一致。
-入口函数没有返回值，只有一个参数且参数类型必须是`[&!#][*!#]byte`；
+入口函数没有返回值，只有一个参数且参数类型必须是`[&#][*#]byte`；
 
 ```feng
 import std$os;
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
 	os$printf("Welcome to programming with Feng language");
 }
 ```
@@ -328,7 +328,7 @@ func test(v int) bool {
 其用法有两种：
 
 1. 索引表达式在右边是读操作，即获取索引对应元素的值作为运算结果。
-   左边一个变量或者在表达式中使用时，仅返回元素值，如果元素不存在则终止运行并抛出[异常](#异常-_未完成_)。
+   左边一个变量或者在表达式中使用时，仅返回元素值，如果元素不存在则终止运行并抛出[异常](#异常)。
    ```feng
    func test(arr [16]int) int {
        return arr[16]; // 索引越界，终止运行并抛出异常
@@ -341,7 +341,7 @@ func test(v int) bool {
        arr[15] = 0; // 修改索引为15的元素值为0
    }
    ```
-   数组的容量是创建之后就不能变了，所以索引越界自然也要终止运行并抛出[异常](#异常-_未完成_)。
+   数组的容量是创建之后就不能变了，所以索引越界自然也要终止运行并抛出[异常](#异常)。
 
 #### new表达式
 
@@ -1178,16 +1178,16 @@ class User {
 
 ```feng
 interface Input {
-   read(b [&!]byte) int;
+   read(b [&]byte) int;
 }
 interface Output {
-   write(b [&!#]byte) int;
+   write(b [&#]byte) int;
 }
 // 组合成的接口DataStorage包含read和write方法
 interface DataStorage {
    Input;
    Output;
-   query() [*!#]byte;
+   query() [*#]byte;
 }
 // 实现File接口的实例自然也实现了Write接口
 func use(ds *DataStorage) Output {
@@ -1742,16 +1742,26 @@ func test() {
 }
 ```
 
-原型变量并非引用类型，但可以为空（即`nil`），也可以加非空前缀标记（`!`）来表示不能为空，这点与引用的非空规则一样：
+原型变量并非引用类型，但可以为空（`nil`），也可以加可空前缀标记（`?`）来表示允许空，默认非空的。
+这点与[引用的规则](#可空引用)一样。举例说明：
 
 ```feng
-func use1(a !func()) {
-   var c1 func() = a;
-   var c2 !func() = a;
-   // var c3 !func() = c1; // 错误×：不能反向传递
+func use1(a func()) {
+   var c1 ?func() = a;     // 非空 → 可空
+   var c2 func() = a;      // 非空 → 非空
+   // var c3 func() = c1;  // 错误×：不能反向传递
    if (c1 != nil) {
-      var c3 !func() = c1; // 显示判断空之后才能反传
+      var c3 func() = c1;  // 显示判断空之后才能反传
    }
+}
+```
+
+注意：可空的原型变量不能被调用，例如：
+
+```feng
+func use2(a ?func()) {
+   // a();           // ✖：不能调用
+   if (a!=nil) a();  // ✔：非空才能调用
 }
 ```
 
@@ -1766,7 +1776,7 @@ func use1(a !func()) {
 
 内置的字符串格式化函数，是一个可变参数函数：
 
-1. 第一个参数是传入的`&!Writer`，也就是实现了内置的`Writer`接口的对象。
+1. 第一个参数是传入的`&Writer`，也就是实现了内置的`Writer`接口的对象。
 2. 格式化字符串字面量：`"This is for {}!"`，其中`{}`是占位符，用于格式化后面的参数。
 3. 要输出的参数实例，数量与占位符必须相同，类型可以是基本类型和类、接口。
 
@@ -1791,7 +1801,7 @@ func test() {
 
 ```feng
 // 上文定义的全局对象stdout
-func printf(fmt [&!#]byte, ...) {   // 定义可变参数
+func printf(fmt [&#]byte, ...) {   // 定义可变参数
     format(stdout, fmt, ...);       // 传递可变参数
 }
 ```
@@ -2149,9 +2159,9 @@ func calc() {
    try {
       step1();
       step2();
-   } catch(e *!#NilException) {
+   } catch(e *#NilException) {
       println("捕获到了空指针");
-   } catch(e *!#IllegalStateException | *!#IllegalArgumentException) {
+   } catch(e *#IllegalStateException | *#IllegalArgumentException) {
       println("捕获到了状态错误或者参数错误");
    } final {
       println("最终经过这里再往下执行");
@@ -2166,7 +2176,7 @@ func calc() {
 func calc() {
    try {
       step1();
-   } catch(e *!#IllegalStateException) {
+   } catch(e *#IllegalStateException) {
       println("捕获到了状态错误或者参数错误");
    }
    return getResult();
@@ -2370,18 +2380,81 @@ func test() {
 }
 ```
 
-##### 非空引用
+##### 可空引用
 
-引用默认是可空的（即`nil`），可以标注为非空（加`!`号），两种只能单向传递：非空 → 可空。
+引用默认是非空的（即`!=nil`），可以标注为可空（加`?`号），两种只能单向传递：非空 → 可空。
 如需反向传递，必须显示对变量进行判断非空（只支持本地变量，不支持字段）：
 
 ```feng
-func f(a *!int, b *int) {
-   var x *int = a;
-   // var y *!int = b; // 错误✖：不能直接传递
+func f(a *int, b *?int) {
+   var x *?int = a;   // 非空引用可以传递给可空引用
+   // var y *int = b; // 错误✖：不能直接传递
    if (b != nil) {
-      var y *!int = b; // 必须显式判断空，在非空的分支内传递
+      var y *int = b; // 必须显式判断空，在非空的分支内传递
    }
+}
+```
+
+总之：如果流程分析能证明变量在某个scope内非空的，那就可以作为非空变量使用：
+
+```feng
+func f(a *?int) {
+   var v = a!=nil ? *a : 0;   // 条件表达式的第一个分支是非空的
+   if (a==nil) return;        // 检查到nil即返回（终止语句），后面的分支一定非空
+   v = *a;     // 可以解引用
+}
+```
+
+但在已证明的非空分支，变量又被赋值了，且不是被赋了一个非空值，那就将回到未可空状态：
+
+```feng
+func f(a *?int, b *?int) {
+   if (a != nil) {
+      a = b;               // 被赋了可空的值，后面就不在是非空了
+      // var y *int = a;   // ✖：被取消了非空状态
+   }
+   if (a != nil) {
+      a = new(int);        // 被赋了非空值（new创建的是非空值）
+      var y *int = a;      // ✔：依然是非空的
+   }
+}
+```
+
+上面的例子中有赋非空值的操作，这个操作在未判断非空的情况下，也能证明是非空的：
+
+```feng
+func (r *?int) {
+   var a *?int = nil;   // 可空引用a
+   a = new(int);        // 赋了一个非空值
+   *a = 0;              // 那么它就是非空的，相当于：*int
+   a = r;               // 赋了可空的值后，就不能证明是非空的了
+   // *a = 0;           // ✖：a必须再次检查非空
+}
+```
+
+可空引用不能进行的一些操作，就是说必须经过非空证明（本地变量`!=nil`）之后才能操作。具体如下：
+
+1. 可空引用不能[解引用](#解引用操作)、访问字段（包括读写）、调用方法。
+2. 可空数组引用不能操作索引，包括读写。
+3. 可空[函数原型](#函数原型)不能调用。
+
+例如：
+
+```feng
+class Car {
+   var id int;
+   func go() {}
+}
+func test1(a *?int, b *?Car) {
+   // *a = 1;        // ✖：不能解引用写
+   // var i = *a;    // ✖：不能解引用读
+   // b.id = 1;      // ✖：不能修改字段
+   // var j = b.id;  // ✖：不能读取字段
+   // b.go();        // ✖：不能调用方法
+}
+func test2(a [*?]byte) {
+   // a[0] = 1;      // ✖：不能修改元素
+   // var i = a[0];  // ✖：不能获取元素值
 }
 ```
 

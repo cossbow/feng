@@ -91,12 +91,12 @@ Circular dependencies are not supported; the dependency graph must be a directed
 ## main Function
 
 The `main` function is the entry point of an executable program, consistent with other languages.
-The entry function has no return value and only one parameter, whose type must be `[&!#][*!#]byte`:
+The entry function has no return value and only one parameter, whose type must be `[&#][*#]byte`:
 
 ```feng
 import std$os;
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     os$printf("Welcome to programming with Feng language");
 }
 ```
@@ -352,7 +352,7 @@ There are two usage patterns:
 1. Index expression on the right side is a read operation, retrieving the value of the element at the index as the
    result.
    When using a single variable on the left or using it in an expression, only the element value is returned. If the
-   element does not exist, execution terminates and an [exception](#exceptions-_[Incomplete]_) is thrown.
+   element does not exist, execution terminates and an [exception](#exceptions) is thrown.
    ```feng
    func test(arr [16]int) int {
        return arr[16]; // Index out of bounds, terminates and throws an exception
@@ -366,7 +366,7 @@ There are two usage patterns:
    }
    ```
    The capacity of an array cannot change after creation, so out-of-bounds access also terminates execution and throws
-   an [exception](#exceptions-_[Incomplete]_).
+   an [exception](#exceptions).
 
 #### new Expression
 
@@ -1236,16 +1236,16 @@ For example, a file can be read and written; interfaces can be designed as follo
 
 ```feng
 interface Input {
-   read(b [&!]byte) int;
+   read(b [&]byte) int;
 }
 interface Output {
-   write(b [&!#]byte) int;
+   write(b [&#]byte) int;
 }
 // Composed interface DataStorage includes both read and write methods
 interface DataStorage {
    Input;
    Output;
-   query() [*!#]byte;
+   query() [*#]byte;
 }
 // An instance implementing the DataStorage interface naturally implements the Output interface
 func use(ds *DataStorage) Output {
@@ -1785,7 +1785,7 @@ func circlyArea(diameter float) float {
 
 A function prototype is a type of variable. A function definition without its body is a prototype: `func` function-name
 `(` parameter-list `)` return-list.
-A [variable](#function-prototype-variable) of this type is either null or points to a function compatible with the
+A [variable](#function-prototype-variables) of this type is either null or points to a function compatible with the
 prototype. Example:
 
 ```feng
@@ -1825,17 +1825,26 @@ func test() {
 }
 ```
 
-Prototype variables are not reference types but can be `nil`. They can also be marked with a non-null prefix (`!`) to
-indicate they cannot be null, following the same non-null rules as references:
+Prototype variables are not reference types but can be `nil`. They can also be marked with a nullable prefix (`?`) to
+indicate they allow null, defaulting to non-null. This follows the same rules as [references](#nullable-reference):
 
 ```feng
-func use1(a !func()) {
-   var c1 func() = a;
-   var c2 !func() = a;
-   // var c3 !func() = c1; // Error: cannot pass in reverse direction
+func use1(a func()) {
+   var c1 ?func() = a;     // non-null → nullable
+   var c2 func() = a;      // non-null → non-null
+   // var c3 func() = c1;  // Error: cannot pass in reverse direction
    if (c1 != nil) {
-      var c3 !func() = c1; // After explicit null check, can pass
+      var c3 func() = c1;  // After explicit null check, can pass
    }
+}
+```
+
+Note: nullable prototype variables cannot be called, for example:
+
+```feng
+func use2(a ?func()) {
+   // a();           // ✖: cannot call
+   if (a!=nil) a();  // ✔: can call only when non-null
 }
 ```
 
@@ -1850,7 +1859,7 @@ Their current use is limited to formatting and wrapping formatting.
 
 The built-in string formatting function is a variadic function:
 
-1. The first parameter is an `&!Writer`, i.e., an object implementing the built-in `Writer` interface.
+1. The first parameter is an `&Writer`, i.e., an object implementing the built-in `Writer` interface.
 2. Format string literal: `"This is for {}!"`, where `{}` is a placeholder for formatting subsequent parameters.
 3. Parameter instances to output; their count must match the number of placeholders. Types can be basic types, classes, and interfaces.
 
@@ -1875,7 +1884,7 @@ For example, define a function that prints to standard output:
 
 ```feng
 // Global object stdout defined above
-func printf(fmt [&!#]byte, ...) {   // Define variadic parameters
+func printf(fmt [&#]byte, ...) {   // Define variadic parameters
     format(stdout, fmt, ...);       // Forward variadic parameters
 }
 ```
@@ -2250,9 +2259,9 @@ func calc() {
    try {
       step1();
       step2();
-   } catch(e *!#NilException) {
+   } catch(e *#NilException) {
       println("Caught null pointer");
-   } catch(e *!#IllegalStateException | *!#IllegalArgumentException) {
+   } catch(e *#IllegalStateException | *#IllegalArgumentException) {
       println("Caught state error or argument error");
    } finally {
       println("Finally, execution continues after here");
@@ -2267,7 +2276,7 @@ With `catch` but no `finally`:
 func calc() {
    try {
       step1();
-   } catch(e *!#IllegalStateException) {
+   } catch(e *#IllegalStateException) {
       println("Caught state error or argument error");
    }
    return getResult();
@@ -2474,20 +2483,74 @@ func test() {
 }
 ```
 
-##### Non-Null Reference
+##### Nullable Reference
 
-References are nullable by default (can be `nil`). They can be marked as non-null (with `!`). Passing is one-way:
+References are non-null by default (i.e., `!= nil`). They can be marked as nullable (with `?`). Passing is one-way:
 non-null → nullable.
 For reverse passing, the variable must be explicitly checked for non-null (supported only for local variables, not
 fields):
 
 ```feng
-func f(a *!int, b *int) {
-   var x *int = a;
-   // var y *!int = b; // Error: cannot pass directly
+func f(a *int, b *?int) {
+   var x *?int = a;   // non-null reference can be passed to nullable reference
+   // var y *int = b; // Error: cannot pass directly
    if (b != nil) {
-      var y *!int = b; // Must explicitly check non-null; pass within the non-null branch
+      var y *int = b; // Must explicitly check non-null; pass within the non-null branch
    }
+}
+```
+
+In summary: if flow analysis can prove that a variable is non-null within a certain scope, it can be used as a
+non-null variable:
+
+```feng
+func f(a *?int) {
+   var v = a!=nil ? *a : 0;   // The first branch of the conditional expression is non-null
+   if (a==nil) return;        // Return on nil (terminating statement); the following branch is definitely non-null
+   v = *a;     // Dereference is safe
+}
+```
+
+However, in a proven non-null branch, if the variable is assigned a value that is not non-null,
+it returns to the nullable state:
+
+```feng
+func f(a *?int, b *?int) {
+   if (a != nil) {
+      a = b;               // Assigned a nullable value; no longer non-null
+      // var y *int = a;   // ✖: non-null status cancelled
+   }
+   if (a != nil) {
+      a = new(int);        // Assigned a non-null value (new creates a non-null value)
+      var y *int = a;      // ✔: still non-null
+   }
+}
+```
+
+Nullable references cannot perform certain operations; non-null proof (local variable `!= nil`) is required first.
+Specifically:
+
+1. Nullable references cannot be [dereferenced](#dereference-operation), access fields (read or write), or call methods.
+2. Nullable array references cannot use index operations (read or write).
+3. Nullable [function prototypes](#function-prototype) cannot be called.
+
+For example:
+
+```feng
+class Car {
+   var id int;
+   func go() {}
+}
+func test1(a *?int, b *?Car) {
+   // *a = 1;        // ✖: cannot dereference-write
+   // var i = *a;    // ✖: cannot dereference-read
+   // b.id = 1;      // ✖: cannot modify field
+   // var j = b.id;  // ✖: cannot read field
+   // b.go();        // ✖: cannot call method
+}
+func test2(a [*?]byte) {
+   // a[0] = 1;      // ✖: cannot modify element
+   // var i = a[0];  // ✖: cannot get element value
 }
 ```
 
@@ -2831,7 +2894,7 @@ statements:
 - The statement sequence is an ordinary sequence, optionally ending with an expression.
 - Macros cannot be called.
 
-For general grammar examples, please refer to [Custom Operations](#Custom-Operations).
+For general grammar examples, please refer to [Custom Special Operations](#custom-special-operations-incomplete).
 
 ### Class Macros _[Incomplete]_
 
