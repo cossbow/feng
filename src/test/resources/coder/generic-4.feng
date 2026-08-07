@@ -15,11 +15,10 @@ class Child`T` : Base {
 
 func test(n int) {
     var c = new(Child`int`, {id=n,v=42});
-    if (c == nil) return;
     var id = c.getId();
     var v = c.getV();
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(1);
 }

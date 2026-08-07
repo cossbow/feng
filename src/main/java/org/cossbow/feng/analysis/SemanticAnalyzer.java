@@ -74,6 +74,10 @@ public class SemanticAnalyzer {
         return errors;
     }
 
+    private void error(String fmt, Object... args) {
+        errors.add(fmt.formatted(args));
+    }
+
     //
 
     private <Key> DAGGraph<Key> makeDAG(Collection<Key> nodes,
@@ -1629,13 +1633,13 @@ public class SemanticAnalyzer {
         return TypeValid.err("can't deliver: unmodifiable -> mutable: %s", lr.pos());
     }
 
-    // 检查非空的传递
-    private boolean checkRequired(TypeDeclarer l, TypeDeclarer r,
-                                  Optional<Expression> re, Entity e) {
-        if (!l.required()) return true;
-        if (r.required()) return true;
-        // 检查是否允许反向传递
-        return re.match(this::ifMarkNonNil);
+    private void checkRequired(TypeDeclarer l, TypeDeclarer r,
+                               Optional<Expression> re, Entity e) {
+        if (!l.required()) return;
+        if (r.required()) return;
+        if (re.match(this::ifMarkNonNil)) return;
+        error("must check-nil before assign optional '%s' to required '%s': %s",
+                r, l, e.pos());
     }
 
     private boolean isByteArray(ArrayTypeDeclarer la) {
@@ -1676,13 +1680,8 @@ public class SemanticAnalyzer {
     }
 
     private TypeValid assignRefer(TypeDeclarer l, LiteralExpression re) {
-        var lr = l.maybeRefer().must();
-        if (re.literal() instanceof NilLiteral) {
-            if (!lr.required()) {
-                return TypeValid.ok();
-            }
-            return TypeValid.err("required-refer can't set nil: %s", re.pos());
-        }
+        if (re.literal() instanceof NilLiteral) return TypeValid.ok();
+
         if (re.literal() instanceof StringLiteral) {
             // 字符串字面量可以传递给数组引用，当然必须是不可修改的
             if (l instanceof ArrayTypeDeclarer la && isByteArray(la)) {
@@ -1954,9 +1953,7 @@ public class SemanticAnalyzer {
             Optional<Expression> re, Entity e) {
         if (l.equals(r)) return TypeValid.ok();
 
-        if (!checkRequired(l, r, re, e))
-            return TypeValid.err("can't assign: optional '%s' -> required '%s', "
-                    + "need nil checking: %s", r, l, e.pos());
+        checkRequired(l, r, re, e);
 
         var lr = l.maybeRefer();
         if (lr.none())
@@ -2122,7 +2119,7 @@ public class SemanticAnalyzer {
             var t = v.type().must();
             var or = t.maybeRefer();
             if (or.match(Refer::required)) {
-                semantic("required refer must be init: %s", v.pos());
+                error("required refer must be init: %s", v.pos());
             }
         } else {
             initVar(v);
@@ -3575,8 +3572,10 @@ public class SemanticAnalyzer {
         var dr = dstType.maybeRefer();
         if (dr.none()) return semantic(
                 "can't cast to a value: %s", dstType.pos());
-        if (dr.get().required()) return semantic(
-                "can't cast to a required-reference: %s", dstType.pos());
+        if (dr.get().required()) {
+            error("can't cast to a required-reference: %s",
+                    dstType.pos());
+        }
 
         if (!referable(dr.get(), sr, Optional.of(g.a()), e).valid())
             return unreachable();
@@ -4212,7 +4211,7 @@ public class SemanticAnalyzer {
     private void checkOptional(Expression e) {
         var t = e.resultType.must();
         if (t.required() || ifMarkNonNil(e)) return;
-        errors.add("must check nil before use '%s': %s".formatted(e, e.pos()));
+        error("must check nil before use '%s': %s", e, e.pos());
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(MemberOfExpression e) {

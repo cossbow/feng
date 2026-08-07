@@ -1,41 +1,37 @@
 
 class A {
-    var n [*]*B;
+    var n [*]*?B;
 }
 class B {
-    var n [*]*A;
+    var n [*]*?A;
 }
-func makeA(n int) *A {
+func makeA(n int) *?A {
     if (n<1) return nil;
     var a = new(A, {n=new([4]*B)});
-    if (a == nil) return nil;
-    var an = a.n;
-    if (an == nil) return nil;
     for(var i=0; i<n && i<4; i+=1) {
-        an[i] = makeB(n-1);
+        var n = makeB(n-1);
+        if (n==nil) continue;
+        a.n[i] = n;
     }
     return a;
 }
-func makeB(n int) *B {
+func makeB(n int) *?B {
     if (n<1) return nil;
     var a = new(B, {n=new([3]*A)});
-    if (a == nil) return nil;
-    var an = a.n;
-    if (an == nil) return nil;
     for(var i=0; i<3; i+=1) {
-        an[i] = makeA(n-1);
+        var n = makeA(n-1);
+        if(n==nil)continue;
+        a.n[i] = n;
     }
     return a;
 }
 func test(n int) {
     var a = makeA(n);
-    if (a == nil) return;
-    var an = a.n;
-    if (an == nil) return;
-    var r = an[0];
+    if (a==nil)return;
+    var r = a.n[0];
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(2);
     test(3);
 }

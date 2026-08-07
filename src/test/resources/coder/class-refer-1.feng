@@ -26,55 +26,39 @@ class C {
 }
 func object1() {
     {
-        var x *A = nil;
+        var x *?A = nil;
         x=new(A);
     }
     {
-        var x *A ;
+        var x *?A ;
         x=new(A);
     }
     {
         var x *A = new(A, {});
     }
     var a *A = new(B, {n=new(B,{s={tag=-1}})});
-    if (a == nil) return;
     a.run();
     const p1 &A = a;
-    if (p1 == nil) return;
     p1.run();
     var b = a;
-    if (b == nil) return;
     b.run();
 
     var c *A= new(A,{n=a.n});
     b=c;
-    if (b == nil) return;
     b.run();
 
-    c=nil;
+    c=new(A);
 
     var d A = {id=112};
     const p2 &A = d;
-    if (p2 == nil) return;
     p2.run();
 
     var s = new(S,{tag=1});
 
-    var c1 = a.clone();
-    if (c1 == nil) return;
-    var c2 = c1.clone();
-    if (c2 == nil) return;
-    var c3 = c2.clone();
-    if (c3 == nil) return;
-    c3.run();
+    a.clone().clone().clone().run();
 
     var i *I = new(B);
-    if (i == nil) return;
-    var i1 = i.clone();
-    if (i1 == nil) return;
-    var i2 = i1.clone();
-    if (i2 == nil) return;
-    i2.run();
+    i.clone().clone().run();
 
     {
         var c C;
@@ -89,6 +73,6 @@ func test(n int) {
 }
 
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(1);
 }

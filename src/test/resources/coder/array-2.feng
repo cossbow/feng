@@ -149,11 +149,11 @@ func array3() {
         }
     }
     {
-        var a *int = nil;
+        var a *int = new(int, 10);
         a = new(int);
     }
     {
-        var a [*]int = nil;
+        var a [*]int = new([0]int);
         a = new([2]int);
     }
 }
@@ -162,6 +162,6 @@ func test(n int) {
     array3();
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(5);
 }

@@ -25,7 +25,6 @@ func test(n int) {
     }
 
     var b= new([n]*A);
-    if (b == nil) return;
     for (var i=0;i < b.length; i+=1) {
         const x = b[i];
     }
@@ -35,6 +34,6 @@ func test(n int) {
 }
 
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(15);
 }

@@ -1,12 +1,10 @@
 
 func init1(a [&]int) {
-    if (a == nil) return;
     for (var i=0; i<a.length; i+=1) {
         a[i] = 1+i;
     }
 }
 func init2(a [&]*int) {
-    if (a == nil) return;
     for (var i=0; i<a.length; i+=1) {
         a[i] = new(int, 1+i);
     }
@@ -46,6 +44,6 @@ func test(n int) {
     array4();
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(15);
 }

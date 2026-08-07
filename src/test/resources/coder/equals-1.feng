@@ -2,7 +2,7 @@
 
 class A {
     var v float;
-    var r *int;
+    var r *?int;
 }
 class B`V` final {
     var v V;
@@ -17,14 +17,14 @@ func refer(i int) {
     if (b1 == b2) {
     }
     {
-        var x *B`int` = b1;
+        var x *?B`int` = b1;
         if (x == nil){
         }
         x = nil;
     }
     {
-        const p1 &B`int` = b1;
-        const p2 &B`int` = b2;
+        const p1 &?B`int` = b1;
+        const p2 &?B`int` = b2;
         if (p1 == p2){}
         if (p1 == nil){}
     }
@@ -36,14 +36,14 @@ func array(n int) {
     if (a == b) {
     }
     {
-        const ra [&]int = a;
-        const rb [&]int = b;
+        const ra [&?]int = a;
+        const rb [&?]int = b;
         if (ra == rb) {
         }
     }
     {
-        const r1 [&]int = a;
-        const r2 [&]int = a;
+        const r1 [&?]int = a;
+        const r2 [&?]int = a;
         if (r1 == r2) {
         }
         if (r1 == nil) {
@@ -57,7 +57,7 @@ func array(n int) {
         b = a;
         if (a == b) {
         }
-        var x [*]int = a;
+        var x [*?]int = a;
         if (x == nil) {
         }
         x = nil;
@@ -81,6 +81,6 @@ func test(k int) {
     array(k);
 }
 
-func main(args [&!#][*!#]byte) {
+func main() {
     test(15);
 }

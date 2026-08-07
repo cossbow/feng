@@ -16,7 +16,6 @@ func test(n int) {
     {
         var a0 = new(A);
         var a1 = new(A, {id=1});
-        if (a1 == nil) return;
         var a2 = new(A,*a1);
         var a A;
         var a3 = new(A,a);
@@ -31,6 +30,6 @@ func test(n int) {
     }
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(15);
 }

@@ -19,7 +19,7 @@ class File (Writer,Reader) {
     }
 
     export
-    func read#(buf [&!]byte) int {
+    func read#(buf [&]byte) int {
         var n = fread(buf.values, 1, uint64(buf.length), fp);
         if (n <= 0) {
             return -1;
@@ -28,7 +28,7 @@ class File (Writer,Reader) {
     }
 
     export
-    func write(data [&!#]byte, offset, length int) int {
+    func write(data [&#]byte, offset, length int) int {
         if (offset>=data.length) return 0;
         var pos = data.values+uint64(offset);
         var len = length<data.length ? length : data.length;
@@ -58,7 +58,7 @@ class File (Writer,Reader) {
     }
 }
 
-func file(fp uint64) *!File {
+func file(fp uint64) *File {
     return new(File, {fp=fp});
 }
 
@@ -66,7 +66,7 @@ func file(fp uint64) *!File {
 // C string helpers
 //
 
-func toCStr(s [&!#]byte) [*!]byte {
+func toCStr(s [&#]byte) [*]byte {
     var buf = new([s.length + 1]byte);
     for (var i = 0; i < s.length; i += 1) {
         buf[i] = s[i];
@@ -92,7 +92,7 @@ func openModeToStr(mode OpenMode) [4]byte {
 //
 
 export
-func open(path [&!#]byte, mode OpenMode) *File {
+func open(path [&#]byte, mode OpenMode) *File {
     var cpath = toCStr(path);
     var cmode = openModeToStr(mode);
     var fp = fopen(cpath.values, cmode.values);
@@ -111,11 +111,11 @@ export
 const stderr = file(__acrt_iob_func(2));
 
 export
-func printf(fmt [&!#]byte, ...) {
+func printf(fmt [&#]byte, ...) {
     format(stdout, fmt, ...);
 }
 
 export
-func logging(fmt [&!#]byte, ...) {
+func logging(fmt [&#]byte, ...) {
     printf(fmt, ...);
 }

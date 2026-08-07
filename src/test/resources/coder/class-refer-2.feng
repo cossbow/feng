@@ -1,26 +1,23 @@
 class A {
     var n [*]*A;
 }
-func make(n int) *A {
+func make(n int) *?A {
     if (n<1) return nil;
     var a = new(A, {n=new([4]*A)});
-    if (a == nil) return nil;
-    var an = a.n;
-    if (an == nil) return nil;
     for(var i=0; i<n && i<4; i+=1) {
-        an[i] = make(n-1);
+        var n = make(n-1);
+        if (n!=nil)
+            a.n[i] = n;
     }
     return a;
 }
 func test(n int) {
     var a = make(n);
-    if (a == nil) return;
-    var an = a.n;
-    if (an == nil) return;
-    var r = an[0];
+    if (a==nil)return;
+    var r = a.n[0];
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(2);
 	test(3);
 }

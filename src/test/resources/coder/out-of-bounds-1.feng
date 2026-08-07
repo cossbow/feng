@@ -8,7 +8,7 @@ func test1() {
     try {
         a[idx(-1)] = 1;
         assert(false);
-    } catch (e *!#OutOfBoundsException) {
+    } catch (e *#OutOfBoundsException) {
     }
 }
 func test2() {
@@ -16,7 +16,7 @@ func test2() {
     try {
         a[idx(10)] = 1;
         assert(false);
-    } catch (e *!#OutOfBoundsException) {
+    } catch (e *#OutOfBoundsException) {
     }
 }
 func test3() {
@@ -31,7 +31,7 @@ func test4() {
     try {
         a[idx(-1)] = 1;
         assert(false);
-    } catch (e *!#OutOfBoundsException) {
+    } catch (e *#OutOfBoundsException) {
     }
 }
 func test5() {
@@ -39,7 +39,7 @@ func test5() {
     try {
         a[idx(10)] = 1;
         assert(false);
-    } catch (e *!#OutOfBoundsException) {
+    } catch (e *#OutOfBoundsException) {
     }
 }
 func test6() {

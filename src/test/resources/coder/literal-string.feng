@@ -19,6 +19,6 @@ func test(i int) {
 }
 
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(1);
 }

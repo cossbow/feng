@@ -1,11 +1,17 @@
 import std$map m;
 
-func intHashing(n &!m$Node`int,int`) int {
+func intHash(n &#m$Node`int,int`) int {
     return n.key;
 }
-func use`T`(f !func(T)) {}
+func intEq(a,b &#m$Node`int,int`) bool {
+    return a.key == b.key;
+}
+func use`T`(f func(T)) {}
 func fff(i int) {}
-func main() {
-    var map = m$newHashmap(intHashing);
+func main(args [&#][*#]byte) {
+    var hashing = m$Hashing`int,int` {
+        hash=intHash, equal=intEq
+    };
+    var map = m$newHashmap(hashing);
     use(fff);
 }

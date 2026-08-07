@@ -10,12 +10,10 @@ class A{
 }
 
 func test(n int) {
-    var a = new(A);
-    if (a == nil) return;
-    a.run();
+    new(A).run();
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(5);
 }
 

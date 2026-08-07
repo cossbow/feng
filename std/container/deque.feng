@@ -30,14 +30,14 @@ export func newDequeCap`T`(cap int) *Deque`T` {
 
 // ===== helper =====
 
-func decIndex`T`(d *!Deque`T`, i int) int {
+func decIndex`T`(d *Deque`T`, i int) int {
     if (i == 0) {
         return d.buf.length - 1;
     }
     return i - 1;
 }
 
-func ensureCap`T`(d *!Deque`T`) {
+func ensureCap`T`(d *Deque`T`) {
     if (d.buf == nil) {
         d.buf = new([8]T);
         d.head = 0;
@@ -59,14 +59,14 @@ func ensureCap`T`(d *!Deque`T`) {
 
 // ===== add =====
 
-export func dequePushFront`T`(d *!Deque`T`, e T) {
+export func dequePushFront`T`(d *Deque`T`, e T) {
     ensureCap`T`(d);
     d.head = decIndex`T`(d, d.head);
     d.buf[d.head] = e;
     d.size += 1;
 }
 
-export func dequePushBack`T`(d *!Deque`T`, e T) {
+export func dequePushBack`T`(d *Deque`T`, e T) {
     ensureCap`T`(d);
     d.buf[d.tail] = e;
     d.tail = (d.tail + 1) % d.buf.length;
@@ -75,7 +75,7 @@ export func dequePushBack`T`(d *!Deque`T`, e T) {
 
 // ===== remove =====
 
-export func dequePopFront`T`(d *!Deque`T`) T {
+export func dequePopFront`T`(d *Deque`T`) T {
     if (d.size == 0) {
         throw new(error$IllegalStateException);
     }
@@ -85,7 +85,7 @@ export func dequePopFront`T`(d *!Deque`T`) T {
     return v;
 }
 
-export func dequePopBack`T`(d *!Deque`T`) T {
+export func dequePopBack`T`(d *Deque`T`) T {
     if (d.size == 0) {
         throw new(error$IllegalStateException);
     }
@@ -97,14 +97,14 @@ export func dequePopBack`T`(d *!Deque`T`) T {
 
 // ===== peek =====
 
-export func dequePeekFront`T`(d *!Deque`T`) T {
+export func dequePeekFront`T`(d *Deque`T`) T {
     if (d.size == 0) {
         throw new(error$IllegalStateException);
     }
     return d.buf[d.head];
 }
 
-export func dequePeekBack`T`(d *!Deque`T`) T {
+export func dequePeekBack`T`(d *Deque`T`) T {
     if (d.size == 0) {
         throw new(error$IllegalStateException);
     }
@@ -113,15 +113,15 @@ export func dequePeekBack`T`(d *!Deque`T`) T {
 
 // ===== properties =====
 
-export func dequeLength`T`(d *!Deque`T`) int {
+export func dequeLength`T`(d *Deque`T`) int {
     return d.size;
 }
 
-export func dequeIsEmpty`T`(d *!Deque`T`) bool {
+export func dequeIsEmpty`T`(d *Deque`T`) bool {
     return d.size == 0;
 }
 
-export func dequeClear`T`(d *!Deque`T`) {
+export func dequeClear`T`(d *Deque`T`) {
     d.head = 0;
     d.tail = 0;
     d.size = 0;

@@ -12,7 +12,7 @@ class Box`T` {
     func get#() (T, bool) {
         return (v, s);
     }
-    func map`E`#(f !func(T)E) (E, bool) {
+    func map`E`#(f func(T)E) (E, bool) {
         return (f(v), s);
     }
 }
@@ -31,9 +31,9 @@ func test(a bool) {
     var b = v.0;
     var x (int,bool) = (1,false);
     var c = (1:int, false).0;
-    const r &!int = v.0;
+    const r &int = v.0;
 
-    var x0 = (1:int8,2.5:float32,new(int):*!int,true);
+    var x0 = (1:int8,2.5:float32,new(int):*int,true);
     x = set(v);
     if (x == v) {
     }
@@ -46,6 +46,6 @@ func test(a bool) {
     var s (Complex, bool) = box.map`Complex`(convert);
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(true);
 }

@@ -1,12 +1,18 @@
 import std$map m;
+import std$os;
 
-
-func intHashing(n &!m$Node`int,int`) int {
+func intHash(n &#m$Node`int,int`) int {
     return n.key;
 }
+func intEq(a,b &#m$Node`int,int`) bool {
+    return a.key == b.key;
+}
+
 
 func test(n int) {
-    var map = m$newHashmap`int,int`(intHashing);
+    var map = m$newHashmap`int,int`({
+        hash=intHash, equal=intEq
+    });
     for(var i=0;i<n;i+=1) {
         map.set(i, i+100);
     }
@@ -18,6 +24,6 @@ func test(n int) {
     if (var r=map.get(101); r.ok){}
 }
 
-func main(args [&!#][*!#]byte) {
+func main() {
     test(5);
 }

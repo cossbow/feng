@@ -33,12 +33,12 @@ export func setFromArray`T`(src [&!#]T, hashing func(T) int) *HashSet`T` {
 
 // ===== helper =====
 
-func setIndexOfKey`T`(s *!HashSet`T`, key T) int {
+func setIndexOfKey`T`(s *HashSet`T`, key T) int {
     var h = s.hashing(key);
     return h & (s.buckets.length - 1);
 }
 
-func setRehash`T`(s *!HashSet`T`) {
+func setRehash`T`(s *HashSet`T`) {
     if (s.buckets == nil) {
         s.buckets = new([16]*SetNode`T`);
     } else if (s.size < s.threshold) {
@@ -64,7 +64,7 @@ func setRehash`T`(s *!HashSet`T`) {
 
 // ===== core =====
 
-export func setAdd`T`(s *!HashSet`T`, key T) bool {
+export func setAdd`T`(s *HashSet`T`, key T) bool {
     setRehash`T`(s);
     var idx = setIndexOfKey`T`(s, key);
     var cur = s.buckets[idx];
@@ -81,7 +81,7 @@ export func setAdd`T`(s *!HashSet`T`, key T) bool {
     return true;
 }
 
-export func setContains`T`(s *!HashSet`T`, key T) bool {
+export func setContains`T`(s *HashSet`T`, key T) bool {
     if (s.buckets == nil) {
         return false;
     }
@@ -96,7 +96,7 @@ export func setContains`T`(s *!HashSet`T`, key T) bool {
     return false;
 }
 
-export func setRemove`T`(s *!HashSet`T`, key T) bool {
+export func setRemove`T`(s *HashSet`T`, key T) bool {
     if (s.buckets == nil) {
         return false;
     }
@@ -121,15 +121,15 @@ export func setRemove`T`(s *!HashSet`T`, key T) bool {
 
 // ===== properties =====
 
-export func setLength`T`(s *!HashSet`T`) int {
+export func setLength`T`(s *HashSet`T`) int {
     return s.size;
 }
 
-export func setIsEmpty`T`(s *!HashSet`T`) bool {
+export func setIsEmpty`T`(s *HashSet`T`) bool {
     return s.size == 0;
 }
 
-export func setClear`T`(s *!HashSet`T`) {
+export func setClear`T`(s *HashSet`T`) {
     s.buckets = nil;
     s.size = 0;
     s.threshold = 0;
@@ -137,7 +137,7 @@ export func setClear`T`(s *!HashSet`T`) {
 
 // ===== bulk =====
 
-export func setToList`T`(s *!HashSet`T`) *Vector`T` {
+export func setToList`T`(s *HashSet`T`) *Vector`T` {
     var list = newVector`T`();
     if (s.buckets == nil) {
         return list;

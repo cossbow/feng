@@ -4,20 +4,14 @@ class A {}
 class List {
     var values [*]A;
     macro index get(index int) A {
-        var v = values;
-        if (v == nil) return {};
-        v[index]
+        values[index]
     }
     macro index set(index int, value &A) {
-        var v = values;
-        if (v == nil) return;
-        if (value == nil) return;
-        v[index] = *value;
+        values[index] = *value;
     }
 }
 
 func use1(a *List) {
-    if (a == nil) return;
     var v = a[0];
     a[1] = v;
 }
@@ -26,6 +20,6 @@ func test(n int){
     use1(a);
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(5);
 }

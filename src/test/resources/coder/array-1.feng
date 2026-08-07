@@ -9,33 +9,26 @@ func array1() {
     var aa [2]A = [{id=123}];
     aa[0].run();
     const ap1 [&]A = aa;
-    if (ap1 == nil) return;
     ap1[0].run();
 
     var ar1 [*]A= new([8]A, [{id=123}]);
-    if (ar1 == nil) return;
     ar1[0].run();
     {
         const ap2 [&]A = ar1;
-        if (ap2 == nil) return;
         ap2[0].run();
     }
-    ar1=nil;
+    ar1=new([0]A);
 
     {
         var ar2 [*]A= new([7]A, aa);
-        if (ar2 == nil) return;
         ar2[0].run();
     }
     {
         var ar2 [2]*A = [new(A, aa[0])];
-        var e = ar2[0];
-        if (e != nil) {
-            e.run();
-        }
+        ar2[0].run();
     }
     {
-        var ar [*]A = nil;
+        var ar [*]A = new([0]A);
         ar = new([2]A);
     }
 }
@@ -45,27 +38,20 @@ func array2() {
     {
         var aa [2]A = [{id=123}];
         const pa &A = aa[0];
-        if (pa == nil) return;
         pa.run();
     }
     {
         var aa [2][5]A = [[{id=123}]];
         const pa &A = aa[0][0];
-        if (pa == nil) return;
         pa.run();
     }
     {
         var aa [2]*A = [new(A)];
-        var e = aa[0];
-        if (e != nil) {
-            e.run();
-        }
+        aa[0].run();
     }
     {
         var aa [2][*]A = [new([4]A, [{id=321}])];
-        var sub = aa[0];
-        if (sub == nil) return;
-        sub[0].run();
+        aa[0][0].run();
     }
 }
 
@@ -83,6 +69,6 @@ func test(n int) {
     array3();
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(5);
 }

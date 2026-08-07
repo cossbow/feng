@@ -19,5 +19,5 @@ struct Aw {
     u int;
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
 }

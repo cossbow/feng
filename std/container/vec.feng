@@ -33,7 +33,7 @@ export func vectorFromArray`T`(src [&!#]T) *Vector`T` {
 
 // ===== helpers =====
 
-func ensureCapacity`T`(v *!Vector`T`, need int) {
+func ensureCapacity`T`(v *Vector`T`, need int) {
     if (v.buf == nil) {
         var cap = 8;
         if (need > cap) {
@@ -56,13 +56,13 @@ func ensureCapacity`T`(v *!Vector`T`, need int) {
     v.buf = nb;
 }
 
-func checkIndex`T`(v *!Vector`T`, index int) {
+func checkIndex`T`(v *Vector`T`, index int) {
     if (index < 0 || index >= v.len) {
         throw new(OutOfBoundsException);
     }
 }
 
-func checkInsertIndex`T`(v *!Vector`T`, index int) {
+func checkInsertIndex`T`(v *Vector`T`, index int) {
     if (index < 0 || index > v.len) {
         throw new(OutOfBoundsException);
     }
@@ -70,30 +70,30 @@ func checkInsertIndex`T`(v *!Vector`T`, index int) {
 
 // ===== capacity =====
 
-export func vectorLength`T`(v *!Vector`T`) int {
+export func vectorLength`T`(v *Vector`T`) int {
     return v.len;
 }
 
-export func vectorCapacity`T`(v *!Vector`T`) int {
+export func vectorCapacity`T`(v *Vector`T`) int {
     if (v.buf == nil) {
         return 0;
     }
     return v.buf.length;
 }
 
-export func vectorIsEmpty`T`(v *!Vector`T`) bool {
+export func vectorIsEmpty`T`(v *Vector`T`) bool {
     return v.len == 0;
 }
 
 // ===== add =====
 
-export func vectorAppend`T`(v *!Vector`T`, e T) {
+export func vectorAppend`T`(v *Vector`T`, e T) {
     ensureCapacity`T`(v, 1);
     v.buf[v.len] = e;
     v.len += 1;
 }
 
-export func vectorAppendAll`T`(v *!Vector`T`, src [&!#]T) {
+export func vectorAppendAll`T`(v *Vector`T`, src [&!#]T) {
     var srcLen = src.length;
     ensureCapacity`T`(v, srcLen);
     for (var i = 0; i < srcLen; i += 1) {
@@ -102,7 +102,7 @@ export func vectorAppendAll`T`(v *!Vector`T`, src [&!#]T) {
     v.len += srcLen;
 }
 
-export func vectorInsert`T`(v *!Vector`T`, index int, e T) {
+export func vectorInsert`T`(v *Vector`T`, index int, e T) {
     checkInsertIndex`T`(v, index);
     ensureCapacity`T`(v, 1);
     for (var i = v.len; i > index; i -= 1) {
@@ -114,17 +114,17 @@ export func vectorInsert`T`(v *!Vector`T`, index int, e T) {
 
 // ===== access =====
 
-export func vectorGet`T`(v *!Vector`T`, index int) T {
+export func vectorGet`T`(v *Vector`T`, index int) T {
     checkIndex`T`(v, index);
     return v.buf[index];
 }
 
-export func vectorSet`T`(v *!Vector`T`, index int, value T) {
+export func vectorSet`T`(v *Vector`T`, index int, value T) {
     checkIndex`T`(v, index);
     v.buf[index] = value;
 }
 
-export func vectorRemoveLast`T`(v *!Vector`T`) T {
+export func vectorRemoveLast`T`(v *Vector`T`) T {
     if (v.len == 0) {
         throw new(error$IllegalStateException);
     }
@@ -132,7 +132,7 @@ export func vectorRemoveLast`T`(v *!Vector`T`) T {
     return v.buf[v.len];
 }
 
-export func vectorRemoveAt`T`(v *!Vector`T`, index int) T {
+export func vectorRemoveAt`T`(v *Vector`T`, index int) T {
     checkIndex`T`(v, index);
     var old = v.buf[index];
     for (var i = index; i < v.len - 1; i += 1) {
@@ -144,7 +144,7 @@ export func vectorRemoveAt`T`(v *!Vector`T`, index int) T {
 
 // ===== search =====
 
-export func vectorIndexOf`T`(v *!Vector`T`, value T) int {
+export func vectorIndexOf`T`(v *Vector`T`, value T) int {
     for (var i = 0; i < v.len; i += 1) {
         if (v.buf[i] == value) {
             return i;
@@ -153,7 +153,7 @@ export func vectorIndexOf`T`(v *!Vector`T`, value T) int {
     return -1;
 }
 
-export func vectorLastIndexOf`T`(v *!Vector`T`, value T) int {
+export func vectorLastIndexOf`T`(v *Vector`T`, value T) int {
     var i = v.len - 1;
     for (i >= 0) {
         if (v.buf[i] == value) {
@@ -164,23 +164,23 @@ export func vectorLastIndexOf`T`(v *!Vector`T`, value T) int {
     return -1;
 }
 
-export func vectorContains`T`(v *!Vector`T`, value T) bool {
+export func vectorContains`T`(v *Vector`T`, value T) bool {
     return vectorIndexOf`T`(v, value) != -1;
 }
 
 // ===== mutation =====
 
-export func vectorClear`T`(v *!Vector`T`) {
+export func vectorClear`T`(v *Vector`T`) {
     v.len = 0;
 }
 
-export func vectorTruncate`T`(v *!Vector`T`, newLen int) {
+export func vectorTruncate`T`(v *Vector`T`, newLen int) {
     if (newLen < v.len) {
         v.len = newLen;
     }
 }
 
-export func vectorReverse`T`(v *!Vector`T`) {
+export func vectorReverse`T`(v *Vector`T`) {
     var i = 0;
     var j = v.len - 1;
     for (i < j) {
@@ -194,7 +194,7 @@ export func vectorReverse`T`(v *!Vector`T`) {
 
 // ===== bulk =====
 
-export func vectorCopyTo`T`(v *!Vector`T`, dst [&!]T) int {
+export func vectorCopyTo`T`(v *Vector`T`, dst [&!]T) int {
     var n = v.len;
     if (dst.length < n) {
         n = dst.length;

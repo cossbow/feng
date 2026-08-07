@@ -1,15 +1,15 @@
 
 class Node {
     var v int;
-    var prev,next *Node;
+    var prev,next *?Node;
 }
 
 class List {
-    var head *Node;
+    var head *?Node;
 
     func add(v int) {
-        var n = new(Node, {v=v});
         var h = head;
+        var n = new(Node, {v=v});
         if (h == nil) {
             head = n;
             return;
@@ -35,12 +35,10 @@ func test(n int) {
         list.add(i+100);
     }
 
-    var c = list.head;
-    for (c != nil) {
-        c = c.next;
+    for(var c *?Node=list.head; c!=nil; c=c.next) {
     }
 }
 
-func main(args [&!#][*!#]byte) {
-    test(1);
+func main() {
+    test(10);
 }

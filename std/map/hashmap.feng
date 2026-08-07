@@ -4,60 +4,55 @@ class Node`K, V` final {
     const key K;
     export
     var value V;
-    var next *Node`K, V`;
+    var next *?Node`K, V`;
 }
 
+export
+class Hashing`K, V` final {
+    export
+    const hash func(&#Node`K, V`) int;
+    export
+    const equal func(&#Node`K, V`, &#Node`K, V`) bool;
+}
 
 class HashMap`K, V` (Map`K, V`) {
-    const hashing !func(&!Node`K, V`) int;
-    var buckets [*]*Node`K, V`;
+    const hashing Hashing`K, V`;
+    var buckets [*?]*?Node`K, V`;
     var size int;
     var threshold int;
 
-    func indexed#(n &!Node`K,V`) int {
-        var b = buckets;
-        if (b == nil) return 0;
-        var h = hashing(n);
-        return h & (b.length-1);
-    }
-
-    func rehash() [*]*Node`K, V` {
-        var b = buckets;
-        if (b == nil) {
-            var newBuck = new([16]*Node`K, V`);
-            buckets = newBuck;
-            threshold = int(float32(newBuck.length) * 0.75);
-            return newBuck;
-        }
-
-        if (size < threshold) {
-            return b;
-        }
-
-        var cap = b.length << 1;
-        var newBuck = new([cap]*Node`K, V`);
-        for (var i=0; i<b.length; i += 1) {
-            var cur = b[i];
-            for (cur != nil) {
-                var next = cur.next;
-                var idx = hashing(cur) % cap;
-                cur.next = newBuck[idx];
-                newBuck[idx] = cur;
-                cur = next;
+    func rehash() [*]*?Node`K, V` {
+        var buckets = this.buckets;
+        if (buckets == nil) {
+            buckets = new([16]*Node`K, V`);
+        } else if (size < threshold) {
+            return buckets;
+        } else {
+            var cap = buckets.length << 1;
+            var newBuck = new([cap]*Node`K, V`);
+            for (var i=0; i<buckets.length; i += 1) {
+                var cur = buckets[i];
+                for (cur != nil) {
+                    var next = cur.next;
+                    var idx = hashing.hash(cur) & (cap-1);
+                    cur.next = newBuck[idx];
+                    newBuck[idx] = cur;
+                    cur = next;
+                }
             }
+            buckets = newBuck;
         }
-        b = newBuck;
-        buckets = b;
-        threshold = int(float32(b.length) * 0.75);
-        return b;
+        if (buckets==nil) throw new(NilException);
+        this.buckets=buckets;
+        threshold = int(float32(buckets.length) * 0.75);
+        return buckets;
     }
 
     export
     func set(key K, value V) Result`V` {
         var bucks = rehash();
-        if (bucks == nil) return {};
         var nn Node`K,V` = {key=key,value=value};
-        var idx = indexed(nn);
+        var idx = hashing.hash(nn)&(bucks.length-1);
         var cur = bucks[idx];
         if (cur == nil) {
             bucks[idx] = new(Node`K, V`, nn);
@@ -65,9 +60,9 @@ class HashMap`K, V` (Map`K, V`) {
             return {ok=true};
         }
 
-        var prev *Node`K, V` = nil;
+        var prev *?Node`K, V` = nil;
         for (cur != nil) {
-            if (key == cur.key) {
+            if (hashing.equal(nn, cur)) {
                 var old = cur.value;
                 cur.value = value;
                 return {v=old};
@@ -75,7 +70,7 @@ class HashMap`K, V` (Map`K, V`) {
             prev = cur;
             cur = cur.next;
         }
-        if (prev == nil) return {};
+        if (prev==nil) throw new(NilException);
         prev.next = new(Node`K, V`, nn);
 
         size += 1;
@@ -90,13 +85,13 @@ class HashMap`K, V` (Map`K, V`) {
             return {};
         }
         var kn Node`K,V` = {key=key};
-        var idx = indexed(kn);
+        var idx = hashing.hash(kn)&(bk.length-1);
         var cur = bk[idx];
         if (cur == nil) {
             return {};
         }
 
-        for (cur != nil && cur.key != key) {
+        for (cur != nil && hashing.equal(cur, kn)) {
             cur = cur.next;
         }
         if (cur == nil) return {};
@@ -105,7 +100,7 @@ class HashMap`K, V` (Map`K, V`) {
 }
 
 export
-func newHashmap`K,V`(hashing !func(&!Node`K,V`)int) *!Map`K,V` {
+func newHashmap`K,V`(hashing Hashing`K,V`) *Map`K,V` {
     return new(HashMap`K,V`, {hashing=hashing});
 }
 

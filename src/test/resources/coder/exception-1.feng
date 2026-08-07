@@ -7,17 +7,17 @@ func task() {
     throw new(MyException);
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     try{
         task();
-    } catch (e *!#MyException) {
+    } catch (e *#MyException) {
         var l = e.line;
     }
     try{
         task();
-    } catch (o *!#Exception) {
-        var e = o?(*#MyException);
-        if (e == nil) return;
+    } catch (o *#Exception) {
+        var e = o?(*?#MyException);
+        if (e==nil) return;
         var l = e.line;
     }
 }

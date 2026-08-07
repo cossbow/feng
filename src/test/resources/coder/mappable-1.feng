@@ -25,6 +25,6 @@ func test(n int) {
     array3();
 }
 
-func main(args [&!#][*!#]byte) {
+func main(args [&#][*#]byte) {
     test(5);
 }

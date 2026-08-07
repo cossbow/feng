@@ -1,16 +1,16 @@
 
 class NilWriter (Writer) {
-    var buf [*!]byte;
+    var buf [*]byte;
     var size int;
-    func write(data [&!#]byte, offset int, length int) int {
+    func write(data [&#]byte, offset int, length int) int {
         size = length;
         return length;
     }
 }
 
 class Buffer (Writable) {
-    const data [*!#]byte;
-    func write#(w &!Writer) int {
+    const data [*#]byte;
+    func write#(w &Writer) int {
         return w.write(data,0,data.length);
     }
 }
@@ -19,5 +19,6 @@ func main() {
     var b NilWriter = {buf=new([64]byte)};
     var s Buffer = {data="feng"};
     format(b, "Hello {}!\n", s);
+//    assert(b.size == 4);  // ❌：预期是4，实际是3，需后续定位
     assert(b.size == 3);
 }
