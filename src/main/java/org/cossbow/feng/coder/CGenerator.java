@@ -1646,7 +1646,8 @@ public class CGenerator implements Generator {
         if (t instanceof DerivedTypeDeclarer tdt
                 && tdt.def() instanceof InterfaceDefinition) {
             if (v.unbound()) return write('(').write(vt).write("[1]){").write(v).write('}');
-            return write('(').write(vt).write("[1]){").write(v).write('}');
+            write('&');
+            return write(v);
         }
         if (t instanceof ArrayTypeDeclarer at && at.refer().has()
                 && at.refer().get().isKind(PHANTOM)

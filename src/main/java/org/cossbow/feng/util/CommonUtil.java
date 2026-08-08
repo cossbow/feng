@@ -155,4 +155,58 @@ public class CommonUtil {
         if (t != null) return t;
         throw new NullPointerException();
     }
+
+    /**
+     * Unescape string escape sequences: simple (\\b, \\t, \\n, \\f, \\r, \\", \\', \\\\).
+     * octal (\\0-\\377), and unicode (\\uXXXX).
+     */
+    public static String unescape(String s) {
+        var sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\' && i + 1 < s.length()) {
+                i++;
+                char next = s.charAt(i);
+                switch (next) {
+                    case 'b' -> sb.append('\b');
+                    case 't' -> sb.append('\t');
+                    case 'n' -> sb.append('\n');
+                    case 'f' -> sb.append('\f');
+                    case 'r' -> sb.append('\r');
+                    case '"' -> sb.append('"');
+                    case '\'' -> sb.append('\'');
+                    case '\\' -> sb.append('\\');
+                    case 'u' -> {
+                        while (i + 1 < s.length() && s.charAt(i + 1) == 'u') i++;
+                        if (i + 4 < s.length()) {
+                            String hex = s.substring(i + 1, i + 5);
+                            sb.append((char) Integer.parseInt(hex, 16));
+                            i += 4;
+                        } else {
+                            sb.append('\\').append(next);
+                        }
+                    }
+                    case '0', '1', '2', '3', '4', '5', '6', '7' -> {
+                        int count = 1;
+                        if (i + 1 < s.length() && isOctal_(s.charAt(i + 1))) {
+                            count++;
+                            if (next <= '3' && i + 2 < s.length() && isOctal_(s.charAt(i + 2)))
+                                count++;
+                        }
+                        String octal = s.substring(i, i + count);
+                        sb.append((char) Integer.parseInt(octal, 8));
+                        i += count - 1;
+                    }
+                    default -> sb.append('\\').append(next);
+                }
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private static boolean isOctal_(char c) {
+        return c >= '0' && c <= '7';
+    }
 }

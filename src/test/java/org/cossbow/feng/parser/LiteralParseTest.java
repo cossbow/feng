@@ -82,16 +82,22 @@ public class LiteralParseTest extends BaseParseTest {
     @Test
     public void testString() {
         var sb = new StringBuilder();
-        sb.append('"');
         for (int i = 0x20; i < 0x7e; i++) {
-            if (i == '"' || i == '\\')
-                sb.append('\\');
             sb.append((char) i);
         }
-        sb.append('"');
-        var value = sb.toString();
-        var sl = (StringLiteral) parseLiteral(value);
-        Assertions.assertEquals(value, sl.toString());
+        // 源码中的转义序列 \" 和 \\ 在 unescape 后变为实际字符
+        var expected = sb.toString();
+        // 构造带转义的源码字符串
+        var src = new StringBuilder();
+        src.append('"');
+        for (int i = 0x20; i < 0x7e; i++) {
+            if (i == '"' || i == '\\')
+                src.append('\\');
+            src.append((char) i);
+        }
+        src.append('"');
+        var sl = (StringLiteral) parseLiteral(src.toString());
+        Assertions.assertEquals(expected, sl.string());
     }
 
     @Test

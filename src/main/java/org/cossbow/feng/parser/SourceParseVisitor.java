@@ -293,6 +293,7 @@ final class SourceParseVisitor
         if (tn == null) return null;
         var text = tn.getText();
         text = text.substring(1, text.length() - 1);
+        text = CommonUtil.unescape(text);
         var sl = new StringLiteral(posOf(tn), charset, text.getBytes(charset)); // 去掉引号
         return table.stringCache.dedup(sl);
     }
