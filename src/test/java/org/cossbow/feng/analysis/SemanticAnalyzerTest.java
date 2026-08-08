@@ -3729,4 +3729,187 @@ public class SemanticAnalyzerTest {
         checkFail(d + "func f(){ try{}catch(e *#Mid){}catch(e *#Leaf){} }");
     }
 
+    // Concurrent check
+
+    @Test
+    public void testAsyncFunction1() {
+        checkSucc("@Async func t() {}");
+
+        checkSucc("func t() int {return 0;}");
+        checkFail("@Async func t() int {return 0;}");
+
+        checkSucc("@Async func t(a int) {}");
+        checkSucc("@Async func t(a *int) {}");
+
+        var d = "struct A {} ";
+        checkSucc(d + "@Async func t(a A) {}");
+        checkSucc(d + "@Async func t(a *A) {}");
+
+        d = "class A {}  ";
+        checkSucc(d + "@Async func t(a A) {}");
+        checkSucc(d + "@Async func t(a *A) {}");
+
+        d = "interface A {}  ";
+        checkFail(d + "@Async func t(a *A) {}");
+
+        d = "enum A {S} ";
+        checkSucc(d + "@Async func t(a *A) {}");
+        checkSucc(d + "@Async func t(a A) {}");
+
+        d = "func A=();  ";
+        checkSucc(d + "@Async func t(a A) {}");
+
+        d = "class A {} ";
+        checkSucc(d + "@Async func t(a A) {}");
+        checkSucc(d + "@Async func t(a *A) {}");
+
+        d = "class A {var i int;} ";
+        checkSucc(d + "@Async func t(a A) {}");
+        checkSucc(d + "@Async func t(a *A) {}");
+
+    }
+
+    @Test
+    public void testAsyncFunction2() {
+        checkSucc("class A { @Sync var i *int;} @Async func t(a *A) {}");
+        checkFail("class A { var i *int;} @Async func t(a *A) {}");
+
+        checkSucc("class A { @Sync var i *int;} @Async func t(a A) {}");
+        checkFail("class A { var i *int;} @Async func t(a A) {}");
+
+        checkSucc("class A { @Sync var i *int;} class B { @Sync var a *A; } @Async func t(a *B) {}");
+        checkFail("class A { @Sync var i *int;} class B { var a *A; } @Async func t(a *B) {}");
+        checkFail("class A { var i *int;} class B { @Sync var a *A; } @Async func t(a *B) {}");
+
+        checkSucc("@Sync class A { var i *int;} @Sync class B { var a *A; } @Async func t(a *B) {}");
+        checkFail("class A { var i *int;} @Sync class B { var a *A; } @Async func t(a *B) {}");
+        checkFail("@Sync class A { var i *int;} class B { var a *A; } @Async func t(a *B) {}");
+
+    }
+
+    @Test
+    public void testAsyncFunction3() {
+        checkSucc("@Sync class A { var i *int;} @Sync class B:A {} @Async func t(a *B) {}");
+        checkSucc("class A { var i *int;} @Sync class B:A {} @Async func t(a *B) {}");
+        checkFail("@Sync class A { var i *int;} class B:A {} @Async func t(a *B) {}");
+        checkSucc("class A { @Sync var i *int;} class B:A {} @Async func t(a *B) {}");
+    }
+
+    @Test
+    public void testAsyncFunction4() {
+        checkSucc("@Async func t(a [2]int) {}");
+        checkFail("@Async func t(a [*]int) {}");
+        checkFail("@Async func t(a [2]*int) {}");
+
+        checkSucc("class A { var i int; } @Async func t(a [2]A) {}");
+        checkFail("class A { var i int; } @Async func t(a [*]A) {}");
+        checkFail("class A { var i int; } @Async func t(a [2]*A) {}");
+
+        checkFail("class A { var i *int; } @Async func t(a [2]A) {}");
+        checkSucc("@Sync class A { var i *int; } @Async func t(a [2]A) {}");
+        checkSucc("class A { @Sync var i *int; } @Async func t(a [2]A) {}");
+    }
+
+    @Test
+    public void testAsyncFunction5() {
+        checkSucc("class A { var i [2]int;} @Async func t(a *A) {}");
+        checkFail("class A { var i [*]int;} @Async func t(a *A) {}");
+
+        checkSucc("class A { var i [2][3]int;} @Async func t(a *A) {}");
+        checkFail("class A { var i [2][*]int;} @Async func t(a *A) {}");
+
+        checkSucc("class A { var i [2][3][4]int;} @Async func t(a *A) {}");
+        checkFail("class A { var i [2][*][4]int;} @Async func t(a *A) {}");
+
+        checkFail("class A { var i [2][3]*int;} @Async func t(a *A) {}");
+
+        checkSucc("class E {} class A { var i [2]E;} @Async func t(a *A) {}");
+        checkFail("class E {} class A { var i [2]*E;} @Async func t(a *A) {}");
+
+        checkSucc("class E { @Sync var i *int; } class A { var i [2]E;} @Async func t(a *A) {}");
+        checkFail("class E { var i *int; } class A { var i [2]E;} @Async func t(a *A) {}");
+    }
+
+    @Test
+    public void testAsyncFunction6() {
+        checkSucc("@Async func t(a (int,bool)) {}");
+        checkFail("@Async func t(a (*int,bool)) {}");
+        checkFail("@Async func t(a (int,*bool)) {}");
+
+        checkSucc("@Async func t(a (int,[3]bool)) {}");
+        checkFail("@Async func t(a (int,[*]bool)) {}");
+
+        checkSucc("class A { var i int;} @Async func t(a (int,A)) {}");
+        checkFail("class A { var i int;} @Async func t(a (int,*A)) {}");
+
+        checkSucc("class A { var i int;} @Async func t(a (int,[5]A)) {}");
+        checkFail("class A { var i int;} @Async func t(a (int,[*]A)) {}");
+
+        checkFail("class A { var i *int;} @Async func t(a (int,A)) {}");
+        checkSucc("class A { @Sync var i *int;} @Async func t(a (int,A)) {}");
+        checkSucc("@Sync class A { var i *int;} @Async func t(a (int,A)) {}");
+    }
+
+    @Test
+    public void testAsyncFunction7() {
+        checkSucc("class A { var i (int,bool);} @Async func t(a *A) {}");
+        checkFail("class A { var i (int,*bool);} @Async func t(a *A) {}");
+
+        checkSucc("class A { var i (int,[7]bool);} @Async func t(a *A) {}");
+        checkFail("class A { var i (int,[*]bool);} @Async func t(a *A) {}");
+
+        checkSucc("class A { var i [4](int,bool);} @Async func t(a *A) {}");
+        checkFail("class A { var i [*](int,bool);} @Async func t(a *A) {}");
+
+        checkFail("class E { var i *int; } class A { var i (int,E);} @Async func t(a *A) {}");
+        checkSucc("class E { @Sync var i *int; } class A { var i (int,E);} @Async func t(a *A) {}");
+        checkSucc("@Sync class E { var i *int; } class A { var i (int,E);} @Async func t(a *A) {}");
+    }
+
+    @Test
+    public void testAsyncFunction8() {
+        var d = "class A {} class B:A{} @Async func t(a *A) {} ";
+        checkSucc(d + "func f(){ @Sync var b = new(B); t(b); }");
+        checkFail(d + "func f(){ var b = new(B); t(b); }");
+
+        d = "interface I {} class A(I){} @Async func t(a *I) {} ";
+        checkFail(d + "func f(){ @Sync var a = new(A); t(a); }");
+
+        d = "@Sync interface I {} class A(I){} @Async func t(a *I) {} ";
+        checkSucc(d + "func f(){ @Sync var a = new(A); t(a); }");
+        checkFail(d + "func f(){ var a = new(A); t(a); }");
+
+    }
+
+    @Test
+    public void testAsyncMethod1() {
+        var d = "class A {@Async func r(){}} ";
+        checkSucc(d + "func t() {@Sync var a = new(A); a.r();}");
+        checkFail(d + "func t() {var a = new(A); a.r();}");
+        checkFail(d + "func t() {@Sync var a A = {}; a.r();}");
+
+        d = "class A {@Async func r(i *int){}} ";
+        checkSucc(d + "func t() {@Sync var a = new(A); @Sync var i = new(int); a.r(i);}");
+        checkFail(d + "func t() {@Sync var a = new(A); var i = new(int); a.r(i);}");
+        checkFail(d + "func t() {var a A = {}; @Sync var i = new(int); a.r(i);}");
+
+    }
+
+    @Test
+    public void testAsyncAssign1() {
+        var d = "class A{} class B:A{} ";
+        checkSucc(d + "func f() { var v = new(A); var r = v; }");
+        checkSucc(d + "func f() { @Sync var v = new(A); var r = v; }");
+        checkSucc(d + "func f() { var v = new(A); var r = v; }");
+    }
+
+    @Test
+    public void testAsyncMark() {
+        var d = "class A{} ";
+        checkFail(d + "func f() { @Sync var v A; }");
+        checkFail(d + "func f() { @Sync var v = new(A); @Sync const r &A = a; }");
+        checkFail(d + "func f() { @Sync var v A; const r &A = v; }");
+        checkFail(d + "@Async func th(a &A) {}");
+    }
+
 }

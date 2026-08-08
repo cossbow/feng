@@ -24,6 +24,13 @@ public class Expression extends Entity {
     }
 
     /**
+     * Means the value is uniquely referenced
+     */
+    public boolean unique() {
+        return false;
+    }
+
+    /**
      * Composite literals require an expected type for checking.
      * Please fill in the type of the expression on the left here.
      */

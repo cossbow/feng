@@ -1,8 +1,10 @@
 package org.cossbow.feng.ast;
 
+import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.proc.Prototype;
+import org.cossbow.feng.util.ErrorUtil;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -12,6 +14,10 @@ public class Method extends Entity {
 
     public Method(Position pos) {
         super(pos);
+    }
+
+    public Modifier modifier() {
+        return ErrorUtil.unreachable();
     }
 
     abstract

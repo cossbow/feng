@@ -123,6 +123,8 @@ public class ParseSymbolTable {
         BUILTIN.add(AttributeDefinition.InheritDef);
         BUILTIN.add(AttributeDefinition.PackDef);
         BUILTIN.add(AttributeDefinition.AlignDef);
+        BUILTIN.add(AttributeDefinition.AsyncDef);
+        BUILTIN.add(AttributeDefinition.SyncDef);
         BUILTIN.add(AttributeDefinition.TestDef);
         BUILTIN.add(ClassDefinition.ObjectClass);
         BUILTIN.add(ClassDefinition.ExceptionClass);

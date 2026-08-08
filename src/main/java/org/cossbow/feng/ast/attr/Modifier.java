@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.attr;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.SymbolMap;
+import org.cossbow.feng.util.Optional;
 
 public class Modifier extends Entity {
     /**
@@ -29,6 +30,14 @@ public class Modifier extends Entity {
         return attributes;
     }
 
+
+    public Optional<Attribute> sync() {
+        return attributes.tryGet(AttributeDefinition.SyncDef.symbol());
+    }
+
+    public Optional<Attribute> async() {
+        return attributes.tryGet(AttributeDefinition.AsyncDef.symbol());
+    }
 
     //
 

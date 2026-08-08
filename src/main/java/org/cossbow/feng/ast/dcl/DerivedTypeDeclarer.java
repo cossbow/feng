@@ -72,6 +72,14 @@ public class DerivedTypeDeclarer extends TypeDeclarer
         return Optional.of(n);
     }
 
+    //
+
+    public boolean syncable() {
+        return def().syncable();
+    }
+
+    //
+
     public boolean baseTypeSame(TypeDeclarer td) {
         if (!(td instanceof DerivedTypeDeclarer t))
             return false;

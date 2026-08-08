@@ -99,6 +99,10 @@ public class InterfaceDefinition extends ObjectDefinition {
         return (allMethods.isEmpty() ? methods : allMethods).tryGet(name);
     }
 
+    public boolean syncable() {
+        return modifier().sync().has();
+    }
+
     // static
 
     /**

@@ -3241,6 +3241,393 @@ Compile-time constants are constants whose values can be deduced and calculated 
 2. Variables declared with `const` whose type is a [primitive type](#primitive-types) or a [string literal](#string-literals).
 3. All expressions composed entirely of compile-time constants are also compile-time constants, because their results can be computed at compile time.
 
+## Concurrency Check
+
+The purpose of the concurrency check is to provide a solution for memory issues introduced by concurrency,
+especially when using reference counting for memory management. It not only solves the counter problem
+(reference counting is not an atomic operation, even with Atomic operations), but also enables counter optimization
+(non-Atomic). Of course, even with GC memory management, this is beneficial.
+
+### Concurrency Check Mechanism
+
+Unlike the strict checking of the type system, the concurrency check is merely a convention-based checking framework
+built on the "trust boundary" principle. Its goal is to constrain that only syncable instances can be shared and
+accessed concurrently. This "trust boundary" refers to the invocation of a function or method marked with `@Async`.
+_Of course, concurrent access includes both concurrent reads and modifications—whether it is read-only depends on
+the actual type of the variable or field._
+
+The basic logic of the concurrency check is: only [syncable instances](#syncable-instances) can "cross"
+the [concurrency boundary](#concurrency-boundary).
+
+Some types are syncable by default, while others require the explicit `@Sync` attribute. See
+[Syncable Instances](#syncable-instances) for details.
+
+For example, when calling an async function, only a syncable instance can be passed as an argument:
+
+```feng
+@Async
+func startThread(a *?int) { // @Async declares that this function will initiate async execution
+}
+func test1() {
+    @Sync var r = new(int); // The simplest example: variable r with @Sync can be shared concurrently
+    startThread(r);         // ✔：Therefore r can be passed as a parameter
+}
+func test2() {
+    var r = new(int);       // Variable r without @Sync cannot be shared concurrently
+    // startThread(r);      // ✖：Therefore r cannot be passed as a parameter
+}
+```
+
+Another example: when calling an async method, it must be initiated through a syncable instance:
+
+```feng
+class Thread {
+    @Async
+    func start() {}
+}
+func test1() {
+    @Sync var t = new(Thread);  // Variable t with @Sync can be shared concurrently
+    t.start();                  // ✔：Therefore the method can be called
+}
+func test2() {
+    var t = new(Thread);        // Variable t without @Sync cannot be shared concurrently
+    // t.start();               // ✖：Therefore the async method cannot be called
+}
+```
+
+### Sync Assignment Rules
+
+The core rule is: sync and non-sync cannot be converted to each other during assignment.
+
+One point to clarify first: instances created by `new` are known to be unowned and can be directly assigned
+to a sync reference:
+
+```feng
+class A {
+    @Sync var i *?int;
+}
+func test() {
+    @Sync var r *A = new(A);    // ✔：Assign to a synced variable
+    r.i = new(int);             // ✔：Assign to a synced field
+}
+```
+
+However, sync references and non-sync references cannot be assigned to each other:
+
+```feng
+func test() {
+    @Sync var r *?int = new(int);
+    var s *?int = new(int);
+    // r = s;   // ✖：Non-sync reference cannot be assigned to sync reference
+    // s = r;   // ✖：Sync reference cannot be assigned to non-sync reference
+}
+```
+
+The following example shows a const field that requires initialization at declaration time—this is also
+allowed because `new(int)` creates an unowned instance that can naturally be assigned to field `i`:
+
+```feng
+class A {
+    @Sync const i *?int;
+}
+func test() {
+    @Sync var r *A = new(A, {i=new(int)});
+}
+```
+
+Value types cannot be annotated with `@Sync` because value-type passing is by copy — the two sides end up
+with independent instances, making the annotation meaningless. For example:
+
+```feng
+class A {
+   @Sync const i *?int;
+}
+@Async func startThread(a A) {}
+func test() {
+   var a A;                  // ✔：Value type is automatically synced, no @Sync needed
+   // @Sync var b A;         // ✖：Cannot annotate @Sync, to avoid ambiguity
+   startThread(a);
+}
+```
+
+[Phantom references](#variable-types-reference-types) cannot be synced. Here are two counterexamples:
+
+```feng
+func test1() {
+   var i int;
+   // @Sync const r2 &int = i;   // ✖：@Sync cannot annotate phantom references
+   @Sync var j = new(int);
+   // const r1 &int = j;         // ✖：As per the rule above, this conversion is not allowed
+}
+```
+
+Note: The assignment rules above are based on type checking. That is, the type is checked first,
+then the sync attribute is checked.
+
+### Syncable Instances
+
+The core of the concurrency check is checking syncable instances.
+
+Whether a specific instance is automatically syncable or requires explicit annotation depends primarily on
+whether there are references along its access path.
+
+The rules differ for the two instance categories: [value types](#variable-types-value-types) and
+[reference types](#variable-types-reference-types):
+
+1. Value types are passed by copying, so two threads would actually use two different instances. Therefore,
+   value types are automatically synced.
+2. However, when a value-type class calls a method, `this` inside the method is a phantom reference,
+   so concurrency boundary methods cannot be called.
+3. Regarding the two kinds of reference types, **phantom references** are forbidden for sync, and the
+   concurrency check is only performed on **strong references**.
+
+An instance may reference other instances. When an instance is synced, the instances it references may also
+be accessed by another thread. Therefore, according to the [Concurrency Check Mechanism](#concurrency-check-mechanism)
+rules, the referenced instances must also be syncable. The compiler will also perform a concurrency check on
+the instance's type.
+
+For example:
+
+```feng
+class A {
+    var i *?int;
+}
+func test() {
+    @Sync var r *A = new(A);
+    // startThread(r);      // ✖：Variable r is marked with @Sync, but class A is not syncable,
+                            //     so r is inferred as non-synced
+}
+```
+
+Instance types include primitive types, enum types, structure types, function prototypes, classes, interfaces
+and their corresponding array types, and tuples. Based on type definitions and whether they can reference other
+types, they can be divided into two categories:
+
+1. Primitive types, enum types, structure types, and function prototypes—these four types automatically
+   acquire the sync attribute because they cannot reference other types.
+2. The remaining types—classes, interfaces, and arrays—are described below:
+    1. The rules for classes are:
+        1. If a class has no reference-type fields, it automatically acquires the sync attribute.
+        2. If all reference-type fields are explicitly marked with `@Sync`, for example:
+           `class A { @Sync var i *?int; @Sync var b *?bool; }`, then class `A` is syncable.
+        3. If `@Sync` is explicitly marked on the class, there is no need to mark each reference-type field
+           individually; the class is syncable.
+           Note!!! **The referenced instance must also be syncable**!!! Therefore, when a value-type field is
+           also a class, that class must also be syncable, and so on.
+           For example: `class A { var i *?int; } class B { var a A; }` — class `B` has no reference-type fields,
+           but its field `a`'s type `A` has an unmarked `@Sync` reference field `i`, so class `B` is not syncable.
+        4. The sync attribute cannot be inherited. Even if the parent class has implemented sync, the child class
+           will be checked independently. Therefore, according to rules 2.1.2 and 2.1.3, the following cases exist:
+            1. Example 1: `@Sync class A { var i *?int; } class B : A {}` — class `B` cannot inherit the `@Sync`
+               attribute on the type, so it is not syncable.
+            2. Example 2: `class A { @Sync var i *?int; } class B : A {}` — class `B` will be checked independently.
+               Since the only reference field `i` of class `B` has `@Sync`, it is syncable.
+    2. Interfaces cannot be instantiated; their references can only point to instances of a class. Therefore, the
+       way to achieve sync is to annotate the interface with `@Sync`, indicating that it can only point to a
+       syncable class.
+    3. First, [variable-length arrays](#arrays) are not syncable (array elements cannot be annotated with attributes).
+       Since arrays can be nested, for an array to be syncable, the nesting path must contain no references. That is,
+       all levels on the nesting path must be [fixed-length arrays](#arrays), and the innermost element must be syncable.
+        1. Example 1: `[2][*]int`, `[2][*][4]int`, `[*][3][*]int`, etc.—all have variable-length arrays on the path
+           and are not syncable.
+        2. Example 2: `[2]*A`, `[2][4]*B`, etc.—the innermost element is a reference and is not syncable.
+        3. Example 3: `[2]A`, `[2][4]B`, etc.—the innermost element is a value type, but the innermost element's
+           type must be syncable.
+    4. Tuples are value types and, like arrays, support nesting. The previous discussion covered arrays alone, but
+       tuples and arrays can be nested within each other, making the situation slightly more complex: arrays are
+       linear nesting, while tuples are tree-shaped nesting. Types composed of nested tuples and arrays are also
+       tree-shaped, and each branch is a nesting path. During checking, each branch must satisfy the requirement
+       of containing no references. For example:
+        1. Example 1: `([2][*]int, [2]int)` — the first element of the tuple is an array whose nesting path contains
+           a reference `[*]int`; it is not syncable.
+        2. Example 2: `[3](int, *A)` — the array's element is a tuple, whose second element is a reference; it is
+           not syncable.
+        3. Example 3: `[3](int, A)`, `([2]int, [3]A)` — no references on the path; whether they are syncable depends
+           on type `A` (since `int` is syncable).
+
+For example, both classes `A` and `B` below are syncable:
+
+```feng
+class A {
+    @Sync var i *?int;
+}
+class B {
+    var a A;
+}
+func test() {
+    @Sync var r *A = new(A);
+    startThread(r); // ✔：Fully implements the sync attribute
+}
+```
+
+In rule 2.1.4, there is another scenario:
+
+```feng
+class A {
+   var i *?int;
+}
+class B : A {
+   @Sync var j *?int;
+}
+func test() {
+   @Sync var b *B = new(B);
+   // startThread(b);      // ✖：Checking class B reveals that the inherited field i
+                           //     has no sync attribute, so it is not syncable
+}
+```
+
+For arrays, the syncable cases are:
+
+```feng
+class A {
+    @Sync var i *?int;       // Note: the only field i is marked sync, so A is syncable
+}
+class B {
+    var i *?int;             // Note: field i is not marked sync, so B is not syncable
+}
+class C {
+    var a1 [2]A;
+    // var a2 [*]A;         // ✖：First nesting level is a variable-length array, making C not syncable
+    // var a3 [2][*]A;      // ✖：Second nesting level is a variable-length array, making C not syncable
+    // var a4 [2][4]*A;     // ✖：Same as above
+    // var b1 [2]B;         // ✖：Type B is not syncable, making C not syncable
+}
+func test() {
+    @Sync var r *C = new(C);    // ✔：Type C has implemented sync
+    startThread(r);             // ✔：Fully implements the sync attribute
+}
+```
+
+A syncable interface can only point to a syncable class. For example:
+
+```feng
+@Sync interface I {}            // Syncable interface
+class A (I) {
+    @Sync var i *?int;          // ✔：Field i is marked sync, so A is syncable
+}
+func test() {
+    @Sync var r *I = new(A);    // ✔：A is syncable, so interface I's reference can point to A's instance
+}
+```
+
+Here is a counterexample:
+
+```feng
+@Sync interface I {}            // Syncable interface
+class A (I) {
+    var i *?int;                // Note: field i is not marked sync
+}
+func test() {
+    @Sync var r *I = new(A);    // ✖：A is not syncable; interface I's reference cannot point to A's instance
+}
+```
+
+Currently, this annotation does not support generics, including both types and functions.
+
+```feng
+// @Sync    // ✖：Generic class cannot be annotated
+class Box`T` {
+    // @Sync    // ✖：Cannot annotate within a generic class
+    var t T;
+}
+// @Async    // ✖：Generic class cannot be annotated
+class startThread`R`() {}
+```
+
+### Concurrency Boundary
+
+Note: A boundary function or boundary method cannot have a return value—this rule exists solely to prevent
+meaningless undefined behavior. Here are two counterexamples:
+
+```feng
+@Async func run() int {
+    return 0;
+}
+class Thread {
+    @Async func run() int {
+        return 0;
+    }
+}
+```
+
+Additionally, classes support overriding parent class methods through inheritance, but if a parent class
+method is a concurrency boundary, the child class's overriding method must also be a concurrency boundary.
+For example:
+
+```feng
+class Thread {
+    var state int;
+
+    @Async func run() {
+    }
+    func state() int {
+        return state;
+    }
+}
+class MyThread : Thread {
+    @Async func run() {     // Note: annotated the same as parent's run()
+    }
+    func state() int {
+        return state;       // Note: no annotation, same as parent's state()
+    }
+}
+```
+
+The same applies when implementing interfaces:
+
+```feng
+@Sync
+interface Runner {
+    @Async run();
+}
+class Thread (Runner) {
+    @Async func run() {     // Note: must be annotated the same as the interface's run()
+    }
+}
+```
+
+When a function or method acts as a boundary, its parameters are implicitly annotated with the sync
+attribute `@Sync`, and the instance type of the parameter must also be syncable. For example:
+
+```feng
+@Sync
+class ThArg {
+    // ..
+}
+@Async
+func thread(t *?ThArg) {
+    @Sync var r = t;           // Parameter t is syncable; this assignment is legal
+    // var s *ThArg = t;       // ✖：Cannot assign to a non-sync variable
+}
+```
+
+Since a non-sync instance cannot call a concurrency boundary method, `this` inside a concurrency boundary
+method is a syncable instance. Additionally, a regular method cannot prove whether `this` is syncable,
+so it cannot call another concurrency boundary method. For example:
+
+```feng
+class A {
+   @Async
+   func run() {}
+   @Async
+   func start() {
+      this.run();       // ✔：this is syncable; calling run() is allowed
+   }
+   func calc() {
+      // this.run();    // ✖：The syncability of this is unknown; calling run() is not allowed
+   }
+}
+```
+
+### Compile-time Optimization
+
+The compiler should optimize based on the `@Sync` attribute of fields and variables,
+but classes with `@Sync` do not require processing.
+This is because sync handling for fields and variables is frequent and simple,
+making compile-time processing highly efficient.
+Class-level sync handling, on the other hand, primarily addresses complex scenarios
+such as concurrent queues.
+
 ## Unit Testing
 
 In test mode, the compiler only compiles unit tests.

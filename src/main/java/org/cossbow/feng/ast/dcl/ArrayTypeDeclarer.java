@@ -110,6 +110,17 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         return element.hasTypeVar();
     }
 
+    /**
+     * Requires:
+     * 1. non reference in the nested-path.
+     * 2. final element was sync
+     */
+    public boolean syncable() {
+        return refer.none() &&
+                element.maybeRefer().none() &&
+                element.syncable();
+    }
+
     //
 
     public static ArrayTypeDeclarer make(

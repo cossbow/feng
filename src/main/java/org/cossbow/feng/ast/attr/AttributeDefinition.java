@@ -3,9 +3,6 @@ package org.cossbow.feng.ast.attr;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.util.Optional;
-import org.cossbow.feng.util.Optional;
-
-import java.util.List;
 
 import static org.cossbow.feng.ast.Position.ZERO;
 
@@ -49,6 +46,24 @@ public class AttributeDefinition extends TypeDefinition {
             new Symbol(new Identifier("Align")),
             makeFields(ValueField, AttributeField.Type.INT));
 
+
+    /**
+     * Built-in @Async attribute: marks a function/method as async boundary
+     */
+    public static final
+    AttributeDefinition AsyncDef = new AttributeDefinition(
+            Position.ZERO, Modifier.empty(),
+            new Symbol(new Identifier("Async")),
+            new IdentifierMap<>());
+    /**
+     * Built-in @Sync attribute: marks a type/variable/field as concurrency-safe
+     */
+    public static final
+    AttributeDefinition SyncDef = new AttributeDefinition(Position.ZERO,
+            Modifier.empty(),
+            new Symbol(new Identifier("Sync")),
+            new IdentifierMap<>());
+
     public static final
     AttributeDefinition TestDef = new AttributeDefinition(ZERO,
             Modifier.empty(),
@@ -59,6 +74,8 @@ public class AttributeDefinition extends TypeDefinition {
         InheritDef.builtin(true);
         PackDef.builtin(true);
         AlignDef.builtin(true);
+        AsyncDef.builtin(true);
+        SyncDef.builtin(true);
         TestDef.builtin(true);
     }
 

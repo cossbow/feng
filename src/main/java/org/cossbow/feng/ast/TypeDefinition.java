@@ -29,6 +29,10 @@ public class TypeDefinition extends Definition {
 
     //
 
+    public boolean syncable() {
+        return true;
+    }
+
     public DerivedType link(TypeArguments tArgs) {
         var dt = new DerivedType(Position.ZERO,
                 symbol(), tArgs);

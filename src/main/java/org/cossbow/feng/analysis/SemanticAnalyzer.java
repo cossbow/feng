@@ -948,6 +948,10 @@ public class SemanticAnalyzer {
             semantic("method's unmodifiable-flag must same: %s <--> %s",
                     pm.pos(), sm.pos());
         }
+        if (pm.modifier().async().has() != sm.modifier().async().has()) {
+            semantic("method's @Sync status must same: %s <--> %s",
+                    pm.pos(), sm.pos());
+        }
     }
 
     private Optional<ClassDefinition>
@@ -1005,7 +1009,83 @@ public class SemanticAnalyzer {
         dag.bfs(this::checkInherit);
         // 最后分析实现接口
         dag.bfs(this::checkImplements);
-        return (dag);
+        // check sync
+        dag.bfs(this::analyzeSync);
+        return dag;
+    }
+
+    //
+
+    private boolean enterAsync;
+
+    private final Set<ClassDefinition> visited = new HashSet<>();
+
+    private boolean analyzeSync(TypeDeclarer td) {
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            var def = dtd.def();
+            if (def instanceof ClassDefinition fcd)
+                analyzeSync(fcd);   // trigger checking class
+            return def.syncable();
+        }
+        if (td instanceof ArrayTypeDeclarer atd) {
+            // Check arrays on nested paths
+            return atd.refer().none() &&
+                    analyzeSync(atd.element());
+        }
+        if (td instanceof TupleTypeDeclarer ttd) {
+            // Check tuples on nested paths,
+            // this is multi-branch checking
+            for (var etd : ttd.elements()) {
+                if (!analyzeSync(etd))
+                    return false;
+            }
+            return true;
+        }
+        return true;
+    }
+
+    /**
+     * Only analyze the class, as the interface just needs
+     * checking for @Sync.
+     * Each ClassDefinition is analyzed once, so we just need
+     * to check if the current one can sync.
+     * We only update the {@link ClassDefinition#syncable} here,
+     * then the {@link TypeDeclarer} can call sync() for the
+     * sync state.
+     */
+    private void analyzeSync(ClassDefinition cd) {
+        if (!visited.add(cd)) return;
+
+        // check the class's @Sync mark
+        boolean classSync = cd.modifier().sync().has();
+        boolean sync = true;
+        for (var cf : cd.allFields()) {
+            var ct = cf.type();
+            // fieldSync: indicate this field will sync
+            boolean fieldSync;
+            // check reference field's @Sync mark
+            var mark = cf.modifier().sync();
+            if (ct.maybeRefer().none()) {
+                if (mark.has()) {
+                    semantic("value-type should not set @Sync: %s",
+                            mark.get().pos());
+                }
+                // value-type will auto sync
+                fieldSync = true;
+            } else {
+                // marked reference-type field will sync
+                ct.markSync(mark.has());
+                fieldSync = ct.markSync();
+            }
+            // class or field sync will trigger checking TypeDefinition
+            if (classSync || fieldSync) {
+                analyzeSync(ct);
+                // check field type syncable
+                if (ct.syncable()) continue;
+            }
+            sync = false;
+        }
+        cd.syncable(sync);
     }
 
     private ClassDefinition enterClass;
@@ -1051,8 +1131,10 @@ public class SemanticAnalyzer {
     }
 
     private void declareMethod(ClassMethod m) {
+        enterAsync = m.modifier().async().has();
         analyse(m.modifier());
         analyse(m.prototype(), false);
+        enterAsync = false;
     }
 
     private void implMethod(ClassDefinition cd) {
@@ -1155,21 +1237,6 @@ public class SemanticAnalyzer {
             if (t instanceof InterfaceDefinition id) return id;
             return semantic("component must be interface: %s", p.pos());
         }).toList();
-    }
-
-    private Optional<Groups.G2<InterfaceMethod, InterfaceMethod>>
-    compatible(InterfaceDefinition part,
-               Map<Identifier, InterfaceMethod> methods) {
-        for (var m : part.methods()) {
-            var name = m.name();
-            var a = methods.putIfAbsent(name, m);
-            if (a == null) continue;
-            // 检查part接口的方法与继承的方法是否一致：这里返回值也要一致
-            if (m.prototype().equals(a.prototype()))
-                continue;
-            return Optional.of(Groups.g2(m, a));
-        }
-        return Optional.empty();
     }
 
     private DAGGraph<InterfaceDefinition>
@@ -1301,8 +1368,10 @@ public class SemanticAnalyzer {
     private FunctionDefinition enterFunc;
 
     private FunctionDefinition declareFunc(FunctionDefinition fd) {
+        enterAsync = fd.modifier().async().has();
         analyse(fd.modifier());
         analyse(fd.prototype(), false);
+        enterAsync = false;
         return fd;
     }
 
@@ -1347,6 +1416,11 @@ public class SemanticAnalyzer {
 
     private Entity analyse(Prototype prot, boolean addVar) {
         analyse(prot.parameterSet(), addVar);
+        if (enterAsync && prot.returnSet().has()) {
+            var r = prot.returnSet().get();
+            semantic("async function/method can't has returns '%s': %s",
+                    r, r.pos());
+        }
         prot.returnSet(prot.returnSet().map(this::analyse));
         return prot;
     }
@@ -1371,8 +1445,32 @@ public class SemanticAnalyzer {
             analyse(fp.modifier());
             enablePhantom = true;
             fp.type(analyse(fp.type()));
+            if (enterAsync) {
+                markSync(fp.type());
+                if (!fp.type().sync()) {
+                    semantic("parameter of async procedure must be sync '%s': %s",
+                            fp.type(), fp.type().pos());
+                }
+            }
             if (addVar) fp.var().use(context::putVar);
         }
+    }
+
+    private void assignableSync(
+            TypeDeclarer l, TypeDeclarer r,
+            Optional<Expression> re, Entity e) {
+        // unique will auto move, no need check
+        if (re.has() && re.get().unique()) return;
+
+        // skip the phantom reference a value
+        if (l.checkRefer(PHANTOM) && r.maybeRefer().none())
+            return;
+
+        // requires same sync state
+        if (l.sync() == r.sync()) return;
+
+        semantic("can't convert between sync '%s' and non-sync '%s': %s",
+                l, r, e.pos());
     }
 
     //
@@ -1951,6 +2049,8 @@ public class SemanticAnalyzer {
     private TypeValid assignable(
             TypeDeclarer l, TypeDeclarer r,
             Optional<Expression> re, Entity e) {
+        assignableSync(l, r, re, e);
+
         if (l.equals(r)) return TypeValid.ok();
 
         checkRequired(l, r, re, e);
@@ -2095,11 +2195,33 @@ public class SemanticAnalyzer {
                         t, t.pos());
                 return;
             }
+            markSync(v.modifier(), vt);
             v.type().set(vt);
         }
         if (isNonNil(g.a())) {
             setNilState(Set.of(v));
         }
+    }
+
+    private TypeDeclarer markSync(Modifier m, TypeDeclarer t) {
+        var s = m.sync();
+        if (s.none()) return t;
+        if (t.maybeRefer().none()) {
+            return semantic("value-type should not set @Sync: %s",
+                    s.get().pos());
+        }
+        return markSync(t);
+    }
+
+    private TypeDeclarer markSync(TypeDeclarer t) {
+        if (t.checkRefer(PHANTOM)) {
+            return semantic("phantom-reference can't set @Sync: %s",
+                    t.pos());
+        }
+        t.markSync(true);
+        if (t.sync()) return t;
+
+        return semantic("'%s' don't support sync: %s", t, t.pos());
     }
 
     private void analyse(Variable v) {
@@ -2110,7 +2232,7 @@ public class SemanticAnalyzer {
                         t.pos());
             }
             enablePhantom = true;
-            return analyse(t);
+            return markSync(v.modifier(), analyse(t));
         });
         if (v.value().none()) {
             if (v.isConst()) {
@@ -3880,6 +4002,10 @@ public class SemanticAnalyzer {
         var kind = enterMethod.escaped() ? STRONG : PHANTOM;
         var ref = new Refer(e.pos(), kind, true, false);
         var td = new DerivedTypeDeclarer(e.pos(), dt, Optional.of(ref));
+        if (enterMethod.modifier().async().has()) {
+            // Obviously, this is sync in async method.
+            td.markSync(true);
+        }
         return Groups.g2(e, td);
     }
 
@@ -4098,6 +4224,16 @@ public class SemanticAnalyzer {
                 s, e.pos());
     }
 
+    void checkEnterAsync(TypeDeclarer t, Method m, Entity e) {
+        if (m.modifier().async().none()) return;
+        if (!t.sync())
+            semantic("non-sync '%s' can't enter async-method '%s': %s",
+                    t, m, e.pos());
+        if (t.maybeRefer().none())
+            semantic("value-type '%s' can't enter async-method '%s': %s",
+                    t, m, e.pos());
+    }
+
     private Groups.G2<Expression, TypeDeclarer>
     optimizeMember(PrimaryExpression s, ClassDefinition cd,
                    Identifier name, DerivedTypeDeclarer st,
@@ -4124,6 +4260,7 @@ public class SemanticAnalyzer {
             var m = checkExport(om.get(), cd, name);
             checkEscaped(st, m, name);
             checkUnmodifiable(s, m, name);
+            checkEnterAsync(st, m, s);
             var gm = GenericMap.make(name, false, st.gm(),
                     m.generic(), generic);
             var prot = gm.instantiate(m.prototype());
@@ -4177,6 +4314,7 @@ public class SemanticAnalyzer {
                 var m = om.get();
                 checkEscaped(st, m, name);
                 checkUnmodifiable(s, m, name);
+                checkEnterAsync(st, m, s);
                 var prot = st.gm().instantiate(m.prototype());
                 var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
                 var n = new MethodExpression(s.pos(),
@@ -4412,6 +4550,12 @@ public class SemanticAnalyzer {
                 if (enterMethod.unmodifiable() && !m.unmodifiable()) {
                     return semantic("unmodifiable method can't call " +
                             "modifiable method: %s", re.pos());
+                }
+                if (enterMethod.modifier().async().none()
+                        && m.modifier().async().has()) {
+                    return semantic("can't call async method '%s' in" +
+                                    " non-async method '%s': %s",
+                            m, enterMethod, re.pos());
                 }
                 // 叠加上继承的泛型替换
                 var gm = enterClass.inherit().map(DerivedType::gm)

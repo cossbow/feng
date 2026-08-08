@@ -35,6 +35,11 @@ public class LiteralExpression extends PrimaryExpression {
     }
 
     @Override
+    public boolean unique() {
+        return true;
+    }
+
+    @Override
     public LiteralExpression mirror() {
         return this;
     }

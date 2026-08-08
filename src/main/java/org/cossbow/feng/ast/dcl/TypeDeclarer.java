@@ -126,4 +126,33 @@ public class TypeDeclarer extends Entity {
     public boolean hasTypeVar() {
         return false;
     }
+
+    //
+
+    /**
+     * Cache the result of checking @Sync
+     */
+    private boolean markSync;
+
+    /**
+     * Is the type synchronized.
+     */
+    public boolean sync() {
+        return (markSync || maybeRefer().none()) && syncable();
+    }
+
+    public boolean markSync() {
+        return markSync;
+    }
+
+    public void markSync(boolean sync) {
+        this.markSync = sync;
+    }
+
+    /**
+     * Is the instance synchronizable
+     */
+    public boolean syncable() {
+        return true;
+    }
 }
