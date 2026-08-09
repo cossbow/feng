@@ -272,6 +272,38 @@ public class CGenerator implements Generator {
         return null;
     }
 
+    // ---- sync-aware inc/dec/cleanup routing ----
+
+    /** "Feng$inc" or "Feng$inc_ns" based on type's sync mark. */
+    private String incFn(TypeDeclarer t) {
+        return t.markSync() ? "Feng$inc" : "Feng$inc_ns";
+    }
+
+    /** "Feng$dec" or "Feng$dec_ns" based on type's sync mark. */
+    private String decFn(TypeDeclarer t) {
+        return t.markSync() ? "Feng$dec" : "Feng$dec_ns";
+    }
+
+    /** "Feng$dec" or "Feng$dec_ns" based on class sync status. */
+    private String decFn(ClassDefinition cd) {
+        return cd.syncable() ? "Feng$dec" : "Feng$dec_ns";
+    }
+
+    /** "Feng$cleanup_sref" or "Feng$cleanup_sref_ns" based on type's sync mark. */
+    private String cleanupSrefFn(TypeDeclarer t) {
+        return t.markSync() ? "Feng$cleanup_sref" : "Feng$cleanup_sref_ns";
+    }
+
+    /** true if e accesses a sync var field (not const, not non-sync). */
+    private boolean isSyncVarField(MemberOfExpression e) {
+        if (!e.resultType.must().markSync()) return false;
+        var st = e.subject().resultType.must();
+        if (!(st instanceof DerivedTypeDeclarer dtd)
+                || !(dtd.def() instanceof ClassDefinition cd)) return false;
+        var cf = cd.allFields().tryGet(e.member());
+        return cf.has() && !cf.get().unmodifiable();
+    }
+
     /**
      * register class cleanup for later file-scope emission.
      * generates cascade release for all strong-ref fields in the hierarchy.
@@ -291,7 +323,7 @@ public class CGenerator implements Generator {
         classCleanups.add(() -> {
             write("static inline void ").write(ck).write("(")
                     .write(cd.symbol()).write(" **p) {").indent();
-            write("if (*p && Feng$dec(*p)) {").indent();
+            write("if (*p && ").write(decFn(cd)).write("(*p)) {").indent();
             // resource free macro first (if exists) — custom cleanup
             // (e.g. linked-list traversal) must run before fields are released
             cd.resourceFree().use(rf -> {
@@ -302,9 +334,14 @@ public class CGenerator implements Generator {
                 var ft = cf.type();
                 var fr = ft.maybeRefer();
                 if (fr.none() || !fr.get().isKind(STRONG)) continue;
-                var fck = fieldCleanupFn(ft);
-                write(fck != null ? fck : "Feng$cleanup_sref")
-                        .write("(&(*p)->").write(cf.name()).write(")").endStmt();
+                if (ft.markSync() && !cf.unmodifiable()) {
+                    // sync var field → Feng$cleanup_sfield (no lock needed at destruction)
+                    write("Feng$cleanup_sfield((void**)&(*p)->").write(cf.name()).write(")").endStmt();
+                } else {
+                    var fck = fieldCleanupFn(ft);
+                    write(fck != null ? fck : cleanupSrefFn(ft))
+                            .write("(&(*p)->").write(cf.name()).write(")").endStmt();
+                }
             }
             write("Feng$free(*p)").endStmt();
             dedent().write('}').newLine();
@@ -331,7 +368,7 @@ public class CGenerator implements Generator {
         classCleanups.add(() -> {
             write("static inline void ").write(ck).write("(")
                     .writeMangledName(dt).write(" **p) {").indent();
-            write("if (*p && Feng$dec(*p)) {").indent();
+            write("if (*p && ").write(decFn(cd)).write("(*p)) {").indent();
             // resource free macro first (if exists) — custom cleanup
             // (e.g. linked-list traversal) must run before fields are released
             cd.resourceFree().use(rf -> {
@@ -341,9 +378,13 @@ public class CGenerator implements Generator {
                 var ft = resolveFromMap(cf.type(), buildTypeMap(cd.generic(), dt.generic()));
                 var fr = ft.maybeRefer();
                 if (fr.none() || !fr.get().isKind(STRONG)) continue;
-                var fck = fieldCleanupFn(ft);
-                write(fck != null ? fck : "Feng$cleanup_sref")
-                        .write("(&(*p)->").write(cf.name()).write(")").endStmt();
+                if (ft.markSync() && !cf.unmodifiable()) {
+                    write("Feng$cleanup_sfield((void**)&(*p)->").write(cf.name()).write(")").endStmt();
+                } else {
+                    var fck = fieldCleanupFn(ft);
+                    write(fck != null ? fck : cleanupSrefFn(ft))
+                            .write("(&(*p)->").write(cf.name()).write(")").endStmt();
+                }
             }
             write("Feng$free(*p)").endStmt();
             dedent().write('}').newLine();
@@ -516,10 +557,15 @@ public class CGenerator implements Generator {
                     var ft = cf.type();
                     var fr = ft.maybeRefer();
                     if (fr.none() || !fr.get().isKind(STRONG)) continue;
-                    var fck = fieldCleanupFn(ft);
-                    write(fck != null ? fck : "Feng$cleanup_sref")
-                            .write("(&").write(lv).write(".")
-                            .write(cf.name()).write(")").endStmt();
+                    if (ft.markSync() && !cf.unmodifiable()) {
+                        write("Feng$cleanup_sfield((void**)&").write(lv).write(".")
+                                .write(cf.name()).write(")").endStmt();
+                    } else {
+                        var fck = fieldCleanupFn(ft);
+                        write(fck != null ? fck : cleanupSrefFn(ft))
+                                .write("(&").write(lv).write(".")
+                                .write(cf.name()).write(")").endStmt();
+                    }
                 }
                 return;
             }
@@ -533,8 +579,8 @@ public class CGenerator implements Generator {
                 return;
             }
         }
-        // pointer reference → cascade Feng$dec
-        write("if (").write(lv).write(") Feng$dec(").write(lv).write(")").endStmt();
+        // pointer reference → cascade dec
+        write("if (").write(lv).write(") ").write(decFn(elem)).write("(").write(lv).write(")").endStmt();
     }
 
     /**
@@ -1422,7 +1468,7 @@ public class CGenerator implements Generator {
             else if (cleanupFn != null)
                 write(" FENG$DEC(").write(cleanupFn).write(")");
             else
-                write(" FENG$DEC(Feng$cleanup_sref)");
+                write(" FENG$DEC(").write(cleanupSrefFn(t)).write(")");
         }
         write(" = ");
         v.value().use(e -> writeValue(e, t), () -> {
@@ -1485,19 +1531,21 @@ public class CGenerator implements Generator {
             }
             // same-type strong ref copy: Feng$inc unless source is unbound
             // (unbound = temporary/new expression that transfers ownership)
+            // also skip inc for sync var field reads — Feng$load_sl already incs
             var needInc = t.maybeRefer().match(r -> r.isKind(STRONG))
                     && !v.unbound()
                     && !(v instanceof IsExpression)
-                    && !noRefInc;
+                    && !noRefInc
+                    && !(v instanceof MemberOfExpression moe && isSyncVarField(moe));
             // SRef array struct: inc the $values pointer, copy {$values, $length}
             if (needInc && t instanceof ArrayTypeDeclarer tat) {
                 var ek = typeKey(tat.element());
                 write("(Feng$ArraySRef_").write(ek).write("){(")
-                        .write(tat.element()).write(" *)Feng$inc((")
+                        .write(tat.element()).write(" *)").write(incFn(t)).write("((")
                         .write(v).write(").$values), (").write(v).write(").$length}");
                 return this;
             }
-            if (needInc) write("Feng$inc(");
+            if (needInc) write(incFn(t)).write('(');
             write(v);
             if (needInc) write(")");
             return this;
@@ -1511,7 +1559,7 @@ public class CGenerator implements Generator {
             var needInc = t.maybeRefer().match(r -> r.isKind(STRONG))
                     && !v.unbound() && !(v instanceof IsExpression)
                     && !noRefInc;
-            if (needInc) write("Feng$inc(");
+            if (needInc) write(incFn(t)).write('(');
             write("((");
             // use mangled name for concrete generic types (Box_IntPtr, not Box)
             if (tdt.derivedType().generic().isEmpty()) write(tcd.symbol());
@@ -1530,7 +1578,7 @@ public class CGenerator implements Generator {
             var needInc = t.maybeRefer().match(r -> r.isKind(STRONG))
                     && !v.unbound() && !(v instanceof IsExpression)
                     && !noRefInc;
-            if (needInc) write("Feng$inc(");
+            if (needInc) write(incFn(t)).write('(');
             write("(void*)(");
             write(v);
             write(")");
@@ -1548,7 +1596,7 @@ public class CGenerator implements Generator {
                     && !v.unbound() && !(v instanceof IsExpression)
                     && !noRefInc;
             write('(').write(t).write("){(").write(at.element()).write(" *)");
-            if (needInc) write("Feng$inc(");
+            if (needInc) write(incFn(t)).write('(');
             else write("(void*)");
             if (rt instanceof ArrayTypeDeclarer) {
                 write('(').write(v).write(").$values");
@@ -1576,7 +1624,7 @@ public class CGenerator implements Generator {
                     && !v.unbound() && !(v instanceof IsExpression)
                     && !noRefInc;
             write("((").baseTypeSymbol(t).write(" *)");
-            if (needInc) write("Feng$inc(");
+            if (needInc) write(incFn(t)).write('(');
             else write("(void*)");
             write('(').write(v).write(").$values");
             if (needInc) write(')');
@@ -1588,7 +1636,7 @@ public class CGenerator implements Generator {
                     && !v.unbound() && !(v instanceof IsExpression)
                     && !noRefInc;
             write("((").baseTypeSymbol(t).write(" *)");
-            if (needInc) write("Feng$inc(");
+            if (needInc) write(incFn(t)).write('(');
             else write("(void*)");
             if (rt.maybeRefer().none()) write("&(").write(v).write(')');
             else write('(').write(v).write(')');
@@ -1675,7 +1723,7 @@ public class CGenerator implements Generator {
             if (r.get().isKind(PHANTOM)) {
                 write("(void*)");
             } else {
-                write("Feng$inc(");
+                write(incFn(t)).write('(');
             }
             literalString(sl).write(".array.$values");
             if (r.get().isKind(PHANTOM))
@@ -2277,6 +2325,15 @@ public class CGenerator implements Generator {
         if (td instanceof ArrayTypeDeclarer) {
             write('(').write(e.resultType.must()).write(')');
         }
+        // sync var field → Feng$load_sl (locked read + inc)
+        if (isSyncVarField(e)) {
+            write("((").baseTypeSymbol(e.resultType.must())
+                    .write(" *)Feng$load_sl((void**)&");
+            ofMember(e.subject());
+            write(e.member());
+            write("))");
+            return this;
+        }
         ofMember(e.subject());
         write(e.member());
         return this;
@@ -2403,7 +2460,7 @@ public class CGenerator implements Generator {
             // interface check: evaluate subject once via block expression
             var needInc = dst.isKind(STRONG) && !e.unbound();
             write("({ void* _s = (void*)(").write(e.subject()).write("); ");
-            if (needInc) write("Feng$inc(");
+            if (needInc) write(incFn(dst)).write('(');
             write("((Feng$iface_vtable(*(Feng$Meta**)_s,");
             if (!dst.derivedType().generic().isEmpty()) {
                 write("&Feng$meta_").write(mangledName(dst.derivedType())).write(".base");
@@ -2419,7 +2476,7 @@ public class CGenerator implements Generator {
                     t instanceof DerivedTypeDeclarer dtd && dtd.def() instanceof InterfaceDefinition);
             var needInc = dst.isKind(STRONG) && !e.unbound();
             write("({ void* _s = (void*)(").write(e.subject()).write("); ");
-            if (needInc) write("Feng$inc(");
+            if (needInc) write(incFn(dst)).write('(');
             write("((Feng$is_kind(");
             if (subjIsIface) write("*(Feng$Meta**)_s");
             else write("(($Object*)_s)->$meta");
@@ -2825,6 +2882,15 @@ public class CGenerator implements Generator {
             if (r.get().isKind(PHANTOM)) {
                 return write(o).write(" = ").castRef(v, t);
             }
+            // sync var field: spinlock-protected store (lock lives in field)
+            if (t.markSync() && o instanceof FieldOperand fo) {
+                write("Feng$store_sl((void**)&");
+                write(o);
+                write(", (void*)(");
+                write(v);
+                write("))");
+                return this;
+            }
             // strong ref: cleanup old value before assignment
             if (t instanceof ArrayTypeDeclarer atd) {
                 // array SRef: use typed temp + array cleanup
@@ -2838,7 +2904,7 @@ public class CGenerator implements Generator {
                 // simple pointer: use void* temp + generic cleanup
                 write(o).write(" = ({ void* _t = (void*)(");
                 castRef(v, t);
-                write("); Feng$cleanup_sref(&");
+                write("); ").write(cleanupSrefFn(t)).write("(&");
                 write(o);
                 write("); _t; })");
             }

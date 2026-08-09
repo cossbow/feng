@@ -27,15 +27,19 @@ typedef double   Float64;
 typedef bool     Bool;
 
 // ===== reference counting allocation =====
+// refcnt is plain int — Linux-kernel style:
+//   - sync types:  atomic ops via (atomic_int*)&refcnt cast
+//   - non-sync:    plain ++/-- access
 typedef struct Feng$Header {
-    atomic_int refcnt;
+    _Alignas(max_align_t)
+    int refcnt;
 } Feng$Header;
 
 static inline void* Feng$alloc(int64_t size) {
     void* p = malloc(sizeof(Feng$Header) + size);
     if (!p) abort();
     Feng$Header* fh = (Feng$Header*) p;
-    atomic_init(&fh->refcnt, 1);
+    fh->refcnt = 1;
     void* o = ((uint8_t*) p) + sizeof(Feng$Header);
     memset(o, 0, size);
     return o;
@@ -50,10 +54,11 @@ static inline void Feng$free(void* p) {
     free(Feng$headerOf(p));
 }
 
+// atomic inc/dec — cast plain int* to atomic_int* (Linux kernel style)
 static inline void* Feng$inc(void* p) {
     if (!p) return p;
-    Feng$Header* fh = Feng$headerOf(p);
-    int ref = atomic_fetch_add(&fh->refcnt, 1);
+    int* prc = &Feng$headerOf(p)->refcnt;
+    int ref = atomic_fetch_add((atomic_int*)prc, 1);
     if (ref < 1) abort();
     return p;
 }
@@ -61,8 +66,24 @@ static inline void* Feng$inc(void* p) {
 // return true if refcnt reaches 0 (caller should release)
 static inline bool Feng$dec(void* p) {
     if (!p) return false;
-    Feng$Header* fh = Feng$headerOf(p);
-    int ref = atomic_fetch_sub(&fh->refcnt, 1) - 1;
+    int* prc = &Feng$headerOf(p)->refcnt;
+    int ref = atomic_fetch_sub((atomic_int*)prc, 1) - 1;
+    if (ref == 0) return true;
+    if (ref < 0) abort();
+    return false;
+}
+
+// ===== non-atomic reference counting (non-sync types, single-threaded) =====
+static inline void* Feng$inc_ns(void* p) {
+    if (!p) return p;
+    int ref = ++Feng$headerOf(p)->refcnt;
+    if (ref <= 1) abort();
+    return p;
+}
+
+static inline bool Feng$dec_ns(void* p) {
+    if (!p) return false;
+    int ref = --Feng$headerOf(p)->refcnt;
     if (ref == 0) return true;
     if (ref < 0) abort();
     return false;
@@ -111,6 +132,76 @@ static inline Float64 Feng$fastPowF(Float64 a, Int64 b) {
 static inline void Feng$cleanup_sref(void* p) {
     void** pp = (void**) p;
     if (*pp && Feng$dec(*pp)) Feng$free(*pp);
+}
+
+// non-atomic cleanup for non-sync types
+static inline void Feng$cleanup_sref_ns(void* p) {
+    void** pp = (void**) p;
+    if (*pp && Feng$dec_ns(*pp)) Feng$free(*pp);
+}
+
+// ===== sync field spinlock (bit 0 of the pointer itself) =====
+// malloc-aligned pointers have bit 0 == 0 — we steal it as a spinlock.
+// This saves the 8-byte overhead of a separate atomic_flag per field
+// (C++ std::atomic<shared_ptr> style).  CAS on the full uintptr_t
+// ensures lock acquisition and pointer load/stores are atomic.
+//
+// bit 0 == 1 → locked;  ptr = raw & ~(uintptr_t)1
+
+// Spinlock-protected load for sync var-field reads.
+//   p = obj->field;  →  p = Feng$load_sl(&obj->field);
+static inline void* Feng$load_sl(void** f) {
+    uintptr_t raw, locked;
+    do {
+        raw = atomic_load((atomic_uintptr_t*)f);
+        while (raw & 1) {
+            raw = atomic_load((atomic_uintptr_t*)f);
+        }
+        locked = raw | 1;
+    } while (!atomic_compare_exchange_weak((atomic_uintptr_t*)f, &raw, locked));
+    // lock acquired; read ptr & inc refcnt
+    void* p = (void*)(raw & ~(uintptr_t)1);
+    if (p) {
+        int* prc = &Feng$headerOf(p)->refcnt;
+        atomic_fetch_add((atomic_int*)prc, 1);
+    }
+    // unlock — restore original raw value (bit 0 clear again)
+    atomic_store((atomic_uintptr_t*)f, raw);
+    return p;
+}
+
+// Spinlock-protected store for sync var-field assignment.
+//   obj->field = src;  →  Feng$store_sl(&obj->field, src);
+static inline void Feng$store_sl(void** f, void* src) {
+    uintptr_t raw, locked;
+    do {
+        raw = atomic_load((atomic_uintptr_t*)f);
+        while (raw & 1) {
+            raw = atomic_load((atomic_uintptr_t*)f);
+        }
+        locked = raw | 1;
+    } while (!atomic_compare_exchange_weak((atomic_uintptr_t*)f, &raw, locked));
+    // lock acquired
+    void* old = (void*)(raw & ~(uintptr_t)1);
+    // inc src
+    if (src) {
+        int* prc = &Feng$headerOf(src)->refcnt;
+        atomic_fetch_add((atomic_int*)prc, 1);
+    }
+    // dec old & free if zero
+    if (old && Feng$dec(old)) Feng$free(old);
+    // store & unlock in one atomic write (bit 0 always 0 for stored src)
+    atomic_store((atomic_uintptr_t*)f, (uintptr_t)src);
+}
+
+// cleanup for sync var fields — for destructors only (refcnt==0, exclusive).
+// The pointer may have bit 0 set by a racing load/store interrupted
+// by the final dec reaching 0, so mask it defensively.
+static inline void Feng$cleanup_sfield(void** f) {
+    uintptr_t raw = atomic_load((atomic_uintptr_t*)f);
+    void* p = (void*)(raw & ~(uintptr_t)1);
+    if (p && Feng$dec(p)) Feng$free(p);
+    *f = NULL;
 }
 
 // ===== phantom array reference =====
@@ -213,9 +304,6 @@ static inline void $Exception$trace(void* self, Uint64 fn, Uint32 line) {
 }
 
 // ===== runtime checks =====
-// Note: Feng$required and Feng$checkIndex are kept as macros so that
-// the caller site's __LINE__ and label address can be captured.
-// They should be called with (ptr, &&_feng_fn_label, __LINE__) from generated code.
 static inline void Feng$required(void* p, Uint64 fn, Uint32 line) {
     if (!p) Feng$throwNullPointer(fn, line);
 }
