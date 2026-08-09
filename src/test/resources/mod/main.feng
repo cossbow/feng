@@ -58,6 +58,6 @@ func test(n int) {
     a$make(n);
 }
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     test(5);
 }

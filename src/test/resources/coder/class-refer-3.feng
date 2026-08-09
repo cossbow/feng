@@ -7,7 +7,7 @@ class B {
 }
 func makeA(n int) *?A {
     if (n<1) return nil;
-    var a = new(A, {n=new([4]*B)});
+    var a = new(A, {n=new([4]*?B)});
     for(var i=0; i<n && i<4; i+=1) {
         var n = makeB(n-1);
         if (n==nil) continue;
@@ -17,7 +17,7 @@ func makeA(n int) *?A {
 }
 func makeB(n int) *?B {
     if (n<1) return nil;
-    var a = new(B, {n=new([3]*A)});
+    var a = new(B, {n=new([3]*?A)});
     for(var i=0; i<3; i+=1) {
         var n = makeA(n-1);
         if(n==nil)continue;
@@ -31,7 +31,7 @@ func test(n int) {
     var r = a.n[0];
 }
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     test(2);
     test(3);
 }

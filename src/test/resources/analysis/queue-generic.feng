@@ -65,6 +65,6 @@ func test(n int) int {
 
 
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     test(15);
 }

@@ -165,7 +165,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
             super(pos, name, type);
         }
 
-        public boolean unmodifiable() {
+        public boolean immutable() {
             return true;
         }
 

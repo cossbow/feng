@@ -16,15 +16,17 @@ class A {
 }
 
 func test(n int) {
-    var a [4]*A;
+    var a [4]*?A;
     for (var i=0;i < a.length; i+=1) {
         const x = a[i];
     }
     for (v,i:a) {
-        const x &A = v;
+        if (v!=nil){
+            const x &A = v;
+        }
     }
 
-    var b= new([n]*A);
+    var b= new([n]*?A);
     for (var i=0;i < b.length; i+=1) {
         const x = b[i];
     }
@@ -34,6 +36,6 @@ func test(n int) {
 }
 
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     test(15);
 }

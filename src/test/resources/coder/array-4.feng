@@ -1,16 +1,16 @@
 
 class A { var id int; }
 func array1() {
-    var ar1 = new([8][3][*][2]A);
-    var ar2 = new([8][3][*][*][2]A);
-    var ar3 = new([8][*][5][*][2]A);
-    var ar4 = new([8][*][5][*][2]*A);
+    var ar1 = new([8][3][*?][2]A);
+    var ar2 = new([8][3][*?][*?][2]A);
+    var ar3 = new([8][*?][5][*?][2]A);
+    var ar4 = new([8][*?][5][*?][2]*?A);
 }
 
 func test(n int) {
     array1();
 }
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     test(5);
 }

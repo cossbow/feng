@@ -13,7 +13,7 @@ func test(n int) {
     new(A).run();
 }
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     test(5);
 }
 

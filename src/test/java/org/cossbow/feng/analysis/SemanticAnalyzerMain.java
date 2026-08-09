@@ -8,7 +8,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
-public class SemanticAnalysisMain {
+public class SemanticAnalyzerMain {
 
     static Source doParse(String filename) {
         try (var is = new FileInputStream(filename)) {

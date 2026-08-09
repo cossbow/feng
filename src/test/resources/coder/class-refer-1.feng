@@ -8,7 +8,7 @@ interface I {
 }
 class A (I) {
     var id int;
-    var n *A;
+    var n *?A;
     var s S;
     func run() {
     }
@@ -73,6 +73,6 @@ func test(n int) {
 }
 
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     test(1);
 }

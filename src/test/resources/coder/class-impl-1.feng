@@ -16,6 +16,6 @@ func test(n int) {
 }
 
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     test(1);
 }

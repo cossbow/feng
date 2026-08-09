@@ -8,7 +8,7 @@ func intEq(a,b &#m$Node`int,int`) bool {
 }
 func use`T`(f func(T)) {}
 func fff(i int) {}
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     var hashing = m$Hashing`int,int` {
         hash=intHash, equal=intEq
     };

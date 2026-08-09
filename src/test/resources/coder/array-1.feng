@@ -24,7 +24,7 @@ func array1() {
         ar2[0].run();
     }
     {
-        var ar2 [2]*A = [new(A, aa[0])];
+        var ar2 [2]*A = [new(A, aa[0]), new(A, aa[0])];
         ar2[0].run();
     }
     {
@@ -46,11 +46,11 @@ func array2() {
         pa.run();
     }
     {
-        var aa [2]*A = [new(A)];
+        var aa [2]*A = [new(A), new(A)];
         aa[0].run();
     }
     {
-        var aa [2][*]A = [new([4]A, [{id=321}])];
+        var aa [2][*]A = [new([4]A, [{id=321}]), new([4]A, [{id=321}])];
         aa[0][0].run();
     }
 }
@@ -69,6 +69,6 @@ func test(n int) {
     array3();
 }
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     test(5);
 }

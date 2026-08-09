@@ -23,6 +23,6 @@ func test(n int) {
     b.run(); // C.run
 }
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     test(15);
 }

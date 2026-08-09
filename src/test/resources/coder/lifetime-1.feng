@@ -1,7 +1,7 @@
 
 class A {
     var id int;
-    var n *A;
+    var n *?A;
     var cb func();
     func run() {
         id = 0;
@@ -35,13 +35,13 @@ func testArr(n int) {
     {
         var a0 [2]*int = [new(int,n+1),new(int,n+2)];
         var a1 [2]A = [{id=n,n=new(A)}];
-        var a2 [2]*A = [new(A,{id=n,n=new(A)})];
+        var a2 [2]*A = [new(A,{id=n,n=new(A)}), new(A,{id=n,n=new(A)})];
     }
     {
-        var a0 [*]*int = new([6]*int, [new(int,n+1),new(int,n+2)] );
+        var a0 [*]*?int = new([6]*?int, [new(int,n+1),new(int,n+2)] );
         var a1 [*]A = new([3]A, [{id=n,n=new(A)}] );
-        var a2 [*]*A = new([3]*A, [new(A,{id=n,n=new(A)})] );
-        var a3 [*][2]*A = new([3][2]*A, [[new(A,{id=n,n=new(A)})]] );
+        var a2 [*]*?A = new([3]*?A, [new(A,{id=n,n=new(A)})] );
+        var a3 [*][2]*?A = new([3][2]*?A, [[new(A,{id=n,n=new(A)})]] );
     }
     {
         var a1 = {
@@ -50,7 +50,7 @@ func testArr(n int) {
             a
         };
         var a2 = {
-            [2]*A[new(A)]
+            [2]*A[new(A), new(A)]
         };
     }
 }
@@ -94,6 +94,6 @@ func test(n int) {
 }
 
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     test(5);
 }

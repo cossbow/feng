@@ -176,7 +176,7 @@ public class EnumDefinition extends TypeDefinition {
             this.enablePhantom = enablePhantom;
         }
 
-        public boolean unmodifiable() {
+        public boolean immutable() {
             return true;
         }
 

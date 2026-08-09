@@ -2554,6 +2554,88 @@ func test2(a [*?]byte) {
 }
 ```
 
+##### Non-null Reference Initialization
+
+Important! This is a critical rule for non-null references:
+The default value for references is `nil`, and obviously a non-null reference cannot be
+its default value, so a non-null value must be explicitly specified to initialize it.
+
+1. This rule applies to classes, tuples, and fixed-length arrays.
+2. Since initialization must be explicit, and the length of variable-length arrays
+   is unknown and cannot be properly initialized, variable-length arrays cannot have
+   non-null element types.
+
+For a variable:
+
+```feng
+func test(i *?int) {
+   // var a *int;          // ✖: must be initialized
+   // var b *int = i;      // ✖: must be initialized with non-null value
+   var c *int = new(int);  // ✓
+}
+```
+
+Since class fields can be references, if a class has a non-null reference field,
+that class must explicitly initialize it. If a value-type field's defining class
+has non-null reference fields, those must also be initialized.
+For example:
+
+```feng
+class A {
+   var i *int;
+}
+func test1() {
+   // var a A;                 // ✖: A has non-null field i, must be initialized
+   // var b A = {};           // ✖: must set non-null field i to non-null value
+   var c A = {i=new(int)};    // ✓
+}
+class B {
+   var a A;
+}
+func test2() {
+   // var a B;                   // ✖: field a's type has non-null field i, must init
+   // var b B = {};              // ✖: same reason as above
+   // var c B = {a={}};          // ✖: same reason as above
+   var d B = {a={i=new(int)}};   // ✓
+}
+```
+
+Fixed-length arrays must fully initialize all elements when the element type
+contains non-null references:
+
+```feng
+func test1(r *int) {
+   // var a [2]*int;          // ✖: not initialized
+   // var b [2]*int = [r];    // ✖: not fully initialized
+   var c [2]*int = [r,r];     // ✓
+}
+```
+
+Tuples are similar:
+
+```feng
+func test1(r *int, s *bool) {
+   // var a (*int,*bool);           // ✖: not initialized
+   // var b (*int,*bool) = (r);     // ✖: not fully initialized
+   var c (*int,*bool) = (r,s);      // ✓
+}
+```
+
+Note! The above has examples of nested class initialization, but classes,
+fixed-length arrays, and tuples can be arbitrarily nested. Here is a simple example:
+
+```feng
+class A {
+   var i *int;
+}
+func test1(r *int) {
+   // var a (*int, [1]A);              // ✖: not initialized
+   // var b (*int, [1]A) = (r,[]);     // ✖: not fully initialized
+   // var c (*int, [1]A) = (r,[{}]);   // ✖: still not fully initialized
+   var d (*int, [1]A) = (r,[{i=r}]);   // ✓
+}
+```
+
 ##### Unmodifiable Reference
 
 References can be marked as unmodifiable (with a `#` symbol), indicating that instances cannot be modified

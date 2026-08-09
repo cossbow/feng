@@ -72,7 +72,7 @@ func test(n int) {
     {
         var a = alloc`*int`(new(int, n+13));
         i = *a[0];
-        var b = new([13]*int, a);
+        var b = new([13]*?int, a);
     }
     {
         var a = make`int`(n+111);
@@ -111,13 +111,13 @@ func test(n int) {
         a[0] = new(SealedBox`Box`int``, {v={v=1}});
     }
     {
-        var d1 = new(Disk`[4]Box`*int``, {
+        var d1 = new(Disk`[4]Box`*?int``, {
             d=[{
                 v=new(int,n)
             }]
         });
-        var d2 = new(Disk`[4]Box`*int``);
-        var d3 = new(Disk`[*]Box`*int``);
+        var d2 = new(Disk`[4]Box`*?int``);
+        var d3 = new(Disk`[*]Box`*?int``);
     }
 
 }

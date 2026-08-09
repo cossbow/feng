@@ -526,6 +526,17 @@ public class SemanticAnalyzer {
                     td.pos());
     }
 
+    private void illegalArrayType(ArrayTypeDeclarer td) {
+        // Variable-length array cannot have non-null element type,
+        // because runtime zero-initialization would produce nil elements.
+        var et = td.element();
+        if (requiredInit(et)) {
+            semantic("variable-length array can't have " +
+                            "non-null element '%s': %s",
+                    et, et.pos());
+        }
+    }
+
     private ArrayTypeDeclarer analyse(ArrayTypeDeclarer td) {
         td.element(analyse(td.element()));
         if (td.length().has()) {
@@ -535,6 +546,7 @@ public class SemanticAnalyzer {
             td.len(g.a().value().longValue());
         } else {
             analyse(td.refer().must());
+            illegalArrayType(td);
         }
         return td;
     }
@@ -1317,14 +1329,15 @@ public class SemanticAnalyzer {
         } else if (prot.parameterSet().size() == 1) {
             var p = prot.parameterSet().fixed(0);
             if (p.type() instanceof ArrayTypeDeclarer at &&
-                    at.refer().match(r -> r.isKind(PHANTOM) && r.required() && r.unmodifiable())
+                    at.refer().match(r -> r.isKind(PHANTOM) &&
+                            r.required() && r.unmodifiable())
                     && at.element() instanceof ArrayTypeDeclarer et &&
-                    et.refer().match(r -> r.required() && r.unmodifiable()) &&
+                    et.refer().match(Refer::unmodifiable) &&
                     et.element() instanceof PrimitiveTypeDeclarer pt &&
                     pt.primitive() == Primitive.BYTE) {
                 //
             } else {
-                semantic("func main required parameter type as '[&!#][*!#]byte': %s", p.pos());
+                semantic("func main required parameter type as '[&!#][*?#]byte': %s", p.pos());
                 return;
             }
         }
@@ -1536,7 +1549,7 @@ public class SemanticAnalyzer {
         var fr = f.type().maybeRefer();
         if (fr.none()) return enablePhantom(lr, e.subject());
 
-        if (f.unmodifiable())
+        if (f.immutable())
             return enablePhantom(lr, e.subject());
         return semantic("can't convert var-refer-field to phantom-refer: %s", e.pos());
     }
@@ -1740,6 +1753,33 @@ public class SemanticAnalyzer {
                 r, l, e.pos());
     }
 
+    /**
+     * Recursively check whether a type contains a non-null (required) reference.
+     * Used to determine if an array/tuple element or class field needs mandatory
+     * non-null initialization.
+     * <p>
+     * Recurse into array elements, tuple elements, and class/struct fields.
+     */
+    private boolean requiredInit(TypeDeclarer td) {
+        var ref = td.maybeRefer();
+        if (ref.has()) return ref.get().required();
+
+        // Value type: check nested structure
+        return switch (td) {
+            case ArrayTypeDeclarer atd -> requiredInit(atd.element());
+            case TupleTypeDeclarer ttd -> ttd.elements().stream()
+                    .anyMatch(this::requiredInit);
+            case DerivedTypeDeclarer dtd -> {
+                if (dtd.def() instanceof ClassDefinition cd) {
+                    yield cd.allFields().stream().anyMatch(f ->
+                            requiredInit(dtd.gm().mapIf(f.type())));
+                }
+                yield false;
+            }
+            default -> false;
+        };
+    }
+
     private boolean isByteArray(ArrayTypeDeclarer la) {
         return la.element() instanceof PrimitiveTypeDeclarer lp
                 && lp.primitive() == Primitive.BYTE;
@@ -1934,10 +1974,6 @@ public class SemanticAnalyzer {
                 try {
                     if (la.element().equals(ra.element())) {
                         return TypeValid.ok();
-                    }
-                    if (la.element() instanceof DerivedTypeDeclarer ldt &&
-                            ra.element() instanceof DerivedTypeDeclarer rdt) {
-                        return assignable(ldt, rdt, e);
                     }
                 } finally {
                     typeNest -= 2;
@@ -2239,9 +2275,8 @@ public class SemanticAnalyzer {
                 semantic("const must init: %s", v.pos());
             }
             var t = v.type().must();
-            var or = t.maybeRefer();
-            if (or.match(Refer::required)) {
-                error("required refer must be init: %s", v.pos());
+            if (requiredInit(t)) {
+                semantic("required initialize: %s", v.pos());
             }
         } else {
             initVar(v);
@@ -3093,7 +3128,7 @@ public class SemanticAnalyzer {
         var r = e.resultType.must().maybeRefer();
         if (r.has()) return r.get().unmodifiable();
         if (e.field().must() instanceof ClassField cf) {
-            if (cf.unmodifiable()) return true;
+            if (cf.immutable()) return true;
         }
         return unmodifiable(e.subject(), left);
     }
@@ -3262,7 +3297,7 @@ public class SemanticAnalyzer {
         var f = of.get();
         if (f instanceof ClassField cf) {
             checkExport(cf, cf.master(), name);
-            if (cf.unmodifiable())
+            if (cf.immutable())
                 return semantic("unmodifiable field: %s", name.pos());
         }
         checkOptional(sg.a());
@@ -3293,7 +3328,7 @@ public class SemanticAnalyzer {
             var of = enterClass.allFields().tryGet(s.name());
             if (of.has()) {
                 var f = of.get();
-                if (f.unmodifiable())
+                if (f.immutable())
                     return semantic("unmodifiable field '%s': %s", f, s.pos());
                 if (enterMethod.unmodifiable())
                     return semantic("in unmodifiable method '%s': %s",
@@ -4481,7 +4516,8 @@ public class SemanticAnalyzer {
         nt.length(lg.a());
 
         var ref = new Refer(nt.pos(), STRONG, true, false);
-        var td = ArrayTypeDeclarer.make(nt.element(), Optional.of(ref), e.pos());
+        var td = ArrayTypeDeclarer.make(nt.element(), Optional.of(ref), nt.pos());
+        illegalArrayType(td);
         if (e.arg().none()) {
             return Groups.g2(e, td);
         }
@@ -4702,6 +4738,13 @@ public class SemanticAnalyzer {
             var v = e.elements().get(td.len().intValue());
             return semantic("excess elements in array initializer: %s", v.pos());
         }
+
+        // Check non-null element initialization requirements
+        if (requiredInit(td.element()) && e.size() < td.len()) {
+            return semantic("non-null element array requires full initialization (expected %d, got %d): %s",
+                    td.len(), e.size(), e.pos());
+        }
+
         if (e.isEmpty()) return Groups.g2(e, td);
 
         var es = e.elements();
@@ -4746,8 +4789,16 @@ public class SemanticAnalyzer {
         }
         for (var f : fields) {
             if (oe.entries().exists(f.name())) continue;
-            if (!f.unmodifiable()) continue;
-            return semantic("const field '%s' must init: %s", f.name(), oe.pos());
+            if (f.immutable()) {
+                error("const field '%s' must init: %s",
+                        f.name(), oe.pos());
+            } else {
+                var ft = dtd.gm().mapIf(f.type());
+                if (requiredInit(ft)) {
+                    error("non-null field '%s' must be init: %s",
+                            f.name(), oe.pos());
+                }
+            }
         }
         var entries = new IdentifierMap<Expression>(oe.entries().size());
         for (var n : oe.entries().nodes()) {

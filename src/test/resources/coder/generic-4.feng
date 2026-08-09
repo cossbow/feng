@@ -19,6 +19,6 @@ func test(n int) {
     var v = c.getV();
 }
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     test(1);
 }

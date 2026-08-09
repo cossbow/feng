@@ -301,7 +301,7 @@ public class CGenerator implements Generator {
         if (!(st instanceof DerivedTypeDeclarer dtd)
                 || !(dtd.def() instanceof ClassDefinition cd)) return false;
         var cf = cd.allFields().tryGet(e.member());
-        return cf.has() && !cf.get().unmodifiable();
+        return cf.has() && !cf.get().immutable();
     }
 
     /**
@@ -334,7 +334,7 @@ public class CGenerator implements Generator {
                 var ft = cf.type();
                 var fr = ft.maybeRefer();
                 if (fr.none() || !fr.get().isKind(STRONG)) continue;
-                if (ft.markSync() && !cf.unmodifiable()) {
+                if (ft.markSync() && !cf.immutable()) {
                     // sync var field → Feng$cleanup_sfield (no lock needed at destruction)
                     write("Feng$cleanup_sfield((void**)&(*p)->").write(cf.name()).write(")").endStmt();
                 } else {
@@ -378,7 +378,7 @@ public class CGenerator implements Generator {
                 var ft = resolveFromMap(cf.type(), buildTypeMap(cd.generic(), dt.generic()));
                 var fr = ft.maybeRefer();
                 if (fr.none() || !fr.get().isKind(STRONG)) continue;
-                if (ft.markSync() && !cf.unmodifiable()) {
+                if (ft.markSync() && !cf.immutable()) {
                     write("Feng$cleanup_sfield((void**)&(*p)->").write(cf.name()).write(")").endStmt();
                 } else {
                     var fck = fieldCleanupFn(ft);
@@ -557,7 +557,7 @@ public class CGenerator implements Generator {
                     var ft = cf.type();
                     var fr = ft.maybeRefer();
                     if (fr.none() || !fr.get().isKind(STRONG)) continue;
-                    if (ft.markSync() && !cf.unmodifiable()) {
+                    if (ft.markSync() && !cf.immutable()) {
                         write("Feng$cleanup_sfield((void**)&").write(lv).write(".")
                                 .write(cf.name()).write(")").endStmt();
                     } else {

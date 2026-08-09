@@ -7,7 +7,7 @@ class Result`V` final {
 class Node`K, V` final {
     var key K;
     var value V;
-    var next *Node`K, V`;
+    var next *?Node`K, V`;
 }
 
 class HashMap`K, V` {
@@ -19,12 +19,12 @@ class HashMap`K, V` {
     func rehash() [*]*?Node`K, V` {
         var bucks = buckets;
         if (bucks == nil) {
-            bucks = new([16]*Node`K, V`);
+            bucks = new([16]*?Node`K, V`);
         } else if (size < threshold) {
             return bucks;
         } else {
             var cap = bucks.length << 1;
-            var newBuck = new([cap]*Node`K, V`);
+            var newBuck = new([cap]*?Node`K, V`);
             for (var i=0; i<bucks.length; i += 1) {
                 var cur = bucks[i];
                 for (cur != nil) {
@@ -108,6 +108,6 @@ func test(n int) {
     if (var r=map.get(101); r.ok){}
 }
 
-func main(args [&#][*#]byte) {
+func main() {
     test(15);
 }

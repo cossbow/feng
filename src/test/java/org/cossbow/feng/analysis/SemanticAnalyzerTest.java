@@ -411,8 +411,8 @@ public class SemanticAnalyzerTest {
 
     @Test
     public void testClassField5() {
-        checkSucc("class A { var ch [*]A; func f() { ch = new([4]A); } }");
-        checkSucc("class A { var ch [*]*A; func f() { ch = new([4]*A); } }");
+        checkSucc("class A { var ch [*?]A; func f() { ch = new([4]A); } }");
+        checkSucc("class A { var ch [*?]*?A; func f() { ch = new([4]*?A); } }");
     }
 
     @Test
@@ -663,9 +663,9 @@ public class SemanticAnalyzerTest {
         checkSucc("func f(a [*]int, i int){ a[i] = 1;}");
         checkFail("func f(a [*]int, i int){ a[i] = false;}");
 
-        checkSucc("func f(i,j int, a [*][*]int){ a[i][j] = 1;}");
-        checkSucc("func f(i,j int, a [*#][*]int){ a[i][j] = 1;}");
-        checkFail("func f(i,j int, a [*][*#]int){ a[i][j] = 1;}");
+        checkSucc("func f(i,j int, a [4][*]int){ a[i][j] = 1;}");
+        checkSucc("func f(i,j int, a [4][*]int){ a[i][j] = 1;}");
+        checkFail("func f(i,j int, a [4][*#]int){ a[i][j] = 1;}");
     }
 
     @Test
@@ -674,11 +674,11 @@ public class SemanticAnalyzerTest {
         checkFail("func f(i *#int){ *i = 0;}");
 
         var d = "class A{var id int; var p *A; var c *#A;} ";
-        checkSucc(d + "func f(i *A){ *i = {id=0};}");
-        checkFail(d + "func f(i *#A){ *i = {id=0};}");
-        checkSucc(d + "func f(i *A){ *i.p = {id=0};}");
-        checkSucc(d + "func f(i *#A){ *i.p = {id=0};}");
-        checkFail(d + "func f(i *A){ *i.c = {id=0};}");
+        checkSucc(d + "func f(i *A){ *i = {id=0,p=i,c=i};}");
+        checkFail(d + "func f(i *#A){ *i = {id=0,p=i,c=i};}");
+        checkSucc(d + "func f(i *A){ *i.p = {id=0,p=i,c=i};}");
+        checkSucc(d + "func f(i *#A, j *A){ *i.p = {id=0,p=j,c=i};}");
+        checkFail(d + "func f(i *A){ *i.c = {id=0,p=i,c=i};}");
 
         checkSucc("func f(a,b *int)int{return *a+*a;}");
         checkSucc("func f(a,b *int)int{return *a-*a;}");
@@ -708,13 +708,13 @@ public class SemanticAnalyzerTest {
         checkSucc(d + "func f(a [*]A) { a[0].id = 1; }");
         checkFail(d + "func f(a [*#]A) { a[0].id = 1; }");
 
-        checkSucc(d + "func f(a [*]*A) { a[0].id = 1; }");
-        checkSucc(d + "func f(a [*#]*A) { a[0].id = 1; }");
+        checkSucc(d + "func f(a [2]*A) { a[0].id = 1; }");
+        checkSucc(d + "func f(a [2]*A) { a[0].id = 1; }");
 
-        checkSucc(d + "func f(b [*]*B) { b[0].a1.id = 1; }");
-        checkFail(d + "func f(b [*]*B) { b[0].a2.id = 1; }");
-        checkSucc(d + "func f(b [*#]*B) { b[0].a1.id = 1; }");
-        checkSucc(d + "func f(b [*]*#B) { b[0].a1.id = 1; }");
+        checkSucc(d + "func f(b [2]*B) { b[0].a1.id = 1; }");
+        checkFail(d + "func f(b [2]*B) { b[0].a2.id = 1; }");
+        checkSucc(d + "func f(b [2]*B) { b[0].a1.id = 1; }");
+        checkSucc(d + "func f(b [2]*#B) { b[0].a1.id = 1; }");
 
         checkSucc(d + "func f3(c *#C) {c.b.a1.id=1;}");
     }
@@ -1188,7 +1188,7 @@ public class SemanticAnalyzerTest {
         checkSucc(d + "func f(s int){var v = new([s]A);}");
         checkSucc(d + "func f(s int){var v = new([s]E);}");
         checkSucc(d + "func f(s int){var v = new([s]C);}");
-        checkSucc(d + "func f(s int){var v = new([s]*I);}");
+        checkSucc(d + "func f(s int){var v = new([s]*?I);}");
         checkFail(d + "func f(s int){var v = new([s]I);}");
     }
 
@@ -1208,13 +1208,13 @@ public class SemanticAnalyzerTest {
 
     @Test
     public void testNewExpression3() {
-        checkSucc("func f(){var b=new([2][*]int);}");
-        checkFail("func f(){var b=new([2][&]int);}");
-        checkSucc("func f(){var b=new([2][3][*]int);}");
-        checkFail("func f(){var b=new([2][3][&]int);}");
+        checkSucc("func f(){var b=new([2][*?]int);}");
+        checkFail("func f(){var b=new([2][&?]int);}");
+        checkSucc("func f(){var b=new([2][3][*?]int);}");
+        checkFail("func f(){var b=new([2][3][&?]int);}");
         checkSucc("func f(){var b=new([2][*?]int, [nil]);}");
         checkFail("func f(){var b=new([2][*?]int, [1]);}");
-        checkSucc("func f(a [*][*]int){var b=new([2][*]int, a);}");
+        checkSucc("func f(a [*][*?]int){var b=new([2][*?]int, a);}");
         checkSucc("func f(a [*][3]int){var b=new([2][3]int, a);}");
         checkSucc("func f(a [*]int){var b=new([2]int, a);}");
         checkSucc("func f(a [2]int){var b=new([2]int, a);}");
@@ -1226,9 +1226,9 @@ public class SemanticAnalyzerTest {
         checkSucc(d + "func f(){var b=new([2]C,[{s=1}]);}");
         checkSucc(d + "func f(a C){var b=new([2]C,[a]);}");
         checkFail(d + "func f(a *C){var b=new([2]C,[a]);}");
-        checkSucc(d + "func f(a *C){var b=new([2]*C,[a]);}");
+        checkSucc(d + "func f(a *C){var b=new([2]*?C,[a]);}");
         checkFail(d + "func f(a &C){var b=new([2]C,[a]);}");
-        checkFail(d + "func f(){var b=new([2]&C);}");
+        checkFail(d + "func f(){var b=new([2]&?C);}");
     }
 
     @Test
@@ -1906,14 +1906,14 @@ public class SemanticAnalyzerTest {
     }
 
     @Test
-    public void testRequire7() {
+    public void testRequired7() {
         var d = "class A { var id int; var n *?A; } ";
         checkSucc(d + "func f(a *?A){for(var n=a;n!=nil;n=n.n){}}");
         checkSucc(d + "func f(a *?A){for(var n=a;n!=nil;n=n.n){n.id=0;}}");
     }
 
     @Test
-    public void testRequire8() {
+    public void testRequired8() {
         checkSucc("func f(a*int,b*?int){var r*?int=a; *r=0; }");
         checkFail("func f(a*int,b*?int){var r*?int=b; *r=0; }");
         checkFail("func f(a*int,b*?int){var r*?int=a; r=b; *r=0; }");
@@ -1926,11 +1926,247 @@ public class SemanticAnalyzerTest {
 
     }
 
+    @Test
+    public void testRequired9(){
+        checkSucc("func f() { var a [1]*int = [new(int)]; }");
+        checkFail("func f() { var a = new([2]*int); }");
+        checkFail("func f(a [*]*int) { }");
+    }
+
+    // === Init check: non-null ref fields/elements must be initialized ===
+    // ---- Class field init ----
+
+    @Test
+    public void testFieldInitNonNullRequired() {
+        // ✗ non-null ref field missing
+        checkFail("class A{ var id *int; } func f(){ var a A = {}; }");
+        // ✓ non-null ref field initialized
+        checkSucc("class A{ var id *int; } func f(){ var a A = {id=new(int)}; }");
+    }
+
+    @Test
+    public void testFieldInitNullableOptional() {
+        // ✓ nullable ref field can be omitted
+        checkSucc("class A{ var id *?int; } func f(){ var a A = {}; }");
+        // ✓ nullable field explicitly set to nil
+        checkSucc("class A{ var id *?int; } func f(){ var a A = {id=nil}; }");
+    }
+
+    @Test
+    public void testFieldInitNonNullWithNil() {
+        // ✗ non-null ref field with nil - caught by checkRequired in assignable
+        checkFail("class A{ var id *int; } func f(){ var a A = {id=nil}; }");
+    }
+
+    @Test
+    public void testFieldInitNonNullAndConst() {
+        // ✗ non-null const field missing
+        checkFail("class A{ const id *int; } func f(){ var a A = {}; }");
+        // ✓ non-null const field initialized
+        checkSucc("class A{ const id *int; } func f(){ var a A = {id=new(int)}; }");
+    }
+
+    @Test
+    public void testFieldInitMultipleFields() {
+        var def = "class A{ var id *int; var name *?int; const age int; } ";
+        // ✗ multiple required fields missing (id and age)
+        checkFail(def + "func f(){ var a A = {}; }");
+        // ✗ partial init (age missing)
+        checkFail(def + "func f(){ var a A = {id=new(int)}; }");
+        // ✓ all required fields initialized
+        checkSucc(def + "func f(){ var a A = {id=new(int),age=18}; }");
+        // ✓ nullable name also provided
+        checkSucc(def + "func f(){ var a A = {id=new(int),name=nil,age=18}; }");
+    }
+
+    @Test
+    public void testFieldInitValueTypeWithNonNullInside() {
+        // Value-type field containing non-null refs (e.g. array)
+        // ✗ [3]*int field missing — value type but contains non-null refs
+        checkFail("class A{ var arr [3]*int; } func f(){ var a A = {}; }");
+        // ✓ [3]*int field fully initialized
+        checkSucc("class A{ var arr [3]*int; } " +
+                "func f(){ var a A = {arr=[new(int),new(int),new(int)]}; }");
+        // ✓ [3]int field missing — pure value type, no refs, allowed
+        checkSucc("class A{ var arr [3]int; } func f(){ var a A = {}; }");
+    }
+
+    @Test
+    public void testFieldInitInherited() {
+        var def = "class Base { var id *int; } ";
+        // ✗ subclass creates object without inherited non-null field
+        checkFail(def + "class Sub:Base{} func f(){ var s Sub = {}; }");
+        // ✓ subclass inherits and initializes non-null field
+        checkSucc(def + "class Sub:Base{} func f(){ var s Sub = {id=new(int)}; }");
+    }
+
+    @Test
+    public void testFieldInitNullableRefToNonNull() {
+        var def = "class A{ var id *int; } ";
+        // ✓ nullable ref after nil-check can be used in non-null context
+        checkSucc(def + "func f(p *?A){ if(p!=nil){ var a A = {id=new(int)}; } }");
+    }
+
+    // ---- Fixed-length array element init ----
+
+    @Test
+    public void testFixedArrayNonNullFullInit() {
+        // ✓ fixed array, non-null elements, fully initialized
+        checkSucc("func f(){ var a [3]*int = [new(int),new(int),new(int)]; }");
+    }
+
+    @Test
+    public void testFixedArrayNonNullPartialInit() {
+        // ✗ fixed array, non-null elements, not fully initialized (1 of 3)
+        checkFail("func f(){ var a [3]*int = [new(int)]; }");
+        // ✗ fixed array, non-null elements, none provided
+        checkFail("func f(){ var a [3]*int = []; }");
+    }
+
+    @Test
+    public void testFixedArrayNullablePartialInit() {
+        // ✓ fixed array, nullable elements, partial init allowed
+        checkSucc("func f(){ var a [3]*?int = [new(int)]; }");
+        // ✓ fixed array, nullable elements, no init
+        checkSucc("func f(){ var a [3]*?int = []; }");
+    }
+
+    @Test
+    public void testFixedArrayPrimitivePartialInit() {
+        // ✓ fixed array, primitive type, partial init allowed
+        checkSucc("func f(){ var a [5]int = [1,2]; }");
+        checkSucc("func f(){ var a [5]bool = [true]; }");
+    }
+
+    @Test
+    public void testFixedArrayClassNonNullFullAndPartial() {
+        var def = "class Car{ var id *int; } ";
+        // ✓ fixed array, non-null class ref elements, fully initialized
+        checkSucc(def + "func f(){ var a [2]*Car = " +
+                "[new(Car,{id=new(int)}),new(Car,{id=new(int)})]; }");
+        // ✗ fixed array, non-null class ref elements, partial init
+        checkFail(def + "func f(){ var a [2]*Car = [new(Car,{id=new(int)})]; }");
+    }
+
+    @Test
+    public void testFixedArrayClassNullablePartialInit() {
+        var def = "class Car{ var id int; } ";
+        // ✓ fixed array, nullable class ref elements, partial init
+        checkSucc(def + "func f(){ var a [2]*?Car = [new(Car,{id=1})]; }");
+    }
+
+    // ---- Multi-dimensional array ----
+
+    @Test
+    public void testMultiDimArrayFullInit() {
+        // ✓ multi-dim array fully initialized
+        checkSucc("func f(){ var a [2][3]*int = [" +
+                "[new(int),new(int),new(int)]," +
+                "[new(int),new(int),new(int)]" +
+                "]; }");
+    }
+
+    @Test
+    public void testMultiDimArrayOuterPartialInit() {
+        // ✗ multi-dim array, outer not fully initialized (1 of 2 inner arrays)
+        checkFail("func f(){ var a [2][3]*int = [" +
+                "[new(int),new(int),new(int)]" +
+                "]; }");
+    }
+
+    @Test
+    public void testMultiDimArrayInnerPartialInit() {
+        // ✗ multi-dim array, inner not fully initialized (first inner [3]*int has only 1)
+        checkFail("func f(){ var a [2][3]*int = [" +
+                "[new(int)]," +
+                "[new(int),new(int),new(int)]" +
+                "]; }");
+    }
+
+    @Test
+    public void testMultiDimArrayInnerNullOk() {
+        // ✓ inner element is nullable, partial init ok
+        checkSucc("func f(){ var a [2][3]*?int = [" +
+                "[new(int)]," +
+                "[new(int),new(int)]" +
+                "]; }");
+    }
+
+    @Test
+    public void testMultiDimArrayPrimitive() {
+        // ✓ multi-dim primitive array, outer partial init ok
+        checkSucc("func f(){ var a [2][3]int = [[1,2]]; }");
+    }
+
+    // ---- Array + tuple nesting ----
+
+    @Test
+    public void testArrayOfTupleNonNullFullInit() {
+        // ✓ array of tuple with non-null ref, fully initialized
+        checkSucc("func f(){ var a [2](*int,bool) = " +
+                "[(new(int),true),(new(int),false)]; }");
+    }
+
+    @Test
+    public void testArrayOfTupleNonNullPartialInit() {
+        // ✗ array of tuple with non-null ref, partial init
+        checkFail("func f(){ var a [2](*int,bool) = [(new(int),true)]; }");
+    }
+
+    @Test
+    public void testArrayOfTupleAllNullable() {
+        // ✓ array of tuple, no non-null refs, partial init ok
+        checkSucc("func f(){ var a [2](*?int,bool) = [(new(int),true)]; }");
+    }
+
+    @Test
+    public void testTupleWithArrayNonNullFullInit() {
+        // ✓ typed array var initialized first, then used in tuple
+        checkSucc("func f(){ " +
+                "var arr [3]*int = [new(int),new(int),new(int)];" +
+                "var t = (arr, true); }");
+    }
+
+    @Test
+    public void testTupleWithArrayNonNullPartialInit() {
+        // ✗ fixed non-null array partial init
+        checkFail("func f(){ var arr [3]*int = [new(int)]; }");
+    }
+
+    // ---- Deep nesting ----
+
+    @Test
+    public void testDeepNestNonNullFullInit() {
+        // ✓ deep nest: array -> tuple -> array -> non-null ref, fully init
+        checkSucc("func f(){ var a [2]([2]*int,bool) = [" +
+                "([new(int),new(int)],true)," +
+                "([new(int),new(int)],false)" +
+                "]; }");
+    }
+
+    @Test
+    public void testDeepNestOuterPartialInit() {
+        // ✗ deep nest, outer partially init
+        checkFail("func f(){ var a [2]([2]*int,bool) = [" +
+                "([new(int),new(int)],true)" +
+                "]; }");
+    }
+
+    @Test
+    public void testDeepNestInnerPartialInit() {
+        // ✗ deep nest, inner [2]*int partially init
+        checkFail("func f(){ var a [2]([2]*int,bool) = [" +
+                "([new(int)],true)," +
+                "([new(int),new(int)],false)" +
+                "]; }");
+    }
+
+
     //
 
     @Test
     public void testPhantom1() {
-        var d = "class A{var n *A;} ";
+        var d = "class A{var n *?A;} ";
         checkSucc(d + "func f(){ var a A; const r &A = a; }");
         checkSucc(d + "func f(a *A){ const r &A = a; }");
         checkSucc(d + "func f(a &A){ const r &A = a; }");
@@ -2110,9 +2346,9 @@ public class SemanticAnalyzerTest {
     @Test
     public void testPhantomInherit6() {
         var d = "interface I{} class A(I){} class B:A{} class R{const b *B;}";
-        checkSucc(d + "func f(c func(a &B)) { var r R;c(r.b); }");
-        checkSucc(d + "func f(c func(a &A)) { var r R;c(r.b); }");
-        checkSucc(d + "func f(c func(a &I)) { var r R;c(r.b); }");
+        checkSucc(d + "func f(c func(a &B)) { var r R = {b=new(B)}; c(r.b); }");
+        checkSucc(d + "func f(c func(a &A)) { var r R = {b=new(B)}; c(r.b); }");
+        checkSucc(d + "func f(c func(a &I)) { var r R = {b=new(B)}; c(r.b); }");
 
         checkSucc(d + "func f(c func(a &B), r *R) { c(r.b); }");
         checkSucc(d + "func f(c func(a &A), r *R) { c(r.b); }");
@@ -2181,8 +2417,8 @@ public class SemanticAnalyzerTest {
     public void testPhantomArray3() {
         var d = "class T{} struct R{} ";
         String[] elements = {"int", "[3]int",
-                "T", "*T", "[3]T", "[*]T", "[5]*T", "[*]*T",
-                "R", "*R", "[3]R", "[*]R", "[5]*R", "[*]*R"};
+                "T", "*?T", "[3]T", "[*?]T", "[5]*?T", "[*?]*?T",
+                "R", "*?R", "[3]R", "[*?]R", "[5]*?R", "[*?]*?R"};
         for (var e : elements) {
             checkSucc(d + "func m(){ var v [2]%s; const r [&]%s = v; }".formatted(e, e));
             checkFail(d + "func m(){ const v [2]%s; const r [&]%s = v; }".formatted(e, e));
@@ -2194,8 +2430,8 @@ public class SemanticAnalyzerTest {
     @Test
     public void testPhantomArray4() {
         var d = "class C{var id int;} struct S{head [4]int;}";
-        String[] elements = {"int", "[3]int", "*int", "S", "[1]S", "[*]S",
-                "C", "*C", "[3]C", "[*]C", "[5]*C", "[*]*C"};
+        String[] elements = {"int", "[3]int", "*?int", "S", "[1]S", "[*?]S",
+                "C", "*?C", "[3]C", "[*?]C", "[5]*?C", "[*?]*?C"};
         for (var e : elements) {
             checkSucc(d + "class T{var f [3]%s;} func m(t *T){ const r [&]%s = t.f; }".formatted(e, e));
             checkFail(d + "class T{const f [3]%s;} func m(t *T){ const r [&]%s = t.f; }".formatted(e, e));
@@ -2329,7 +2565,7 @@ public class SemanticAnalyzerTest {
         checkFail(d + "func f(a [s1]int){ var b [s3]int = a; }");
         checkFail(d + "func f(a [s1]int){ var b [s2]int = a; }");
         checkSucc(d + "func f(){var a=new([s1]int);}");
-        checkSucc(d + "func f(){var a=new([s1]*int);}");
+        checkSucc(d + "func f(){var a=new([s1]*?int);}");
 
         checkFail(d + "func f(a [*]int){var b [s1]int = a;}");
         checkFail(d + "func f(a [s1]int){var b [*]int = a;}");
@@ -2348,7 +2584,7 @@ public class SemanticAnalyzerTest {
         checkFail(d + "func f(s [*]*A){var r [*]*I = s;}");
         checkFail(d + "func f(s [&]*A){var r [&]*I = s;}");
 
-        checkSucc(d + "func f(s [&]*A){var r [3]*I; r[2] = s[0];}");
+        checkSucc(d + "func f(s [&]*?A){var r [3]*?I; r[2] = s[0];}");
     }
 
     @Test
@@ -2371,11 +2607,11 @@ public class SemanticAnalyzerTest {
         checkSucc(d + "func f(){var a [2]F = [f]; }");
         checkSucc(d + "func f(){var a [2]func() = [f]; }");
 
-        checkSucc(d + "func f(){var a [2]*int = [new(int)]; }");
-        checkSucc(d + "func f(){var a [2]*C = [new(C)]; }");
-        checkSucc(d + "func f(){var a [2]*P = [new(C)]; }");
-        checkSucc(d + "func f(){var a [2]*I = [new(C)]; }");
-        checkSucc(d + "func f(){var a [2]*S = [new(S)]; }");
+        checkFail(d + "func f(){var a [2]*int = [new(int)]; }");
+        checkFail(d + "func f(){var a [2]*C = [new(C)]; }");
+        checkFail(d + "func f(){var a [2]*P = [new(C)]; }");
+        checkFail(d + "func f(){var a [2]*I = [new(C)]; }");
+        checkFail(d + "func f(){var a [2]*S = [new(S)]; }");
 
         checkFail(d + "func f(a [*]func()*C){var v [*]func()*P = a;}");
     }
@@ -2423,7 +2659,7 @@ public class SemanticAnalyzerTest {
 
     @Test
     public void testDeclareMultiArray3() {
-        checkSucc("func t(v [*]int) { var a [2][*]int = [v]; }");
+        checkFail("func t(v [*]int) { var a [2][*]int = [v]; }");
         checkFail("func t(v [4]int) { var a [2][*]int = [v]; }");
         checkFail("func t(v [4]int) { var a [*][4]int = [v]; }");
         checkSucc("func t(v [4]int) { var a [*][4]int = new([6][4]int, [v]); }");
@@ -2810,8 +3046,8 @@ public class SemanticAnalyzerTest {
 
     @Test
     public void testMappable5() {
-        checkSucc("func f(a [*]*int){var v [*]*int = a;}");
-        checkFail("func f(a [*]*int){var v [*]*int8 = a;}");
+        checkSucc("func f(a [*]*?int){var v [*]*?int = a;}");
+        checkFail("func f(a [*]*?int){var v [*]*?int8 = a;}");
         var d = "struct S{} interface I{} class C{} enum E{T,} func F=(); ";
         checkFail(d + "func f(a [*]S){var v [*]*int = a;}");
         checkFail(d + "func f(a [*]*S){var v [*]*int = a;}");

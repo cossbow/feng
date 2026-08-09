@@ -52,7 +52,7 @@ public class ClassField extends Field {
     }
 
     @Override
-    public boolean unmodifiable() {
+    public boolean immutable() {
         return declare == Declare.CONST;
     }
 
