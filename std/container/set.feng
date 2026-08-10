@@ -20,7 +20,9 @@ class HashSet`T` {
 // ===== factory functions =====
 
 export func newSet`T`(hashing func(T) int) *HashSet`T` {
-    return new(HashSet`T`, {hashing=hashing});
+    var s = new(HashSet`T`, {hashing=hashing, buckets=new([16]*?SetNode`T`)});
+    s.threshold = int(float32(16) * 0.75);
+    return s;
 }
 
 export func setFromArray`T`(src [&#]T, hashing func(T) int) *HashSet`T` {
@@ -39,26 +41,23 @@ func setIndexOfKey`T`(s *HashSet`T`, key T) int {
 }
 
 func setRehash`T`(s *HashSet`T`) {
-    if (s.buckets == nil) {
-        s.buckets = new([16]*SetNode`T`);
-    } else if (s.size < s.threshold) {
+    if (s.size < s.threshold) {
         return;
-    } else {
-        var cap = s.buckets.length << 1;
-        var newBuck = new([cap]*SetNode`T`);
-        for (var i = 0; i < s.buckets.length; i += 1) {
-            var cur = s.buckets[i];
-            for (cur != nil) {
-                var next = cur.next;
-                var h = s.hashing(cur.key);
-                var idx = h & (cap - 1);
-                cur.next = newBuck[idx];
-                newBuck[idx] = cur;
-                cur = next;
-            }
-        }
-        s.buckets = newBuck;
     }
+    var cap = s.buckets.length << 1;
+    var newBuck = new([cap]*?SetNode`T`);
+    for (var i = 0; i < s.buckets.length; i += 1) {
+        var cur = s.buckets[i];
+        for (cur != nil) {
+            var next = cur.next;
+            var h = s.hashing(cur.key);
+            var idx = h & (cap - 1);
+            cur.next = newBuck[idx];
+            newBuck[idx] = cur;
+            cur = next;
+        }
+    }
+    s.buckets = newBuck;
     s.threshold = int(float32(s.buckets.length) * 0.75);
 }
 
@@ -80,9 +79,6 @@ export func setAdd`T`(s *HashSet`T`, key T) bool {
 }
 
 export func setContains`T`(s *HashSet`T`, key T) bool {
-    if (s.buckets == nil) {
-        return false;
-    }
     var idx = setIndexOfKey`T`(s, key);
     var cur = s.buckets[idx];
     for (cur != nil) {
@@ -95,9 +91,6 @@ export func setContains`T`(s *HashSet`T`, key T) bool {
 }
 
 export func setRemove`T`(s *HashSet`T`, key T) bool {
-    if (s.buckets == nil) {
-        return false;
-    }
     var idx = setIndexOfKey`T`(s, key);
     var cur = s.buckets[idx];
     var prev *?SetNode`T` = nil;
@@ -128,18 +121,15 @@ export func setIsEmpty`T`(s *HashSet`T`) bool {
 }
 
 export func setClear`T`(s *HashSet`T`) {
-    s.buckets = new([0]*?SetNode`T`);
+    s.buckets = new([16]*?SetNode`T`);
     s.size = 0;
-    s.threshold = 0;
+    s.threshold = int(float32(16) * 0.75);
 }
 
 // ===== bulk =====
 
 export func setToList`T`(s *HashSet`T`) *Vector`T` {
     var list = newVector`T`();
-    if (s.buckets == nil) {
-        return list;
-    }
     for (var i = 0; i < s.buckets.length; i += 1) {
         var cur = s.buckets[i];
         for (cur != nil) {

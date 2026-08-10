@@ -11,4 +11,5 @@ export
 interface Map`K, V` {
     set(key K, value V) Result`V`;
     get#(key K) Result`V`;
+    remove(key K) Result`V`;
 }

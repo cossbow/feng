@@ -16,7 +16,8 @@ export func hexEncodeTo(dst [&]byte, src [&#]byte) int {
 }
 
 export func hexEncode(src [&#]byte) [*]byte {
-    var dst = new([src.length * 2]byte);
+    var dstSize = src.length * 2;
+    var dst = new([dstSize]byte);
     hexEncodeTo(dst, src);
     return dst;
 }
@@ -54,7 +55,8 @@ export func hexDecode(src [&#]byte) ([*?]byte, bool) {
     if (src.length % 2 != 0) {
         return (nil, false);
     }
-    var dst = new([src.length / 2]byte);
+    var dstSize = src.length / 2;
+    var dst = new([dstSize]byte);
     var r = hexDecodeTo(dst, src);
     if (!r.1) {
         return (nil, false);

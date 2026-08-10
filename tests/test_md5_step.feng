@@ -1,6 +1,6 @@
 import std$encoding;
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     // MD5("") padding block -> X[0]=128, rest=0
     var block [64]byte;
     block[0] = 128;

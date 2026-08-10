@@ -4,7 +4,7 @@ import std$encoding;
 
 const K0 uint32 = 3614090360;
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     // Build MD5("") padding block: just byte 0x80 = 128
     var w [4]byte;
     w[0] = 128; w[1] = 0; w[2] = 0; w[3] = 0;

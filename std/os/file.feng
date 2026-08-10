@@ -67,7 +67,8 @@ func file(fp uint64) *File {
 //
 
 func toCStr(s [&#]byte) [*]byte {
-    var buf = new([s.length + 1]byte);
+    var bufSize = s.length + 1;
+    var buf = new([bufSize]byte);
     for (var i = 0; i < s.length; i += 1) {
         buf[i] = s[i];
     }

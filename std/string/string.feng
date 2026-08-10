@@ -225,7 +225,8 @@ class String (Writable) {
             }
         }
         // Build result
-        var result = new([count + 1]String);
+        var resultSize = count + 1;
+        var result = new([resultSize]String);
         var idx = 0;
         var start = 0;
         pos = 0;

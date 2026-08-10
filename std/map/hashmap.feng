@@ -97,10 +97,45 @@ class HashMap`K, V` (Map`K, V`) {
         if (cur == nil) return {};
         return {ok=true, v=cur.value};
     }
+
+    export
+    func remove(key K) Result`V` {
+        var bk = buckets;
+        if (bk == nil) {
+            return {};
+        }
+        var kn Node`K,V` = {key=key};
+        var idx = hashing.hash(kn)&(bk.length-1);
+        var cur = bk[idx];
+        var prev *?Node`K,V` = nil;
+        for (cur != nil) {
+            if (hashing.equal(cur, kn)) {
+                if (prev == nil) {
+                    bk[idx] = cur.next;
+                } else {
+                    prev.next = cur.next;
+                }
+                size -= 1;
+                return {ok=true, v=cur.value};
+            }
+            prev = cur;
+            cur = cur.next;
+        }
+        return {};
+    }
+
+    export func nodeCount() int {
+        return size;
+    }
+
+    export func clear() {
+        buckets = nil;
+        size = 0;
+        threshold = 0;
+    }
 }
 
 export
 func newHashmap`K,V`(hashing Hashing`K,V`) *Map`K,V` {
     return new(HashMap`K,V`, {hashing=hashing});
 }
-

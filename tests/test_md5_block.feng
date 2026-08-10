@@ -18,7 +18,7 @@ const S [64]int = [
     6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21,
 ];
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     var block [64]byte;
     block[0] = 128;
 

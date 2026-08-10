@@ -5,7 +5,7 @@
 
 export
 class BitSet {
-    var bits [*]int;   // word array, each int holds 32 bits
+    var bits [*]int;    // word array, each int holds 32 bits
     var length int;     // total bit capacity
 
     // ===== set =====
@@ -80,9 +80,6 @@ class BitSet {
 
     // Count of set bits (popcount).
     export func count() int {
-        if (bits == nil) {
-            return 0;
-        }
         var total = 0;
         var wordCount = bits.length;
         for (var i = 0; i < wordCount; i += 1) {
@@ -109,11 +106,9 @@ class BitSet {
 
     // Reset all bits to 0.
     export func clearAll() {
-        if (bits != nil) {
-            var wordCount = bits.length;
-            for (var i = 0; i < wordCount; i += 1) {
-                bits[i] = 0;
-            }
+        var wordCount = bits.length;
+        for (var i = 0; i < wordCount; i += 1) {
+            bits[i] = 0;
         }
     }
 
@@ -122,9 +117,6 @@ class BitSet {
     // this = this & other
     export func and(other *?BitSet) {
         if (other == nil) {
-            return;
-        }
-        if (bits == nil) {
             return;
         }
         var minWords = bits.length;
@@ -144,7 +136,7 @@ class BitSet {
         if (other == nil) {
             return;
         }
-        if (other.bits == nil) {
+        if (other.bits.length == 0) {
             return;
         }
         // Expand if needed
@@ -153,10 +145,8 @@ class BitSet {
             var newLen = otherBits;
             var wordCount = newLen / 32;
             var newBits = new([wordCount]int);
-            if (bits != nil) {
-                for (var i = 0; i < bits.length; i += 1) {
-                    newBits[i] = bits[i];
-                }
+            for (var i = 0; i < bits.length; i += 1) {
+                newBits[i] = bits[i];
             }
             bits = newBits;
             length = newLen;
@@ -172,7 +162,7 @@ class BitSet {
         if (other == nil) {
             return;
         }
-        if (other.bits == nil) {
+        if (other.bits.length == 0) {
             return;
         }
         var otherBits = other.length;
@@ -180,10 +170,8 @@ class BitSet {
             var newLen = otherBits;
             var wordCount = newLen / 32;
             var newBits = new([wordCount]int);
-            if (bits != nil) {
-                for (var i = 0; i < bits.length; i += 1) {
-                    newBits[i] = bits[i];
-                }
+            for (var i = 0; i < bits.length; i += 1) {
+                newBits[i] = bits[i];
             }
             bits = newBits;
             length = newLen;
@@ -195,13 +183,7 @@ class BitSet {
     }
 
     // this = this & !other
-    export func andNot(other *?BitSet) {
-        if (other == nil) {
-            return;
-        }
-        if (bits == nil) {
-            return;
-        }
+    export func andNot(other &BitSet) {
         var minWords = bits.length;
         if (other.bits.length < minWords) {
             minWords = other.bits.length;
@@ -215,11 +197,11 @@ class BitSet {
 // ===== factory functions =====
 
 export func newBitSet() *BitSet {
-    return new(BitSet);
+    return new(BitSet, {bits=new([0]int)});
 }
 
 export func newBitSetCap(nbits int) *BitSet {
-    var bs = new(BitSet);
+    var bs = new(BitSet, {bits=new([0]int)});
     if (nbits > 0) {
         bs.set(nbits - 1);
         bs.clear(nbits - 1);

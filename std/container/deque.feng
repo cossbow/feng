@@ -13,18 +13,18 @@ class Deque`T` {
 // ===== factory functions =====
 
 export func newDeque`T`() *Deque`T` {
-    return new(Deque`T`);
+    var d = new(Deque`T`);
+    d.buf = new([8]T);
+    return d;
 }
 
 export func newDequeCap`T`(cap int) *Deque`T` {
     var d = new(Deque`T`);
-    if (cap > 0) {
-        var initCap = 8;
-        if (cap > initCap) {
-            initCap = cap;
-        }
-        d.buf = new([initCap]T);
+    var initCap = 8;
+    if (cap > initCap) {
+        initCap = cap;
     }
+    d.buf = new([initCap]T);
     return d;
 }
 
@@ -38,12 +38,6 @@ func decIndex`T`(d *Deque`T`, i int) int {
 }
 
 func ensureCap`T`(d *Deque`T`) {
-    if (d.buf == nil) {
-        d.buf = new([8]T);
-        d.head = 0;
-        d.tail = 0;
-        return;
-    }
     if (d.size < d.buf.length) {
         return;
     }

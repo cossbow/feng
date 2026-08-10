@@ -7,7 +7,7 @@ class StringBuilder (Writer) {
     var len int;
 
     func ensureCapacity(need int) {
-        if (buf == nil) {
+        if (buf.length == 0) {
             var cap = need < 16 ? 16 : need;
             buf = new([cap]byte);
             return;
@@ -132,7 +132,7 @@ class StringBuilder (Writer) {
 
 export
 func newBuilder() StringBuilder {
-    return {};
+    return {buf=new([0]byte)};
 }
 
 export

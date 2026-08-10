@@ -22,7 +22,7 @@ func md5I(x, y, z uint32) uint32 {
     return y ~ (x | (!z));
 }
 
-func main(args [&#][*#]byte) {
+func main(args [&#][*?#]byte) {
     // Test 1: leftRotate
     assert(leftRotate(1, 1) == 2);
     assert(leftRotate(2147483648, 1) == 1);  // 0x80000000 rotl 1

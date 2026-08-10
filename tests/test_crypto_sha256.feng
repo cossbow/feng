@@ -1,6 +1,8 @@
 import std$testing;
 import std$hash;
 
+// SHA-256 test vectors from FIPS 180-4
+
 @Test
 func testSha256Empty() {
     var h = hash$newSha256();
@@ -8,6 +10,7 @@ func testSha256Empty() {
     h.write(empty);
     var buf [32]byte;
     h.sum(buf);
+    // SHA256("") = e3b0c442...
     testing$assertTrue(buf[0] == 227);
     testing$assertTrue(buf[31] == 85);
 }
@@ -16,4 +19,52 @@ func testSha256Empty() {
 func testSha256Size() {
     var h = hash$newSha256();
     testing$assertTrue(h.size() == 32);
+}
+
+@Test
+func testSha256Abc() {
+    var h = hash$newSha256();
+    // "abc"
+    var data [3]byte = [97, 98, 99];
+    h.write(data);
+    var buf [32]byte;
+    h.sum(buf);
+    // SHA256("abc") = ba7816bf 8f01cfea 414140de 5dae2223 b00361a3 96177a9c b410ff61 f20015ad
+    testing$assertTrue(buf[0] == 186);   // 0xba
+    testing$assertTrue(buf[1] == 120);   // 0x78
+    testing$assertTrue(buf[30] == 21);   // 0x15
+    testing$assertTrue(buf[31] == 173);  // 0xad
+}
+
+@Test
+func testSha256Reset() {
+    var h = hash$newSha256();
+    var data [3]byte = [97, 98, 99];
+    h.write(data);
+    h.reset();
+    var buf [32]byte;
+    h.sum(buf);
+    // After reset, should produce SHA256("")
+    testing$assertTrue(buf[0] == 227);
+    testing$assertTrue(buf[31] == 85);
+}
+
+@Test
+func testSha256MultiBlock() {
+    // 128 bytes — exactly 2 blocks, triggers block() in write()
+    var h = hash$newSha256();
+    var data [*]byte = new([128]byte);
+    for (var i = 0; i < 128; i += 1) {
+        data[i] = 97;  // all 'a'
+    }
+    h.write(data);
+    var buf [32]byte;
+    var n = h.sum(buf);
+    testing$assertTrue(n == 32);
+    // Verify output is not all zeros (i.e., hash was computed)
+    var nonZero = false;
+    for (var i = 0; i < 32; i += 1) {
+        if (buf[i] != 0) { nonZero = true; }
+    }
+    testing$assertTrue(nonZero);
 }

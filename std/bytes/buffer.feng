@@ -13,7 +13,7 @@ class BufferWriter (Writer) {
     var len int;
 
     func growIfNeed(need int) {
-        if (buf==nil) {
+        if (buf.length == 0) {
             var cap = newCapacity(0, need);
             buf = new([cap]byte);
             return;
@@ -82,7 +82,7 @@ class BufferWriter (Writer) {
 
 export
 func newWriter() BufferWriter {
-    return {};
+    return {buf=new([0]byte)};
 }
 
 export
