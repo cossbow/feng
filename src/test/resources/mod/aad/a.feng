@@ -1,0 +1,6 @@
+import test$aab b;
+
+export
+class IntPair`E` : b$Pair`E,int` {
+}
+

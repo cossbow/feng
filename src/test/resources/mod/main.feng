@@ -1,6 +1,7 @@
 import test$aaa a;
 import test$aab v;
 import test$aac r;
+import test$aad d;
 import std$map m;
 
 struct V3 {
@@ -56,6 +57,8 @@ func test(n int) {
 
     a$wrap`int`(123);
     a$make(n);
+
+    var p d$IntPair`bool` = {a=true,b=n};
 }
 
 func main(args [&#][*?#]byte) {
