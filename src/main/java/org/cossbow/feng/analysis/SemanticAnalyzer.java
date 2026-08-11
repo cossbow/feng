@@ -1688,8 +1688,8 @@ public class SemanticAnalyzer {
             if (lc.isFinal()) return TypeValid.err(
                     "final-class never be inherited: %s", lc.pos());
             if (rd instanceof InterfaceDefinition) {
-                return TypeValid.err("interface never inherited class: %s",
-                        rd.pos());
+                return TypeValid.err("need cast by is-expression '%s'?('%s'): %s",
+                        rt, lt, rt.pos());
             }
             if (rd instanceof ClassDefinition rc) {
                 var ok = checkInherited(lt.derivedType(),
