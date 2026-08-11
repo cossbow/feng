@@ -379,8 +379,30 @@ var b *Device = new(Device, {});
 [Reference type variables](#reference-type-variables) are separate from
 instances; [strong references](#strong-reference-type) can only reference instances created via `new`.
 
-The parameter is optional; without it, the instance is initialized to default values. For arrays, you can pass
-an [array expression](#array-expression); for classes and structs, you can pass a [field expression](#field-expression).
+The parameter is optional; without it, the instance is initialized to default values.
+
+For classes and structs, you can pass a [field expression](#field-expression), or a
+value-type expression whose type must match the instance being created.
+
+```feng
+struct A { id int; }
+func test(a A) {
+   var x = new(A, {id=12});
+   var y = new(A, a);
+}
+```
+
+For arrays, you can pass an [array expression](#array-expression) or a
+fixed-length array. If the length of the init value exceeds the new array's
+length, it will be truncated to the actual length:
+
+```feng
+func test(a [2]int) {
+   var x = new([2]int, [1]);
+   var y = new([4]int, a);
+   var z = new([1]int, a);
+}
+```
 
 #### Array Expression
 

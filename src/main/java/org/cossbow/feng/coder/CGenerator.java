@@ -2180,6 +2180,9 @@ public class CGenerator implements Generator {
                         }
                     }
                 }
+            } else {
+                // copy the entire value (struct copy or reference copy with inc)
+                write("*_p = ").write(a).endStmt();
             }
             write("_p; })");
         }, () -> {
@@ -2211,12 +2214,13 @@ public class CGenerator implements Generator {
                     .write(t.length()).write("}; ");
 
             if (a instanceof ArrayExpression ae) {
-                // init with explicit values: assign each element with proper type conversion
+                // init with explicit values: truncate if init has more elements than array length
                 int i = 0;
                 for (var v : ae.elements()) {
+                    write("if (").write(String.valueOf(i)).write(" < _a.$length) { ");
                     write("_a.$values[").write(String.valueOf(i)).write("] = ");
                     writeValue(v, t.element());
-                    write("; ");
+                    write("; } ");
                     i++;
                 }
             } else {
