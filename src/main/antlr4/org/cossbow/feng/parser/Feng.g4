@@ -576,7 +576,6 @@ operandExpr
     | tupleExpr                 # TupleExpression
     | pairsExpr                 # PairsExpression
     | symbol typeArguments?     # SymbolExpression
-    | symbol NOT?               # MacroExpression
     | current=(THIS|SUPER)      # CurrentExpression
     | FUNC procedure            # LambdaExpression
     | '(' expression ')'        # ParenExpression
