@@ -1,16 +1,16 @@
-import std$map m;
+import std$container c;
 import std$os;
 
-func intHash(n &#m$Node`int,int`) int {
+func intHash(n &#c$Node`int,int`) int {
     return n.key;
 }
-func intEq(a,b &#m$Node`int,int`) bool {
+func intEq(a,b &#c$Node`int,int`) bool {
     return a.key == b.key;
 }
 
 
 func test(n int) {
-    var map = m$newHashmap`int,int`({
+    var map = c$newHashmap`int,int`({
         hash=intHash, equal=intEq
     });
     for(var i=0;i<n;i+=1) {

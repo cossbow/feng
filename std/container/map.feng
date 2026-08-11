@@ -1,3 +1,19 @@
+
+export
+class Result`V` final {
+    export
+    var v V;
+    export
+    var ok bool;
+}
+
+export
+interface Map`K, V` {
+    set(key K, value V) Result`V`;
+    get(key K) Result`V`;
+    remove(key K) Result`V`;
+}
+
 export
 class Node`K, V` final {
     export
@@ -12,10 +28,12 @@ class Hashing`K, V` final {
     export
     const hash func(&#Node`K, V`) int;
     export
-    const equal func(&#Node`K, V`, &#Node`K, V`) bool;
+    const equal func(a,b &#Node`K, V`) bool;
 }
 
+export
 class HashMap`K, V` (Map`K, V`) {
+    export
     const hashing Hashing`K, V`;
     var buckets [*?]*?Node`K, V`;
     var size int;
@@ -79,7 +97,7 @@ class HashMap`K, V` (Map`K, V`) {
     }
 
     export
-    func get#(key K) Result`V` {
+    func get(key K) Result`V` {
         var bk = buckets;
         if (bk == nil) {
             return {};
@@ -91,7 +109,7 @@ class HashMap`K, V` (Map`K, V`) {
             return {};
         }
 
-        for (cur != nil && hashing.equal(cur, kn)) {
+        for (cur != nil && !hashing.equal(cur, kn)) {
             cur = cur.next;
         }
         if (cur == nil) return {};
@@ -124,7 +142,7 @@ class HashMap`K, V` (Map`K, V`) {
         return {};
     }
 
-    export func nodeCount() int {
+    export func size() int {
         return size;
     }
 
@@ -132,6 +150,53 @@ class HashMap`K, V` (Map`K, V`) {
         buckets = nil;
         size = 0;
         threshold = 0;
+    }
+
+    export func iterator() *HashMapIter`K, V` {
+        return new(HashMapIter`K, V`, {bk=buckets});
+    }
+}
+
+// ===== iterator =====
+
+export
+class HashMapIter`K, V` {
+    var bk [*?]*?Node`K, V`;
+    var idx int;
+    var cur *?Node`K, V`;
+
+    func advance() {
+        var b = bk;
+        if (b == nil) { cur = nil; return; }
+        for (cur == nil && idx < b.length) {
+            cur = b[idx];
+            idx += 1;
+        }
+    }
+
+    export func hasNext() bool {
+        advance();
+        return cur != nil;
+    }
+
+    export func next() {
+        var c = cur;
+        if (c != nil) {
+            cur = c.next;
+        }
+        advance();
+    }
+
+    export func key() K {
+        var c = cur;
+        if (c == nil) throw new(NilException);
+        return c.key;
+    }
+
+    export func value() V {
+        var c = cur;
+        if (c == nil) throw new(NilException);
+        return c.value;
     }
 }
 

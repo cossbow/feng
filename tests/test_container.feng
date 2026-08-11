@@ -1,17 +1,18 @@
 import std$testing;
-import std$container;
+import std$container c;
 
 // ===== helper =====
 
-func intCmp(a, b int) int {
-    if (a < b) { return -1; }
-    if (a > b) { return 1; }
-    return 0;
+func intHash(n &#c$Node`int,c$Void`) int {
+    return n.key;
 }
-
-func intHash(v int) int {
-    return v;
+func intEq(a,b &#c$Node`int,c$Void`) bool {
+    return a.key == b.key;
 }
+const hashing c$Hashing`int,c$Void` = {
+    hash = intHash,
+    equal = intEq
+};
 
 // =====================================================
 // Vector tests
@@ -19,183 +20,183 @@ func intHash(v int) int {
 
 @Test
 func testVectorAppend() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 10);
-    container$vectorAppend`int`(v, 20);
-    container$vectorAppend`int`(v, 30);
-    testing$assertTrue(container$vectorLength`int`(v) == 3);
-    testing$assertTrue(container$vectorGet`int`(v, 0) == 10);
-    testing$assertTrue(container$vectorGet`int`(v, 1) == 20);
-    testing$assertTrue(container$vectorGet`int`(v, 2) == 30);
+    var v = c$newVector`int`();
+    v.append(10);
+    v.append(20);
+    v.append(30);
+    testing$assertTrue(v.length() == 3);
+    testing$assertTrue(v.get(0) == 10);
+    testing$assertTrue(v.get(1) == 20);
+    testing$assertTrue(v.get(2) == 30);
 }
 
 @Test
 func testVectorAppendAll() {
-    var v = container$newVector`int`();
+    var v = c$newVector`int`();
     var src [3]int = [1, 2, 3];
-    container$vectorAppendAll`int`(v, src);
-    testing$assertTrue(container$vectorLength`int`(v) == 3);
-    testing$assertTrue(container$vectorGet`int`(v, 0) == 1);
+    v.appendAll(src);
+    testing$assertTrue(v.length() == 3);
+    testing$assertTrue(v.get(0) == 1);
 }
 
 @Test
 func testVectorGetSet() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 5);
-    container$vectorSet`int`(v, 0, 99);
-    testing$assertTrue(container$vectorGet`int`(v, 0) == 99);
+    var v = c$newVector`int`();
+    v.append(5);
+    v.set(0, 99);
+    testing$assertTrue(v.get(0) == 99);
 }
 
 @Test
 func testVectorInsert() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 1);
-    container$vectorAppend`int`(v, 3);
-    container$vectorInsert`int`(v, 1, 2);
-    testing$assertTrue(container$vectorLength`int`(v) == 3);
-    testing$assertTrue(container$vectorGet`int`(v, 0) == 1);
-    testing$assertTrue(container$vectorGet`int`(v, 1) == 2);
-    testing$assertTrue(container$vectorGet`int`(v, 2) == 3);
+    var v = c$newVector`int`();
+    v.append(1);
+    v.append(3);
+    v.insert(1, 2);
+    testing$assertTrue(v.length() == 3);
+    testing$assertTrue(v.get(0) == 1);
+    testing$assertTrue(v.get(1) == 2);
+    testing$assertTrue(v.get(2) == 3);
 }
 
 @Test
 func testVectorInsertAtEnd() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 1);
-    container$vectorInsert`int`(v, 1, 2);
-    testing$assertTrue(container$vectorLength`int`(v) == 2);
-    testing$assertTrue(container$vectorGet`int`(v, 1) == 2);
+    var v = c$newVector`int`();
+    v.append(1);
+    v.insert(1, 2);
+    testing$assertTrue(v.length() == 2);
+    testing$assertTrue(v.get(1) == 2);
 }
 
 @Test
 func testVectorRemoveAt() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 1);
-    container$vectorAppend`int`(v, 2);
-    container$vectorAppend`int`(v, 3);
-    var removed = container$vectorRemoveAt`int`(v, 1);
+    var v = c$newVector`int`();
+    v.append(1);
+    v.append(2);
+    v.append(3);
+    var removed = v.removeAt(1);
     testing$assertTrue(removed == 2);
-    testing$assertTrue(container$vectorLength`int`(v) == 2);
-    testing$assertTrue(container$vectorGet`int`(v, 0) == 1);
-    testing$assertTrue(container$vectorGet`int`(v, 1) == 3);
+    testing$assertTrue(v.length() == 2);
+    testing$assertTrue(v.get(0) == 1);
+    testing$assertTrue(v.get(1) == 3);
 }
 
 @Test
 func testVectorRemoveLast() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 1);
-    container$vectorAppend`int`(v, 2);
-    var last = container$vectorRemoveLast`int`(v);
+    var v = c$newVector`int`();
+    v.append(1);
+    v.append(2);
+    var last = v.removeLast();
     testing$assertTrue(last == 2);
-    testing$assertTrue(container$vectorLength`int`(v) == 1);
-    testing$assertTrue(container$vectorGet`int`(v, 0) == 1);
+    testing$assertTrue(v.length() == 1);
+    testing$assertTrue(v.get(0) == 1);
 }
 
 @Test
 func testVectorIndexOf() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 10);
-    container$vectorAppend`int`(v, 20);
-    container$vectorAppend`int`(v, 10);
-    testing$assertTrue(container$vectorIndexOf`int`(v, 10) == 0);
-    testing$assertTrue(container$vectorIndexOf`int`(v, 20) == 1);
-    testing$assertTrue(container$vectorIndexOf`int`(v, 99) == -1);
+    var v = c$newVector`int`();
+    v.append(10);
+    v.append(20);
+    v.append(10);
+    testing$assertTrue(v.indexOf(10) == 0);
+    testing$assertTrue(v.indexOf(20) == 1);
+    testing$assertTrue(v.indexOf(99) == -1);
 }
 
 @Test
 func testVectorLastIndexOf() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 10);
-    container$vectorAppend`int`(v, 20);
-    container$vectorAppend`int`(v, 10);
-    testing$assertTrue(container$vectorLastIndexOf`int`(v, 10) == 2);
-    testing$assertTrue(container$vectorLastIndexOf`int`(v, 99) == -1);
+    var v = c$newVector`int`();
+    v.append(10);
+    v.append(20);
+    v.append(10);
+    testing$assertTrue(v.lastIndexOf(10) == 2);
+    testing$assertTrue(v.lastIndexOf(99) == -1);
 }
 
 @Test
 func testVectorContains() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 42);
-    testing$assertTrue(container$vectorContains`int`(v, 42));
-    testing$assertFalse(container$vectorContains`int`(v, 99));
+    var v = c$newVector`int`();
+    v.append(42);
+    testing$assertTrue(v.contains(42));
+    testing$assertFalse(v.contains(99));
 }
 
 @Test
 func testVectorReverse() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 1);
-    container$vectorAppend`int`(v, 2);
-    container$vectorAppend`int`(v, 3);
-    container$vectorReverse`int`(v);
-    testing$assertTrue(container$vectorGet`int`(v, 0) == 3);
-    testing$assertTrue(container$vectorGet`int`(v, 1) == 2);
-    testing$assertTrue(container$vectorGet`int`(v, 2) == 1);
+    var v = c$newVector`int`();
+    v.append(1);
+    v.append(2);
+    v.append(3);
+    v.reverse();
+    testing$assertTrue(v.get(0) == 3);
+    testing$assertTrue(v.get(1) == 2);
+    testing$assertTrue(v.get(2) == 1);
 }
 
 @Test
 func testVectorClear() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 1);
-    container$vectorAppend`int`(v, 2);
-    container$vectorClear`int`(v);
-    testing$assertTrue(container$vectorLength`int`(v) == 0);
-    testing$assertTrue(container$vectorIsEmpty`int`(v));
+    var v = c$newVector`int`();
+    v.append(1);
+    v.append(2);
+    v.clear();
+    testing$assertTrue(v.length() == 0);
+    testing$assertTrue(v.isEmpty());
 }
 
 @Test
 func testVectorTruncate() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 1);
-    container$vectorAppend`int`(v, 2);
-    container$vectorAppend`int`(v, 3);
-    container$vectorTruncate`int`(v, 1);
-    testing$assertTrue(container$vectorLength`int`(v) == 1);
-    testing$assertTrue(container$vectorGet`int`(v, 0) == 1);
+    var v = c$newVector`int`();
+    v.append(1);
+    v.append(2);
+    v.append(3);
+    v.truncate(1);
+    testing$assertTrue(v.length() == 1);
+    testing$assertTrue(v.get(0) == 1);
 }
 
 @Test
 func testVectorTruncateNoGrow() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 1);
-    container$vectorTruncate`int`(v, 5);
-    testing$assertTrue(container$vectorLength`int`(v) == 1);
+    var v = c$newVector`int`();
+    v.append(1);
+    v.truncate(5);
+    testing$assertTrue(v.length() == 1);
 }
 
 @Test
 func testVectorIsEmpty() {
-    var v = container$newVector`int`();
-    testing$assertTrue(container$vectorIsEmpty`int`(v));
-    container$vectorAppend`int`(v, 1);
-    testing$assertFalse(container$vectorIsEmpty`int`(v));
+    var v = c$newVector`int`();
+    testing$assertTrue(v.isEmpty());
+    v.append(1);
+    testing$assertFalse(v.isEmpty());
 }
 
 @Test
 func testVectorCapacity() {
-    var v = container$newVector`int`();
-    testing$assertTrue(container$vectorCapacity`int`(v) == 0);
-    container$vectorAppend`int`(v, 1);
-    testing$assertTrue(container$vectorCapacity`int`(v) >= 1);
+    var v = c$newVector`int`();
+    testing$assertTrue(v.capacity() == 0);
+    v.append(1);
+    testing$assertTrue(v.capacity() >= 1);
 }
 
 @Test
 func testVectorGrow() {
-    var v = container$newVector`int`();
+    var v = c$newVector`int`();
     for (var i = 0; i < 100; i += 1) {
-        container$vectorAppend`int`(v, i);
+        v.append(i);
     }
-    testing$assertTrue(container$vectorLength`int`(v) == 100);
-    testing$assertTrue(container$vectorGet`int`(v, 0) == 0);
-    testing$assertTrue(container$vectorGet`int`(v, 99) == 99);
+    testing$assertTrue(v.length() == 100);
+    testing$assertTrue(v.get(0) == 0);
+    testing$assertTrue(v.get(99) == 99);
 }
 
 @Test
 func testVectorCopyTo() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 1);
-    container$vectorAppend`int`(v, 2);
-    container$vectorAppend`int`(v, 3);
+    var v = c$newVector`int`();
+    v.append(1);
+    v.append(2);
+    v.append(3);
     var dst [3]int;
-    var n = container$vectorCopyTo`int`(v, dst);
+    var n = v.copyTo(dst);
     testing$assertTrue(n == 3);
     testing$assertTrue(dst[0] == 1);
     testing$assertTrue(dst[1] == 2);
@@ -204,12 +205,12 @@ func testVectorCopyTo() {
 
 @Test
 func testVectorCopyToSmall() {
-    var v = container$newVector`int`();
-    container$vectorAppend`int`(v, 1);
-    container$vectorAppend`int`(v, 2);
-    container$vectorAppend`int`(v, 3);
+    var v = c$newVector`int`();
+    v.append(1);
+    v.append(2);
+    v.append(3);
     var dst [2]int;
-    var n = container$vectorCopyTo`int`(v, dst);
+    var n = v.copyTo(dst);
     testing$assertTrue(n == 2);
     testing$assertTrue(dst[0] == 1);
     testing$assertTrue(dst[1] == 2);
@@ -218,16 +219,16 @@ func testVectorCopyToSmall() {
 @Test
 func testVectorFromArray() {
     var src [3]int = [4, 5, 6];
-    var v = container$vectorFromArray`int`(src);
-    testing$assertTrue(container$vectorLength`int`(v) == 3);
-    testing$assertTrue(container$vectorGet`int`(v, 0) == 4);
+    var v = c$vectorFromArray`int`(src);
+    testing$assertTrue(v.length() == 3);
+    testing$assertTrue(v.get(0) == 4);
 }
 
 @Test
 func testVectorNewCap() {
-    var v = container$newVectorCap`int`(32);
-    testing$assertTrue(container$vectorCapacity`int`(v) >= 32);
-    testing$assertTrue(container$vectorLength`int`(v) == 0);
+    var v = c$newVectorCap`int`(32);
+    testing$assertTrue(v.capacity() >= 32);
+    testing$assertTrue(v.length() == 0);
 }
 
 // =====================================================
@@ -236,51 +237,51 @@ func testVectorNewCap() {
 
 @Test
 func testStackPushPop() {
-    var s = container$newStack`int`();
-    container$stackPush`int`(s, 10);
-    container$stackPush`int`(s, 20);
-    container$stackPush`int`(s, 30);
-    testing$assertTrue(container$stackPop`int`(s) == 30);
-    testing$assertTrue(container$stackPop`int`(s) == 20);
-    testing$assertTrue(container$stackPop`int`(s) == 10);
-    testing$assertTrue(container$stackIsEmpty`int`(s));
+    var s = c$newStack`int`();
+    s.push(10);
+    s.push(20);
+    s.push(30);
+    testing$assertTrue(s.pop() == 30);
+    testing$assertTrue(s.pop() == 20);
+    testing$assertTrue(s.pop() == 10);
+    testing$assertTrue(s.isEmpty());
 }
 
 @Test
 func testStackPeek() {
-    var s = container$newStack`int`();
-    container$stackPush`int`(s, 42);
-    testing$assertTrue(container$stackPeek`int`(s) == 42);
-    testing$assertTrue(container$stackSize`int`(s) == 1);
+    var s = c$newStack`int`();
+    s.push(42);
+    testing$assertTrue(s.peek() == 42);
+    testing$assertTrue(s.size() == 1);
 }
 
 @Test
 func testStackSize() {
-    var s = container$newStack`int`();
-    testing$assertTrue(container$stackSize`int`(s) == 0);
-    container$stackPush`int`(s, 1);
-    container$stackPush`int`(s, 2);
-    testing$assertTrue(container$stackSize`int`(s) == 2);
-    container$stackPop`int`(s);
-    testing$assertTrue(container$stackSize`int`(s) == 1);
+    var s = c$newStack`int`();
+    testing$assertTrue(s.size() == 0);
+    s.push(1);
+    s.push(2);
+    testing$assertTrue(s.size() == 2);
+    s.pop();
+    testing$assertTrue(s.size() == 1);
 }
 
 @Test
 func testStackIsEmpty() {
-    var s = container$newStack`int`();
-    testing$assertTrue(container$stackIsEmpty`int`(s));
-    container$stackPush`int`(s, 1);
-    testing$assertFalse(container$stackIsEmpty`int`(s));
+    var s = c$newStack`int`();
+    testing$assertTrue(s.isEmpty());
+    s.push(1);
+    testing$assertFalse(s.isEmpty());
 }
 
 @Test
 func testStackClear() {
-    var s = container$newStack`int`();
-    container$stackPush`int`(s, 1);
-    container$stackPush`int`(s, 2);
-    container$stackClear`int`(s);
-    testing$assertTrue(container$stackIsEmpty`int`(s));
-    testing$assertTrue(container$stackSize`int`(s) == 0);
+    var s = c$newStack`int`();
+    s.push(1);
+    s.push(2);
+    s.clear();
+    testing$assertTrue(s.isEmpty());
+    testing$assertTrue(s.size() == 0);
 }
 
 // =====================================================
@@ -289,7 +290,7 @@ func testStackClear() {
 
 @Test
 func testBitSetSetGet() {
-    var bs = container$newBitSet();
+    var bs = c$newBitSet();
     bs.set(0);
     bs.set(5);
     bs.set(31);
@@ -302,7 +303,7 @@ func testBitSetSetGet() {
 
 @Test
 func testBitSetClear() {
-    var bs = container$newBitSet();
+    var bs = c$newBitSet();
     bs.set(10);
     testing$assertTrue(bs.get(10));
     bs.clear(10);
@@ -311,14 +312,14 @@ func testBitSetClear() {
 
 @Test
 func testBitSetClearOutOfRange() {
-    var bs = container$newBitSet();
+    var bs = c$newBitSet();
     bs.clear(100);
     testing$assertFalse(bs.get(100));
 }
 
 @Test
 func testBitSetToggle() {
-    var bs = container$newBitSet();
+    var bs = c$newBitSet();
     bs.toggle(0);
     testing$assertTrue(bs.get(0));
     bs.toggle(0);
@@ -327,7 +328,7 @@ func testBitSetToggle() {
 
 @Test
 func testBitSetAutoGrow() {
-    var bs = container$newBitSet();
+    var bs = c$newBitSet();
     bs.set(99);
     testing$assertTrue(bs.get(99));
     testing$assertTrue(bs.cap() >= 100);
@@ -335,13 +336,13 @@ func testBitSetAutoGrow() {
 
 @Test
 func testBitSetGetOutOfRange() {
-    var bs = container$newBitSet();
+    var bs = c$newBitSet();
     testing$assertFalse(bs.get(999));
 }
 
 @Test
 func testBitSetCount() {
-    var bs = container$newBitSet();
+    var bs = c$newBitSet();
     testing$assertTrue(bs.count() == 0);
     bs.set(0);
     bs.set(3);
@@ -351,7 +352,7 @@ func testBitSetCount() {
 
 @Test
 func testBitSetIsEmpty() {
-    var bs = container$newBitSet();
+    var bs = c$newBitSet();
     testing$assertTrue(bs.isEmpty());
     bs.set(0);
     testing$assertFalse(bs.isEmpty());
@@ -359,7 +360,7 @@ func testBitSetIsEmpty() {
 
 @Test
 func testBitSetClearAll() {
-    var bs = container$newBitSet();
+    var bs = c$newBitSet();
     bs.set(0);
     bs.set(5);
     bs.set(10);
@@ -371,8 +372,8 @@ func testBitSetClearAll() {
 
 @Test
 func testBitSetAnd() {
-    var a = container$newBitSet();
-    var b = container$newBitSet();
+    var a = c$newBitSet();
+    var b = c$newBitSet();
     a.set(0);
     a.set(2);
     b.set(0);
@@ -385,8 +386,8 @@ func testBitSetAnd() {
 
 @Test
 func testBitSetOr() {
-    var a = container$newBitSet();
-    var b = container$newBitSet();
+    var a = c$newBitSet();
+    var b = c$newBitSet();
     a.set(0);
     a.set(2);
     b.set(1);
@@ -400,8 +401,8 @@ func testBitSetOr() {
 
 @Test
 func testBitSetOrGrow() {
-    var a = container$newBitSet();
-    var b = container$newBitSet();
+    var a = c$newBitSet();
+    var b = c$newBitSet();
     b.set(100);
     a.or(b);
     testing$assertTrue(a.get(100));
@@ -409,8 +410,8 @@ func testBitSetOrGrow() {
 
 @Test
 func testBitSetXor() {
-    var a = container$newBitSet();
-    var b = container$newBitSet();
+    var a = c$newBitSet();
+    var b = c$newBitSet();
     a.set(0);
     a.set(1);
     b.set(1);
@@ -423,8 +424,8 @@ func testBitSetXor() {
 
 @Test
 func testBitSetAndNot() {
-    var a = container$newBitSet();
-    var b = container$newBitSet();
+    var a = c$newBitSet();
+    var b = c$newBitSet();
     a.set(0);
     a.set(1);
     b.set(1);
@@ -435,13 +436,13 @@ func testBitSetAndNot() {
 
 @Test
 func testBitSetNewCap() {
-    var bs = container$newBitSetCap(64);
+    var bs = c$newBitSetCap(64);
     testing$assertTrue(bs.cap() >= 64);
 }
 
 @Test
 func testBitSetAndNil() {
-    var bs = container$newBitSet();
+    var bs = c$newBitSet();
     bs.set(0);
     bs.and(nil);
     testing$assertTrue(bs.get(0));
@@ -453,138 +454,138 @@ func testBitSetAndNil() {
 
 @Test
 func testDequePushBackPopFront() {
-    var d = container$newDeque`int`();
-    container$dequePushBack`int`(d, 1);
-    container$dequePushBack`int`(d, 2);
-    container$dequePushBack`int`(d, 3);
-    testing$assertTrue(container$dequePopFront`int`(d) == 1);
-    testing$assertTrue(container$dequePopFront`int`(d) == 2);
-    testing$assertTrue(container$dequePopFront`int`(d) == 3);
-    testing$assertTrue(container$dequeIsEmpty`int`(d));
+    var d = c$newDeque`int`();
+    d.pushBack(1);
+    d.pushBack(2);
+    d.pushBack(3);
+    testing$assertTrue(d.popFront() == 1);
+    testing$assertTrue(d.popFront() == 2);
+    testing$assertTrue(d.popFront() == 3);
+    testing$assertTrue(d.isEmpty());
 }
 
 @Test
 func testDequePushFrontPopBack() {
-    var d = container$newDeque`int`();
-    container$dequePushFront`int`(d, 1);
-    container$dequePushFront`int`(d, 2);
-    container$dequePushFront`int`(d, 3);
-    testing$assertTrue(container$dequePopBack`int`(d) == 1);
-    testing$assertTrue(container$dequePopBack`int`(d) == 2);
-    testing$assertTrue(container$dequePopBack`int`(d) == 3);
+    var d = c$newDeque`int`();
+    d.pushFront(1);
+    d.pushFront(2);
+    d.pushFront(3);
+    testing$assertTrue(d.popBack() == 1);
+    testing$assertTrue(d.popBack() == 2);
+    testing$assertTrue(d.popBack() == 3);
 }
 
 @Test
 func testDequePushBackPopBack() {
-    var d = container$newDeque`int`();
-    container$dequePushBack`int`(d, 1);
-    container$dequePushBack`int`(d, 2);
-    testing$assertTrue(container$dequePopBack`int`(d) == 2);
-    testing$assertTrue(container$dequePopBack`int`(d) == 1);
+    var d = c$newDeque`int`();
+    d.pushBack(1);
+    d.pushBack(2);
+    testing$assertTrue(d.popBack() == 2);
+    testing$assertTrue(d.popBack() == 1);
 }
 
 @Test
 func testDequePushFrontPopFront() {
-    var d = container$newDeque`int`();
-    container$dequePushFront`int`(d, 1);
-    container$dequePushFront`int`(d, 2);
-    testing$assertTrue(container$dequePopFront`int`(d) == 2);
-    testing$assertTrue(container$dequePopFront`int`(d) == 1);
+    var d = c$newDeque`int`();
+    d.pushFront(1);
+    d.pushFront(2);
+    testing$assertTrue(d.popFront() == 2);
+    testing$assertTrue(d.popFront() == 1);
 }
 
 @Test
 func testDequePeekFront() {
-    var d = container$newDeque`int`();
-    container$dequePushBack`int`(d, 42);
-    testing$assertTrue(container$dequePeekFront`int`(d) == 42);
-    testing$assertTrue(container$dequeLength`int`(d) == 1);
+    var d = c$newDeque`int`();
+    d.pushBack(42);
+    testing$assertTrue(d.peekFront() == 42);
+    testing$assertTrue(d.length() == 1);
 }
 
 @Test
 func testDequePeekBack() {
-    var d = container$newDeque`int`();
-    container$dequePushBack`int`(d, 10);
-    container$dequePushBack`int`(d, 20);
-    testing$assertTrue(container$dequePeekBack`int`(d) == 20);
-    testing$assertTrue(container$dequeLength`int`(d) == 2);
+    var d = c$newDeque`int`();
+    d.pushBack(10);
+    d.pushBack(20);
+    testing$assertTrue(d.peekBack() == 20);
+    testing$assertTrue(d.length() == 2);
 }
 
 @Test
 func testDequeLength() {
-    var d = container$newDeque`int`();
-    testing$assertTrue(container$dequeLength`int`(d) == 0);
-    container$dequePushBack`int`(d, 1);
-    container$dequePushFront`int`(d, 2);
-    testing$assertTrue(container$dequeLength`int`(d) == 2);
-    container$dequePopFront`int`(d);
-    testing$assertTrue(container$dequeLength`int`(d) == 1);
+    var d = c$newDeque`int`();
+    testing$assertTrue(d.length() == 0);
+    d.pushBack(1);
+    d.pushFront(2);
+    testing$assertTrue(d.length() == 2);
+    d.popFront();
+    testing$assertTrue(d.length() == 1);
 }
 
 @Test
 func testDequeIsEmpty() {
-    var d = container$newDeque`int`();
-    testing$assertTrue(container$dequeIsEmpty`int`(d));
-    container$dequePushBack`int`(d, 1);
-    testing$assertFalse(container$dequeIsEmpty`int`(d));
+    var d = c$newDeque`int`();
+    testing$assertTrue(d.isEmpty());
+    d.pushBack(1);
+    testing$assertFalse(d.isEmpty());
 }
 
 @Test
 func testDequeClear() {
-    var d = container$newDeque`int`();
-    container$dequePushBack`int`(d, 1);
-    container$dequePushBack`int`(d, 2);
-    container$dequeClear`int`(d);
-    testing$assertTrue(container$dequeIsEmpty`int`(d));
-    testing$assertTrue(container$dequeLength`int`(d) == 0);
+    var d = c$newDeque`int`();
+    d.pushBack(1);
+    d.pushBack(2);
+    d.clear();
+    testing$assertTrue(d.isEmpty());
+    testing$assertTrue(d.length() == 0);
 }
 
 @Test
 func testDequeGrow() {
-    var d = container$newDeque`int`();
+    var d = c$newDeque`int`();
     for (var i = 0; i < 100; i += 1) {
-        container$dequePushBack`int`(d, i);
+        d.pushBack(i);
     }
-    testing$assertTrue(container$dequeLength`int`(d) == 100);
-    testing$assertTrue(container$dequePeekFront`int`(d) == 0);
-    testing$assertTrue(container$dequePeekBack`int`(d) == 99);
+    testing$assertTrue(d.length() == 100);
+    testing$assertTrue(d.peekFront() == 0);
+    testing$assertTrue(d.peekBack() == 99);
 }
 
 @Test
 func testDequeWrapAround() {
-    var d = container$newDeque`int`();
+    var d = c$newDeque`int`();
     for (var i = 0; i < 20; i += 1) {
-        container$dequePushBack`int`(d, i);
+        d.pushBack(i);
     }
     for (var i = 0; i < 10; i += 1) {
-        container$dequePopFront`int`(d);
+        d.popFront();
     }
     for (var i = 100; i < 110; i += 1) {
-        container$dequePushBack`int`(d, i);
+        d.pushBack(i);
     }
-    testing$assertTrue(container$dequeLength`int`(d) == 20);
-    testing$assertTrue(container$dequePeekFront`int`(d) == 10);
-    testing$assertTrue(container$dequePeekBack`int`(d) == 109);
+    testing$assertTrue(d.length() == 20);
+    testing$assertTrue(d.peekFront() == 10);
+    testing$assertTrue(d.peekBack() == 109);
 }
 
 @Test
 func testDequeMixed() {
-    var d = container$newDeque`int`();
-    container$dequePushBack`int`(d, 1);
-    container$dequePushFront`int`(d, 2);
-    container$dequePushBack`int`(d, 3);
-    container$dequePushFront`int`(d, 4);
-    testing$assertTrue(container$dequePopFront`int`(d) == 4);
-    testing$assertTrue(container$dequePopBack`int`(d) == 3);
-    testing$assertTrue(container$dequePopFront`int`(d) == 2);
-    testing$assertTrue(container$dequePopBack`int`(d) == 1);
+    var d = c$newDeque`int`();
+    d.pushBack(1);
+    d.pushFront(2);
+    d.pushBack(3);
+    d.pushFront(4);
+    testing$assertTrue(d.popFront() == 4);
+    testing$assertTrue(d.popBack() == 3);
+    testing$assertTrue(d.popFront() == 2);
+    testing$assertTrue(d.popBack() == 1);
 }
 
 @Test
 func testDequeNewCap() {
-    var d = container$newDequeCap`int`(64);
-    testing$assertTrue(container$dequeIsEmpty`int`(d));
-    container$dequePushBack`int`(d, 1);
-    testing$assertTrue(container$dequeLength`int`(d) == 1);
+    var d = c$newDequeCap`int`(64);
+    testing$assertTrue(d.isEmpty());
+    d.pushBack(1);
+    testing$assertTrue(d.length() == 1);
 }
 
 // =====================================================
@@ -593,152 +594,124 @@ func testDequeNewCap() {
 
 @Test
 func testHashSetAdd() {
-    var s = container$newSet`int`(intHash);
-    testing$assertTrue(container$setAdd`int`(s, 1));
-    testing$assertTrue(container$setAdd`int`(s, 2));
-    testing$assertFalse(container$setAdd`int`(s, 1));
-    testing$assertTrue(container$setLength`int`(s) == 2);
+    var s = c$newSet`int`(hashing);
+    testing$assertTrue(s.add(1));
+    testing$assertTrue(s.add(2));
+    testing$assertFalse(s.add(1));
+    testing$assertTrue(s.size() == 2);
 }
 
 @Test
 func testHashSetContains() {
-    var s = container$newSet`int`(intHash);
-    container$setAdd`int`(s, 10);
-    container$setAdd`int`(s, 20);
-    testing$assertTrue(container$setContains`int`(s, 10));
-    testing$assertTrue(container$setContains`int`(s, 20));
-    testing$assertFalse(container$setContains`int`(s, 30));
+    var s = c$newSet`int`(hashing);
+    s.add(10);
+    s.add(20);
+    testing$assertTrue(s.contains(10));
+    testing$assertTrue(s.contains(20));
+    testing$assertFalse(s.contains(30));
 }
 
 @Test
 func testHashSetContainsEmpty() {
-    var s = container$newSet`int`(intHash);
-    testing$assertFalse(container$setContains`int`(s, 1));
+    var s = c$newSet`int`(hashing);
+    testing$assertFalse(s.contains(1));
 }
 
 @Test
 func testHashSetRemove() {
-    var s = container$newSet`int`(intHash);
-    container$setAdd`int`(s, 1);
-    container$setAdd`int`(s, 2);
-    container$setAdd`int`(s, 3);
-    testing$assertTrue(container$setRemove`int`(s, 2));
-    testing$assertFalse(container$setRemove`int`(s, 2));
-    testing$assertTrue(container$setLength`int`(s) == 2);
-    testing$assertTrue(container$setContains`int`(s, 1));
-    testing$assertFalse(container$setContains`int`(s, 2));
-    testing$assertTrue(container$setContains`int`(s, 3));
+    var s = c$newSet`int`(hashing);
+    s.add(1);
+    s.add(2);
+    s.add(3);
+    testing$assertTrue(s.remove(2));
+    testing$assertFalse(s.remove(2));
+    testing$assertTrue(s.size() == 2);
+    testing$assertTrue(s.contains(1));
+    testing$assertFalse(s.contains(2));
+    testing$assertTrue(s.contains(3));
 }
 
 @Test
 func testHashSetRemoveHead() {
-    var s = container$newSet`int`(intHash);
-    container$setAdd`int`(s, 0);
-    container$setAdd`int`(s, 16);
-    container$setAdd`int`(s, 32);
-    testing$assertTrue(container$setRemove`int`(s, 0));
-    testing$assertFalse(container$setContains`int`(s, 0));
-    testing$assertTrue(container$setContains`int`(s, 16));
-    testing$assertTrue(container$setContains`int`(s, 32));
+    var s = c$newSet`int`(hashing);
+    s.add(0);
+    s.add(16);
+    s.add(32);
+    testing$assertTrue(s.remove(0));
+    testing$assertFalse(s.contains(0));
+    testing$assertTrue(s.contains(16));
+    testing$assertTrue(s.contains(32));
 }
 
 @Test
 func testHashSetRemoveMiddle() {
-    var s = container$newSet`int`(intHash);
-    container$setAdd`int`(s, 0);
-    container$setAdd`int`(s, 16);
-    container$setAdd`int`(s, 32);
-    testing$assertTrue(container$setRemove`int`(s, 16));
-    testing$assertTrue(container$setContains`int`(s, 0));
-    testing$assertFalse(container$setContains`int`(s, 16));
-    testing$assertTrue(container$setContains`int`(s, 32));
+    var s = c$newSet`int`(hashing);
+    s.add(0);
+    s.add(16);
+    s.add(32);
+    testing$assertTrue(s.remove(16));
+    testing$assertTrue(s.contains(0));
+    testing$assertFalse(s.contains(16));
+    testing$assertTrue(s.contains(32));
 }
 
 @Test
 func testHashSetRemoveLast() {
-    var s = container$newSet`int`(intHash);
-    container$setAdd`int`(s, 0);
-    container$setAdd`int`(s, 16);
-    container$setAdd`int`(s, 32);
-    testing$assertTrue(container$setRemove`int`(s, 32));
-    testing$assertTrue(container$setContains`int`(s, 0));
-    testing$assertTrue(container$setContains`int`(s, 16));
-    testing$assertFalse(container$setContains`int`(s, 32));
+    var s = c$newSet`int`(hashing);
+    s.add(0);
+    s.add(16);
+    s.add(32);
+    testing$assertTrue(s.remove(32));
+    testing$assertTrue(s.contains(0));
+    testing$assertTrue(s.contains(16));
+    testing$assertFalse(s.contains(32));
 }
 
 @Test
 func testHashSetRemoveFromEmpty() {
-    var s = container$newSet`int`(intHash);
-    testing$assertFalse(container$setRemove`int`(s, 1));
+    var s = c$newSet`int`(hashing);
+    testing$assertFalse(s.remove(1));
 }
 
 @Test
 func testHashSetLength() {
-    var s = container$newSet`int`(intHash);
-    testing$assertTrue(container$setLength`int`(s) == 0);
-    container$setAdd`int`(s, 1);
-    testing$assertTrue(container$setLength`int`(s) == 1);
-    container$setAdd`int`(s, 1);
-    testing$assertTrue(container$setLength`int`(s) == 1);
+    var s = c$newSet`int`(hashing);
+    testing$assertTrue(s.size() == 0);
+    s.add(1);
+    testing$assertTrue(s.size() == 1);
+    s.add(1);
+    testing$assertTrue(s.size() == 1);
 }
 
 @Test
 func testHashSetIsEmpty() {
-    var s = container$newSet`int`(intHash);
-    testing$assertTrue(container$setIsEmpty`int`(s));
-    container$setAdd`int`(s, 1);
-    testing$assertFalse(container$setIsEmpty`int`(s));
+    var s = c$newSet`int`(hashing);
+    testing$assertTrue(s.isEmpty());
+    s.add(1);
+    testing$assertFalse(s.isEmpty());
 }
 
 @Test
 func testHashSetClear() {
-    var s = container$newSet`int`(intHash);
-    container$setAdd`int`(s, 1);
-    container$setAdd`int`(s, 2);
-    container$setClear`int`(s);
-    testing$assertTrue(container$setIsEmpty`int`(s));
-    testing$assertTrue(container$setLength`int`(s) == 0);
-    testing$assertFalse(container$setContains`int`(s, 1));
+    var s = c$newSet`int`(hashing);
+    s.add(1);
+    s.add(2);
+    s.clear();
+    testing$assertTrue(s.isEmpty());
+    testing$assertTrue(s.size() == 0);
+    testing$assertFalse(s.contains(1));
 }
 
 @Test
 func testHashSetRehash() {
-    var s = container$newSet`int`(intHash);
+    var s = c$newSet`int`(hashing);
     for (var i = 0; i < 100; i += 1) {
-        container$setAdd`int`(s, i);
+        s.add(i);
     }
-    testing$assertTrue(container$setLength`int`(s) == 100);
+    testing$assertTrue(s.size() == 100);
     for (var i = 0; i < 100; i += 1) {
-        testing$assertTrue(container$setContains`int`(s, i));
+        testing$assertTrue(s.contains(i));
     }
 }
 
-@Test
-func testHashSetToList() {
-    var s = container$newSet`int`(intHash);
-    container$setAdd`int`(s, 3);
-    container$setAdd`int`(s, 1);
-    container$setAdd`int`(s, 2);
-    var list = container$setToList`int`(s);
-    testing$assertTrue(container$vectorLength`int`(list) == 3);
-    testing$assertTrue(container$vectorContains`int`(list, 1));
-    testing$assertTrue(container$vectorContains`int`(list, 2));
-    testing$assertTrue(container$vectorContains`int`(list, 3));
-}
 
-@Test
-func testHashSetToListEmpty() {
-    var s = container$newSet`int`(intHash);
-    var list = container$setToList`int`(s);
-    testing$assertTrue(container$vectorLength`int`(list) == 0);
-}
-
-@Test
-func testHashSetFromArray() {
-    var src [4]int = [4, 5, 6, 5];
-    var s = container$setFromArray`int`(src, intHash);
-    testing$assertTrue(container$setLength`int`(s) == 3);
-    testing$assertTrue(container$setContains`int`(s, 4));
-    testing$assertTrue(container$setContains`int`(s, 5));
-    testing$assertTrue(container$setContains`int`(s, 6));
-}

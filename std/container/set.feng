@@ -1,141 +1,55 @@
-// ===== HashSet`T` — hash-based set with chaining =====
-//
-// Uses standalone functions for cross-module generic instantiation.
+// ===== HashSet`T` — backed by HashMap`T, Void` =====
 
 export
-class SetNode`T` {
+struct Void {}
+
+export
+interface Set`T` {
+    add(key T) bool;
+    contains(key T) bool;
+    remove(key T) bool;
+    size() int;
+    isEmpty() bool;
+    clear();
+}
+
+export
+class HashSet`T` (Set`T`) {
+    const inner *HashMap`T,Void`;
+
     export
-    const key T;
-    var next *?SetNode`T`;
+    func add(key T) bool {
+        return inner.set(key, {}).ok;
+    }
+
+    export func contains(key T) bool {
+        return inner.get(key).ok;
+    }
+
+    export func remove(key T) bool {
+        return inner.remove(key).ok;
+    }
+
+    export func size() int { return inner.size(); }
+    export func isEmpty() bool { return size() == 0; }
+    export func clear() { inner.clear(); }
+
+    export func toList() *Vector`T` {
+        var list = newVector`T`();
+        var it = inner.iterator();
+        for (it.hasNext()) {
+            list.append(it.key());
+            it.next();
+        }
+        return list;
+    }
 }
+
+// ===== factory =====
 
 export
-class HashSet`T` {
-    const hashing func(T) int;
-    var buckets [*]*?SetNode`T`;
-    var size int;
-    var threshold int;
-}
-
-// ===== factory functions =====
-
-export func newSet`T`(hashing func(T) int) *HashSet`T` {
-    var s = new(HashSet`T`, {hashing=hashing, buckets=new([16]*?SetNode`T`)});
-    s.threshold = int(float32(16) * 0.75);
-    return s;
-}
-
-export func setFromArray`T`(src [&#]T, hashing func(T) int) *HashSet`T` {
-    var s = newSet`T`(hashing);
-    for (var i = 0; i < src.length; i += 1) {
-        setAdd`T`(s, src[i]);
-    }
-    return s;
-}
-
-// ===== helper =====
-
-func setIndexOfKey`T`(s *HashSet`T`, key T) int {
-    var h = s.hashing(key);
-    return h & (s.buckets.length - 1);
-}
-
-func setRehash`T`(s *HashSet`T`) {
-    if (s.size < s.threshold) {
-        return;
-    }
-    var cap = s.buckets.length << 1;
-    var newBuck = new([cap]*?SetNode`T`);
-    for (var i = 0; i < s.buckets.length; i += 1) {
-        var cur = s.buckets[i];
-        for (cur != nil) {
-            var next = cur.next;
-            var h = s.hashing(cur.key);
-            var idx = h & (cap - 1);
-            cur.next = newBuck[idx];
-            newBuck[idx] = cur;
-            cur = next;
-        }
-    }
-    s.buckets = newBuck;
-    s.threshold = int(float32(s.buckets.length) * 0.75);
-}
-
-// ===== core =====
-
-export func setAdd`T`(s *HashSet`T`, key T) bool {
-    setRehash`T`(s);
-    var idx = setIndexOfKey`T`(s, key);
-    for (var cur = s.buckets[idx]; cur != nil; cur = cur.next) {
-        if (cur.key == key) {
-            return false;
-        }
-    }
-    var nn = new(SetNode`T`, {key=key});
-    nn.next = s.buckets[idx];
-    s.buckets[idx] = nn;
-    s.size += 1;
-    return true;
-}
-
-export func setContains`T`(s *HashSet`T`, key T) bool {
-    var idx = setIndexOfKey`T`(s, key);
-    var cur = s.buckets[idx];
-    for (cur != nil) {
-        if (cur.key == key) {
-            return true;
-        }
-        cur = cur.next;
-    }
-    return false;
-}
-
-export func setRemove`T`(s *HashSet`T`, key T) bool {
-    var idx = setIndexOfKey`T`(s, key);
-    var cur = s.buckets[idx];
-    var prev *?SetNode`T` = nil;
-    for (cur != nil) {
-        if (cur.key == key) {
-            if (prev == nil) {
-                s.buckets[idx] = cur.next;
-            } else {
-                prev.next = cur.next;
-            }
-            s.size -= 1;
-            return true;
-        }
-        prev = cur;
-        cur = cur.next;
-    }
-    return false;
-}
-
-// ===== properties =====
-
-export func setLength`T`(s *HashSet`T`) int {
-    return s.size;
-}
-
-export func setIsEmpty`T`(s *HashSet`T`) bool {
-    return s.size == 0;
-}
-
-export func setClear`T`(s *HashSet`T`) {
-    s.buckets = new([16]*?SetNode`T`);
-    s.size = 0;
-    s.threshold = int(float32(16) * 0.75);
-}
-
-// ===== bulk =====
-
-export func setToList`T`(s *HashSet`T`) *Vector`T` {
-    var list = newVector`T`();
-    for (var i = 0; i < s.buckets.length; i += 1) {
-        var cur = s.buckets[i];
-        for (cur != nil) {
-            vectorAppend`T`(list, cur.key);
-            cur = cur.next;
-        }
-    }
-    return list;
+func newSet`T`(hashing Hashing`T,Void`) *HashSet`T` {
+    return new(HashSet`T`, {
+        inner = new(HashMap`T,Void`, {hashing=hashing})
+    });
 }

@@ -2,7 +2,7 @@ import test$aaa a;
 import test$aab v;
 import test$aac r;
 import test$aad d;
-import std$map m;
+import std$container c;
 
 struct V3 {
     arr [3]a$Bu;
@@ -23,19 +23,19 @@ func defaultHash`T`(k T) T {
     return (k);
 }
 
-func intHash(n &#m$Node`int,int`) int {
+func intHash(n &#c$Node`int,int`) int {
     return n.key;
 }
-func intEq(a,b &#m$Node`int,int`) bool {
+func intEq(a,b &#c$Node`int,int`) bool {
     return a.key==b.key;
 }
-const intHashing m$Hashing`int,int` = {
+const intHashing c$Hashing`int,int` = {
     hash=intHash,
     equal=intEq
 };
 
 func testMap(n int) {
-    var map = m$newHashmap(intHashing);
+    var map = c$newHashmap(intHashing);
     for(var i=0;i<n;i+=1) {
         map.set(i, i+100);
     }
