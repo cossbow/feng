@@ -83,6 +83,13 @@ public class Monomorphization {
         // 2. Discover concrete types inside generic function bodies
         discoverConcreteFuncBodyTypes();
 
+        // 2.5 Discover generic function instantiations from concrete class method bodies.
+        // When a generic class method (e.g. HashSet<T>.toList()) calls a generic standalone
+        // function (e.g. newVector<T>()), the call is resolved only after the class is
+        // instantiated with concrete type args. This step scans class method bodies with
+        // the resolved type map to discover those func instantiations.
+        discoverClassMethodFuncInsts();
+
         // 3. Discover generic-parent instantiations of non-generic classes
         for (var cd : ast.dagClasses) {
             if (!cd.generic().isEmpty()) continue;
@@ -996,5 +1003,53 @@ public class Monomorphization {
 
         ast.concreteFuncInsts.addAll(initial);
         ast.concreteFuncInsts.addAll(allDiscovered);
+    }
+
+    /**
+     * Discover generic function instantiations from concrete class method bodies.
+     * When a generic class method (e.g. {@code HashSet<T>.toList()}) calls a generic
+     * standalone function (e.g. {@code newVector<T>()}), the call site is discovered
+     * only when the method body is scanned with the resolved type map (T → Int).
+     * <p>
+     * Also handles transitive discovery: if a newly discovered func instantiation's
+     * body calls further generic functions, those are discovered too.
+     */
+    private void discoverClassMethodFuncInsts() {
+        var allDiscoveredFromClasses = new LinkedHashSet<FuncInstantiation>();
+
+        for (var dt : ast.concreteInstantiations) {
+            if (!(dt.def() instanceof ClassDefinition cd) || cd.generic().isEmpty()) continue;
+            if (dt.generic().isEmpty() || dt.hasTypeVar()) continue;
+            var typeParams = cd.generic();
+            var typeArgs = dt.generic();
+
+            withMono(typeParams, typeArgs, () -> {
+                for (var cm : cd.methods()) {
+                    if (!cm.generic().isEmpty()) continue;
+                    cm.procedure().use(proc -> preScanStmt(proc.body()));
+                }
+            });
+            allDiscoveredFromClasses.addAll(ast.concreteFuncInsts);
+            ast.concreteFuncInsts.clear();
+        }
+
+        if (allDiscoveredFromClasses.isEmpty()) return;
+
+        // BFS: transitively discover func instantiations from bodies of
+        // newly discovered func instantiations
+        var processed = new HashSet<FuncInstantiation>();
+        var worklist = new ArrayList<>(allDiscoveredFromClasses);
+        int i = 0;
+        while (i < worklist.size()) {
+            var fi = worklist.get(i++);
+            if (fi.args().hasTypeVar()) continue;
+            if (!processed.add(fi)) continue;
+            withMono(fi.fd().generic(), fi.args(), () -> preScanFunc(fi.fd()));
+            worklist.addAll(ast.concreteFuncInsts);
+            ast.concreteFuncInsts.clear();
+        }
+
+        ast.concreteFuncInsts.addAll(allDiscoveredFromClasses);
+        ast.concreteFuncInsts.addAll(processed);
     }
 }
