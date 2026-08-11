@@ -29,35 +29,35 @@ func sum(a, b int) int {
 }
 ```
 
-假设`printf`是module`fmt`提供的打印到终端的函数：
+假设`printf`是module`std$os`提供的打印到终端的函数：
 
 ```feng
-import fmt *;
+import std$os;
 func test() {
-    printf("%d + %d = %d \n", 1, 3, sum(1, 3));
+    os$printf("{} + {} = {} \n", 1, 3, sum(1, 3));
 }
 ```
 
 可以没有返回值的函数：
 
 ```feng
-import fmt *;
+import std$os;
 func test(a, b int) {
-    printf("%d\n", a + b);
+    os$printf("{}\n", a + b);
 }
 ```
 
 有返回值的函数：
 
 ```feng
-import fmt *;
+import std$os;
 func div(a, b int) int {
     return a / b;
 }
 func test() {
     var a, b = 1, 3;
     var s = div(a, b);
-    printf("%d / %d = %d\n", a, b, s);
+    os$printf("{} / {} = {}\n", a, b, s);
 }
 ```
 
@@ -78,20 +78,15 @@ func sample() {
 }
 ```
 
-## 模块
-
-作为代码组织单元，同一个目录下的文件都属于一个模块，且模块名与目录名相同，因此无需在文件里声明。
-不支持循环依赖，即依赖关系只能是与向无环图。
-
 ## main函数
 
 main函数是可执行程序的入口函数，这个和其他语言一致。
-入口函数没有返回值，只有一个参数且参数类型必须是`[&#][*#]byte`；
+但入口函数没有返回值和参数；
 
 ```feng
 import std$os;
 
-func main(args [&#][*#]byte) {
+func main() {
 	os$printf("Welcome to programming with Feng language");
 }
 ```
@@ -104,7 +99,7 @@ func main(args [&#][*#]byte) {
 
 ## 模块
 
-模块是代码的基本管理单元。
+作为代码组织单元，同一个目录下的文件都属于一个模块，且模块名与目录名相同，因此无需在文件里声明。主要有下面的要求：
 
 1. 模块内部的全局符号不能重用，相当于单文件内部一样。
 2. 在模块内部所有的内容都可见，跨模块只能访问导出的符号。
@@ -141,24 +136,25 @@ class Foo {
 
 ### 导入符号
 
-声明导入`com$cossbow$fmt`模块：
+声明导入`std$math`模块：
 
 ```feng
-import com$cossbow$fmt;
+import std$math;
 func test() {
-   fmt$println(string("Hello Fēng!"));
+   var s = math$sin(0.1);
 }
 ```
 
 可以设置module别名：
 
 ```feng
-import com$cossbow$fmt ccfmt;
+import std$math m;
 func test() {
-    var m Sring = ccfmt$sprintf("Hello Fēng!");
-    ccfmt$println(m);
+    var s = m$sin(0.1);
 }
 ```
+
+不支持循环导入，即依赖关系只能是有向无环图。比如：`a`模块导入了`b`模块，`b`模块也导入了`a`模块，这样是错误的，无法编译。
 
 ## 原始类型
 
@@ -277,9 +273,9 @@ func test(a,b int) {
 | !    | 按位取反 |
 | <<   | 左位移  |
 | \>\> | 右位移  |
-| &    | 位与   |
-| ~    | 位异或  |
-| \|   | 位或   |
+| &    | 按位与  |
+| ~    | 按位异或 |
+| \|   | 按位或  |
 
 #### 关系运算
 
@@ -294,16 +290,13 @@ func test(a,b int) {
 
 #### 逻辑运算
 
-| 运算符  | 描述   |
-|------|------|
-| !    | 逻辑非  |
-| &    | 按位与  |
-| ~    | 按位异或 |
-| \|   | 按位或  |
-| &&   | 逻辑与  |
-| \|\| | 逻辑或  |
+| 运算符  | 描述               |
+|------|------------------|
+| !    | 逻辑非（与按位取反是相同的符号） |
+| &&   | 逻辑与              |
+| \|\| | 逻辑或              |
 
-因为[布尔类型](#布尔类型)只有最低位有效，其他位忽略，则位运算的`&`、`~`、`|`对布尔值运算的结构依然是有效的布尔值，
+因为[布尔类型](#布尔类型)只有最低位有效，其他位忽略，因此位运算的`&`、`~`、`|`对布尔值运算的结构依然是有效的布尔值，
 且运算结果`&`与`&&`一致、`|`与`||`一致，差别是`&&`和`||`具有“短路”效应：
 即当左边的计算结果可以决定最终结果时，右边的表达式就不会被执行了。
 
@@ -542,6 +535,43 @@ func test(o *Object) {
 枚举类型要保持简单，不能使用。
 `bool`类型是特殊的原始类型，编译器可以采用高效的方式存储，因此不能使用。
 
+```feng
+struct Buf {
+   v [64]int;
+}
+class Cat {
+   var name [*#]byte;
+}
+enum State {Halt,}
+func test() {
+   var s1 = sizeof(int);            // ✔：返回值为int的字节大小8
+   var s2 = sizeof([3]int);         // ✔：返回 8x3=24
+   // var s3 = sizeof([*]int);      // ✖：不能用于变长数组
+   var s4 = sizeof(Buf);            // ✔：返回结构类型的大小
+   var s5 = sizeof([2]Buf);         // ✔：结构类型的定长数组大小也可以获取
+   // var s6 = sizeof([*]Buf);      // ✖：也是变长数组，不能用
+   // var s7 = sizeof(Cat);         // ✖：不能用于类
+   // var s8 = sizeof(State);       // ✖：也不能用于枚举
+   // var s9 = sizeof((int,bool));  // ✖：也不能用于元组
+   // var s10 = sizeof(bool);       // ✖：也不能用于bool
+}
+```
+
+#### 条件表达式
+
+条件表达式的作用是根据条件（值为`bool`类型）选择两个可选值中的一个作为返回值。格式为：条件 `?` 值1 `:` 值2
+如果条件的值为`true`则返回值1，`false`则返回值2
+
+例如下面这个取绝对值的函数：
+
+```feng
+func abs(n int) int {
+   return n<0 ? -n : n;
+}
+```
+
+与`if`语句可以省略`else`分支的特点不同，两个分支都是必须的。
+
 #### 赋值运算
 
 赋值运算符相当于运算的一种简写，即左操作数自己与右操作数参与对应的运算后再赋值给左操作数。因此也要求赋值运算的左右操作数是同类型的。
@@ -635,6 +665,7 @@ func testAdd(a,b Complex) Complex {
 比如自定义一个字典类`Map`，功能是提供派生类型的Key和Value的索引。用法示例：
 
 ```feng
+import std$os;
 class Map {
    // 索引读
    macro operator indexGet(key, operand, exists) {
@@ -653,7 +684,7 @@ func test() {
    var v, exists = m[100];
    // 直接读：运行时如果key不存在（exists为false）则终止执行并抛出异常
    var v int64 = m[100];
-   printf("m[100] = %s\n", v);
+   os$printf("m[100] = {}\n", v);
 }
 ```
 
@@ -740,7 +771,7 @@ class Mouse {
 }
 func test() {
    var m1 Mouse;
-   var m2 *Mouse = new(Cat);
+   var m2 *Mouse = new(Mouse);
 }
 ```
 
@@ -792,10 +823,11 @@ class Task {
 通过值类型的变量来调用方法：
 
 ```feng
+import std$os;
 func sample1() {
    var task Task;
    task.start();
-   printf("task state '%s'\n", task.state.name);   // 打印：task state: 'RUN'
+   os$printf("task state '{}'\n", task.state.name);   // 打印：task state: 'RUN'
 }
 ```
 
@@ -815,6 +847,7 @@ func sample2() {
 在成员方法内使用当前类的成员，本地变量可能和字段同名，那么需要通过`this`来使用字段：
 
 ```feng
+import std$os;
 class Cat {
    var name String;
    func setName(name String) {
@@ -822,7 +855,7 @@ class Cat {
       this.name = name; // 上文有name变量/参数，与成员字段name冲突，必须加this
    }
    func log() {
-      printf("%s: miao~~\n", name); // 上文没有name变量，可以省略this
+      os$printf("{}: miao~~\n", name); // 上文没有name变量，可以省略this
    }
 }
 ```
@@ -902,10 +935,11 @@ class Disk : Device {
 下面举例说明类的多态：先定义一个父类`Animal`，并且有一个字段`name`和一个方法`eat`：
 
 ```feng
+import std$os;
 class Animal {
     var name [*#]byte;
     func eat(food [*#]byte) {
-        printf("Animal %s eating %s\n", name, food);
+        os$printf("Animal {} eating {}\n", name, food);
     }
 }
 ```
@@ -915,12 +949,12 @@ class Animal {
 ```feng
 class Cat : Animal {
     func eat(food [*#]byte) {
-        printf("Cat %s eating %s.\n", age, name, food);
+        os$printf("Cat {} eating {}.\n", name, food);
     }
 }
 ```
 
-允许`Animal`的引用指向一个子类实例，通过父类引用调用`eat`方法时，允许时实际会调用子类的`eat`方法：
+允许`Animal`的引用指向一个子类实例，通过父类引用调用`eat`方法时，实际会调用子类的`eat`方法：
 
 ```feng
 func test() {
@@ -957,7 +991,7 @@ func sample1(lc *Animal) {
 func sample2(lc &Animal) {
     var c2 &Cat = lc;
 }
-func sample2(lc *Animal) {
+func sample3(lc *Animal) {
     var c2 &Cat = lc;
 }
 ```
@@ -1229,7 +1263,7 @@ func sample4(lc *LocalCache) {
 因为值的数量是有限的，因此必须在定义时把全部值都列举出来：
 
 ```feng
-enum TaskState {WAIT, RUN, DONE,}   // 注意结尾必须有个逗号“,”
+enum TaskState {WAIT, RUN, DONE,}
 ```
 
 [枚举变量](#枚举变量)的值必须是枚举值中的一个，不能为空（`nil`）。
@@ -1273,9 +1307,10 @@ func sample(s BillState) {
 支持[迭代循环](#迭代循环)所有枚举值：
 
 ```feng
+import std$os;
 func test() {
    for ( s : TaskState )
-      printf("name: %s, id: %d \n", s.name, s.id);
+      os$printf("name: {}, id: {} \n", s.name, s.id);
 }
 ```
 
@@ -1514,7 +1549,7 @@ var ga (bool,int);
 var gb (bool,*int);
 var gc (int,[*]uint64,[16]byte);
 class Car {
-   var int speed;
+   var speed int;
 }
 var gd (int,Car);
 ```
@@ -1604,14 +1639,14 @@ func f2(a *Foo) [*]int64 { // length为0
 
 ```feng
 func test() {
-   var a1 [*]int; // 可映射
-   var a2 [*][2]int; // 可映射
+   var a1 [*]int;       // 可映射
+   var a2 [*][2]int;    // 可映射
    var a3 [*][3][4]int; // 可映射
 
-   var a4 [*]*int; // 不可映射
-   var a4 [*][*]int; // 不可映射
-   var a4 [*][5]*int; // 不可映射
-   var a4 [*][6][*]int; // 不可映射
+   var a4 [*]*int;      // 不可映射
+   var a5 [*][*]int;    // 不可映射
+   var a6 [*][5]*int;   // 不可映射
+   var a7 [*][6][*]int; // 不可映射
 }
 ```
 
@@ -1624,7 +1659,7 @@ func test() {
 ```feng
 func run() {}
 func start() { run(); }
-func exec(a []Sting) *Error {
+func exec(a [*#]String) *Error {
    return nil;
 }
 ```
@@ -1663,7 +1698,7 @@ func send(l Queue, a int) {
 
 ```feng
 func add(a, b int) int {
-    reutrn a + b;
+    return a + b;
 }
 ```
 
@@ -1706,6 +1741,8 @@ func circlyArea(diameter float) float {
 例如：
 
 ```feng
+import std$os;
+
 func add(a, b int) int { return a + b; }
 func sub(a, b int) int { return a - b; }
 func mul(a, b int) int { return a * b; }
@@ -1713,7 +1750,7 @@ func div(a, b int) int { return a / b; }
 
 func Calc(a, b int) int;
 func test(c Calc) {
-    printf("%d\n", c(rand(), rand()));
+    os$printf("{}\n", c(rand(), rand()));
 }
 func test() {
     test(add);
@@ -1849,20 +1886,22 @@ func abs(m int) int {
 可以省略`else`语句：
 
 ```feng
+import std$os;
 func printIfError(err uint) {
    if (err == 0) return;
-   printf("Error: %u\n", err);
+   os$printf("Error: %u\n", err);
 }
 ```
 
 可以在条件表达式前面加一个初始化语句：
 
 ```feng
+import std$os;
 func test(m Map`int,*Node`, k int) {
    if (var n,ok = m[k]; ok) { // 这里的n和ok变量只属于当前块
-      printf("value of %d is: %s\n", k, n.value());
+      os$printf("value of {} is: {}\n", k, n.value());
    }
-   // printf("value of %d is: %s\n", k, n.value()); // 错误✖：外层不能使用
+   // os$printf("value of {} is: {}\n", k, n.value()); // 错误✖：外层不能使用
 }
 ```
 
@@ -1952,13 +1991,15 @@ func test() {
 func test() {
     var src []int = [0,1,2,3,4,5,6,7,8,9];
     for ( v : src )  // 只获取值
-      handle(j);
+      handle(v);
     for ( i,v : src) //  同时获取索引和值
       println(i, v);
 }
 ```
 
 当然`continue`和`break`语句对迭代循环依然有效。
+
+#### 自定义迭代循环 _[未完成]_
 
 循环语句遍历形式默认只对数组使用，对自定义类可以实现自定义迭代器，然后就可以用迭代循环来遍历了。
 实现迭代是通过名为`Iterator`的helper宏实现的，但考虑循环是很常用的语法，所以利用宏直接由编译器展开。
@@ -2423,7 +2464,7 @@ func f(a *?int, b *?int) {
 上面的例子中有赋非空值的操作，这个操作在未判断非空的情况下，也能证明是非空的：
 
 ```feng
-func (r *?int) {
+func test(r *?int) {
    var a *?int = nil;   // 可空引用a
    a = new(int);        // 赋了一个非空值
    *a = 0;              // 那么它就是非空的，相当于：*int
@@ -2583,11 +2624,12 @@ func f(a *int, b *Foo) {
 它可以指向一个类`Device`的实例，或者`Device`的[子类](#多态)的实例：
 
 ```feng
+import std$os;
 func test() {
     var b *Device = new(Device);    // 初始化指向一个新分配的Bus实例
     var a *Device = b;              // 将b引用的实例传递给a
     a.speed = 10;                   // a和b的修改都会更新同一个实例
-    printf("speed=%d", b.speed);  // 打印：speed=10
+    os$printf("speed={}", b.speed);  // 打印：speed=10
 }
 ```
 
@@ -2747,19 +2789,20 @@ func test() {
 3. 当内层声明同名的变量时（不要求同类型），外层的同名变量则被遮住，不能使用。
 
 ```feng
+import std$os;
 func test() {
    var v = "Hello"; // 变量v的生命周期在当前函数内
    {
       var s = "Fēng!"; // 变量s的生命周期在当前块内
-      printf("%s %s\n", v, s);   // 可使用外部声明的变量v
+      os$printf("{} {}\n", v, s);   // 可使用外部声明的变量v
    }
-   // printf("%s %s\n", v, s);  // 错误✖：不能使用内层块内的变量s
+   // os$printf("{} {}\n", v, s);  // 错误✖：不能使用内层块内的变量s
    {
-      // printf("%s %s\n", v, s);  // 错误✖：不能使用另一个块内的变量s
+      // os$printf("{} {}\n", v, s);  // 错误✖：不能使用另一个块内的变量s
    }
    {
       var v = "Dear Fēng"; // 内层重新声明同名的变量，外层的变量v就被遮住了
-      printf("%s\n", v); // 打印：Dear Fēng
+      os$printf("{}\n", v); // 打印：Dear Fēng
    }
    // var v = "Fēng"; // 错误✖：不能重新声明
 }
@@ -2812,12 +2855,13 @@ _这里定义声明周期为运行时。_
 字符串常量不是在函数栈上分配的，而是一律放在常量区：
 
 ```feng
+import std$os;
 func moduleName() [*#]byte {
     var r [*#]byte = "test-module";
     return r; // 离开函数moduleName还是能使用
 }
 func test() {
-    printf("module: %s\n", moduleName());
+    os$printf("module: {}\n", moduleName());
 }
 ```
 
@@ -2971,7 +3015,7 @@ class Box`E` {
 ```feng
 func use() {
    var box Box`[*]int`;
-   box.set(new[15]int);
+   box.set(new([15]int));
    box.get()[0] = 100;
 }
 ```

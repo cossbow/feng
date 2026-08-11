@@ -33,35 +33,35 @@ func sum(a, b int) int {
 }
 ```
 
-Assume `printf` is a function provided by module `fmt` for printing to the terminal:
+Assume `printf` is a function provided by module `std$os` for printing to the terminal:
 
 ```feng
-import fmt *;
+import std$os;
 func test() {
-    printf("%d + %d = %d \n", 1, 3, sum(1, 3));
+    os$printf("{} + {} = {} \n", 1, 3, sum(1, 3));
 }
 ```
 
 A function with no return value:
 
 ```feng
-import fmt *;
+import std$os;
 func test(a, b int) {
-    printf("%d\n", a + b);
+    os$printf("{}\n", a + b);
 }
 ```
 
 A function with a return value:
 
 ```feng
-import fmt *;
+import std$os;
 func div(a, b int) int {
     return a / b;
 }
 func test() {
     var a, b = 1, 3;
     var s = div(a, b);
-    printf("%d / %d = %d\n", a, b, s);
+    os$printf("{} / {} = {}\n", a, b, s);
 }
 ```
 
@@ -82,21 +82,15 @@ func sample() {
 }
 ```
 
-## Modules
-
-As a code organization unit, all files in the same directory belong to the same module, and the module name is the same
-as the directory name, so no declaration is needed in the file.
-Circular dependencies are not supported; the dependency graph must be a directed acyclic graph (DAG).
-
 ## main Function
 
 The `main` function is the entry point of an executable program, consistent with other languages.
-The entry function has no return value and only one parameter, whose type must be `[&#][*#]byte`:
+The entry function has no return value and no parameters:
 
 ```feng
 import std$os;
 
-func main(args [&#][*#]byte) {
+func main() {
     os$printf("Welcome to programming with Feng language");
 }
 ```
@@ -117,6 +111,9 @@ A module is the basic unit of code management.
 3. Module names correspond one-to-one with paths; module names are not declared in files. Directory names must follow
    the same rules as variable names.
    For example, on Linux, module `com$jjj$base$util` corresponds to the relative path `com/jjj/base/util`.
+
+Circular imports are not supported; the dependency graph must be a directed acyclic graph (DAG). For example, if module
+`a` imports module `b` and module `b` also imports module `a`, this is an error and will not compile.
 
 ### Exporting Symbols
 
@@ -163,7 +160,7 @@ You can set a module alias:
 ```feng
 import com$cossbow$fmt ccfmt;
 func test() {
-    var m Sring = ccfmt$sprintf("Hello Fēng!");
+    var m String = ccfmt$sprintf("Hello Fēng!");
     ccfmt$println(m);
 }
 ```
@@ -574,6 +571,45 @@ Classes do not support `sizeof` because field reordering is allowed.
 Enumerations must remain simple and do not support `sizeof`.
 `bool` is a special primitive type that the compiler may store efficiently, so `sizeof` is not supported.
 
+```feng
+struct Buf {
+   v [64]int;
+}
+class Cat {
+   var name [*#]byte;
+}
+enum State {Halt,}
+func test() {
+   var s1 = sizeof(int);            // ✔: returns the byte size of int, e.g. 8
+   var s2 = sizeof([3]int);         // ✔: returns 8×3=24
+   // var s3 = sizeof([*]int);      // ✖: cannot be used on variable-length arrays
+   var s4 = sizeof(Buf);            // ✔: returns the size of the struct type
+   var s5 = sizeof([2]Buf);         // ✔: fixed-size array of struct is also supported
+   // var s6 = sizeof([*]Buf);      // ✖: also a variable-length array, not allowed
+   // var s7 = sizeof(Cat);         // ✖: cannot be used on classes
+   // var s8 = sizeof(State);       // ✖: cannot be used on enums
+   // var s9 = sizeof((int,bool));  // ✖: cannot be used on tuples
+   // var s10 = sizeof(bool);       // ✖: cannot be used on bool
+}
+```
+
+#### Conditional Expression
+
+The conditional expression picks one of two optional values based on a condition (of type `bool`).
+Format: `condition ? value1 : value2`
+
+If the condition is `true`, `value1` is returned; otherwise `value2` is returned.
+
+For example, an absolute value function:
+
+```feng
+func abs(n int) int {
+   return n<0 ? -n : n;
+}
+```
+
+Unlike the `if` statement, which can omit the `else` branch, both branches are mandatory here.
+
 #### Assignment Operation
 
 Assignment operators are shorthand for operations: the left operand participates in the operation with the right
@@ -777,7 +813,7 @@ class Mouse {
 }
 func test() {
    var m1 Mouse;
-   var m2 *Mouse = new(Cat);
+   var m2 *Mouse = new(Mouse);
 }
 ```
 
@@ -955,7 +991,7 @@ prototype:
 ```feng
 class Cat : Animal {
     func eat(food [*#]byte) {
-        printf("Cat %s eating %s.\n", age, name, food);
+        printf("Cat %s eating %s.\n", name, food);
     }
 }
 ```
@@ -1000,7 +1036,7 @@ func sample1(lc *Animal) {
 func sample2(lc &Animal) {
     var c2 &Cat = lc;
 }
-func sample2(lc *Animal) {
+func sample3(lc *Animal) {
     var c2 &Cat = lc;
 }
 ```
@@ -1688,9 +1724,9 @@ func test() {
    var a3 [*][3][4]int; // mappable
 
    var a4 [*]*int; // not mappable
-   var a4 [*][*]int; // not mappable
-   var a4 [*][5]*int; // not mappable
-   var a4 [*][6][*]int; // not mappable
+   var a5 [*][*]int; // not mappable
+   var a6 [*][5]*int; // not mappable
+   var a7 [*][6][*]int; // not mappable
 }
 ```
 
@@ -1703,7 +1739,7 @@ The function name is required; parameter list, return list, and function body ca
 ```feng
 func run() {}
 func start() { run(); }
-func exec(a []Sting) *Error {
+func exec(a []String) *Error {
    return nil;
 }
 ```
@@ -2042,7 +2078,7 @@ For arrays, a simpler way to iterate over all elements:
 func test() {
     var src []int = [0,1,2,3,4,5,6,7,8,9];
     for ( v : src )  // value only
-      handle(j);
+      handle(v);
     for ( i,v : src) // both index and value
       println(i, v);
 }
@@ -3090,7 +3126,7 @@ The box class defined above can hold any instance:
 ```feng
 func use() {
    var box Box`[*]int`;
-   box.set(new[15]int);
+   box.set(new([15]int));
    box.get()[0] = 100;
 }
 ```

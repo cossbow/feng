@@ -9,12 +9,13 @@ The Fēng language is a statically typed, object-oriented programming language t
 * Resource classes with destructors.
 * `struct` and `union` like in C, supporting arbitrary conversion between them.
 * Phantom reference mechanism, similar to C++ references or Rust borrowing.
-* Simple compile-time generics.
+* Monomorphized generics with type inference.
 * References and methods support an immutable (`read-only`) marker, enabling write protection of data without
   encapsulation.
-* Non-null references and non-null checks help reduce null pointer issues and improve code quality.
+* Control-flow-based non-null checking reduces null pointer issues and improves program stability.
 * Simple modular code organization.
 * Supports partial operator overloading.
+* Trust-boundary-based concurrency checking.
 
 For detailed syntax design, please refer to the [reference manual](reference.md).
 
@@ -36,28 +37,29 @@ debugging in IDEA.
 
 ## Semantic Analysis
 
-The main analysis class is [SemanticAnalysis](src/main/java/org/cossbow/feng/analysis/SemanticAnalysis.java).
+The main analysis class is [SemanticAnalyzer](src/main/java/org/cossbow/feng/analysis/SemanticAnalyzer.java).
 
 Completed semantic analyses include:
 
 1. Symbol checking: Check whether types and functions are defined, and whether variables are declared.
 2. Constant folding: Evaluate constants directly.
-3. Type checking: Check variable assignments, return value types, function prototype comparisons, and convertible type
-   checks.
-4. Class inheritance and interface implementation checks.
-5. Check for missing return paths.
-6. Variable lifetime checking.
-7. Check for anonymous objects in expressions.
-8. Required checks for reference and function type variables.
-9. Unmodifiable checks for references.
+3. Struct type layout calculation and bounds checking.
+4. Type checking: variable assignment, return value types, function prototype comparison, and convertible type checks.
+5. Class inheritance and interface implementation checks.
+6. Multi-branch path termination statement checking.
+7. Variable lifetime checking.
+8. Check for anonymous objects in expressions.
+9. Read-only constraint and checking for references.
 10. Statement context checking.
 11. Generic type parameter checking.
 12. Checking of symbols exported from other modules.
+13. Non-null checking.
+14. Concurrency checking.
 
-## Target Code Generation
+## Compiler Backend
 
-Only C++ code generation is currently implemented, with the tool
-class [CppGenerator](src/main/java/org/cossbow/feng/coder/CppGenerator.java).
+The compiler first generates C code, which is then built into a binary. The C backend class
+is [CGenerator.java](src/main/java/org/cossbow/feng/coder/CGenerator.java).
 
 Completed code features:
 
@@ -70,15 +72,17 @@ Completed code features:
 7. Runtime type checking: Completed
 8. Variable cleanup and reference instance management: Completed
 9. Literals and initialization: Completed
-10. Generics: Completed
+10. Generics: checking and inference completed, constraints not yet
 11. String formatting: Completed
-12. Modules: One C/C++ file generated per module.
+12. Modules: Completed
+13. Concurrency safety for references: Completed
 
-# Tool Building
+# Compiler
 
-The current build tool supports compiling a single source file, a single module, or multi-module joint builds.
+The compiler supports compiling a single source file, a single module, or multi-module project builds.
+Entry class: [Compiler.java](src/main/java/org/cossbow/feng/Compiler.java).
 
-The tool is developed in Java, requiring JDK and Maven to be installed first. For details,
+To build the compiler, JDK and Maven are required. For installation details,
 consult [deepseek](https://chat.deepseek.com/).
 The project dependencies include only antlr4-runtime, jcommander, and 3 Maven plugins, which are automatically
 downloaded during build. Recommended build command:
@@ -90,7 +94,9 @@ mvn clean package -Dmaven.test.skip=true
 The packaged JAR will be in the target directory: `feng-${version}.jar`
 For example, with the current version "0.0.1-dev", the built package is `feng-0.0.1-dev.jar`.
 
-Tool usage:
+To run the compiler, Java and Clang are required. Clang installation can also be consulted with deepseek.
+
+Compiler usage:
 
 ```shell
 java -jar feng-0.0.1-dev.jar -t [type] -i [source] -o [output directory]
@@ -102,8 +108,8 @@ Parameter descriptions:
    organization
 2. -i Source path: For a single file, points to the full file path; for a module or project, points to the corresponding
    directory.
-3. -o Output directory: For a single file, outputs one C++ file; for a module or project, each module corresponds to one
-   C++ file. If not specified, defaults to the source directory.
+3. -o Output directory: used by the build process, including intermediate and final artifacts; defaults to the source
+   directory if not specified.
 4. -p Current package name: Defaults to the filename or directory name.
 5. -L Add dependency packages: Multiple packages can be specified as key-value pairs (package name = path), for example:
    `-Lfoo=D:\dev\libs\foo`
@@ -111,24 +117,16 @@ Parameter descriptions:
 7. -T [switch] Unit test mode: compiles only unit test cases into an executable; the `main` function is not compiled.
 8. --test-name Specify test cases: effective in unit test mode, filters test cases to execute. Can be specified multiple times.
 
-Compile a single source file:
+For example, compiling a single source file:
 
 ```shell
-java -jar feng-0.0.1-dev.jar -t f -i jjj.feng -o jjj.cpp
+java -jar feng-0.0.1-dev.jar -t f -i jjj.feng -o /var/build
 ```
 
-The generated C++ requires a C/C++ compilation environment, and the C++20 standard must be specified during compilation:
+The build results under `/var/build` are:
 
-```shell
-c++ --std=c++20 -c jjj.cpp -o jjj.o
-```
-
-If the Fēng code contains a `main` function, a `main` function will be created in the corresponding C++ file, allowing
-it to be compiled into an executable:
-
-```shell
-c++ --std=c++20 jjj.cpp -o jjj.o
-```
+1. One `.o` file is generated per module after compilation.
+2. If one of the modules contains a `main` function, an executable is also produced.
 
 # Editor Support
 
