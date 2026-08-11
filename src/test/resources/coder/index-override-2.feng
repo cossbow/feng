@@ -1,0 +1,27 @@
+
+class Vector`E` {
+    var values [*]E;
+    macro index get(index int) E {
+        values[index]
+    }
+    macro index set(index int, value E) {
+        values[index] = value;
+    }
+}
+
+class A {
+    var id int;
+}
+
+func use1(a *Vector`A`) {
+    var v = a[0];
+    a[1] = v;
+}
+func test(n int){
+    var a = new(Vector`A`, {values=new([n]A)});
+    use1(a);
+}
+
+func main() {
+    test(5);
+}

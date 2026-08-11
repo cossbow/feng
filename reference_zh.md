@@ -655,41 +655,38 @@ func testAdd(a,b Complex) Complex {
 }
 ```
 
-#### 自定义特殊运算 _[未完成]_
+#### 自定义特殊运算
 
 ##### 自定义索引运算
 
 默认只有数组支持的[索引表达式](#索引表达式)也可以自定义。
 由于索引运算符分有读和写两种操作，因此分成`indexGet`和`indexSet`两个过程宏。
 
-比如自定义一个字典类`Map`，功能是提供派生类型的Key和Value的索引。用法示例：
+比如自定义一个`Vector`（自动扩容的数组），要实现索引操作，可以这样：
 
 ```feng
 import std$os;
-class Map {
-   // 索引读
-   macro operator indexGet(key, operand, exists) {
-      var n = getNode(key);
-      operand, exists = if (n != nil) n.value, true else nil, nil;
-   }
-   // 索引写
-   macro operator indexSet(key int, value String) {
-      set(key, value);
-   }
+class Vector`E` {
+    var values [*]E;
+    // TODO: 假如实现了自动扩容 grow(index int)
+    macro index get(index int) E {
+        get[index]
+    }
+    macro index set(index int, value E) {
+        grow(index);
+        values[index] = value;
+    }
 }
 func test() {
-   var m Map;
-   m[100] = 159;
-   // 带检查读：运行时如果key不存在则exists为false
-   var v, exists = m[100];
-   // 直接读：运行时如果key不存在（exists为false）则终止执行并抛出异常
-   var v int64 = m[100];
+   var m Vector`int` = {values=new([1024]int)};
+   m[100] = 159;     // 调用 macro index set
+   var v = m[100];   // 调用 macro index get
    os$printf("m[100] = {}\n", v);
 }
 ```
 
-在写操作时索引不存在是否终止执行取决于内部实现：
-比如一般情况的Map是可以新增key的，而数组是不能自动扩容的。
+在写操作时索引不存在的处理取决于内部实现：
+比如一般情况的`Map`是可以新增key的，而数组是不能自动扩容的。
 
 ## 类
 

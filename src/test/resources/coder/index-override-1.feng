@@ -1,5 +1,7 @@
 
-class A {}
+class A {
+    var id int;
+}
 
 class List {
     var values [*]A;

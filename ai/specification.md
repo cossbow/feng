@@ -598,11 +598,10 @@ macroProcedure = name "(" [params] ")" [type] "{" statementList [expression] "}"
 | `!=` | `ne` | Same as left | `bool` |
 | `>` | `gt` | Same as left | `bool` |
 | `>=` | `ge` | Same as left | `bool` |
-| `[]` (read) | `indexGet` | key, operand, exists | — |
-| `[]` (write) | `indexSet` | key, value | — |
+| `[]` (read) | `index get` | index | element type |
+| `[]` (write) | `index set` | index, value | — |
 
 [MUST] Custom operators can only be defined in classes.
-[NOTE] Custom index operators are `[未完成]` (not yet complete).
 
 ### 5.13 Object Expression (Field Initialization)
 

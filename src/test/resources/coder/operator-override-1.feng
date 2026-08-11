@@ -53,6 +53,6 @@ func test(n int) {
     c = !b;
 }
 
-func main(args [&#][*?#]byte) {
+func main() {
     test(5);
 }

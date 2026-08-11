@@ -694,41 +694,39 @@ func testAdd(a,b Complex) Complex {
 }
 ```
 
-#### Custom Special Operations _[Incomplete]_
+#### Custom Special Operations
 
 ##### Custom Index Operation
 
 The [index expression](#index-expression), which is only supported by arrays by default, can also be customized.
-Index operations are divided into read and write operations, implemented via two procedural macros: `indexGet` and
-`indexSet`.
+Since index operators consist of read and write operations, they are split into two procedural macros:
+`indexGet` and `indexSet`.
 
-For example, a custom dictionary class `Map` providing indexed access with derived key and value types. Usage example:
+For example, a custom `Vector` (auto-growing array) implementing indexed access:
 
 ```feng
-class Map {
-   // Index read
-   macro operator indexGet(key, operand, exists) {
-      var n = getNode(key);
-      operand, exists = if (n != nil) n.value, true else nil, nil;
-   }
-   // Index write
-   macro operator indexSet(key int, value String) {
-      set(key, value);
-   }
+import std$os;
+class Vector`E` {
+    var values [*]E;
+    // TODO: assuming auto-growing grow(index int)
+    macro index get(index int) E {
+        get[index]
+    }
+    macro index set(index int, value E) {
+        grow(index);
+        values[index] = value;
+    }
 }
 func test() {
-   var m Map;
-   m[100] = 159;
-   // Checked read: if key does not exist at runtime, exists is false
-   var v, exists = m[100];
-   // Direct read: if key does not exist (exists false), execution terminates and an exception is thrown
-   var v int64 = m[100];
-   printf("m[100] = %s\n", v);
+   var m Vector`int` = {values=new([1024]int)};
+   m[100] = 159;     // calls macro index set
+   var v = m[100];   // calls macro index get
+   os$printf("m[100] = {}\n", v);
 }
 ```
 
-Whether a write operation terminates execution when an index does not exist depends on the implementation:
-For a typical Map, new keys can be added; arrays cannot be automatically resized.
+How write operations handle non-existent indexes depends on the implementation:
+for a typical `Map`, new keys can be added; arrays cannot be automatically resized.
 
 ## Classes
 

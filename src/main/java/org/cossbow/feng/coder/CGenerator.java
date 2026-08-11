@@ -2041,7 +2041,12 @@ public class CGenerator implements Generator {
                     if (!master.methods().exists(mName)) {
                         var owner = me.method() instanceof ClassMethod cmm
                                 && cmm.master() != null ? cmm.master() : cd;
-                        write(owner.symbol()).write(mName);
+                        if (!dtd.derivedType().generic().isEmpty()) {
+                            writeMangledName(dtd.derivedType()).write('$');
+                        } else {
+                            write(owner.symbol());
+                        }
+                        write(mName);
                         write('(').write(me.subject());
                         if (!e.arguments().isEmpty()) {
                             write(", ");
@@ -4403,6 +4408,14 @@ public class CGenerator implements Generator {
                 if (!cm.generic().isEmpty()) continue; // skip method-level generics
                 implConcreteMethod(cm, dt);
             }
+            // operator/index macros — same as implClass for non-generic classes
+            for (var cm : cd.binaryOperators().values()) implConcreteMethod(cm, dt);
+            for (var cm : cd.unaryOperators().values()) implConcreteMethod(cm, dt);
+            cd.indexOperator().use(io -> {
+                io.get().use(cm -> implConcreteMethod(cm, dt));
+                io.set().use(cm -> implConcreteMethod(cm, dt));
+            });
+
         });
     }
 
@@ -4461,6 +4474,14 @@ public class CGenerator implements Generator {
                 if (!cm.generic().isEmpty()) continue; // skip method-level generics
                 implConcreteMethod(cm, dt);
             }
+            // operator/index macros — same as implClass for non-generic classes
+            for (var cm : cd.binaryOperators().values()) implConcreteMethod(cm, dt);
+            for (var cm : cd.unaryOperators().values()) implConcreteMethod(cm, dt);
+            cd.indexOperator().use(io -> {
+                io.get().use(cm -> implConcreteMethod(cm, dt));
+                io.set().use(cm -> implConcreteMethod(cm, dt));
+            });
+
         });
         // generate method-level generic instantiations for this class/dt
         for (var mi : table.concreteMethodInsts) {

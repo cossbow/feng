@@ -860,7 +860,7 @@ public class SemanticAnalyzer {
                     pd, pt.pos());
             return;
         }
-        // 检查同名属性
+        // check fields: unsupport shadow parent's fields
         for (var pf : pd.allFields()) {
             var cf = cd.fields().tryGet(pf.name());
             if (cf.none()) {
@@ -870,7 +870,7 @@ public class SemanticAnalyzer {
                 cd.allFields().add(nf.name(), nf);
                 continue;
             }
-            semantic("can't hide parent field: %s%s",
+            semantic("can't shadowing parent field: %s%s",
                     pf.name(), cf.get().pos());
             return;
         }
@@ -4117,12 +4117,13 @@ public class SemanticAnalyzer {
             var op = cd.indexOperator().must();
             if (op.get().has()) {
                 var cm = op.get().get();
+                var prot = dtd.gm().instantiate(cm.prototype());
                 var a = (PrimaryExpression) sg.a();
                 var s = new MethodExpression(a.pos(), a, cm);
                 var ig = optimize(e.index());
-                var n = new CallExpression(e.pos(), s, List.of(ig.a()),
-                        cm.prototype());
-                var td = cm.prototype().returnSet().must();
+                var n = new CallExpression(e.pos(), s,
+                        List.of(ig.a()), prot);
+                var td = prot.returnSet().must();
                 return Groups.g2(n, td);
             }
         }
@@ -5130,7 +5131,7 @@ public class SemanticAnalyzer {
         var param = new FixedParameter(mv.pos(), Modifier.empty(),
                 mv.name(), mv.type().get());
 
-        return macro2Method(cd, mf, List.of(param), Optional.empty(), true);
+        return macro2Method(cd, mf, List.of(param), mp.result(), true);
     }
 
     private ClassMethod macroIndexSet(ClassDefinition cd, Macro m) {
