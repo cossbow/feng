@@ -396,6 +396,29 @@ public class CGenerator implements Generator {
      * emit per-type array SRef cleanup functions at file scope
      */
     /**
+     * Pre-register cleanup types for imported class method bodies.
+     * Must be called BEFORE emitCleanupForwardDecls() so that
+     * FENG$DEC references in imported class method bodies can resolve.
+     */
+    private void preRegisterImportedClassCleanups() {
+        var localClasses = new HashSet<ClassDefinition>();
+        for (var cd : table.dagClasses) localClasses.add(cd);
+        for (var dt : table.concreteInstantiations) {
+            if (!(dt.def() instanceof ClassDefinition cd)
+                    || localClasses.contains(cd)
+                    || cd.generic().isEmpty()
+                    || dt.generic().isEmpty()
+                    || dt.hasTypeVar()) continue;
+            withMono(cd.generic(), dt.generic(), () -> {
+                for (var cm : cd.methods()) {
+                    if (!cm.generic().isEmpty()) continue;
+                    cm.procedure().use(proc -> preScanCleanupStmts(proc.body()));
+                }
+            });
+        }
+    }
+
+    /**
      * Emit forward declarations for all cleanup functions (array + class).
      * Must be called AFTER struct/typedef emissions but BEFORE classMethods/functionDefinition
      * so that FENG$DEC references in method bodies can resolve the function names.
@@ -5213,6 +5236,10 @@ public class CGenerator implements Generator {
 
         writeComment("global const");
         declareGlobalVar(table.constVars);
+
+        // Pre-register cleanup types for imported class method bodies,
+        // so that FENG$DEC references can be forward-declared before method bodies.
+        if (!header) preRegisterImportedClassCleanups();
 
         // Emit forward declarations for cleanup functions BEFORE classMethods()
         // so that FENG$DEC references in method bodies can resolve the function names.
