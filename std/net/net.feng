@@ -1,0 +1,255 @@
+// ===== std$net — TCP / UDP networking =====
+//
+// Addresses are packed as uint64 (ip<<16 | port).
+// All address math done in pure Feng to avoid C-call issues in methods.
+
+import std$string;
+import std$error;
+import std$net$platform;
+
+// ===== internal helpers =====
+
+func toCStr(s [&#]byte) [*]byte {
+    var buf = new([s.length + 1]byte);
+    for (var i = 0; i < s.length; i += 1) { buf[i] = s[i]; }
+    buf[s.length] = 0;
+    return buf;
+}
+
+// Build sockaddr_in bytes (little-endian host → big-endian network)
+func sockAddrBytes(ip uint32, port int) [16]byte {
+    var a [16]byte;
+    a[0] = 2; a[1] = 0;                    // sin_family = AF_INET
+    var p = uint16(port);
+    a[2] = byte((p >> 8) & 0xFF);           // sin_port, big-endian
+    a[3] = byte(p & 0xFF);
+    a[4] = byte((ip >> 24) & 0xFF);         // sin_addr, big-endian
+    a[5] = byte((ip >> 16) & 0xFF);
+    a[6] = byte((ip >> 8) & 0xFF);
+    a[7] = byte(ip & 0xFF);
+    return a;
+}
+
+// Extract ip (host-order) from big-endian sockaddr_in bytes
+func sockAddrIP(a [&#]byte) uint32 {
+    return (uint32(a[4]) << 24) | (uint32(a[5]) << 16) |
+           (uint32(a[6]) << 8) | uint32(a[7]);
+}
+
+// Extract port from big-endian sockaddr_in bytes
+func sockAddrPort(a [&#]byte) int {
+    return int((uint16(a[2]) << 8) | uint16(a[3]));
+}
+
+// Format ip as dotted-decimal string
+func ipToStr(ip uint32) string$String {
+    var a = int((ip >> 24) & 0xFF);
+    var b = int((ip >> 16) & 0xFF);
+    var c = int((ip >> 8) & 0xFF);
+    var d = int(ip & 0xFF);
+
+    var buf [16]byte;
+    var pos = 0;
+    var parts [4]int = [a, b, c, d];
+    for (var i = 0; i < 4; i += 1) {
+        var v = parts[i];
+        if (v >= 100) { buf[pos] = byte(48 + v/100); pos += 1; v = v % 100; }
+        if (v >= 10 || parts[i] >= 100) { buf[pos] = byte(48 + v/10); pos += 1; }
+        buf[pos] = byte(48 + v%10); pos += 1;
+        if (i < 3) { buf[pos] = 46; pos += 1; }
+    }
+    var result = new([pos]byte);
+    for (var i = 0; i < pos; i += 1) { result[i] = buf[i]; }
+    return string$fromUtf8(result);
+}
+
+// Parse dotted-decimal ip string to uint32, returns (ip, ok)
+func parseIP(s [&#]byte) (uint32, bool) {
+    var ip uint32 = 0;
+    var part int = 0;
+    var dots = 0;
+    for (var i = 0; i < s.length; i += 1) {
+        var ch = s[i];
+        if (ch >= 48 && ch <= 57) {
+            part = part * 10 + int(ch - 48);
+            if (part > 255) { return (0, false); }
+        } else if (ch == 46) {
+            if (dots >= 3) { return (0, false); }
+            ip = (ip << 8) | uint32(part);
+            part = 0;
+            dots += 1;
+        } else {
+            return (0, false);
+        }
+    }
+    if (dots != 3) { return (0, false); }
+    ip = (ip << 8) | uint32(part);
+    return (ip, true);
+}
+
+// ===== lazy WSA startup =====
+
+var started bool;
+func ensureStartup() {
+    if (!started) {
+        platform$netInit();
+        started = true;
+    }
+}
+
+// ===== Addr =====
+
+export
+class Addr final {
+    export const packed uint64;   // high 32 = ip (host order), low 16 = port
+
+    export func ip() string$String {
+        return ipToStr(uint32(packed >> 16));
+    }
+
+    export func port() int {
+        return int(packed & 0xFFFF);
+    }
+}
+
+export
+func resolve(host [&#]byte, port int) Addr {
+    var r = parseIP(host);
+    var ip = r.0;
+    var ok = r.1;
+    if (!ok) { throw new(error$ParseException); }
+    return {packed=(uint64(ip) << 16) | uint64(uint16(port))};
+}
+
+export
+func ip4(a, b, c, d byte, port int) Addr {
+    var ip = (uint32(a) << 24) | (uint32(b) << 16) |
+             (uint32(c) << 8) | uint32(d);
+    return {packed=(uint64(ip) << 16) | uint64(uint16(port))};
+}
+
+// ===== Socket =====
+
+export
+class Socket (Writer, Reader) {
+    const fd int;
+
+    macro resource free() {
+        _closeFd(fd);
+    }
+
+    func _close() {
+        _closeFd(fd);
+    }
+
+    // ---- Reader ----
+
+    export
+    func read#(buf [&]byte) int {
+        var n = int(recv(int32(fd), buf.values, int32(buf.length), 0));
+        if (n <= 0) { return -1; }
+        return n;
+    }
+
+    // ---- Writer ----
+
+    export
+    func write(data [&#]byte, offset, length int) int {
+        if (offset >= data.length) { return 0; }
+        var pos = data.values + uint64(offset);
+        var len = length + offset;
+        if (len > data.length) { len = data.length; }
+        len = len - offset;
+        if (len <= 0) { return 0; }
+        var n = int(send(int32(fd), pos, int32(len), 0));
+        if (n < 0) { return -1; }
+        return n;
+    }
+
+    // ---- accept ----
+
+    export func accept() (*Socket, *Addr) {
+        var addr [16]byte;
+        var addrLen [1]int = [16];
+        var newFd = int(accept(int32(fd), addr.values, addrLen.values));
+        if (newFd < 0) { throw new(error$IllegalStateException); }
+        var ip = sockAddrIP(addr);
+        var pt = sockAddrPort(addr);
+        return (new(Socket, {fd=newFd}),
+                new(Addr, {packed=(uint64(ip) << 16) | uint64(uint16(pt))}));
+    }
+
+    // ---- UDP ----
+
+    export func sendTo(data [&#]byte, addr Addr) int {
+        var a = sockAddrBytes(uint32(addr.packed >> 16), int(addr.packed & 0xFFFF));
+        var n = int(sendto(int32(fd), data.values, int32(data.length), 0, a.values, 16));
+        if (n < 0) { return -1; }
+        return n;
+    }
+
+    export func recvFrom(buf [&]byte) (int, *Addr) {
+        var addr [16]byte;
+        var addrLen [1]int = [16];
+        var n = int(recvfrom(int32(fd), buf.values, int32(buf.length), 0, addr.values, addrLen.values));
+        if (n < 0) { return (-1, new(Addr, {packed=0})); }
+        var ip = sockAddrIP(addr);
+        var pt = sockAddrPort(addr);
+        return (n, new(Addr, {packed=(uint64(ip) << 16) | uint64(uint16(pt))}));
+    }
+
+    // ---- close ----
+
+    export func close() {
+        _closeFd(fd);
+    }
+}
+
+// ===== internal =====
+
+func _closeFd(fd int) {
+    platform$netCloseSock(int32(fd));
+}
+
+// ===== factory functions =====
+
+export
+func listenTCP(addr Addr) *Socket {
+    ensureStartup();
+    var a = sockAddrBytes(uint32(addr.packed >> 16), int(addr.packed & 0xFFFF));
+    var fd = int(socket(2, 1, 0));  // AF_INET, SOCK_STREAM
+    if (fd < 0) { throw new(error$IllegalStateException); }
+    var opt [4]byte = [1, 0, 0, 0];
+    setsockopt(int32(fd), 1, 2, opt.values, 4);  // SOL_SOCKET, SO_REUSEADDR
+    if (bind(int32(fd), a.values, 16) < 0) {
+        _closeFd(fd); throw new(error$IllegalStateException);
+    }
+    if (listen(int32(fd), 128) < 0) {
+        _closeFd(fd); throw new(error$IllegalStateException);
+    }
+    return new(Socket, {fd=fd});
+}
+
+export
+func dial(addr Addr) *Socket {
+    ensureStartup();
+    var a = sockAddrBytes(uint32(addr.packed >> 16), int(addr.packed & 0xFFFF));
+    var fd = int(socket(2, 1, 0));
+    if (fd < 0) { throw new(error$IllegalStateException); }
+    if (connect(int32(fd), a.values, 16) < 0) {
+        _closeFd(fd); throw new(error$IllegalStateException);
+    }
+    return new(Socket, {fd=fd});
+}
+
+export
+func listenUDP(addr Addr) *Socket {
+    ensureStartup();
+    var a = sockAddrBytes(uint32(addr.packed >> 16), int(addr.packed & 0xFFFF));
+    var fd = int(socket(2, 2, 0));  // AF_INET, SOCK_DGRAM
+    if (fd < 0) { throw new(error$IllegalStateException); }
+    if (bind(int32(fd), a.values, 16) < 0) {
+        _closeFd(fd); throw new(error$IllegalStateException);
+    }
+    return new(Socket, {fd=fd});
+}

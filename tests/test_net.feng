@@ -1,0 +1,130 @@
+import std$testing;
+import std$net n;
+
+// ===== Addr tests =====
+
+@Test
+func testResolveLocalhost() {
+    var addr = n$resolve("127.0.0.1", 8080);
+    // 127.0.0.1 = 0x7F000001, port 8080
+    var expected uint64 = (uint64(0x7F000001) << 16) | 8080;
+    testing$assertTrue(addr.packed == expected);
+    testing$assertTrue(addr.port() == 8080);
+}
+
+@Test
+func testIp4() {
+    var addr = n$ip4(192, 168, 1, 1, 443);
+    var expected uint64 = (uint64(0xC0A80101) << 16) | 443;
+    testing$assertTrue(addr.packed == expected);
+    testing$assertTrue(addr.port() == 443);
+}
+
+@Test
+func testIp4SingleDigit() {
+    var addr = n$ip4(0, 0, 0, 0, 53);
+    testing$assertTrue(addr.packed == 53);  // ip=0, port=53
+    testing$assertTrue(addr.port() == 53);
+}
+
+@Test
+func testIp4ThreeDigit() {
+    var addr = n$ip4(255, 100, 10, 1, 9999);
+    var expected uint64 = (uint64(0xFF640A01) << 16) | 9999;
+    testing$assertTrue(addr.packed == expected);
+    testing$assertTrue(addr.port() == 9999);
+}
+
+// ===== Socket: TCP listen + dial (loopback) =====
+
+@Test
+func testTCPListenAndDial() {
+    // Start a TCP listener on an ephemeral port
+    var addr = n$ip4(127, 0, 0, 1, 0);
+    // Use a hardcoded port for testing
+    var testAddr = n$ip4(127, 0, 0, 1, 19999);
+    var listener = n$listenTCP(testAddr);
+    testing$assertTrue(listener != nil);
+
+    // Connect to the listener
+    var conn = n$dial(testAddr);
+    testing$assertTrue(conn != nil);
+
+    // Accept the connection (should not block since connect already happened)
+    var acc = listener.accept();
+    var accepted = acc.0;
+    testing$assertTrue(accepted != nil);
+
+    // Send data from client to server
+    var msg [5]byte = [72, 101, 108, 108, 111];  // "Hello"
+    var nw = conn.write(msg, 0, 5);
+    testing$assertTrue(nw == 5);
+
+    // Read on the accepted socket
+    var buf [10]byte;
+    var nr = accepted.read(buf);
+    testing$assertTrue(nr == 5);
+    testing$assertTrue(buf[0] == 72);
+    testing$assertTrue(buf[4] == 111);
+
+    // Send reply
+    var reply [2]byte = [79, 75];  // "OK"
+    accepted.write(reply, 0, 2);
+
+    // Read reply on client
+    var rbuf [10]byte;
+    var rr = conn.read(rbuf);
+    testing$assertTrue(rr == 2);
+    testing$assertTrue(rbuf[0] == 79);
+
+    // Cleanup
+    accepted.close();
+    conn.close();
+    listener.close();
+}
+
+// ===== Socket: close / RAII =====
+
+@Test
+func testSocketClose() {
+    var addr = n$ip4(127, 0, 0, 1, 19998);
+    var listener = n$listenTCP(addr);
+    testing$assertTrue(listener != nil);
+
+    // Closing on the same var should be fine
+    listener.close();
+}
+
+// ===== UDP =====
+
+@Test
+func testUDPBind() {
+    var addr = n$ip4(127, 0, 0, 1, 19997);
+    var sock = n$listenUDP(addr);
+    testing$assertTrue(sock != nil);
+    sock.close();
+}
+
+@Test
+func testUDPSendRecv() {
+    var addr1 = n$ip4(127, 0, 0, 1, 19996);
+    var addr2 = n$ip4(127, 0, 0, 1, 19995);
+
+    var sock1 = n$listenUDP(addr1);
+    var sock2 = n$listenUDP(addr2);
+    testing$assertTrue(sock1 != nil);
+    testing$assertTrue(sock2 != nil);
+
+    var msg [3]byte = [65, 66, 67];  // "ABC"
+    var ns = sock1.sendTo(msg, addr2);
+    testing$assertTrue(ns == 3);
+
+    var rbuf [10]byte;
+    var rf = sock2.recvFrom(rbuf);
+    var nr = rf.0;
+    testing$assertTrue(nr == 3);
+    testing$assertTrue(rbuf[0] == 65);
+
+    sock1.close();
+    sock2.close();
+}
