@@ -79,7 +79,7 @@ public class CppGenerator implements Generator {
 
         @Override
         public String compiler() {
-            return "c++";
+            return "clang++";
         }
 
         @Override

@@ -11,18 +11,40 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
+/**
+ * Thin wrapper around {@link ProcessBuilder} that captures stdout/stderr
+ * and provides a clean {@link Result}.
+ */
 public class Command {
     private final Path dir;
     private final List<String> cmd;
+    private final boolean quiet;
 
     public Command(Path dir, List<String> cmd) {
-        this.dir = dir;
-        this.cmd = cmd;
+        this(dir, cmd, false);
     }
 
     public Command(Path dir, String... cmd) {
-        this(dir, Arrays.asList(cmd));
+        this(dir, Arrays.asList(cmd), false);
     }
+
+    private Command(Path dir, List<String> cmd, boolean quiet) {
+        this.dir = dir;
+        this.cmd = cmd;
+        this.quiet = quiet;
+    }
+
+    // ---- factories ----
+
+    /**
+     * Create a silent command suitable for tool detection
+     * (no working directory, stderr merged into stdout, no inheritIO).
+     */
+    public static Command detect(String... cmd) {
+        return new Command(null, Arrays.asList(cmd), true);
+    }
+
+    // ---- exec ----
 
     private CompletableFuture<String> read(Supplier<InputStream> src) {
         return CompletableFuture.supplyAsync(() -> {
@@ -39,10 +61,16 @@ public class Command {
 
     private Process start() {
         try {
-            return new ProcessBuilder(cmd)
-                    .directory(dir.toFile())
-                    .inheritIO()
-                    .start();
+            var pb = new ProcessBuilder(cmd);
+            if (dir != null) {
+                pb.directory(dir.toFile());
+            }
+            if (quiet) {
+                pb.redirectErrorStream(true);
+            } else {
+                pb.inheritIO();
+            }
+            return pb.start();
         } catch (IOException e) {
             throw ErrorUtil.sneaky(e);
         }
@@ -54,12 +82,15 @@ public class Command {
         var out = read(p::getInputStream);
         try {
             int ec = p.waitFor();
-            return new Result(ec, err.get(), out.get());
+            return new Result(ec, out.get(), err.get());
         } catch (Exception e) {
             throw ErrorUtil.sneaky(e);
         }
     }
 
     public record Result(int code, String out, String err) {
+        public int code() { return code; }
+        public String out() { return out; }
+        public String err() { return err; }
     }
 }

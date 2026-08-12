@@ -97,7 +97,7 @@ public class CGenerator implements Generator {
 
         @Override
         public String compiler() {
-            return "cc";
+            return "clang";
         }
 
         @Override

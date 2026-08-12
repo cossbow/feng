@@ -5,8 +5,6 @@ import org.cossbow.feng.ast.Source;
 import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.c2feng.CModuleParser;
-import org.cossbow.feng.c2feng.convert.C2FengConverter;
-import org.cossbow.feng.c2feng.parse.CHeaderParser;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.dag.DAGUtil;
 import org.cossbow.feng.parser.ParseSymbolTable;
@@ -32,6 +30,7 @@ public class ModuleParser {
     private final List<Path> allCSources = new ArrayList<>();
     // whether test mode is enabled (filters out testing modules)
     private final boolean testMode;
+    private final TargetOS os;
 
     public List<Path> allCSources() {
         return allCSources;
@@ -39,21 +38,23 @@ public class ModuleParser {
 
     public ModuleParser(String pkg, Path base, Charset charset,
                         Map<Identifier, ModuleParser> libs,
-                        boolean testMode) {
+                        boolean testMode,
+                        TargetOS os) {
         this.pkg = new Identifier(pkg);
         this.base = base;
         this.charset = charset;
         this.libs = libs;
         this.testMode = testMode;
+        this.os = os;
     }
 
     public ModuleParser(String pkg, Path base, Charset charset,
                         Map<Identifier, ModuleParser> libs) {
-        this(pkg, base, charset, libs, false);
+        this(pkg, base, charset, libs, false, TargetOS.AUTO);
     }
 
     public ModuleParser(String pkg, Path base, Charset charset) {
-        this(pkg, base, charset, Map.of(), false);
+        this(pkg, base, charset, Map.of(), false, TargetOS.AUTO);
     }
 
     public Identifier pkg() {
@@ -145,8 +146,9 @@ public class ModuleParser {
      */
     private void processConfig(Path module, FModule fm) throws IOException {
         var cfg = ModuleConfig.load(absPath(module));
-        if (!cfg.linkLibs().isEmpty()) {
-            fm.linkLibs(cfg.linkLibs());
+        var libs = cfg.linkLibs(os);
+        if (!libs.isEmpty()) {
+            fm.linkLibs(libs);
         }
         fm.testing(cfg.testing());
     }

@@ -9,12 +9,12 @@ import org.cossbow.feng.ast.proc.FixedParameter;
 import org.cossbow.feng.coder.CppGenerator;
 import org.cossbow.feng.coder.Generator;
 import org.cossbow.feng.dag.DAGGraph;
-import org.cossbow.feng.err.SemanticException;
 import org.cossbow.feng.mod.ModuleAnalysis;
 import org.cossbow.feng.mod.ModuleParser;
 import org.cossbow.feng.util.Command;
 import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.TargetOS;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -49,6 +49,7 @@ public class Compiler {
     private String pkg;
     private Map<String, String> lib = Map.of();
     private Build build = Build.MAKE;
+    private TargetOS os = TargetOS.AUTO;
 
     public Compiler(Generator.Factory factory) {
         this.factory = CommonUtil.required(factory);
@@ -89,6 +90,11 @@ public class Compiler {
 
     public Compiler buildSystem(Build build) {
         this.build = build;
+        return this;
+    }
+
+    public Compiler os(TargetOS os) {
+        this.os = CommonUtil.required(os);
         return this;
     }
 
@@ -172,7 +178,8 @@ public class Compiler {
     }
 
     private static Map<Identifier, ModuleParser> getLibParsers(
-            String pkg, Map<String, String> lib, boolean test) {
+            String pkg, Map<String, String> lib, boolean test,
+            TargetOS os) {
         if (lib == null || lib.isEmpty()) return Map.of();
         var parsers = new HashMap<Identifier, ModuleParser>();
         if (lib.containsKey(pkg)) {
@@ -182,7 +189,7 @@ public class Compiler {
         for (var le : lib.entrySet()) {
             var base = toPath(le.getValue());
             var p = new ModuleParser(le.getKey(), base, UTF_8,
-                    Map.of(), test);
+                    Map.of(), test, os);
             if (parsers.put(p.pkg(), p) != null) {
                 return argument("package '%s' conflict in libraries",
                         le.getKey());
@@ -195,7 +202,7 @@ public class Compiler {
             String pkg, Path dir,
             Map<String, String> lib) {
         return new ModuleParser(pkg, dir, UTF_8,
-                getLibParsers(pkg, lib, test), test);
+                getLibParsers(pkg, lib, test, os), test, os);
     }
 
     // ---- core pipeline ----
@@ -392,27 +399,45 @@ public class Compiler {
             var isC = factory.extension().equals(".c");
             var cmakeArgs = new ArrayList<String>();
             cmakeArgs.add("cmake");
-            if (System.getProperty("os.name", "").startsWith("Windows")) {
+
+            // Prefer Ninja on all os for fast parallel builds
+            if (TargetOS.commandExists("ninja")) {
+                cmakeArgs.add("-G");
+                cmakeArgs.add("Ninja");
+            } else if (TargetOS.isHostWindows()) {
                 cmakeArgs.add("-G");
                 cmakeArgs.add("MinGW Makefiles");
             }
+
             cmakeArgs.add(".");
-            cmakeArgs.add("-DCMAKE_C_COMPILER=cc");
+            cmakeArgs.add("-DCMAKE_C_COMPILER=" + factory.compiler());
             cmakeArgs.add("--log-level=ERROR");
-            if (!isC) cmakeArgs.add("-DCMAKE_CXX_COMPILER=c++");
+            if (!isC) cmakeArgs.add("-DCMAKE_CXX_COMPILER=" + factory.compiler());
             var ret = new Command(dir, cmakeArgs).exec();
             if (ret.code() != 0) {
                 ErrorUtil.backend("cmake configure failed (exit %d): %s",
                         ret.code(), ret.err());
                 return;
             }
-            ret = new Command(dir, "cmake", "--build", ".", "--", "-s").exec();
+
+            // --build: Ninja auto-parallelizes; Make needs -j
+            var buildArgs = new ArrayList<String>();
+            buildArgs.add("cmake");
+            buildArgs.add("--build");
+            buildArgs.add(".");
+            if (!TargetOS.commandExists("ninja")) {
+                buildArgs.add("-j");
+            }
+            buildArgs.add("--");
+            buildArgs.add("-s");
+            ret = new Command(dir, buildArgs).exec();
             if (ret.code() != 0) {
                 ErrorUtil.backend("build failed (exit %d): %s",
                         ret.code(), ret.err());
             }
         } else {
-            var ret = new Command(dir, "make", "-s").exec();
+            var makeCmd = TargetOS.detectMake();
+            var ret = new Command(dir, makeCmd, "-s", "-j").exec();
             if (ret.code() != 0) {
                 ErrorUtil.backend("build failed (exit %d): %s",
                         ret.code(), ret.err());
@@ -453,6 +478,13 @@ public class Compiler {
                         + " -fsanitize=address)\n");
             }
 
+            if (os.isCross()) {
+                var crossFlags = " --target=" + os.targetTriple()
+                        + " -D" + os.osDefine();
+                w.write("\ntarget_compile_options(${PROJECT_NAME} PRIVATE"
+                        + crossFlags + ")\n");
+            }
+
             if (!allLinkLibs.isEmpty()) {
                 w.write("\ntarget_link_libraries(${PROJECT_NAME}");
                 for (var lib : allLinkLibs) {
@@ -473,6 +505,7 @@ public class Compiler {
         var flagsVar = isC ? "CFLAGS" : "CXXFLAGS";
         var stdFlag = isC ? "--std=c11" : "--std=c++20";
         var arVar = "AR";
+        var ccDefault = factory.compiler();
 
         var linkFlags = new StringBuilder();
         for (var lib : allLinkLibs) {
@@ -482,12 +515,18 @@ public class Compiler {
         var moreFlags = asan ? " -fsanitize=address -fno-omit-frame-pointer" : "";
         if (!debug) moreFlags += " -g -O2";
 
+        // cross-compilation: add target triple + OS define so C #ifdef matches
+        if (os.isCross()) {
+            moreFlags += " --target=" + os.targetTriple();
+            moreFlags += " -D" + os.osDefine();
+        }
+
         try (var w = Files.newBufferedWriter(dir.resolve("Makefile"), UTF_8)) {
             w.write("# Makefile for Fēng generated " + (isC ? "C" : "C++") + " code\n");
             w.write("# Generated by the Fēng compiler\n\n");
 
-            w.write(compilerVar + " ?= " + (isC ? "cc" : "c++") + "\n");
-            if (!isC) w.write("CC ?= cc\n");
+            w.write(compilerVar + " ?= " + ccDefault + "\n");
+            if (!isC) w.write("CC ?= clang\n");
             w.write(flagsVar + " ?= " + stdFlag + moreFlags + "\n");
             if (!isC) w.write("CFLAGS ?= --std=c11 " + moreFlags + "\n\n");
             else w.write("\n");

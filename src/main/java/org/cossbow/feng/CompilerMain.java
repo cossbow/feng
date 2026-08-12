@@ -3,6 +3,7 @@ package org.cossbow.feng;
 import org.cossbow.feng.coder.CGenerator;
 import org.cossbow.feng.coder.CppGenerator;
 import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.TargetOS;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ITypeConverter;
@@ -52,6 +53,11 @@ public class CompilerMain {
             converter = BuildConverter.class)
     private Compiler.Build build = Compiler.Build.MAKE;
 
+    @Option(names = {"--os"},
+            description = "target os: auto (default), windows, linux",
+            converter = TargetOSConverter.class)
+    private TargetOS os = TargetOS.AUTO;
+
     @Option(names = {"-D", "--debug"},
             description = "enable debug mode (assert statements, debug checks)")
     private boolean debug;
@@ -78,6 +84,7 @@ public class CompilerMain {
         c.asan(Boolean.parseBoolean(System.getProperty("feng.asan")));
         c.test(test).testFilter(testNames);
         c.buildSystem(build);
+        c.os(os);
         c.pkg(pkg);
         c.lib(lib);
         return c;
@@ -174,6 +181,19 @@ public class CompilerMain {
             }
             if (t != null) return t;
             throw new IllegalArgumentException("Unknown builder: " + s);
+        }
+    }
+
+    static class TargetOSConverter implements ITypeConverter<TargetOS> {
+        @Override
+        public TargetOS convert(String s) {
+            return switch (s.toLowerCase()) {
+                case "auto", "a" -> TargetOS.AUTO;
+                case "windows", "win", "w" -> TargetOS.WINDOWS;
+                case "linux", "lin", "l" -> TargetOS.LINUX;
+                default -> throw new IllegalArgumentException(
+                        "Unknown os: " + s + " (use auto/windows/linux)");
+            };
         }
     }
 }
