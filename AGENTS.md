@@ -6,8 +6,9 @@ You are working on the **Fēng language compiler** source code. Follow these rul
 
 ```
 feng/
-├── specification.md          # Canonical language spec (read first)
-├── BUILD.md                  # Compiler build & usage (ai/BUILD.md)
+├── ai/
+│   ├── specification.md      # Canonical language spec (read first)
+│   └── BUILD.md              # Compiler build & usage (ai/BUILD.md)
 ├── reference_zh.md           # Language reference (Chinese, examples)
 ├── reference.md              # Language reference (English, examples)
 ├── src/main/antlr4/.../

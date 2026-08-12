@@ -11,7 +11,7 @@
 #   The script creates AGENTS.md in the project root,
 #   referencing specification.md and BUILD.md from $FENG_HOME/docs/.
 #
-#   A local .fengtemp/ directory is created (gitignore'd) for
+#   A local .output/ directory is created (gitignore'd) for
 #   compiler scratch files.
 #
 # Example:
@@ -56,12 +56,12 @@ if ! ls "$FENG_HOME"/feng-*.jar >/dev/null 2>&1; then
 fi
 
 # ---- create local directories ----
-mkdir -p "$PROJECT_DIR/.fengtemp"
+mkdir -p "$PROJECT_DIR/.output"
 if [ ! -f "$PROJECT_DIR/.gitignore" ]; then
-    echo ".fengtemp/" >> "$PROJECT_DIR/.gitignore"
+    echo ".output/" >> "$PROJECT_DIR/.gitignore"
 else
-    if ! grep -q ".fengtemp" "$PROJECT_DIR/.gitignore" 2>/dev/null; then
-        echo ".fengtemp/" >> "$PROJECT_DIR/.gitignore"
+    if ! grep -q ".output" "$PROJECT_DIR/.gitignore" 2>/dev/null; then
+        echo ".output/" >> "$PROJECT_DIR/.gitignore"
     fi
 fi
 
@@ -83,7 +83,7 @@ You are working on a **Fēng language** project. Follow these rules.
 | Language specification | \`$SPEC\` |
 | Compiler usage guide | \`$BUILD\` |
 | Fēng source files | \`*.feng\` in this project |
-| Output directory | \`.fengtemp/\` (gitignored) |
+| Output directory | \`.output/\` (gitignored) |
 
 ## Workflow
 
@@ -91,19 +91,19 @@ You are working on a **Fēng language** project. Follow these rules.
 2. [MUST] Use the compiler via:
 
    \`\`\`bash
-   java -jar $FENG_HOME_NORM/feng-<version>.jar -t f -i <source.feng> -o .fengtemp/<source>.cpp
+   java -jar $FENG_HOME_NORM/feng-<version>.jar -t f -i <source.feng> -o .output/<source>.cpp
    \`\`\`\`
 
 3. [MUST] Compile generated C++ with \`--std=c++20\`:
 
    \`\`\`bash
-   c++ --std=c++20 .fengtemp/<source>.cpp -o .fengtemp/<binary>
+   c++ --std=c++20 .output/<source>.cpp -o .output/<binary>
    \`\`\`
 
 4. [MAY] Use test mode for \`@Test\` functions:
 
    \`\`\`bash
-   java -jar $FENG_HOME_NORM/feng-<version>.jar -T -t f -i <test.feng> -o .fengtemp/<test>.cpp
+   java -jar $FENG_HOME_NORM/feng-<version>.jar -T -t f -i <test.feng> -o .output/<test>.cpp
    \`\`\`
 
 ## Key Conventions
@@ -120,7 +120,7 @@ You are working on a **Fēng language** project. Follow these rules.
 $PROJECT_NAME/
 ├── *.feng               # Fēng source files
 ├── AGENTS.md            # This file (AI instructions)
-├── .fengtemp/           # Compiler output (gitignored)
+├── .output/           # Compiler output (gitignored)
 └── .gitignore
 \`\`\`
 EOF
