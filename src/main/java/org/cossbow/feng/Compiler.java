@@ -287,6 +287,7 @@ public class Compiler {
             if (!isC && !fm.headerFiles().isEmpty()) w.write("extern \"C\" {\n");
             for (var h : fm.headerFiles()) {
                 w.append("#include ").append('"')
+                        .append(name).append("_")
                         .append(h.getFileName().toString());
                 w.append('"').write("\n");
             }
@@ -526,8 +527,9 @@ public class Compiler {
             var target = dir.resolve(src.getFileName());
             Files.copy(src, target, REPLACE_EXISTING);
         }
+        var modName = fm.path().filename();
         for (var hdr : fm.headerFiles()) {
-            var target = dir.resolve(hdr.getFileName());
+            var target = dir.resolve(modName + "_" + hdr.getFileName().toString());
             Files.copy(hdr, target, REPLACE_EXISTING);
         }
     }
