@@ -283,7 +283,7 @@ operand
     : symbol                    # VariableOperand
     | primaryExpr indexOf       # IndexOperand
     | primaryExpr memberOf      # FieldOperand
-    | primaryExpr tupleIndex    # TupleOperand
+    | primaryExpr TupleIndex    # TupleOperand
     | MUL primaryExpr           # DereferOperand
     ;
 
@@ -565,7 +565,7 @@ primaryExpr
     | primaryExpr is                                    # IsExpression
     | primaryExpr indexOf                               # IndexOfExpression
     | primaryExpr memberOf typeArguments?               # MemberOfExpression
-    | primaryExpr tupleIndex                            # TupleIndexExpression
+    | primaryExpr TupleIndex                            # TupleIndexExpression
     | primaryExpr argumentSet                           # CallExpression
     ;
 
@@ -643,8 +643,8 @@ memberOf
     : DOT member=Identifier
     ;
 
-tupleIndex
-    : DOT index=DecimalInteger
+TupleIndex
+    : DOT DecimalInteger
     ;
 
 // type for new

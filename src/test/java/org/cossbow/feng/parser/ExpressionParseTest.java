@@ -781,5 +781,70 @@ public class ExpressionParseTest extends BaseParseTest {
         Assertions.assertEquals(a, varName(me.callee()));
     }
 
+    //
+    // tuple index
+
+    @Test
+    public void testTupleIndexBasic() {
+        var name = randVarSymbol(12);
+        var expr = (TupleIndexExpression) parseExpr(name + ".0");
+        Assertions.assertEquals(name, varName(expr.subject()));
+        Assertions.assertEquals(0, expr.index());
+    }
+
+    @Test
+    public void testTupleIndexCascade() {
+        var name = randVarSymbol(12);
+        var expr = (TupleIndexExpression) parseExpr(name + ".0.1");
+        var left = (TupleIndexExpression) expr.subject();
+        Assertions.assertEquals(name, varName(left.subject()));
+        Assertions.assertEquals(0, left.index());
+        Assertions.assertEquals(1, expr.index());
+    }
+
+    @Test
+    public void testTupleIndexThenMemberOf() {
+        var name = randVarSymbol(12);
+        var field = randVarName(6);
+        var expr = (MemberOfExpression) parseExpr(name + ".0." + field);
+        var left = (TupleIndexExpression) expr.subject();
+        Assertions.assertEquals(name, varName(left.subject()));
+        Assertions.assertEquals(0, left.index());
+        Assertions.assertEquals(field, expr.member());
+    }
+
+    @Test
+    public void testMemberOfThenTupleIndex() {
+        var name = randVarSymbol(12);
+        var field = randVarName(6);
+        var expr = (TupleIndexExpression) parseExpr(name + "." + field + ".0");
+        var left = (MemberOfExpression) expr.subject();
+        Assertions.assertEquals(name, varName(left.subject()));
+        Assertions.assertEquals(field, left.member());
+        Assertions.assertEquals(0, expr.index());
+    }
+
+    @Test
+    public void testTupleIndexThenIndexOf() {
+        var name = randVarSymbol(12);
+        var indexName = randVarSymbol(6);
+        var expr = (IndexOfExpression) parseExpr(name + ".0[" + indexName + "]");
+        var left = (TupleIndexExpression) expr.subject();
+        Assertions.assertEquals(name, varName(left.subject()));
+        Assertions.assertEquals(0, left.index());
+        Assertions.assertEquals(indexName, varName(expr.index()));
+    }
+
+    @Test
+    public void testIndexOfThenTupleIndex() {
+        var name = randVarSymbol(12);
+        var indexName = randVarSymbol(6);
+        var expr = (TupleIndexExpression) parseExpr(name + "[" + indexName + "].0");
+        var left = (IndexOfExpression) expr.subject();
+        Assertions.assertEquals(name, varName(left.subject()));
+        Assertions.assertEquals(indexName, varName(left.index()));
+        Assertions.assertEquals(0, expr.index());
+    }
+
 
 }

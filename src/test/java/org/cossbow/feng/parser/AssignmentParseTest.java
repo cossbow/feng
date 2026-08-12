@@ -112,6 +112,75 @@ public class AssignmentParseTest extends BaseParseTest {
             Assertions.assertEquals(v, varName(indexLeft.subject()));
             Assertions.assertEquals(i, varName(indexLeft.index()));
         });
+
+        assignmentOperationTester(v + ".0", lhs -> {
+            var tupleLeft = (TupleOperand) lhs;
+            Assertions.assertEquals(v, varName(tupleLeft.subject()));
+            Assertions.assertEquals(0, tupleLeft.index());
+        });
+    }
+
+    //
+    // tuple operand
+
+    @Test
+    public void testTupleOperandBasic() {
+        var name = randVarSymbol(12);
+        var val = randVarSymbol(8);
+        var code = "%s.0=%s;".formatted(name, val);
+        var stmt = (AssignmentsStatement) doParseLocal(code);
+        var a = stmt.list().getFirst();
+        var op = (TupleOperand) a.operand();
+        Assertions.assertEquals(name, varName(op.subject()));
+        Assertions.assertEquals(0, op.index());
+        Assertions.assertEquals(val, varName(a.value()));
+    }
+
+    @Test
+    public void testTupleOperandCascade() {
+        var name = randVarSymbol(12);
+        var val = randVarSymbol(8);
+        var code = "%s.0.1=%s;".formatted(name, val);
+        var stmt = (AssignmentsStatement) doParseLocal(code);
+        var a = stmt.list().getFirst();
+        var op = (TupleOperand) a.operand();
+        Assertions.assertEquals(1, op.index());
+        var left = (TupleIndexExpression) op.subject();
+        Assertions.assertEquals(name, varName(left.subject()));
+        Assertions.assertEquals(0, left.index());
+        Assertions.assertEquals(val, varName(a.value()));
+    }
+
+    @Test
+    public void testTupleOperandThenField() {
+        var name = randVarSymbol(12);
+        var field = randVarName(6);
+        var val = randVarSymbol(8);
+        var code = "%s.0.%s=%s;".formatted(name, field, val);
+        var stmt = (AssignmentsStatement) doParseLocal(code);
+        var a = stmt.list().getFirst();
+        var op = (FieldOperand) a.operand();
+        Assertions.assertEquals(field, op.field());
+        var left = (TupleIndexExpression) op.subject();
+        Assertions.assertEquals(name, varName(left.subject()));
+        Assertions.assertEquals(0, left.index());
+        Assertions.assertEquals(val, varName(a.value()));
+    }
+
+    @Test
+    public void testFieldOperandThenTuple() {
+        var name = randVarSymbol(12);
+        var field = randVarName(6);
+        var val = randVarSymbol(8);
+        var code = "%s.%s.0=%s;".formatted(name, field, val);
+        var stmt = (AssignmentsStatement) doParseLocal(code);
+        var a = stmt.list().getFirst();
+        var op = (TupleOperand) a.operand();
+        Assertions.assertEquals(0, op.index());
+        var left = (MemberOfExpression) op.subject();
+        Assertions.assertEquals(name, varName(left.subject()));
+        Assertions.assertEquals(field, left.member());
+        Assertions.assertEquals(val, varName(a.value()));
     }
 
 }

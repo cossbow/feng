@@ -1008,8 +1008,8 @@ final class SourceParseVisitor
     public Entity visitTupleIndexExpression(
             FengParser.TupleIndexExpressionContext ctx) {
         var subject = (PrimaryExpression) visit(ctx.primaryExpr());
-        var index = Integer.parseInt(ctx
-                .tupleIndex().DecimalInteger().getText());
+        var idx = ctx.TupleIndex().getText().substring(1);
+        var index = Integer.parseInt(idx);
         return new TupleIndexExpression(posOf(ctx), subject, index);
     }
 
@@ -1229,8 +1229,8 @@ final class SourceParseVisitor
     @Override
     public Entity visitTupleOperand(FengParser.TupleOperandContext ctx) {
         var subject = (PrimaryExpression) visit(ctx.primaryExpr());
-        var index = Integer.parseInt(ctx
-                .tupleIndex().DecimalInteger().getText());
+        var idx = ctx.TupleIndex().getText().substring(1);
+        var index = Integer.parseInt(idx);
         return new TupleOperand(posOf(ctx), subject, index);
     }
 
