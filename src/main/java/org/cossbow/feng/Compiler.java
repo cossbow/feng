@@ -202,6 +202,11 @@ public class Compiler {
 
     public void compile(DAGGraph<FModule> dag, Path dir)
             throws IOException {
+        // Clean stale generated files from previous compilations to prevent
+        // symbol ID mismatches (the static IdGenerator in Variable assigns
+        // different IDs across runs).
+        cleanBuildDir(dir);
+
         var moduleNames = new ArrayList<String>();
         var ma = new ModuleAnalysis(test);
         ma.analyse(dag);
@@ -521,6 +526,30 @@ public class Compiler {
     }
 
     // ---- utilities ----
+
+    /**
+     * Remove stale generated C/H files from a previous compilation.
+     * Without this, old {@code .c} / {@code .h} files holding
+     * different variable IDs ({@link org.cossbow.feng.ast.dcl.Variable#id()})
+     * cause symbol mismatches at link time.
+     */
+    private static void cleanBuildDir(Path dir) throws IOException {
+        if (!Files.isDirectory(dir)) return;
+        try (var stream = Files.list(dir)) {
+            for (var f : stream.toList()) {
+                var name = f.getFileName().toString();
+                // Clean generated source/header/object/build files.
+                // C source files belonging to modules are re‑copied by
+                // copyCSources() later in the pipeline.
+                if (name.endsWith(".c") || name.endsWith(".h")
+                        || name.endsWith(".o") || name.endsWith(".obj")
+                        || name.equals("Makefile")
+                        || name.equals("CMakeLists.txt")) {
+                    Files.deleteIfExists(f);
+                }
+            }
+        }
+    }
 
     void copyCSources(FModule fm, Path dir) throws IOException {
         for (var src : fm.cSources()) {
