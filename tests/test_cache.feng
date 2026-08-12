@@ -1,0 +1,141 @@
+import std$testing;
+import std$container c;
+
+// ===== hash/equal helpers =====
+
+func intHash(k int) int {
+    return k;
+}
+func intEq(a, b int) bool {
+    return a == b;
+}
+
+// ===== basic ops =====
+
+@Test
+func testCachePutGet() {
+    var ca = c$newCache`int,int`(3, intHash, intEq);
+    ca.put(1, 10);
+    ca.put(2, 20);
+    var r1 = ca.get(1);
+    testing$assertTrue(r1.1);
+    testing$assertTrue(r1.0 == 10);
+    var r2 = ca.get(2);
+    testing$assertTrue(r2.1);
+    testing$assertTrue(r2.0 == 20);
+}
+
+@Test
+func testCacheNotFound() {
+    var ca = c$newCache`int,int`(3, intHash, intEq);
+    var r = ca.get(99);
+    testing$assertFalse(r.1);
+}
+
+@Test
+func testCacheUpdate() {
+    var ca = c$newCache`int,int`(3, intHash, intEq);
+    ca.put(1, 10);
+    ca.put(1, 99);
+    var r = ca.get(1);
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0 == 99);
+}
+
+// ===== eviction =====
+
+@Test
+func testCacheEvictLRU() {
+    var ca = c$newCache`int,int`(2, intHash, intEq);
+    ca.put(1, 10);
+    ca.put(2, 20);
+    ca.put(3, 30);  // should evict key 1
+    testing$assertFalse(ca.get(1).1);
+    testing$assertTrue(ca.get(2).1);
+    testing$assertTrue(ca.get(3).1);
+}
+
+@Test
+func testCacheAccessUpdatesLRU() {
+    var ca = c$newCache`int,int`(2, intHash, intEq);
+    ca.put(1, 10);
+    ca.put(2, 20);
+    // Access key 1 → now 2 is LRU
+    testing$assertTrue(ca.get(1).1);
+    ca.put(3, 30);  // should evict key 2
+    testing$assertTrue(ca.get(1).1);
+    testing$assertFalse(ca.get(2).1);
+    testing$assertTrue(ca.get(3).1);
+}
+
+// ===== size / capacity =====
+
+@Test
+func testCacheSize() {
+    var ca = c$newCache`int,int`(5, intHash, intEq);
+    testing$assertTrue(ca.length() == 0);
+    testing$assertTrue(ca.isEmpty());
+    ca.put(1, 10);
+    testing$assertTrue(ca.length() == 1);
+    testing$assertTrue(!ca.isEmpty());
+    testing$assertTrue(ca.capacity() == 5);
+}
+
+// ===== remove =====
+
+@Test
+func testCacheRemove() {
+    var ca = c$newCache`int,int`(3, intHash, intEq);
+    ca.put(1, 10);
+    ca.put(2, 20);
+    var ok = ca.remove(1);
+    testing$assertTrue(ok);
+    testing$assertFalse(ca.get(1).1);
+    testing$assertTrue(ca.length() == 1);
+}
+
+@Test
+func testCacheRemoveNotFound() {
+    var ca = c$newCache`int,int`(3, intHash, intEq);
+    var ok = ca.remove(99);
+    testing$assertFalse(ok);
+}
+
+// ===== contains =====
+
+@Test
+func testCacheContains() {
+    var ca = c$newCache`int,int`(3, intHash, intEq);
+    ca.put(1, 10);
+    testing$assertTrue(ca.contains(1));
+    testing$assertFalse(ca.contains(2));
+}
+
+// ===== clear =====
+
+@Test
+func testCacheClear() {
+    var ca = c$newCache`int,int`(3, intHash, intEq);
+    ca.put(1, 10);
+    ca.put(2, 20);
+    ca.clear();
+    testing$assertTrue(ca.isEmpty());
+    testing$assertTrue(ca.length() == 0);
+    testing$assertFalse(ca.get(1).1);
+}
+
+// ===== re-insert after eviction =====
+
+@Test
+func testCacheReinsert() {
+    var ca = c$newCache`int,int`(2, intHash, intEq);
+    ca.put(1, 10);
+    ca.put(2, 20);
+    ca.put(3, 30);  // evicts 1
+    ca.put(1, 11);  // re-insert 1, evicts 2
+    var r = ca.get(1);
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0 == 11);
+    testing$assertFalse(ca.get(2).1);
+    testing$assertTrue(ca.get(3).1);
+}

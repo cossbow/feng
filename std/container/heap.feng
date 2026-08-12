@@ -1,0 +1,108 @@
+// ===== Heap`T` — binary heap (array-based) =====
+//
+// Default: min-heap when cmp(a,b) < 0 means a < b.
+// For a max-heap, use cmp(a,b) where a > b returns -1.
+
+import std$error;
+
+export
+class Heap`T` {
+    var buf [*]T;
+    var size int;
+    const cmp func(T,T)int;
+
+    // ===== helpers =====
+
+    func parent(i int) int { return (i - 1) / 2; }
+    func left(i int) int { return 2 * i + 1; }
+    func right(i int) int { return 2 * i + 2; }
+
+    func grow() {
+        var cap = 0;
+        if (buf != nil) { cap = buf.length; }
+        if (size < cap) { return; }
+        var newCap = cap * 2;
+        if (newCap < 8) { newCap = 8; }
+        var nb = new([newCap]T);
+        for (var i = 0; i < size; i += 1) { nb[i] = buf[i]; }
+        buf = nb;
+    }
+
+    func swap(i, j int) {
+        var tmp = buf[i];
+        buf[i] = buf[j];
+        buf[j] = tmp;
+    }
+
+    // siftUp restores heap property after push.
+    func siftUp(start int) {
+        var i = start;
+        var p = parent(i);
+        for (i > 0 && cmp(buf[i], buf[p]) < 0) {
+            swap(i, p);
+            i = p;
+            p = parent(i);
+        }
+    }
+
+    // siftDown restores heap property after pop.
+    func siftDown(start int) {
+        var i = start;
+        var done = false;
+        for (!done) {
+            var l = left(i);
+            var r = right(i);
+            var smallest = i;
+            if (l < size && cmp(buf[l], buf[smallest]) < 0) {
+                smallest = l;
+            }
+            if (r < size && cmp(buf[r], buf[smallest]) < 0) {
+                smallest = r;
+            }
+            if (smallest == i) {
+                done = true;
+            } else {
+                swap(i, smallest);
+                i = smallest;
+            }
+        }
+    }
+
+    // ===== core ops =====
+
+    export func push(e T) {
+        grow();
+        buf[size] = e;
+        siftUp(size);
+        size += 1;
+    }
+
+    export func pop() T {
+        if (size == 0) { throw new(error$IllegalStateException); }
+        var top = buf[0];
+        size -= 1;
+        buf[0] = buf[size];
+        siftDown(0);
+        return top;
+    }
+
+    export func peek() T {
+        if (size == 0) { throw new(error$IllegalStateException); }
+        return buf[0];
+    }
+
+    // ===== query =====
+
+    export func length() int { return size; }
+    export func isEmpty() bool { return size == 0; }
+
+    export func clear() {
+        size = 0;
+    }
+}
+
+// ===== factory =====
+
+export func newHeap`T`(cmp func(T,T)int) *Heap`T` {
+    return new(Heap`T`, {cmp=cmp, buf=new([0]T)});
+}

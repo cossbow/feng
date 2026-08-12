@@ -1,0 +1,219 @@
+// ===== Cache`K,V` — LRU (least-recently-used) cache =====
+//
+// Backed by a hash table and doubly-linked list for O(1) get/put/remove.
+// Evicts the least-recently-used entry when capacity is exceeded.
+
+export
+class Entry`K,V` {
+    var key K;
+    var value V;
+    var prev *?Entry`K,V`;       // linked-list prev
+    var next *?Entry`K,V`;       // linked-list next
+    var hashNext *?Entry`K,V`;   // hash-bucket chain next
+}
+
+export
+class Cache`K,V` {
+    const hash func(K)int;
+    const equal func(K,K)bool;
+    const cap int;
+    var buckets [*?]*?Entry`K,V`;
+    var size int;
+    var head *?Entry`K,V`;   // most-recently-used
+    var tail *?Entry`K,V`;   // least-recently-used
+    var threshold int;
+
+    macro resource free() {
+        var cur = head;
+        for (cur != nil) {
+            var n = cur.next;
+            cur.prev = nil;
+            cur.next = nil;
+            cur.hashNext = nil;
+            cur = n;
+        }
+    }
+
+    // ===== linked-list helpers =====
+
+    func unlink(node *?Entry`K,V`) {
+        if (node == nil) { return; }
+        var p = node.prev;
+        var n = node.next;
+        if (p != nil) { p.next = n; }
+        if (n != nil) { n.prev = p; }
+        if (head == node) { head = n; }
+        if (tail == node) { tail = p; }
+        node.prev = nil;
+        node.next = nil;
+    }
+
+    func pushFront(node *?Entry`K,V`) {
+        if (node == nil) { return; }
+        node.prev = nil;
+        var h = head;
+        node.next = h;
+        if (h != nil) { h.prev = node; }
+        head = node;
+        if (tail == nil) { tail = node; }
+    }
+
+    func moveToFront(node *?Entry`K,V`) {
+        if (node == nil || head == node) { return; }
+        unlink(node);
+        pushFront(node);
+    }
+
+    func removeTail() {
+        var t = tail;
+        if (t != nil) {
+            unlink(t);
+            removeFromMap(t);
+            size -= 1;
+        }
+    }
+
+    // ===== hash-table helpers =====
+
+    func rehash() [*?]*?Entry`K,V` {
+        var bk = buckets;
+        if (bk == nil || bk.length == 0) {
+            bk = new([16]*?Entry`K,V`);
+            buckets = bk;
+            threshold = 12;
+            return bk;
+        }
+        if (size < threshold) { return bk; }
+        var oldLen = bk.length;
+        var newLen = oldLen * 2;
+        var newBuck = new([newLen]*?Entry`K,V`);
+        for (var i = 0; i < oldLen; i += 1) {
+            var cur = bk[i];
+            for (cur != nil) {
+                var hNext = cur.hashNext;
+                var idx = hash(cur.key) & (newLen - 1);
+                cur.hashNext = newBuck[idx];
+                newBuck[idx] = cur;
+                cur = hNext;
+            }
+        }
+        buckets = newBuck;
+        threshold = int(float32(newLen) * 0.75);
+        return newBuck;
+    }
+
+    func findInMap(key K) *?Entry`K,V` {
+        var bk = buckets;
+        if (bk == nil || bk.length == 0) { return nil; }
+        var idx = hash(key) & (bk.length - 1);
+        var cur = bk[idx];
+        for (cur != nil && !equal(cur.key, key)) {
+            cur = cur.hashNext;
+        }
+        return cur;
+    }
+
+    func addToMap(node *?Entry`K,V`) {
+        if (node == nil) { return; }
+        var bk = rehash();
+        if (bk == nil) { return; }
+        var idx = hash(node.key) & (bk.length - 1);
+        node.hashNext = bk[idx];
+        bk[idx] = node;
+        size += 1;
+    }
+
+    func removeFromMap(node *?Entry`K,V`) {
+        if (node == nil) { return; }
+        var bk = buckets;
+        if (bk == nil || bk.length == 0) { return; }
+        var idx = hash(node.key) & (bk.length - 1);
+        var cur = bk[idx];
+        var prev *?Entry`K,V` = nil;
+        for (cur != nil) {
+            if (equal(cur.key, node.key)) {
+                if (prev == nil) {
+                    bk[idx] = cur.hashNext;
+                } else {
+                    prev.hashNext = cur.hashNext;
+                }
+                return;
+            }
+            prev = cur;
+            cur = cur.hashNext;
+        }
+    }
+
+    // ===== public API =====
+
+    export func get(key K) (V, bool) {
+        var node = findInMap(key);
+        if (node == nil) {
+            var zero V;
+            return (zero, false);
+        }
+        moveToFront(node);
+        return (node.value, true);
+    }
+
+    export func put(key K, value V) {
+        var node = findInMap(key);
+        if (node != nil) {
+            node.value = value;
+            moveToFront(node);
+            return;
+        }
+        for (size >= cap) {
+            removeTail();
+        }
+        var e = new(Entry`K,V`);
+        e.key = key;
+        e.value = value;
+        addToMap(e);
+        pushFront(e);
+    }
+
+    export func remove(key K) bool {
+        var node = findInMap(key);
+        if (node == nil) { return false; }
+        unlink(node);
+        removeFromMap(node);
+        size -= 1;
+        return true;
+    }
+
+    export func contains(key K) bool {
+        return findInMap(key) != nil;
+    }
+
+    export func length() int { return size; }
+    export func capacity() int { return cap; }
+    export func isEmpty() bool { return size == 0; }
+
+    export func clear() {
+        var cur = head;
+        for (cur != nil) {
+            var n = cur.next;
+            cur.prev = nil;
+            cur.next = nil;
+            cur.hashNext = nil;
+            cur = n;
+        }
+        head = nil;
+        tail = nil;
+        buckets = nil;
+        size = 0;
+        threshold = 0;
+    }
+}
+
+// ===== factory =====
+
+export func newCache`K,V`(cap int, hash func(K)int, equal func(K,K)bool) *Cache`K,V` {
+    return new(Cache`K,V`, {
+        cap = cap,
+        hash = hash,
+        equal = equal,
+        buckets = new([0]*?Entry`K,V`)
+    });
+}

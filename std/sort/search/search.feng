@@ -1,0 +1,75 @@
+// ===== Binary Search — standard / lower-bound / upper-bound =====
+//
+// All functions require the array to be sorted according to cmp.
+// cmp(a, b) < 0 means a < b, == 0 means a == b, > 0 means a > b.
+
+// binarySearch returns the index of target in the sorted array, or -1 if not found.
+export
+func binarySearch`T`(arr [&#]T, target T, cmp func(T,T)int) int {
+    return binarySearchRange`T`(arr, target, 0, arr.length - 1, cmp);
+}
+
+// binarySearchRange searches within [lo, hi] (inclusive).
+export
+func binarySearchRange`T`(arr [&#]T, target T, lo, hi int, cmp func(T,T)int) int {
+    var l = lo;
+    var h = hi;
+    for (l <= h) {
+        var mid = l + (h - l) / 2;
+        var c = cmp(target, arr[mid]);
+        if (c < 0) {
+            h = mid - 1;
+        } else if (c > 0) {
+            l = mid + 1;
+        } else {
+            return mid;
+        }
+    }
+    return -1;
+}
+
+// lowerBound returns the index of the first element >= target.
+// If all elements < target, returns arr.length.
+export
+func lowerBound`T`(arr [&#]T, target T, cmp func(T,T)int) int {
+    var lo = 0;
+    var hi = arr.length;
+    for (lo < hi) {
+        var mid = lo + (hi - lo) / 2;
+        if (cmp(arr[mid], target) < 0) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    return lo;
+}
+
+// upperBound returns the index of the first element > target.
+// If all elements <= target, returns arr.length.
+export
+func upperBound`T`(arr [&#]T, target T, cmp func(T,T)int) int {
+    var lo = 0;
+    var hi = arr.length;
+    for (lo < hi) {
+        var mid = lo + (hi - lo) / 2;
+        if (cmp(arr[mid], target) <= 0) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    return lo;
+}
+
+// equalRange returns (lower, upper) — the half-open range [lower, upper)
+// of elements equal to target. If not found, returns (lo, lo) where lo is the
+// insertion point.
+export
+func equalRange`T`(arr [&#]T, target T, cmp func(T,T)int) (int,int) {
+    var lo = lowerBound`T`(arr, target, cmp);
+    if (lo == arr.length || cmp(arr[lo], target) != 0) {
+        return (lo, lo);
+    }
+    return (lo, upperBound`T`(arr, target, cmp));
+}

@@ -1,0 +1,110 @@
+import std$testing;
+import std$sort$search s;
+
+func cmpInt(a, b int) int {
+    if (a < b) { return -1; }
+    if (a > b) { return 1; }
+    return 0;
+}
+
+// ===== binarySearch =====
+
+@Test
+func testBinarySearchFound() {
+    var arr [6]int = [1, 3, 5, 7, 9, 11];
+    testing$assertTrue(s$binarySearch`int`(arr, 5, cmpInt) == 2);
+    testing$assertTrue(s$binarySearch`int`(arr, 1, cmpInt) == 0);
+    testing$assertTrue(s$binarySearch`int`(arr, 11, cmpInt) == 5);
+}
+
+@Test
+func testBinarySearchNotFound() {
+    var arr [6]int = [1, 3, 5, 7, 9, 11];
+    testing$assertTrue(s$binarySearch`int`(arr, 0, cmpInt) == -1);
+    testing$assertTrue(s$binarySearch`int`(arr, 6, cmpInt) == -1);
+    testing$assertTrue(s$binarySearch`int`(arr, 12, cmpInt) == -1);
+}
+
+@Test
+func testBinarySearchEmpty() {
+    var arr [0]int;
+    testing$assertTrue(s$binarySearch`int`(arr, 1, cmpInt) == -1);
+}
+
+@Test
+func testBinarySearchSingle() {
+    var arr [1]int = [42];
+    testing$assertTrue(s$binarySearch`int`(arr, 42, cmpInt) == 0);
+    testing$assertTrue(s$binarySearch`int`(arr, 7, cmpInt) == -1);
+}
+
+// ===== lowerBound =====
+
+@Test
+func testLowerBoundFound() {
+    var arr [6]int = [1, 3, 5, 7, 9, 11];
+    testing$assertTrue(s$lowerBound`int`(arr, 5, cmpInt) == 2);
+    testing$assertTrue(s$lowerBound`int`(arr, 1, cmpInt) == 0);
+}
+
+@Test
+func testLowerBoundMissing() {
+    var arr [6]int = [1, 3, 5, 7, 9, 11];
+    testing$assertTrue(s$lowerBound`int`(arr, 0, cmpInt) == 0);
+    testing$assertTrue(s$lowerBound`int`(arr, 6, cmpInt) == 3);
+    testing$assertTrue(s$lowerBound`int`(arr, 12, cmpInt) == 6);
+}
+
+@Test
+func testLowerBoundDuplicates() {
+    var arr [5]int = [2, 2, 2, 2, 2];
+    testing$assertTrue(s$lowerBound`int`(arr, 2, cmpInt) == 0);
+}
+
+// ===== upperBound =====
+
+@Test
+func testUpperBoundFound() {
+    var arr [6]int = [1, 3, 5, 7, 9, 11];
+    testing$assertTrue(s$upperBound`int`(arr, 5, cmpInt) == 3);
+    testing$assertTrue(s$upperBound`int`(arr, 11, cmpInt) == 6);
+}
+
+@Test
+func testUpperBoundMissing() {
+    var arr [6]int = [1, 3, 5, 7, 9, 11];
+    testing$assertTrue(s$upperBound`int`(arr, 0, cmpInt) == 0);
+    testing$assertTrue(s$upperBound`int`(arr, 6, cmpInt) == 3);
+}
+
+@Test
+func testUpperBoundDuplicates() {
+    var arr [5]int = [2, 2, 2, 2, 2];
+    testing$assertTrue(s$upperBound`int`(arr, 2, cmpInt) == 5);
+}
+
+// ===== equalRange =====
+
+@Test
+func testEqualRangeFound() {
+    var arr [6]int = [1, 3, 5, 7, 9, 11];
+    var r = s$equalRange`int`(arr, 5, cmpInt);
+    testing$assertTrue(r.0 == 2);
+    testing$assertTrue(r.1 == 3);
+}
+
+@Test
+func testEqualRangeDuplicates() {
+    var arr [5]int = [2, 2, 2, 2, 2];
+    var r = s$equalRange`int`(arr, 2, cmpInt);
+    testing$assertTrue(r.0 == 0);
+    testing$assertTrue(r.1 == 5);
+}
+
+@Test
+func testEqualRangeNotFound() {
+    var arr [6]int = [1, 3, 5, 7, 9, 11];
+    var r = s$equalRange`int`(arr, 4, cmpInt);
+    testing$assertTrue(r.0 == 2);
+    testing$assertTrue(r.1 == 2);   // .0 == .1 means not found
+}
