@@ -1,0 +1,182 @@
+import std$testing;
+import std$path;
+import std$string;
+
+// ===== join =====
+
+@Test
+func testJoinSimple() {
+    var a = string$fromUtf8("foo");
+    var b = string$fromUtf8("bar");
+    var r = path$join(a, b);
+    testing$assertTrue(r.equals(string$fromUtf8("foo/bar")));
+}
+
+@Test
+func testJoinNoSep() {
+    var a = string$fromUtf8("foo/");
+    var b = string$fromUtf8("bar");
+    var r = path$join(a, b);
+    testing$assertTrue(r.equals(string$fromUtf8("foo/bar")));
+}
+
+@Test
+func testJoinEmpty() {
+    var a = string$EMPTY;
+    var b = string$fromUtf8("bar");
+    testing$assertTrue(path$join(a, b).equals(b));
+    testing$assertTrue(path$join(b, a).equals(b));
+}
+
+@Test
+func testJoinRoot() {
+    var a = string$fromUtf8("/");
+    var b = string$fromUtf8("etc");
+    var r = path$join(a, b);
+    testing$assertTrue(r.equals(string$fromUtf8("/etc")));
+}
+
+// ===== base =====
+
+@Test
+func testBaseSimple() {
+    var r = path$base(string$fromUtf8("/foo/bar/baz.txt"));
+    testing$assertTrue(r.equals(string$fromUtf8("baz.txt")));
+}
+
+@Test
+func testBaseTrailingSlash() {
+    var r = path$base(string$fromUtf8("/foo/bar/"));
+    testing$assertTrue(r.equals(string$fromUtf8("bar")));
+}
+
+@Test
+func testBaseRoot() {
+    var r = path$base(string$fromUtf8("/"));
+    testing$assertTrue(r.equals(string$fromUtf8("/")));
+}
+
+@Test
+func testBaseEmpty() {
+    var r = path$base(string$EMPTY);
+    testing$assertTrue(r.equals(string$fromUtf8(".")));
+}
+
+@Test
+func testBaseNoDir() {
+    var r = path$base(string$fromUtf8("foo.txt"));
+    testing$assertTrue(r.equals(string$fromUtf8("foo.txt")));
+}
+
+// ===== dir =====
+
+@Test
+func testDirSimple() {
+    var r = path$dir(string$fromUtf8("/foo/bar/baz.txt"));
+    testing$assertTrue(r.equals(string$fromUtf8("/foo/bar")));
+}
+
+@Test
+func testDirRoot() {
+    var r = path$dir(string$fromUtf8("/foo"));
+    testing$assertTrue(r.equals(string$fromUtf8("/")));
+}
+
+@Test
+func testDirNoDir() {
+    var r = path$dir(string$fromUtf8("foo.txt"));
+    testing$assertTrue(r.equals(string$fromUtf8(".")));
+}
+
+// ===== ext =====
+
+@Test
+func testExtSimple() {
+    var r = path$ext(string$fromUtf8("/foo/bar.txt"));
+    testing$assertTrue(r.equals(string$fromUtf8(".txt")));
+}
+
+@Test
+func testExtNoExt() {
+    var r = path$ext(string$fromUtf8("/foo/bar"));
+    testing$assertTrue(r.equals(string$EMPTY));
+}
+
+@Test
+func testExtHidden() {
+    var r = path$ext(string$fromUtf8("/foo/.hidden"));
+    testing$assertTrue(r.equals(string$EMPTY));
+}
+
+@Test
+func testExtMultiDot() {
+    var r = path$ext(string$fromUtf8("/foo/bar.tar.gz"));
+    testing$assertTrue(r.equals(string$fromUtf8(".gz")));
+}
+
+// ===== split =====
+
+@Test
+func testSplit() {
+    var t = path$split(string$fromUtf8("/foo/bar/baz.txt"));
+    testing$assertTrue(t.0.equals(string$fromUtf8("/foo/bar")));
+    testing$assertTrue(t.1.equals(string$fromUtf8("baz.txt")));
+}
+
+// ===== isAbs =====
+
+@Test
+func testIsAbsTrue() {
+    testing$assertTrue(path$isAbs(string$fromUtf8("/foo/bar")));
+    testing$assertTrue(path$isAbs(string$fromUtf8("/")));
+}
+
+@Test
+func testIsAbsFalse() {
+    testing$assertFalse(path$isAbs(string$fromUtf8("foo/bar")));
+    testing$assertFalse(path$isAbs(string$EMPTY));
+}
+
+// ===== clean =====
+
+@Test
+func testCleanSimple() {
+    var r = path$clean(string$fromUtf8("foo/bar"));
+    testing$assertTrue(r.equals(string$fromUtf8("foo/bar")));
+}
+
+@Test
+func testCleanDoubleSep() {
+    var r = path$clean(string$fromUtf8("foo//bar"));
+    testing$assertTrue(r.equals(string$fromUtf8("foo/bar")));
+}
+
+@Test
+func testCleanDot() {
+    var r = path$clean(string$fromUtf8("foo/./bar"));
+    testing$assertTrue(r.equals(string$fromUtf8("foo/bar")));
+}
+
+@Test
+func testCleanDotDot() {
+    var r = path$clean(string$fromUtf8("foo/bar/../baz"));
+    testing$assertTrue(r.equals(string$fromUtf8("foo/baz")));
+}
+
+@Test
+func testCleanEmpty() {
+    var r = path$clean(string$EMPTY);
+    testing$assertTrue(r.equals(string$fromUtf8(".")));
+}
+
+@Test
+func testCleanTrailingSlash() {
+    var r = path$clean(string$fromUtf8("/foo/bar/"));
+    testing$assertTrue(r.equals(string$fromUtf8("/foo/bar")));
+}
+
+@Test
+func testCleanRoot() {
+    var r = path$clean(string$fromUtf8("/"));
+    testing$assertTrue(r.equals(string$fromUtf8("/")));
+}

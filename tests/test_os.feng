@@ -1,8 +1,55 @@
 import std$testing;
 import std$os;
+import std$string;
 
 @Test
 func testPrintf() {
     var i = 100;
     os$printf("{}", i);
+}
+
+@Test
+func testMakeDir() {
+    var ok = os$makeDir("test_tmp_dir");
+    testing$assertTrue(ok);
+    os$removeDir("test_tmp_dir");
+}
+
+@Test
+func testExists() {
+    testing$assertFalse(os$exists("__nonexistent_path__"));
+}
+
+@Test
+func testRemove() {
+    var ok = os$makeDir("test_rm_dir");
+    testing$assertTrue(ok);
+    var r = os$removeDir("test_rm_dir");
+    testing$assertTrue(r);
+}
+
+@Test
+func testGetEnvVar() {
+    var s = os$getEnvVar("PATH");
+    testing$assertFalse(s.isEmpty());
+}
+
+@Test
+func testGetEnvVarMissing() {
+    var s = os$getEnvVar("__FENG_NONEXISTENT_VAR__");
+    testing$assertTrue(s.isEmpty());
+}
+
+@Test
+func testSetEnvVar() {
+    var ok = os$setEnvVar("FENG_TEST_VAR", "hello");
+    testing$assertTrue(ok);
+    var val = os$getEnvVar("FENG_TEST_VAR");
+    testing$assertTrue(val.equals(string$fromUtf8("hello")));
+}
+
+@Test
+func testGetWorkDir() {
+    var dir = os$getWorkDir();
+    testing$assertFalse(dir.isEmpty());
 }

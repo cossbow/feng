@@ -1,3 +1,5 @@
+import std$string;
+
 export
 enum OpenMode {
     Read,
@@ -114,4 +116,117 @@ const stderr = file(__acrt_iob_func(2));
 export
 func printf(fmt [&#]byte, ...) {
     format(stdout, fmt, ...);
+}
+
+// ========== OS utility functions ==========
+
+// Helper: convert a null-terminated C string (from a buffer) to Fēng String.
+func cBufToString(buf [*#]byte, maxLen int) string$String {
+    var len = 0;
+    for (len < maxLen && buf[len] != 0) {
+        len += 1;
+    }
+    if (len == 0) { return string$EMPTY; }
+    var result = new([len]byte);
+    for (var i = 0; i < len; i += 1) {
+        result[i] = buf[i];
+    }
+    return string$fromUtf8(result);
+}
+
+// ===== Directory operations =====
+
+// Create a directory. Returns true on success.
+export
+func makeDir(path [&#]byte) bool {
+    var cpath = toCStr(path);
+    return mkdir(cpath.values) == 0;
+}
+
+// Remove a file. Returns true on success.
+export
+func removeFile(path [&#]byte) bool {
+    var cpath = toCStr(path);
+    return remove(cpath.values) == 0;
+}
+
+// Remove an empty directory. Returns true on success.
+export
+func removeDir(path [&#]byte) bool {
+    var cpath = toCStr(path);
+    return rmdir(cpath.values) == 0;
+}
+
+// ===== File/path existence =====
+
+// Check if a file or directory exists.
+export
+func exists(path [&#]byte) bool {
+    var cpath = toCStr(path);
+    return access(cpath.values, 0) == 0;
+}
+
+// Check if a file or directory is readable.
+export
+func isReadable(path [&#]byte) bool {
+    var cpath = toCStr(path);
+    return access(cpath.values, 4) == 0;
+}
+
+// Check if a file or directory is writable.
+export
+func isWritable(path [&#]byte) bool {
+    var cpath = toCStr(path);
+    return access(cpath.values, 2) == 0;
+}
+
+// ===== Environment variables =====
+
+// Get an environment variable. Returns empty string if not set.
+export
+func getEnvVar(name [&#]byte) string$String {
+    var cname = toCStr(name);
+    var ptr = getenv(cname.values);
+    if (ptr == 0) { return string$EMPTY; }
+    var len = int(strlen(ptr));
+    if (len == 0) { return string$EMPTY; }
+    var buf = new([len]byte);
+    memcpy(buf.values, ptr, uint64(len));
+    return string$fromUtf8(buf);
+}
+
+// Set an environment variable. Returns true on success.
+export
+func setEnvVar(name, value [&#]byte) bool {
+    // Build "NAME=VALUE" string
+    var totalLen = name.length + value.length + 1;
+    var env = new([totalLen + 1]byte);
+    var pos = 0;
+    for (var i = 0; i < name.length; i += 1) {
+        env[pos] = name[i]; pos += 1;
+    }
+    env[pos] = 61; pos += 1;  // '='
+    for (var i = 0; i < value.length; i += 1) {
+        env[pos] = value[i]; pos += 1;
+    }
+    env[pos] = 0;
+    return putenv(env.values) == 0;
+}
+
+// ===== Current directory =====
+
+// Get the current working directory.
+export
+func getWorkDir() string$String {
+    var buf = new([4096]byte);
+    var ptr = getcwd(buf.values, 4096);
+    if (ptr == 0) { return string$EMPTY; }
+    return cBufToString(buf, 4096);
+}
+
+// Change the current working directory. Returns true on success.
+export
+func changeDir(path [&#]byte) bool {
+    var cpath = toCStr(path);
+    return chdir(cpath.values) == 0;
 }

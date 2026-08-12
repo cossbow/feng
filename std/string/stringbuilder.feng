@@ -139,3 +139,10 @@ export
 func newBuilderCapacity(cap int) StringBuilder {
     return {buf=new([cap]byte)};
 }
+
+// Create a heap-allocated StringBuilder (strong reference).
+// Useful for passing to `format` which requires a Writer reference.
+export
+func newBuilderRef() *StringBuilder {
+    return new(StringBuilder, {buf=new([0]byte)});
+}

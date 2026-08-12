@@ -1,0 +1,268 @@
+// ===== Fēng Standard Library -- path =====
+// Pure Fēng implementation. No C dependencies.
+// Path manipulation using '/' as the universal separator.
+
+import std$string;
+
+export
+const SEPARATOR byte = 47;  // '/'
+
+// Helper: return a String containing just "/".
+func strSep() string$String {
+    var b = new([1]byte);
+    b[0] = SEPARATOR;
+    return string$fromUtf8(b);
+}
+
+// Helper: return a String containing ".".
+func strDot() string$String {
+    return string$fromUtf8(".");
+}
+
+// ===== Path joining =====
+
+export
+func join(a, b string$String) string$String {
+    var av = a.bytes();
+    var bv = b.bytes();
+    if (av == nil) { return b; }
+    if (bv == nil) { return a; }
+    if (bv.length == 0) { return a; }
+    if (av.length == 0) { return b; }
+    var needSep = av[av.length - 1] != SEPARATOR
+               && bv[0] != SEPARATOR;
+    var total = av.length + bv.length;
+    if (needSep) { total += 1; }
+    var buf = new([total]byte);
+    var pos = 0;
+    for (var i = 0; i < av.length; i += 1) {
+        buf[pos] = av[i]; pos += 1;
+    }
+    if (needSep) {
+        buf[pos] = SEPARATOR; pos += 1;
+    }
+    for (var i = 0; i < bv.length; i += 1) {
+        buf[pos] = bv[i]; pos += 1;
+    }
+    return string$fromUtf8(buf);
+}
+
+// ===== Path decomposition =====
+
+// Return the last element of the path (trailing slashes removed).
+export
+func base(path string$String) string$String {
+    var pv = path.bytes();
+    if (pv == nil || pv.length == 0) {
+        return strDot();
+    }
+    // Trim trailing slashes
+    var end = pv.length;
+    for (end > 1 && pv[end - 1] == SEPARATOR) {
+        end -= 1;
+    }
+    if (end == 0) {
+        return strSep();
+    }
+    // Find last separator
+    var i = end - 1;
+    for (i >= 0 && pv[i] != SEPARATOR) {
+        i -= 1;
+    }
+    if (i < 0) {
+        // No separator found — return the whole trimmed path
+        var n = end;
+        var buf = new([n]byte);
+        for (var j = 0; j < n; j += 1) {
+            buf[j] = pv[j];
+        }
+        return string$fromUtf8(buf);
+    }
+    if (i + 1 == end) {
+        return strSep();
+    }
+    var n = end - i - 1;
+    var buf = new([n]byte);
+    for (var j = 0; j < n; j += 1) {
+        buf[j] = pv[i + 1 + j];
+    }
+    return string$fromUtf8(buf);
+}
+
+// Return the directory part of the path.
+export
+func dir(path string$String) string$String {
+    var pv = path.bytes();
+    if (pv == nil || pv.length == 0) {
+        return strDot();
+    }
+    // Trim trailing slashes to find the directory
+    var end = pv.length;
+    for (end > 1 && pv[end - 1] == SEPARATOR) {
+        end -= 1;
+    }
+    if (end == 0) {
+        return strSep();
+    }
+    var i = end - 1;
+    for (i >= 0 && pv[i] != SEPARATOR) {
+        i -= 1;
+    }
+    if (i < 0) {
+        return strDot();
+    }
+    // Trim separators from the directory part too
+    for (i >= 1 && pv[i - 1] == SEPARATOR) {
+        i -= 1;
+    }
+    if (i == 0) {
+        return strSep();
+    }
+    var buf = new([i]byte);
+    for (var j = 0; j < i; j += 1) {
+        buf[j] = pv[j];
+    }
+    return string$fromUtf8(buf);
+}
+
+// Return the file extension (including the leading dot).
+// Returns empty string if no extension.
+export
+func ext(path string$String) string$String {
+    var b = base(path);
+    var bv = b.bytes();
+    if (bv == nil || bv.length == 0) {
+        return string$EMPTY;
+    }
+    // Skip leading dot (hidden files on Unix)
+    if (bv.length == 1 && bv[0] == 46) {
+        return string$EMPTY;
+    }
+    var i = bv.length - 1;
+    for (i >= 0 && bv[i] != 46) {
+        i -= 1;
+    }
+    if (i <= 0) {
+        return string$EMPTY;
+    }
+    var n = bv.length - i;
+    var buf = new([n]byte);
+    for (var j = 0; j < n; j += 1) {
+        buf[j] = bv[i + j];
+    }
+    return string$fromUtf8(buf);
+}
+
+// Split path into directory and base name.
+export
+func split(path string$String) (string$String, string$String) {
+    return (dir(path), base(path));
+}
+
+// ===== Path predicates =====
+
+// Check if the path is absolute.
+export
+func isAbs(path string$String) bool {
+    var pv = path.bytes();
+    if (pv == nil || pv.length == 0) { return false; }
+    return pv[0] == SEPARATOR;
+}
+
+// ===== Path cleaning =====
+
+// Clean normalizes the path by removing redundant separators,
+// resolving "." and ".." elements, and removing trailing slashes.
+export
+func clean(path string$String) string$String {
+    var pv = path.bytes();
+    if (pv == nil || pv.length == 0) {
+        return strDot();
+    }
+    var rooted = pv[0] == SEPARATOR;
+    var n = pv.length;
+
+    // Use a byte buffer for the result (max size = input size)
+    var w = 0;  // write position
+    var r = 0;  // read position
+    var buf = new([n]byte);
+
+    if (rooted) {
+        buf[w] = SEPARATOR;
+        w += 1;
+        r += 1;
+    }
+
+    // Track dot count for ".." resolution
+    var dotdot = rooted ? 1 : 0;
+
+    for (r < n) {
+        // Skip repeated separators
+        if (pv[r] == SEPARATOR) {
+            r += 1;
+            continue;
+        }
+
+        // Handle "." component
+        if (pv[r] == 46 && (r + 1 == n || pv[r + 1] == SEPARATOR)) {
+            r += 1;  // skip the dot
+            continue;
+        }
+
+        // Handle ".." component
+        if (pv[r] == 46 && r + 1 < n && pv[r + 1] == 46
+            && (r + 2 == n || pv[r + 2] == SEPARATOR)) {
+            r += 2;  // skip ".."
+            // Backtrack one component
+            if (w > dotdot) {
+                w -= 1;
+                for (w > dotdot && buf[w - 1] != SEPARATOR) {
+                    w -= 1;
+                }
+                // Also remove the separator before the component
+                if (w > dotdot) {
+                    w -= 1;
+                }
+            } else if (!rooted) {
+                if (w > 0) {
+                    buf[w] = SEPARATOR; w += 1;
+                }
+                buf[w] = 46; w += 1;
+                buf[w] = 46; w += 1;
+                // Don't update dotdot — next component still needs a separator
+            }
+            continue;
+        }
+
+        // Copy regular component
+        var start = r;
+        for (r < n && pv[r] != SEPARATOR) {
+            r += 1;
+        }
+        if (w > dotdot) {
+            buf[w] = SEPARATOR; w += 1;
+        }
+        for (var i = start; i < r; i += 1) {
+            buf[w] = pv[i]; w += 1;
+        }
+    }
+
+    if (w == 0) {
+        if (rooted) {
+            return strSep();
+        }
+        return strDot();
+    }
+
+    // Trim trailing separators
+    var end = w;
+    for (end > 1 && buf[end - 1] == SEPARATOR) {
+        end -= 1;
+    }
+
+    var result = new([end]byte);
+    for (var i = 0; i < end; i += 1) {
+        result[i] = buf[i];
+    }
+    return string$fromUtf8(result);
+}
