@@ -372,7 +372,7 @@ public class CGenerator implements Generator {
             // resource free macro first (if exists) — custom cleanup
             // (e.g. linked-list traversal) must run before fields are released
             cd.resourceFree().use(rf -> {
-                writeMangledName(dt).write(rf.name()).write("(*p)").endStmt();
+                writeMangledName(dt).write('$').write(rf.name()).write("(*p)").endStmt();
             });
             for (var cf : cd.allFields().values()) {
                 var ft = resolveFromMap(cf.type(), buildTypeMap(cd.generic(), dt.generic()));
