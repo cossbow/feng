@@ -181,8 +181,19 @@ public class ModuleParser {
 
     private FModule parseOneModule(Path module) throws IOException {
         try (var ls = Files.list(absPath(module))) {
-            var files = ls.filter(Constants.srcTest()).toList();
-            return parseModuleFiles(module, files, List.of());
+            var list = ls.toList();
+            var files = new ArrayList<Path>();
+            var cFiles = new ArrayList<Path>();
+            for (var it : list) {
+                if (!Files.isRegularFile(it)) continue;
+                var name = it.getFileName().toString();
+                if (Constants.isSource(name)) {
+                    files.add(it);
+                } else if (name.endsWith(".c")) {
+                    cFiles.add(it.toAbsolutePath().normalize());
+                }
+            }
+            return parseModuleFiles(module, files, cFiles);
         }
     }
 
