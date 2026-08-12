@@ -214,13 +214,106 @@ typeArguments     = "`" TypeDeclarer {"," TypeDeclarer} "`"
 | `?` | Nullable (default is non-null) | `*?int` |
 | `#` | Unmodifiable (const through this reference) | `*#int` |
 
-**Rules:**
+#### General Reference Rules
+
 1. [MUST] Non-null → Nullable is allowed. Nullable → Non-null requires explicit `!= nil` check.
 2. [MUST] Modifiable → Unmodifiable is allowed. Reverse is forbidden.
-3. [MUST] Phantom references can only be declared with `const`.
-4. [MUST] Phantom references are only valid as local variables or parameters; they cannot be fields or global variables.
-5. [MUST] Strong references can only reference instances created via `new`.
-6. [MUST] Phantom references can reference value-type variables, constant fields, and temporary instances (literals, new, return values).
+
+#### Strong References (`*T`)
+
+1. [MUST] Strong references can only reference instances created via `new`.
+2. [MUST] An instance referenced by at least one strong reference variable is kept alive by the memory manager.
+3. [MUST] When an instance has no strong references pointing to it, it is eligible for reclamation.
+
+#### Phantom References (`&T`)
+
+Phantom references do NOT affect memory management. They can reference both
+`new`-allocated instances and value-type instances.
+
+A phantom reference can only point to an **"immobile" instance** — one that can be
+proven not to be freed or moved during the phantom reference's lifetime. The following
+rules enumerate the cases where immobility is guaranteed.
+
+**Declaration and scope:**
+1. [MUST] Phantom reference variables are always `const` — declared with `const` keyword.
+2. [MUST] Phantom references can only be local variables or parameters. They cannot be fields or global variables.
+3. [MUST] `@Sync` cannot be applied to phantom references.
+
+**What can be assigned to a phantom reference:**
+4. [MUST] Value-type variables that are currently in scope.
+5. [MUST] Const reference variables (both strong and phantom) that are currently in scope.
+6. [MUST] An existing phantom reference can be passed to a new phantom reference of a compatible type.
+7. [MUST] When a local strong reference is aliased by a phantom reference, the strong reference becomes immutable for the phantom's lifetime.
+8. [MUST] Within the scope where a class instance is accessible via phantom reference:
+   - Its value-type fields can be phantom-referenced.
+   - Instances referenced by its const fields can be phantom-referenced.
+9. [MUST] Phantom reference **parameters** have a unique capability: they may also reference temporary instances — literals, initialization expressions, `new`-created instances, and return values — that would otherwise be destroyed after the call.
+
+**Examples:**
+
+*Global variables — always in scope:*
+```feng
+var gDrv Driver;
+const rDrv *Driver = new(Driver);
+func use() {
+    const d1 &Driver = gDrv;   // value-type global → phantom
+    const d2 &Driver = rDrv;   // strong-ref global → phantom
+}
+```
+
+*Local variables — must be in scope:*
+```feng
+func sample1() {
+    var drv Driver;
+    const d1 &Driver = drv;           // value-type local → phantom
+}
+func sample2() {
+    const drv *Driver = new(Driver);
+    const d1 &Driver = drv;           // strong-ref local → phantom
+}
+func sample3() {
+    var drv *Driver = new(Driver);
+    {
+        const d1 &Driver = drv;       // aliased — drv is immutable here
+        // drv = nil;                 // ✖ forbidden while d1 is in scope
+    }
+    drv = nil;                        // ✔ allowed after d1 out of scope
+}
+```
+
+*Class fields — via phantom reference chain:*
+```feng
+class Device {
+    const driver *Driver;
+    var disk Disk;
+}
+func sample1(dev Device) {            // value-type parameter
+    const drv &Driver = dev.driver;   // const field → phantom
+    const dk  &Disk   = dev.disk;     // value-type field → phantom
+}
+func sample2(dev *Device) {           // strong-ref parameter
+    const drv &Driver = dev.driver;
+    const dk  &Disk   = dev.disk;
+}
+```
+
+*Phantom reference parameters — accept temporaries:*
+```feng
+func use1(a &int)    { /* ... */ }
+func use2(a &Device) { /* ... */ }
+func use3(a [&]int)  { /* ... */ }
+
+func sample() {
+    use1(0);                         // literal
+    use1(new(int));                  // new-created
+    use1(get());                     // return value
+    use2(Device{});                  // initialization expression
+    use2(new(Device));               // new-created
+    use3([]int[1,2]);               // array literal
+    use3(new([2]int));              // new-created array
+}
+func get() int { return 1; }
+```
 
 ### 3.4 Function Prototype Types
 
@@ -1004,18 +1097,112 @@ func testName() { }
 
 ### 11.2 Pointer Handling
 
-[MUST] C pointers are treated as `uint64` in Feng.
-[MUST] Feng strong references (`*`) can be cast to `uint64` for passing to C pointer parameters.
-[MUST] Reverse cast (`uint64` → reference) is FORBIDDEN.
-[MUST] Array references (`[]`) expose their pointer via the built-in field `values` (type `uint64`).
+C pointers are represented as `uint64` in Feng.
 
-### 11.3 C Modules
+**Converting Feng references to C pointers:**
+1. [MUST] Strong references (`*T`) and phantom references (`&T`) can both be cast to `uint64` for passing to C pointer parameters.
+2. [MUST] The resulting `uint64` is a valid C pointer to the referenced value.
+3. [MUST] Reverse cast (`uint64` → reference) is FORBIDDEN.
+4. [MUST] Array references (`[*]T`) expose their pointer via the built-in field `values` (type `uint64`).
 
-[MUST] A C module is a directory with `.h` + `.c` files. The directory name follows Feng module naming.
+**Example** — passing a class field's address to C:
+```feng
+class Buffer {
+    var len int32;
+    func writeData() {
+        const r &int32 = len;      // phantom reference to the field
+        var ptr uint64 = uint64(r); // C pointer to len
+        cFunction(ptr, ...);        // pass to C
+    }
+}
+```
+
+### 11.3 Calling C Library Functions
+
+To call C functions (from libc or a third-party library), place a `.h` header file
+directly in the Feng module directory. The header includes the target library's
+headers and declares any symbols the Feng code needs. Feng code then calls those
+functions directly — no `import` is required.
+
+**Rules:**
+1. [MUST] The `.h` file resides in the Feng module directory (alongside `.feng` files).
+2. [MUST] `#include` the relevant system/library headers so the compiler can resolve types and recognize the functions.
+3. [SHOULD] Additionally declare any functions not covered by the `#include`d headers (e.g. POSIX extensions).
+4. [MUST] Call the function from Feng by its C name, with no module prefix.
+
+**Example** — calling libc from `std/os/file.feng`:
+
+```c
+// file.h — placed in std/os/, alongside file.feng
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Additional POSIX functions not in standard headers
+int mkdir(const char *path);
+int access(const char *path, int mode);
+char *getcwd(char *buf, int size);
+```
+
+```feng
+// file.feng — calls C functions directly, no import needed
+func open(path [&#]byte, mode OpenMode) *File {
+    var fp = fopen(cpath.values, cmode.values);  // from <stdio.h>
+    return file(fp);
+}
+func makeDir(path [&#]byte) bool {
+    return mkdir(cpath.values) == 0;             // declared in file.h
+}
+```
+
+To pass the address of a value-type field (rather than an array), take a **phantom reference**
+to the field and cast it to `uint64`:
+
+```feng
+// Pass a class field's address to a C function
+class Counter {
+    var n int32;
+    func reset() {
+        const r &int32 = n;
+        c_reset(uint64(r));   // pass &n as C pointer
+    }
+}
+```
+
+**How the compiler decides which functions get a module prefix**:
+The compiler maintains a known list of C standard library function names. Functions
+from `#include`d system headers or those explicitly recognized as libc symbols are
+called without a prefix. Functions that the compiler does NOT recognize as standard
+library symbols will receive the module's prefix (e.g., `module$functionName`),
+making them uncallable by their bare name.
+
+### 11.4 Third-Party C Libraries
+
+[MUST] libc is linked automatically — no extra configuration is needed.
+[MUST] Third-party libraries (e.g., `pthread`, `m`, `dl`) require a `feng.cfg`
+file in the module directory:
+
+```properties
+# feng.cfg
+link=pthread
+```
+
+[MUST] The `link` value is the library name without the `-l` prefix.
+[MUST] Multiple libraries are comma-separated: `link=pthread,m`.
+
+### 11.5 C Implementation Modules
+
+When you need custom C code (not just calling an existing library), create a
+**separate** subdirectory with `.h` + `.c` files. This is a C module.
+
+[MUST] A C module is a directory containing `.h` + `.c` files. The directory name
+follows Feng module naming.
 [MUST] Feng and C code cannot be mixed in the same module.
-[MUST] The `.h` file declares the symbols (functions, types, globals) usable from Feng.
-[MUST] The compiler prefixes symbols with the module path.
-[MUST] Feng code imports and uses C modules like normal modules:
+[MUST] The `.h` file declares the symbols (functions, types, globals) exported from the C module.
+[MUST] The `.c` file implements them.
+[MUST] Feng code imports the C module with `import` and accesses its symbols
+with the module's last-segment prefix:
+
 ```
 import jjj$mm;
 func test() {
@@ -1023,14 +1210,68 @@ func test() {
 }
 ```
 
-### 11.4 External C Libraries
+**When to use §11.3 vs §11.5:**
 
-[MUST] `libc` is automatically linked.
-[MUST] Third-party libraries require a `feng.cfg` file in the module directory:
-```properties
-link=pthread,m
+| Scenario | Approach | Section |
+|----------|----------|---------|
+| Call libc functions (`fopen`, `printf`, `malloc`, …) | `.h` in Feng module, `#include` libc headers | §11.3 |
+| Call third-party library functions | `.h` in Feng module + `feng.cfg` with `link=` | §11.3, §11.4 |
+| Call compiler builtins (`__atomic_*`, `__builtin_*`) | C module with wrapper `.c` | §11.5 |
+| Need custom C logic (algorithms, platform glue) | C module | §11.5 |
+
+### 11.6 Compiler Builtins
+
+Compiler builtins (e.g., GCC `__atomic_*`, Clang `__builtin_*`) are NOT part of
+any C library — they are recognized and inlined by the C compiler at the call site.
+Because they are not declared in any system header, the Feng compiler does NOT
+recognize them as standard library functions and will prefix their names.
+
+**[MUST] Compiler builtins require a C module wrapper** (§11.5). You cannot
+call them directly from a Feng module's `.h` file.
+
+**Example** — wrapping GCC `__atomic_*` builtins:
+
+```c
+// c/atomic.h — C module header
+#include <stdint.h>
+
+int32_t atomic_int32_load(const volatile void* ptr, int memorder);
+void    atomic_int32_store(volatile void* ptr, int32_t val, int memorder);
+int32_t atomic_int32_fetch_add(volatile void* ptr, int32_t val, int memorder);
 ```
-[MUST] The `link` value is the library name without `-l` prefix, comma-separated for multiple libraries.
+
+```c
+// c/atomic.c — calls the builtin internally
+#include <stdint.h>
+
+int32_t atomic_int32_load(const volatile void* ptr, int memorder) {
+    return __atomic_load_4(ptr, memorder);
+}
+void atomic_int32_store(volatile void* ptr, int32_t val, int memorder) {
+    __atomic_store_4(ptr, val, memorder);
+}
+int32_t atomic_int32_fetch_add(volatile void* ptr, int32_t val, int memorder) {
+    return __atomic_fetch_add_4(ptr, val, memorder);
+}
+```
+
+```feng
+// atomic.feng — imports the C module, calls wrapped functions
+import std$async$c;
+
+class Counter final {
+    var buf [*]int32;
+}
+func load(c &Counter) int32 {
+    return c$atomic_int32_load(c.buf.values, int32(5));  // 5 = SEQ_CST
+}
+```
+
+**Common builtin families:**
+| Family | Provider | Example | Purpose |
+|--------|----------|---------|---------|
+| `__atomic_*` | GCC / Clang | `__atomic_fetch_add_4` | Atomic operations |
+| `__builtin_*` | GCC / Clang | `__builtin_popcount` | Compiler intrinsics |
 
 ---
 

@@ -2785,7 +2785,7 @@ func test() {
 }
 ```
 
-Phantom references can only be local variables or parameters. They can be passed in the following scenarios:
+Phantom references can only be local variables or parameters, and can only point to an "immobile" instance within scope — "immobile" means the instance can be proven not to be freed. Therefore only the following can be passed to a phantom reference:
 
 1. Value type variables within scope can be referenced by phantom references.
 2. Constant reference variables within scope can pass their instances to phantom references.
