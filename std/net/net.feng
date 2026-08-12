@@ -60,7 +60,7 @@ func ipToStr(ip uint32) string$String {
     }
     var result = new([pos]byte);
     for (var i = 0; i < pos; i += 1) { result[i] = buf[i]; }
-    return string$fromUtf8(result);
+    return string$utf8(result);
 }
 
 // Parse dotted-decimal ip string to uint32, returns (ip, ok)

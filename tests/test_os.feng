@@ -45,7 +45,7 @@ func testSetEnvVar() {
     var ok = os$setEnvVar("FENG_TEST_VAR", "hello");
     testing$assertTrue(ok);
     var val = os$getEnvVar("FENG_TEST_VAR");
-    testing$assertTrue(val.equals(string$fromUtf8("hello")));
+    testing$assertTrue(val.equals(string$utf8("hello")));
 }
 
 @Test

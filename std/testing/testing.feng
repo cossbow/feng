@@ -12,7 +12,7 @@ class AssertionException : Exception {
 export
 func assertTrue(condition bool) {
     if (!condition) {
-        throw new(AssertionException, {message = string$fromUtf8("expected true, got false")});
+        throw new(AssertionException, {message = string$utf8("expected true, got false")});
     }
 }
 
@@ -20,7 +20,7 @@ func assertTrue(condition bool) {
 export
 func assertFalse(condition bool) {
     if (condition) {
-        throw new(AssertionException, {message = string$fromUtf8("expected false, got true")});
+        throw new(AssertionException, {message = string$utf8("expected false, got true")});
     }
 }
 

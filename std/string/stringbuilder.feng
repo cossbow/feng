@@ -55,31 +55,31 @@ class StringBuilder (Writer) {
     export
     func appendInt(v int) {
         var s = strconv$formatInt(v);
-        append(fromUtf8(s));
+        append(utf8(s));
     }
 
     export
     func appendFloat(v float) {
         var s = strconv$formatFloat(v);
-        append(fromUtf8(s));
+        append(utf8(s));
     }
 
     export
     func appendBool(v bool) {
         var s = strconv$formatBool(v);
-        append(fromUtf8(s));
+        append(utf8(s));
     }
 
     export
     func appendInt64(v int64) {
         var s = strconv$formatInt64(v);
-        append(fromUtf8(s));
+        append(utf8(s));
     }
 
     export
     func appendUint(v uint) {
         var s = strconv$formatUint(v);
-        append(fromUtf8(s));
+        append(utf8(s));
     }
 
     // Append raw bytes without going through String.
@@ -115,7 +115,7 @@ class StringBuilder (Writer) {
         for (var i = 0; i < len; i += 1) {
             b[i] = buf[i];
         }
-        return fromUtf8(b);
+        return utf8(b);
     }
 
     // Writable - enables: format(sb, "count: {}", n)

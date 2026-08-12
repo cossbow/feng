@@ -4,7 +4,7 @@ import std$error;
 
 @Test
 func testString() {
-    var s = string$fromUtf8("Hello");
+    var s = string$utf8("Hello");
     testing$assertTrue(s.byteLength() == 5);
     testing$assertTrue(s.runeCount() == 5);
     testing$assertFalse(s.isEmpty());
@@ -12,9 +12,9 @@ func testString() {
 
 @Test
 func testCompare() {
-    var a = string$fromUtf8("abc");
-    var b = string$fromUtf8("abc");
-    var c = string$fromUtf8("abd");
+    var a = string$utf8("abc");
+    var b = string$utf8("abc");
+    var c = string$utf8("abd");
     testing$assertTrue(a.compare(b) == 0);
     testing$assertTrue(a.compare(c) < 0);
     testing$assertTrue(a.equals(b));
@@ -23,40 +23,40 @@ func testCompare() {
 
 @Test
 func testConcat() {
-    var a = string$fromUtf8("Hello");
-    var b = string$fromUtf8(" World");
+    var a = string$utf8("Hello");
+    var b = string$utf8(" World");
     var c = a.concat(b);
     testing$assertTrue(c.byteLength() == 11);
 }
 
 @Test
 func testIndexOf() {
-    var s = string$fromUtf8("Hello, World!");
+    var s = string$utf8("Hello, World!");
     var i1 = s.indexOf(87);  // 'W' = 87
     testing$assertTrue(i1 == 7);
-    var i2 = s.indexOfStr(string$fromUtf8("World"));
+    var i2 = s.indexOfStr(string$utf8("World"));
     testing$assertTrue(i2 == 7);
-    var c = s.contains(string$fromUtf8("World"));
+    var c = s.contains(string$utf8("World"));
     testing$assertTrue(c);
 }
 
 @Test
 func testPrefixSuffix() {
-    var s = string$fromUtf8("Hello, World!");
-    testing$assertTrue(s.startsWith(string$fromUtf8("Hello")));
-    testing$assertTrue(s.endsWith(string$fromUtf8("World!")));
+    var s = string$utf8("Hello, World!");
+    testing$assertTrue(s.startsWith(string$utf8("Hello")));
+    testing$assertTrue(s.endsWith(string$utf8("World!")));
 }
 
 @Test
 func testSubstring() {
-    var s = string$fromUtf8("Hello, World!");
+    var s = string$utf8("Hello, World!");
     var sub = s.substring(7, 12);
     testing$assertTrue(sub.byteLength() == 5);
 }
 
 @Test
 func testRune() {
-    var s = string$fromUtf8("你好世界");
+    var s = string$utf8("你好世界");
     var r0 = s.rune(0);
     testing$assertTrue(r0 != 0);  // valid rune
     testing$assertTrue(s.runeCount() == 4);
@@ -70,87 +70,87 @@ func testEmpty() {
 
 @Test
 func testSplit() {
-    var s = string$fromUtf8("a,b,c");
-    var parts = s.split(string$fromUtf8(","));
+    var s = string$utf8("a,b,c");
+    var parts = s.split(string$utf8(","));
     // parts should have 3 elements: "a", "b", "c"
     var p0 = parts[0];
     var p1 = parts[1];
     var p2 = parts[2];
 
     // empty separator: returns entire string
-    var s2 = string$fromUtf8("hello");
+    var s2 = string$utf8("hello");
     var parts2 = s2.split(string$EMPTY);
 }
 
 @Test
 func testSplitEmpty() {
-    var s = string$fromUtf8("");
-    var parts = s.split(string$fromUtf8(","));
+    var s = string$utf8("");
+    var parts = s.split(string$utf8(","));
 }
 
 @Test
 func testJoin() {
     var parts = new([3]string$String);
-    parts[0] = string$fromUtf8("a");
-    parts[1] = string$fromUtf8("b");
-    parts[2] = string$fromUtf8("c");
-    var joined = string$join(parts, string$fromUtf8(","));
+    parts[0] = string$utf8("a");
+    parts[1] = string$utf8("b");
+    parts[2] = string$utf8("c");
+    var joined = string$join(parts, string$utf8(","));
 
     // join empty
     var empty = new([0]string$String);
-    var e = string$join(empty, string$fromUtf8(","));
+    var e = string$join(empty, string$utf8(","));
 
     // single element
     var single = new([1]string$String);
-    single[0] = string$fromUtf8("only");
-    var s = string$join(single, string$fromUtf8(","));
+    single[0] = string$utf8("only");
+    var s = string$join(single, string$utf8(","));
 }
 
 @Test
 func testReplace() {
-    var s = string$fromUtf8("hello world hello");
-    var r = s.replace(string$fromUtf8("hello"), string$fromUtf8("hi"));
+    var s = string$utf8("hello world hello");
+    var r = s.replace(string$utf8("hello"), string$utf8("hi"));
     testing$assertTrue(r.byteLength() > 0);
 
     // replace with empty -> remove all
-    var r2 = s.replace(string$fromUtf8("hello"), string$EMPTY);
+    var r2 = s.replace(string$utf8("hello"), string$EMPTY);
 
     // no match
-    var r3 = s.replace(string$fromUtf8("xyz"), string$fromUtf8("abc"));
+    var r3 = s.replace(string$utf8("xyz"), string$utf8("abc"));
 }
 
 @Test
 func testTrim() {
-    var s1 = string$fromUtf8("  hello  ");
+    var s1 = string$utf8("  hello  ");
     var t1 = s1.trim();
 
-    var s2 = string$fromUtf8("\t\n  world  \r\n");
+    var s2 = string$utf8("\t\n  world  \r\n");
     var t2 = s2.trim();
 
     // already trimmed
-    var s3 = string$fromUtf8("abc");
+    var s3 = string$utf8("abc");
     var t3 = s3.trim();
 
     // all whitespace
-    var s4 = string$fromUtf8("   ");
+    var s4 = string$utf8("   ");
     var t4 = s4.trim();
 }
 
 @Test
 func testToLower() {
-    var s = string$fromUtf8("Hello, WORLD!");
+    var s = string$utf8("Hello, WORLD!");
     var lower = s.toLower();
 }
 
 @Test
 func testToUpper() {
-    var s = string$fromUtf8("Hello, world!");
+    var s = string$utf8("Hello, world!");
     var upper = s.toUpper();
 }
 
 @Test
 func testRuneException() {
-    var s = string$fromUtf8("你好");
+    var s = string$utf8("你好");
     try {
         s.rune(10);  // out of bounds
     } catch(e *#OutOfBoundsException) {
@@ -160,7 +160,7 @@ func testRuneException() {
 
 @Test
 func testSubstringException() {
-    var s = string$fromUtf8("hello");
+    var s = string$utf8("hello");
     try {
         s.substring(5, 2);  // start > end
     } catch(e *#error$IllegalArgumentException) {
@@ -172,9 +172,9 @@ func testSubstringException() {
 @Test
 func testBuilder() {
     var sb = string$newBuilder();
-    sb.append(string$fromUtf8("Hello"));
-    sb.append(string$fromUtf8(" "));
-    sb.append(string$fromUtf8("World"));
+    sb.append(string$utf8("Hello"));
+    sb.append(string$utf8(" "));
+    sb.append(string$utf8("World"));
     var s = sb.build();
     testing$assertTrue(s.byteLength() == 11);
 }
@@ -183,7 +183,7 @@ func testBuilder() {
 func testAppendInt() {
     var sb = string$newBuilder();
     sb.appendInt(42);
-    sb.append(string$fromUtf8(" "));
+    sb.append(string$utf8(" "));
     sb.appendInt(-100);
     var s = sb.build();
     testing$assertTrue(s.byteLength() > 0);
@@ -193,7 +193,7 @@ func testAppendInt() {
 func testAppendBool() {
     var sb = string$newBuilder();
     sb.appendBool(true);
-    sb.append(string$fromUtf8(" "));
+    sb.append(string$utf8(" "));
     sb.appendBool(false);
     var s = sb.build();
     testing$assertTrue(s.byteLength() > 0);
@@ -247,7 +247,7 @@ func testAppendFloat() {
 @Test
 func testClear() {
     var sb = string$newBuilder();
-    sb.append(string$fromUtf8("hello"));
+    sb.append(string$utf8("hello"));
     sb.clear();
     testing$assertTrue(sb.isEmpty());
     var s = sb.build();
@@ -256,7 +256,7 @@ func testClear() {
 @Test
 func testLength() {
     var sb = string$newBuilder();
-    sb.append(string$fromUtf8("hi"));
+    sb.append(string$utf8("hi"));
     testing$assertTrue(sb.length() == 2);
 
     var sb2 = string$newBuilder();
@@ -266,6 +266,6 @@ func testLength() {
 @Test
 func testCapacity() {
     var sb = string$newBuilderCapacity(100);
-    sb.append(string$fromUtf8("test"));
+    sb.append(string$utf8("test"));
     var s = sb.build();
 }

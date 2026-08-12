@@ -131,7 +131,7 @@ func cBufToString(buf [*#]byte, maxLen int) string$String {
     for (var i = 0; i < len; i += 1) {
         result[i] = buf[i];
     }
-    return string$fromUtf8(result);
+    return string$utf8(result);
 }
 
 // ===== Directory operations =====
@@ -192,7 +192,7 @@ func getEnvVar(name [&#]byte) string$String {
     if (len == 0) { return string$EMPTY; }
     var buf = new([len]byte);
     memcpy(buf.values, ptr, uint64(len));
-    return string$fromUtf8(buf);
+    return string$utf8(buf);
 }
 
 // Set an environment variable. Returns true on success.

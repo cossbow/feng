@@ -414,12 +414,12 @@ class String (Writable) {
 // Factory functions
 
 export
-func fromUtf8(data [*#]byte) String {
+func utf8(data [*#]byte) String {
     return {value=data};
 }
 
 export
-func fromBytes(data [*#]byte) String {
+func ascii(data [*#]byte) String {
     return {value=data};
 }
 

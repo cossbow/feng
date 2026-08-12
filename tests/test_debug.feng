@@ -3,7 +3,7 @@ import std$string;
 
 @Test
 func testDebugString() {
-    var s2 = string$fromUtf8("你好世界");
+    var s2 = string$utf8("你好世界");
     testing$assertTrue(s2.runeCount() == 4);
     var r0 = s2.rune(0);
     testing$assertTrue(r0 != 0);
