@@ -4002,7 +4002,8 @@ public class SemanticAnalyzer {
             return semantic("inconvertible %s(%s): %s",
                     p, lit, e.pos());
         }
-        if (g.b().maybeRefer().has() && !(g.b() instanceof ArrayTypeDeclarer)) {
+        if ((g.b().maybeRefer().has() && !(g.b() instanceof ArrayTypeDeclarer))
+                || g.b() instanceof FuncTypeDeclarer) {
             // If `a` is of type `*T`, we can convert `a` to `uint64`:
             // for example: var a = new(int); var p = uint64(a);
             if (p == Primitive.UINT64) {
