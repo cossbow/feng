@@ -634,7 +634,7 @@ public class SemanticAnalyzerTest {
 
     @Test
     public void testAssignValue7() {
-        var def = "class A{ var a *A; } ";
+        var def = "class A{ var a *?A; } ";
         checkSucc(def + "func f() { var a *A =new(A); a.a = a; }");
         checkFail(def + "func f() { var a *A =new(A, {a=a}); }");
     }
@@ -2036,6 +2036,15 @@ public class SemanticAnalyzerTest {
         checkSucc(def + "func f(p *?A){ if(p!=nil){ var a A = {id=new(int)}; } }");
     }
 
+    @Test
+    public void testFieldInitInNew1() {
+        checkSucc("class A {} func f() { var a = new(A); }");
+        checkSucc("class A { var i int; } func f() { var a = new(A); }");
+
+        checkSucc("class A { var i *int; } func f() { var a = new(A,{i=new(int)}); }");
+        checkFail("class A { var i *int; } func f() { var a = new(A); }");
+    }
+
     // ---- Fixed-length array element init ----
 
     @Test
@@ -2189,7 +2198,6 @@ public class SemanticAnalyzerTest {
                 "([new(int),new(int)],false)" +
                 "]; }");
     }
-
 
     //
 

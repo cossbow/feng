@@ -4570,6 +4570,10 @@ public class SemanticAnalyzer {
                 e.pos(), STRONG, true, false));
         var dtd = new DerivedTypeDeclarer(e.pos(), dt, ref);
         if (e.arg().none()) {
+            if (requiredInit(new DerivedTypeDeclarer(e.pos(), dt))) {
+                error("new type '%s' required init: %s",
+                        dt, e.pos());
+            }
             return Groups.g2(e, dtd);
         }
         var arg = e.arg().get();
