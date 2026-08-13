@@ -167,6 +167,30 @@ public class LiteralCalculator {
         return semantic("float not support " + op);
     }
 
+    // Float ^ Integer → Float
+    public Literal calc(BinaryOperator op,
+                        FloatLiteral al,
+                        IntegerLiteral bl) {
+        if (op != BinaryOperator.POW)
+            return semantic("float-integer not support " + op);
+        BigDecimal a = checkRange(al.value());
+        BigInteger b = bl.value();
+        var c = checkRange(pow(a, b));
+        return new FloatLiteral(al.pos(), c);
+    }
+
+    // Integer ^ Float → Float
+    public Literal calc(BinaryOperator op,
+                        IntegerLiteral al,
+                        FloatLiteral bl) {
+        if (op != BinaryOperator.POW)
+            return semantic("integer-float not support " + op);
+        BigDecimal a = new BigDecimal(al.value());
+        BigDecimal b = checkRange(bl.value());
+        var c = checkRange(pow(a, b));
+        return new FloatLiteral(al.pos(), c);
+    }
+
     public interface BoolFun {
         boolean calc(boolean a, boolean b);
     }

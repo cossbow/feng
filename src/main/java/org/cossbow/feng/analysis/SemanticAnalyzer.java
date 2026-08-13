@@ -3467,9 +3467,36 @@ public class SemanticAnalyzer {
         var lv = l.literal();
         var rv = r.literal();
         if (op == BinaryOperator.POW) {
-            var n = new BinaryExpression(e.pos(), op, l, r);
-            var t = l.resultType.must();
-            return Groups.g2(n, t);
+            // int ^ int
+            if (lv instanceof IntegerLiteral li &&
+                    rv instanceof IntegerLiteral ri) {
+                var lit = calculator.calc(op, li, ri);
+                return Groups.g2(new LiteralExpression(e.pos(), lit),
+                        Primitive.INT.declarer(e.pos()));
+            }
+            // float ^ int
+            if (lv instanceof FloatLiteral fl &&
+                    rv instanceof IntegerLiteral ri) {
+                var lit = calculator.calc(op, fl, ri);
+                return Groups.g2(new LiteralExpression(e.pos(), lit),
+                        Primitive.FLOAT.declarer(e.pos()));
+            }
+            // int ^ float
+            if (lv instanceof IntegerLiteral li &&
+                    rv instanceof FloatLiteral fr) {
+                var lit = calculator.calc(op, li, fr);
+                return Groups.g2(new LiteralExpression(e.pos(), lit),
+                        Primitive.FLOAT.declarer(e.pos()));
+            }
+            // float ^ float
+            if (lv instanceof FloatLiteral fl &&
+                    rv instanceof FloatLiteral fr) {
+                var lit = calculator.calc(op, fl, fr);
+                return Groups.g2(new LiteralExpression(e.pos(), lit),
+                        Primitive.FLOAT.declarer(e.pos()));
+            }
+            return semantic("not support %s %s %s: %s",
+                    l, op, r, e.pos());
         }
 
         if (lv instanceof IntegerLiteral ill &&
@@ -3511,7 +3538,9 @@ public class SemanticAnalyzer {
             return Groups.g2(new LiteralExpression(e.pos(), lit), td);
         }
 
-        return unreachable();
+        return semantic("not support %s %s %s: %s",
+                l, op, r, e.pos());
+
     }
 
     private TypeValid referCompare(
