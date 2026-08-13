@@ -144,19 +144,48 @@ public class SemanticAnalyzerTest {
     }
 
     @Test
-    public void testtestClassInherit5() {
-        checkSucc("class A {} class B:A{}");
-        checkFail("class A final {} class B:A{}");
-
-        checkSucc("class A {} func f(a *A){var o *Object = a;}");
-        checkFail("class A final {} func f(a *A){var o *Object = a;}");
-    }
-
-    @Test
     public void testClassInherit5() {
         checkFail("class A{var b A;}");
         checkFail("class A{var b B;} class B:A{}");
         checkFail("class A{var c C;} class B:A{} class C:B{}");
+    }
+
+    @Test
+    public void testFinalClass1() {
+        checkSucc("class A {} class B:A{}");
+        checkFail("class A final {} class B:A{}");
+        checkFail("class A {} class B final:A{}");
+        checkSucc("class A final {} class B final : A{}");
+
+        checkSucc("class A : Object {}");
+        checkFail("class A final : Object {}");
+
+        checkSucc("interface I {} class B (I) {}");
+        checkSucc("interface I {} class B final (I) {}");
+
+    }
+
+    @Test
+    public void testFinalClass2() {
+        checkSucc("class A {} func f(a *A){var o *Object = a;}");
+        checkFail("class A final {} func f(a *A){var o *Object = a;}");
+
+        checkSucc("class A {} class B:A{} func f(b *B){var a *A = b;}");
+        checkFail("class A final {} class B final:A{} func f(b *B){var a *A = b;}");
+
+        var d = "interface I {} ";
+        checkSucc(d + "class A (I) {} func f(a *A){var i *I = a;}");
+        checkFail(d + "class A final (I) {} func f(a *A){var i *I = a;}");
+    }
+
+    @Test
+    public void testFinalClass3() {
+        checkSucc("class A {} class B:A{} func f(a *A){var b = a?(*?B);}");
+        checkFail("class A final {} class B final:A{} func f(a *A){var b = a?(*?B);}");
+
+        var d = "interface I {} ";
+        checkSucc(d + "class A (I) {} func f(i *I){var a = i?(*?A);}");
+        checkFail(d + "class A final (I) {} func f(i *I){var a = i?(*?A);}");
     }
 
     @Test
@@ -1927,7 +1956,7 @@ public class SemanticAnalyzerTest {
     }
 
     @Test
-    public void testRequired9(){
+    public void testRequired9() {
         checkSucc("func f() { var a [1]*int = [new(int)]; }");
         checkFail("func f() { var a = new([2]*int); }");
         checkFail("func f(a [*]*int) { }");

@@ -526,18 +526,15 @@ func far() {
 
 #### is表达式
 
-用于判断是否能类的引用是否能进行转换的语法，比如类的实例的引用传递可以给接口或父类指针，反过来则需要判断其类型。
+[协变](#协变)操作之后，丢失原来的类型信息，而这个表达式的作用就是可以在允许时查询能否转换。
 
-返回的是对应类型的引用，如果类型不能匹配则返回`nil`，因此可能引发空指针：
+表达式返回的是期望的类型（只能是支持的引用），如果类型不能匹配则返回`nil`，因此只能返回一个可空引用：
 
 ```feng
 func test(o *Object) {
-   var f *File = o?(*File);   // 转换成File类的引用
-   var w Writer = o?(*Writer);  // 转换成Writer接口
-   o?(*Writer).write("Hello!"); // 在表达式中使用，有空指针风险
-   if (var w Writer = o?(*Writer); w != nil) {
-      // 这样避免空指针
-   }
+   var f = o?(*?File);     // 转换成File类的引用
+   var w = o?(*?Writer);   // 转换成Writer接口引用
+   if (w!=nil) w.write("Hello!");
 }
 ```
 
@@ -785,15 +782,15 @@ class Mouse {
    var id int;
    var name [*#]byte;
 }
-func test() {
+func test(name [*#]byte) {
    var m1 Mouse;
-   var m2 *Mouse = new(Mouse);
+   var m2 *Mouse = new(Mouse, {name=name});
 }
 ```
 
 如果没有初始化，或者初始化中没有指定的字段，一律置为默认状态：对应内存全`0`，引用类型则是`nil`值。
 
-副作用：一个导出类的，但它有未导出`const`字段，在其他模块就无法实例化该类。
+副作用：一个被导出类的，但它有未导出`const`字段，在其他模块就无法实例化该类。
 比如下面的`Dog`类就只能在当前模块实例化：
 
 ```feng
@@ -818,7 +815,7 @@ func dog(id int, name [*#]byte) Dog {
 
 1. 必须通过类实例来调用。
 2. 在方法内部能使用当前实例的类成员。
-3. 方法名称作为唯一ID，在当前类的方法集中是唯一的，包括继承来的方法，但子类会覆盖同名的父类方法。
+3. 在当前类的方法集（含继承）中方法名必须唯一，唯一的例外是子类覆写父类的同名同原型方法。
 
 比如定义`Task`类用于管理任务（枚举`TaskState`是任务的状态）：
 
@@ -884,41 +881,21 @@ func sample() {
 }
 ```
 
-`this`能传递给[虚引用类型](#虚引用类型)的变量，但如果强引用调用方法时可传递给强引用，
-如果值类型调用时可赋值给值变量。例如：
+`this`能传递给[虚引用类型](#虚引用类型)的变量。例如：
 
 ```feng
 class Foo {
    var name String;
    func aaa() {
-      var x &Cat = this;
+      var x1 &Foo = this;     // ✔：允许传给虚引用
+      // var x2 *Foo = this;  // ✖：不能传给强引用
+      // var x3 Foo = this;   // ✖：类型不匹配：引用传给值类型
+      var x4 Foo = *this;     // ✔：支持解引用
    }
-   func bbb() {
-      var x *Cat = this;
-   }
-   func ccc() {
-      var x Cat = this;
-   }
-}
-func use1() {
-    var f Foo;
-    f.aaa();
-    // f.bbb(); // ✖
-    f.ccc();
-}
-func use2(f *Foo) {
-    f.aaa();
-    f.bbb();
-    // f.ccc(); // ✖
-}
-func use3(f &Foo) {
-    f.aaa();
-    // f.bbb(); // ✖
-    // f.ccc(); // ✖
 }
 ```
 
-`this`在[逃逸方法](#逃逸方法)内才能传递给强引用。
+`this`只有在[逃逸方法](#逃逸方法)内才能传递给强引用。
 
 ### super关键字
 
@@ -970,48 +947,6 @@ class Cat : Animal {
 }
 ```
 
-允许`Animal`的引用指向一个子类实例，通过父类引用调用`eat`方法时，实际会调用子类的`eat`方法：
-
-```feng
-func test() {
-   var animal *Animal = new(Cat, {name="Tom"});
-   animal.eat("fish-meat"); // 将打印的是：Cat Tom eating fish-meat.
-}
-```
-
-通过这个例子可以看到，方法`eat`在继承之后可以允许有多个实现，父类引用的不同子类均会指向子类实现的方法。
-
-支持[is表达式](#is表达式)来判断子类型：
-
-```feng
-func test(animal *Animal) {
-    var cat, ok = animal?(*Cat);
-    if (ok) cat.eat("mouse");
-}
-func test() {
-    test(new(Cat));
-}
-```
-
-父类与子类仅支持引用传递，值类型变量之间不能传递。且传递规则为：
-
-1. 引用类型相同的情况，子类可以传递给父类。
-2. 子类的常量强引用可以传递给父类的虚引用。
-
-比如父类`Animal`和子类`Cat`之间传递：
-
-```feng
-func sample1(lc *Animal) {
-    var c1 *Cat = lc;
-}
-func sample2(lc &Animal) {
-    var c2 &Cat = lc;
-}
-func sample3(lc *Animal) {
-    var c2 &Cat = lc;
-}
-```
-
 #### 抽象
 
 多态的父类的方法也有自己的实现，但[接口](#接口)的方法没有具体实现，而是接口的“子类”给出实现，因此叫抽象。
@@ -1043,9 +978,51 @@ class YourTask {
 }
 ```
 
-用法和多态类似了：
+### 协变
+
+协变是一种运行时的动态特性，并且不是所以的类都支持协变，只有非final类才支持，而[final类](#final类)是不支持的。
+
+#### 继承协变
+
+父类引用指向子类实例、接口引用指向实现类实例，面向对象编程中把这种操作称为**协变**。
+
+比如允许`Animal`的引用指向一个子类实例，通过父类引用调用`eat`方法时，实际会调用子类的`eat`方法：
 
 ```feng
+import std$os;
+class Animal {
+    var name [*#]byte;
+    func eat(food [*#]byte) {
+        os$printf("Animal {} eating {}\n", name, food);
+    }
+}
+class Cat : Animal {
+    func eat(food [*#]byte) {
+        os$printf("Cat {} eating {}.\n", name, food);
+    }
+}
+func test() {
+   var animal *Animal = new(Cat, {name="Tom"});
+   animal.eat("fish-meat"); // 将打印的是：Cat Tom eating fish-meat.
+}
+```
+
+前面`Task`接口的引用可以指向它的任何一个实现类：
+
+```feng
+interface Task {
+   run();
+}
+class MyTask (Task) {
+   func run() {
+      println("Run my task!");
+   }
+}
+class YourTask {
+   func run() {
+      println("Run your task!");
+   }
+}
 func asyncRun(t *Task) {
     t.run(); // 假装这里在异步执行
 }
@@ -1055,11 +1032,24 @@ func test() {
 }
 ```
 
-当然也支持[is表达式](#is表达式)判断类型。
+父类与子类仅支持引用传递，且在传递时引用类型的转换参考[引用类型](#引用类型)一节；值类型变量之间不能传递。
+
+#### 动态转换
+
+因为协变操作，导致原来的类型信息丢失了，但可以在运行时通过[is表达式](#is表达式)来转换。
+例如：
+
+```feng
+func use(animal *Animal) {
+    var cat = animal?(*Cat);
+    if (cat!=nil) cat.eat("mouse");
+}
+func test() {
+    use(new(Cat));
+}
+```
 
 #### 方法协变
-
-父类引用指向子类实例、接口引用指向实现类实例，面向对象编程中把这种操作称为**协变**。
 
 多态的方法返回值支持协变，即子类方法的返回类型可以是 父类方法的返回类型 的子类或实现类。
 但其参数必须一致，而且方法上的逃逸标记、不可修改标记也必须一致。
@@ -1091,32 +1081,101 @@ class I {
 }
 class Box (I) {
    func get() *B {   // 实现get()方法，但返回类型是 接口的get()方法返回类型 的子类
-      return new(A);
+      return new(B);
    }
 }
 ```
 
-### 根类
+#### Object类
 
-由于类是单继承的，因此所有类都会按继承关系形成一棵树，而这棵树的根类就是`Object`类。
+由于类是单继承的，所有非final类都会按继承关系形成一棵树，而这棵树的根类就是`Object`类。
 这是内置的类，没有声明继承任何父类的类则默认直接继承`Object`类。
 `Object`类没有任何成员，可以创建一个`Object`的对象。
 
 ```feng
+class Device {
+   var name [*]byte;
+}
 func test() {
-    var o *Object = new(Object);
-    o = new(Device);
+    var o *Object = new(Object); // 创建一个Object实例
+    o = new(Device);             // 可以指向任何一个非final类实例
+}
+```
+
+显然，由于[协变](#协变)仅适用于非final类，接口的引用只能指向它的一个实现类的实例，而这个实现类一定是非final类，
+所以被接口引用的实例一定是`Object`的子类。例如：
+
+```feng
+interface I {}
+func test(i *I) {
+   var o *Object = i;
 }
 ```
 
 ### final类
 
-如果希望定义的类仅用于保存数据，或者有简单的逻辑，而不希望用于复杂的继承和接口设计，可以给类加上final。
-这个类就不能被继承，也不会有基类（不是Object的子类），不能抽象接口（应该可以，但是未实现）。
+final类是在类名称后加上`final`关键字修饰的类，不加`final`的我们称非final类，也就是支持[协变](#协变)的类。
+final类主要用于简单的数据封装。
+
+例如一个简单final类：
 
 ```feng
 class User final {
    var id int;
+}
+```
+
+与非final类的对比解释final类的特征：
+
+1. 首先，`Object`是非final类。
+2. final类只能继承final类，非final类只能继承非final类。
+3. final类可以实现任意接口。
+4. final类不支持协变（[多态](#多态)和[抽象](#抽象)），也就是不能转换引用的类型。
+
+下面我们分别举例说明：
+
+final类继承：
+
+```feng
+class A final {}
+class B : A final {}
+```
+
+final类不能继承非final类：
+
+```feng
+class A {}
+// class B final : A {}  // ✖：final类不能继承非final类
+```
+
+非final类也不能继承final类：
+
+```feng
+class A final {}
+// class B : A {}  // ✖：final类不能被非final类继承
+```
+
+可以实现接口：
+
+```feng
+interface I {}
+class A final (I) {}
+```
+
+最后，不支持[协变](#协变)：
+
+```feng
+interface I {}
+class A final {}
+class B final : A (I) {}
+func test1() {
+   var b = new(B);
+   // var a *A = b;     // ✖：不支持继承协变
+   // var i *I = b;     // ✖：不支持抽象协变
+}
+func test2(a *A, i *I) {
+   // var b1 = a?(*?B); // ✖：既然不支持协变，那也无法使用is表达式
+   // var b2 = i?(*?B); // ✖：同上，无法使用is表达式
 }
 ```
 

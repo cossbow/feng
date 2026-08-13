@@ -844,22 +844,22 @@ public class SemanticAnalyzer {
     private void checkInherit(ClassDefinition cd) {
         cd.allFields().addAll(cd.fields());
         cd.allMethods().addAll(cd.methods());
-
-        // 填充 ancestors：沿 parent 链收集所有祖先类
-        cd.parent().use(pd -> {
-            cd.ancestors().add(pd);
-            cd.ancestors().addAll(pd.ancestors());
-        });
-
-        if (!cd.parent().match(p ->
-                p != ClassDefinition.ObjectClass)) return;
+        if (cd.inherit().none()) return;
         var pt = cd.inherit().must();
         var pd = cd.parent().must();
-        if (pd.isFinal()) {
-            semantic("can't inherit final %s: %s",
-                    pd, pt.pos());
+        if (cd.isFinal() != pd.isFinal()) {
+            semantic("final-class and non-final-class can't " +
+                            "have inheritance relationship: '%s' -> '%s'",
+                    pd, cd);
             return;
         }
+
+        // 填充 ancestors：沿 parent 链收集所有祖先类
+        cd.ancestors().add(pd);
+        cd.ancestors().addAll(pd.ancestors());
+
+        if (pd == ClassDefinition.ObjectClass) return;
+
         // check fields: unsupport shadow parent's fields
         for (var pf : pd.allFields()) {
             var cf = cd.fields().tryGet(pf.name());
@@ -916,10 +916,7 @@ public class SemanticAnalyzer {
     private ClassDefinition findParentClass(DerivedType t) {
         var def = findDef(t);
         if (def instanceof ClassDefinition pcd) {
-            if (!pcd.isFinal())
-                return pcd;
-            return semantic("can't inherit final %s: %s",
-                    pcd, t.pos());
+            return pcd;
         }
         return semantic("require class but actual '%s': %s",
                 def, t.pos());
@@ -1680,13 +1677,13 @@ public class SemanticAnalyzer {
                 return TypeValid.ok();
             if (rd instanceof ClassDefinition rc) {
                 return !rc.isFinal() ? TypeValid.ok() : TypeValid.err(
-                        "final-class never inherit any: %s", rc.pos());
+                        "final-class not support covariant: %s", rd.pos());
             }
         }
 
         if (ld instanceof ClassDefinition lc) {
             if (lc.isFinal()) return TypeValid.err(
-                    "final-class never be inherited: %s", lc.pos());
+                    "final-class not support covariant: %s", rd.pos());
             if (rd instanceof InterfaceDefinition) {
                 return TypeValid.err("need cast by is-expression '%s'?('%s'): %s",
                         rt, lt, rt.pos());
@@ -1700,6 +1697,10 @@ public class SemanticAnalyzer {
                         rc, lc, rc.pos());
             }
             return unreachable();
+        }
+        if (rd instanceof ClassDefinition rc && rc.isFinal()) {
+            return TypeValid.err(
+                    "final-class not support covariant: %s", rd.pos());
         }
 
         var li = (InterfaceDefinition) ld;
@@ -1967,16 +1968,9 @@ public class SemanticAnalyzer {
 
         // Arrays
         if (r instanceof ArrayTypeDeclarer ra) {
-            // 数组比较复杂，虚比较每一层的元素
-            // 数组引用本身可以是虚引用，但元素不能是，通过typeNest控制
             if (l instanceof ArrayTypeDeclarer la) {
-                typeNest += 2;
-                try {
-                    if (la.element().equals(ra.element())) {
-                        return TypeValid.ok();
-                    }
-                } finally {
-                    typeNest -= 2;
+                if (la.element().equals(ra.element())) {
+                    return TypeValid.ok();
                 }
             }
         }

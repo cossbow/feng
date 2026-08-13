@@ -930,41 +930,21 @@ func sample() {
 }
 ```
 
-`this` can be passed to [phantom reference type](#phantom-reference-type) variables. If called via a strong reference,
-it can be passed to a strong reference; if called via a value type, it can be assigned to a value variable. Example:
+`this` can be passed to [phantom reference type](#phantom-reference-type) variables. For example:
 
 ```feng
 class Foo {
    var name String;
    func aaa() {
-      var x &Cat = this;
+      var x1 &Foo = this;     // ✔: Can be passed to phantom reference
+      // var x2 *Foo = this;  // ✖: Cannot be passed to strong reference
+      // var x3 Foo = this;   // ✖: Type mismatch: reference to value type
+      var x4 Foo = *this;     // ✔: Dereference supported
    }
-   func bbb() {
-      var x *Cat = this;
-   }
-   func ccc() {
-      var x Cat = this;
-   }
-}
-func use1() {
-    var f Foo;
-    f.aaa();
-    // f.bbb(); // ✖
-    f.ccc();
-}
-func use2(f *Foo) {
-    f.aaa();
-    f.bbb();
-    // f.ccc(); // ✖
-}
-func use3(f &Foo) {
-    f.aaa();
-    // f.bbb(); // ✖
-    // f.ccc(); // ✖
 }
 ```
 
-`this` can only be passed to strong references within the [escaping method](#escaping-methods).
+`this` can only be passed to strong references within an [escaping method](#escaping-methods).
 
 ### super Keyword
 
@@ -1029,38 +1009,6 @@ func test() {
 This example shows that the `eat` method can have multiple implementations after inheritance, and parent class
 references pointing to different subclasses will call the subclass's implementation.
 
-[is expressions](#is-expression) are supported for subtype checking:
-
-```feng
-func test(animal *Animal) {
-    var cat, ok = animal?(*Cat);
-    if (ok) cat.eat("mouse");
-}
-func test() {
-    test(new(Cat));
-}
-```
-
-Parent and child classes only support reference passing; value type variables cannot be passed between them. Passing
-rules:
-
-1. When reference types are the same, a subclass can be passed to a parent class.
-2. A constant strong reference of a subclass can be passed to a phantom reference of the parent class.
-
-Example with parent class `Animal` and subclass `Cat`:
-
-```feng
-func sample1(lc *Animal) {
-    var c1 *Cat = lc;
-}
-func sample2(lc &Animal) {
-    var c2 &Cat = lc;
-}
-func sample3(lc *Animal) {
-    var c2 &Cat = lc;
-}
-```
-
 #### Abstraction
 
 Polymorphic parent classes have their own method implementations, but [interface](#interfaces) methods have no
@@ -1106,11 +1054,77 @@ func test() {
 }
 ```
 
-[is expressions](#is-expression) are also supported for type checking.
+### Covariance
+
+Covariance is a feature available only to non-final classes; it is a runtime dynamic characteristic, while [final classes](#final-class) do not support this feature.
+
+#### Inheritance Covariance
+
+A parent class reference pointing to a subclass instance, or an interface reference pointing to an implementing class instance — this operation in object-oriented programming is called **covariance**.
+
+For example, an `Animal` reference can point to a subclass instance; when calling the `eat` method via the parent class reference, the subclass's `eat` method is actually invoked:
+
+```feng
+import std$os;
+class Animal {
+    var name [*#]byte;
+    func eat(food [*#]byte) {
+        os$printf("Animal {} eating {}\n", name, food);
+    }
+}
+class Cat : Animal {
+    func eat(food [*#]byte) {
+        os$printf("Cat {} eating {}.\n", name, food);
+    }
+}
+func test() {
+   var animal *Animal = new(Cat, {name="Tom"});
+   animal.eat("fish-meat"); // Prints: Cat Tom eating fish-meat.
+}
+```
+
+The earlier `Task` interface reference can point to any of its implementing classes:
+
+```feng
+interface Task {
+   run();
+}
+class MyTask (Task) {
+   func run() {
+      println("Run my task!");
+   }
+}
+class YourTask {
+   func run() {
+      println("Run your task!");
+   }
+}
+func asyncRun(t *Task) {
+    t.run(); // Pretend this is asynchronous execution
+}
+func test() {
+    asyncRun(new(MyTask));      // Prints: Run my task!
+    asyncRun(new(YourTask));    // Prints: Run your task!
+}
+```
+
+Parent and child classes only support reference passing; for reference type conversion rules during passing, see the [Reference Types](#reference-types) section. Value type variables cannot be passed between them.
+
+#### Dynamic Cast
+
+Because covariance operations cause the original type information to be lost, it can be recovered at runtime using [is expressions](#is-expression). For example:
+
+```feng
+func use(animal *Animal) {
+    var cat = animal?(*Cat);
+    if (cat!=nil) cat.eat("mouse");
+}
+func test() {
+    use(new(Cat));
+}
+```
 
 #### Method Covariance
-
-When a parent class reference points to a subclass instance, or an interface reference points to an implementing class instance, this operation is known in object-oriented programming as **covariance**.
 
 Polymorphic method return values support covariance, meaning the return type of a subclass method can be a subclass or implementing class of the parent class method's return type.
 However, its parameters must remain identical, and the escaping and unmodifiable markers on the method must also match.
@@ -1137,7 +1151,7 @@ Interface implementing classes also support covariance:
 ```feng
 class A {}
 class B : A {}
-interface I {
+class I {
    func get() *A;
 }
 class Box (I) {
@@ -1147,30 +1161,95 @@ class Box (I) {
 }
 ```
 
-### Root Class
+#### Object Class
 
-Since classes support single inheritance, all classes form a tree based on inheritance relationships, with the root
-class being `Object`.
+Since classes use single inheritance, all non-final classes form a tree based on inheritance relationships, with the root class being `Object`.
 `Object` is a built-in class. Any class without an explicit parent class inherits from `Object` by default.
 `Object` has no members; an `Object` instance can be created.
 
 ```feng
+class Device {
+   var name [*]byte;
+}
 func test() {
-    var o *Object = new(Object);
-    o = new(Device);
+    var o *Object = new(Object); // Create an Object instance
+    o = new(Device);             // Can point to any non-final class instance
+}
+```
+
+Clearly, since [covariance](#covariance) applies only to non-final classes: an interface reference can only point to an instance of its implementing class, and that implementing class must be non-final; therefore, the instance referenced by the interface must be a subclass of `Object`. For example:
+
+```feng
+interface I {}
+func test(i *I) {
+   var o *Object = i;
 }
 ```
 
 ### final Class
 
-If a class is intended only for storing data or simple logic, and not for complex inheritance or interface design, it
-can be marked as `final`.
-Such a class cannot be inherited, has no base class (is not a subclass of Object), and cannot abstract interfaces (
-should be possible, but not implemented).
+A final class is declared by appending the `final` keyword after the class name. Classes without `final` are referred to as non-final classes — i.e., the classes that support [covariance](#covariance).
+A final class is mainly used for simple data encapsulation.
+
+For example, a simple final class:
 
 ```feng
 class User final {
    var id int;
+}
+```
+
+Differences from non-final classes:
+
+1. First, `Object` is a non-final class.
+2. A final class can only inherit from final classes; a non-final class can only inherit from non-final classes.
+3. A final class can implement any interface.
+4. A final class does not support [covariance](#covariance) ([polymorphism](#polymorphism) and [abstraction](#abstraction)), meaning reference types cannot be converted.
+
+Examples for each rule:
+
+final class inheritance:
+
+```feng
+class A final {}
+class B : A final {}
+```
+
+A final class cannot inherit from a non-final class:
+
+```feng
+class A {}
+// class B final : A {}  // ✖: A final class cannot inherit from a non-final class
+```
+
+A non-final class cannot inherit from a final class:
+
+```feng
+class A final {}
+// class B : A {}  // ✖: A final class cannot be inherited by a non-final class
+```
+
+Can implement interfaces:
+
+```feng
+interface I {}
+class A final (I) {}
+```
+
+Finally, covariance is not supported:
+
+```feng
+interface I {}
+class A final {}
+class B final : A (I) {}
+func test1() {
+   var b = new(B);
+   // var a *A = b;     // ✖: Inheritance covariance
+   // var i *I = b;     // ✖: Abstraction covariance
+}
+func test2(a *A, i *I) {
+   // var b1 = a?(*?B); // ✖: Since covariance is unsupported, is-expressions cannot be used either
+   // var b2 = i?(*?B); // ✖: Same as above, is-expressions cannot be used
 }
 ```
 

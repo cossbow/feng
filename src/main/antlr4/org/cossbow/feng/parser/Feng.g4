@@ -166,8 +166,7 @@ classDefinition
     : modifier CLASS name=Identifier typeParameters? classExtension '{' classMember* '}'
     ;
 classExtension
-    : FINAL
-    | classInherit? classImpl?
+    : FINAL? classInherit? classImpl?
     ;
 classMember
     : modifier classMemberImpl

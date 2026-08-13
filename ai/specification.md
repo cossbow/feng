@@ -42,6 +42,7 @@ Complete list of reserved keywords:
 | Language name | `Feng`, `feng`, `FENG` |
 
 _Note: `let` is reserved in the grammar but has no defined semantics._
+_Note: `final` serves both as a class modifier (`class Foo final`) and as the `try`-`catch`-`final` clause._
 
 ### 1.4 Operators & Punctuation
 
@@ -404,7 +405,7 @@ returnSet          = TypeDeclarer | "this"
 **Syntax:**
 ```
 classDefinition = [modifier] "class" Identifier [typeParameters] classExtension "{" {classMember} "}"
-classExtension  = "final" | [classInherit] [classImpl]
+classExtension  = ["final"] [classInherit] [classImpl]
 classInherit    = ":" DefinedType
 classImpl       = "(" DefinedType {"," DefinedType} ")"
 classMember     = classMemberFields | classMemberMethod | macro
@@ -422,19 +423,29 @@ classMemberMethod  = functionDefinition
 7. [MUST] `super` refers to the direct parent class.
 
 #### Inheritance
-1. [MUST] Single inheritance only. The root class is `Object` (built-in, no members).
+1. [MUST] Single inheritance only. For non-final classes, the root class is `Object` (built-in, no members). Final classes do NOT inherit from `Object`.
 2. [MUST] Child classes cannot declare fields with the same name as parent fields.
 3. [MUST] Methods can be overridden if they have the same prototype (name + parameters + return type variants for covariance).
 4. [MUST] Method name uniqueness: a method name in a class must be unique across inherited and own methods; overriding is the exception.
+5. [MUST] A final class can only inherit from a final class; a non-final class can only inherit from a non-final class.
 
 #### Polymorphism
-1. [MUST] A parent-class reference can point to a child-class instance (covariance).
+1. [MUST] A parent-class reference can point to a child-class instance (covariance). This applies only to non-final classes.
 2. [MUST] Method dispatch is dynamic: calling through a parent reference invokes the child's override.
 3. [MUST] Covariant return types: a child method's return type can be a subclass of the parent method's return type.
 4. [MUST] Parameters and escape/unmodifiable markers must match exactly.
+5. [MUST] Covariance (polymorphism and abstraction) does NOT apply to final classes; reference types cannot be converted to or from a final class.
 
 #### final Class
-[MUST] A `final` class cannot be inherited. It does NOT extend `Object`. It cannot implement interfaces.
+
+[MUST] A class declared with the `final` keyword is a final class. Classes without `final` are non-final classes.
+
+1. [MUST] `Object` is a non-final class.
+2. [MUST] A final class can only inherit from a final class; a non-final class can only inherit from a non-final class. Consequently, a final class cannot inherit from a non-final class, and a non-final class cannot inherit from a final class.
+3. [MUST] A final class does NOT inherit from `Object` (because `Object` is non-final and final classes can only inherit final classes).
+4. [MUST] A final class can implement any interface.
+5. [MUST] A final class does not support covariance (polymorphism and abstraction); reference types cannot be converted to or from it.
+6. [MUST] Since covariance is unsupported, `is` expressions involving a final class are not allowed.
 
 #### Resource Class
 [MAY] A class with a `macro resource free()` method is a resource class. The macro is called when the instance is released.
@@ -456,6 +467,7 @@ interfaceMemberMethod = name "(" [parametersSet] ")" [returnSet] ";"
 4. [MUST] Method name conflicts: if composed interfaces have methods with the same name, they are treated as one; prototypes must be compatible.
 5. [MUST] A composed interface can be passed where a component interface is expected.
 6. [MUST] A class implementing an interface must provide all methods.
+7. [MUST] Both final and non-final classes can implement interfaces. However, since covariance applies only to non-final classes, an interface reference can only point to a non-final implementing class instance.
 
 ### 4.5 Enums
 
@@ -643,9 +655,10 @@ macroProcedure = name "(" [params] ")" [type] "{" statementList [expression] "}"
 
 **Semantics:**
 1. [MUST] Checks if the expression's runtime type is compatible with the target type.
-2. [MUST] Returns `(value, ok)` — the converted reference and a boolean success indicator.
-3. [MUST] If the conversion fails, returns `(nil, false)`.
+2. [MUST] Returns a nullable reference of the target type; the target type must be a reference type.
+3. [MUST] If the conversion fails, returns `nil`. The result must be checked against `nil` before use.
 4. [MAY] Used for downcasting in class hierarchies and interface checks.
+5. [MUST] The `is` expression cannot be used on final classes (source or target), since final classes do not support covariance.
 
 ### 5.9 `sizeof` Expression
 
@@ -1339,6 +1352,7 @@ func load(c &Counter) int32 {
 |-----------|:---------:|:-------------------:|:--------------:|:--------:|:-------------:|
 | Primitives | ✅ | — | — | — | ✅ other int types |
 | Classes (ref) | ✅ | ✅ (covariant) | ✅ | — | — |
+| Classes (ref, final) | ✅ | — | — | — | — |
 | Interfaces (ref) | ✅ | — | ✅ (composed→component) | — | — |
 | Structs/Unions | ✅ | — | — | ✅ (boundary check) | — |
 | Fixed Arrays | ✅ | — | — | ✅ (element mappable) | — |
@@ -1419,7 +1433,7 @@ interfaceMemberPart   = definedType ";"
 ```
 classDefinition   = modifier "class" Identifier [typeParameters] classExtension
                     "{" {classMember} "}"
-classExtension    = "final" | [classInherit] [classImpl]
+classExtension    = ["final"] [classInherit] [classImpl]
 classInherit      = ":" definedType
 classImpl         = "(" definedType {"," definedType} ")"
 classMember       = modifier (classMemberFields | classMemberMethod | macro)
