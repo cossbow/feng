@@ -10,7 +10,7 @@ if [[ -z "$jar" ]]; then
     jar=$(findJar)
 fi
 
-cmd="java -Dfeng.asan=true -jar ${jar}"
+cmd="java -Dsan=address -jar ${jar}"
 args="-Lstd=std -p test -t f -b m -D -T"
 
 out="target/test-std"

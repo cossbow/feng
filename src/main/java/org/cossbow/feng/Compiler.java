@@ -43,7 +43,7 @@ public class Compiler {
 
     private final Generator.Factory factory;
     private boolean debug;
-    private boolean asan;
+    private String sanitizer;
     private boolean test;
     private Set<String> testFilter = Set.of();
     private String pkg;
@@ -61,8 +61,8 @@ public class Compiler {
         return this;
     }
 
-    public Compiler asan(boolean asan) {
-        this.asan = asan;
+    public Compiler sanitizer(String sanitizer) {
+        this.sanitizer = sanitizer;
         return this;
     }
 
@@ -471,11 +471,11 @@ public class Compiler {
             if (!isC && !cSources.isEmpty()) w.write(" ${C_SOURCES}");
             w.write(")\n");
 
-            if (asan) {
+            if (sanitizer != null && !sanitizer.isEmpty()) {
                 w.write("\ntarget_compile_options(${PROJECT_NAME} PRIVATE"
-                        + " -fsanitize=address -fno-omit-frame-pointer)\n");
+                        + " -fsanitize=" + sanitizer + " -fno-omit-frame-pointer)\n");
                 w.write("target_link_options(${PROJECT_NAME} PRIVATE"
-                        + " -fsanitize=address)\n");
+                        + " -fsanitize=" + sanitizer + ")\n");
             }
 
             if (os.isCross()) {
@@ -512,7 +512,8 @@ public class Compiler {
             linkFlags.append(" -l").append(lib);
         }
 
-        var moreFlags = asan ? " -fsanitize=address -fno-omit-frame-pointer" : "";
+        var moreFlags = (sanitizer == null || sanitizer.isEmpty())
+                ? "" : " -fsanitize=" + sanitizer + " -fno-omit-frame-pointer";
         if (!debug) moreFlags += " -g -O2";
 
         // cross-compilation: add target triple + OS define so C #ifdef matches
