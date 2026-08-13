@@ -1028,6 +1028,19 @@ The concurrency model is based on `@Sync`/`@Async` attribute-based compile-time 
 [MUST] If a parent class method is NOT `@Async`, the overriding child method must NOT be `@Async`.
 [MUST] Same rules apply for interface implementations.
 
+### 8.7 Compiler Backend Handling
+
+The concurrency check is purely a compile-time check. The compiler backend treats `@Sync`
+differently depending on where it is applied:
+
+1. [MUST] `@Sync` on a field or variable: the compiler generates the concurrent
+   operations — atomic reference counting, and (for fields) spinlock-protected
+   load/store.
+2. [MUST] `@Sync` on a class: the compiler only marks the type as syncable and
+   generates NO concurrent operations. Concurrency correctness for the class's
+   internal state is the programmer's responsibility (e.g., via mutex, cond, or
+   atomic operations).
+
 ---
 
 ## 9. Exception System

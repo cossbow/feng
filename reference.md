@@ -3757,14 +3757,17 @@ class A {
 }
 ```
 
-### Compile-time Optimization
+### Compiler Optimization
 
-The compiler should optimize based on the `@Sync` attribute of fields and variables,
-but classes with `@Sync` do not require processing.
-This is because sync handling for fields and variables is frequent and simple,
-making compile-time processing highly efficient.
-Class-level sync handling, on the other hand, primarily addresses complex scenarios
-such as concurrent queues.
+The concurrency check is purely a syntactic and semantic check. The compiler backend
+handles the `@Sync` attribute in two cases:
+
+1. Sync handling for fields and variables is frequent and simple, so the compiler
+   processes it efficiently and directly generates the appropriate concurrent operations.
+2. Class-level sync handling primarily targets complex scenarios — for example,
+   lock-free concurrent queues — where the compiler generates no concurrent processing.
+
+The current compiler follows the two cases above.
 
 ## Unit Testing
 
