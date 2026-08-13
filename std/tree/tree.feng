@@ -1,0 +1,527 @@
+// ===== Tree`T` — 红黑树（有序集合）=====
+//
+// 一种自平衡的二叉搜索树，元素按 cmp 保持有序。
+// cmp(a,b) < 0 表示 a < b，== 0 表示相等，> 0 表示 a > b。
+// 重复元素会被拒绝（insert 返回 false）。
+//
+// 采用 CLRS 红黑树不变式，用 nil 作为黑色哨兵节点：
+//   1. 根是黑色；
+//   2. 红节点的子节点必须是黑色；
+//   3. 从任一节点到其所有叶子（nil）的路径上黑色节点数相同。
+//
+// 所有操作均摊复杂度为 O(log n)，中序遍历按升序输出元素。
+
+import std$error;
+
+export
+class TreeNode`T` {
+    const value T;
+    var red bool;                        // true=红, false=黑
+    var left *?TreeNode`T`;
+    var right *?TreeNode`T`;
+    var parent *?TreeNode`T`;
+}
+
+export
+class Tree`T` {
+    const cmp func(T,T)int;
+    var root *?TreeNode`T`;
+    var size int;
+
+    // ===== 内部辅助 =====
+
+    func isRed(node *?TreeNode`T`) bool {
+        return node != nil && node.red;
+    }
+
+    func rotateLeft(x *?TreeNode`T`) {
+        if (x == nil) { return; }
+        var y = x.right;
+        if (y == nil) { return; }
+        x.right = y.left;
+        var yl = y.left;
+        if (yl != nil) { yl.parent = x; }
+        y.parent = x.parent;
+        var xp = x.parent;
+        if (xp == nil) { root = y; }
+        else if (x == xp.left) { xp.left = y; }
+        else { xp.right = y; }
+        y.left = x;
+        x.parent = y;
+    }
+
+    func rotateRight(x *?TreeNode`T`) {
+        if (x == nil) { return; }
+        var y = x.left;
+        if (y == nil) { return; }
+        x.left = y.right;
+        var yr = y.right;
+        if (yr != nil) { yr.parent = x; }
+        y.parent = x.parent;
+        var xp = x.parent;
+        if (xp == nil) { root = y; }
+        else if (x == xp.right) { xp.right = y; }
+        else { xp.left = y; }
+        y.right = x;
+        x.parent = y;
+    }
+
+    func minimum(node *?TreeNode`T`) *?TreeNode`T` {
+        var cur = node;
+        for (cur != nil) {
+            var l = cur.left;
+            if (l == nil) { return cur; }
+            cur = l;
+        }
+        return nil;
+    }
+
+    func maximum(node *?TreeNode`T`) *?TreeNode`T` {
+        var cur = node;
+        for (cur != nil) {
+            var r = cur.right;
+            if (r == nil) { return cur; }
+            cur = r;
+        }
+        return nil;
+    }
+
+    func find(value T) *?TreeNode`T` {
+        var cur = root;
+        for (cur != nil) {
+            var c = cmp(value, cur.value);
+            if (c == 0) { return cur; }
+            var next = cur.left;
+            if (c > 0) { next = cur.right; }
+            cur = next;
+        }
+        return nil;
+    }
+
+    // ===== 插入 =====
+
+    func insertFixup(z *?TreeNode`T`) {
+        if (z == nil) { return; }
+        var node *?TreeNode`T` = z;
+        var p = node.parent;
+        for (p != nil && p.red) {
+            var g = p.parent;
+            if (g != nil) {
+                if (p == g.left) {
+                    var uncle = g.right;
+                    if (uncle != nil && uncle.red) {
+                        p.red = false;
+                        uncle.red = false;
+                        g.red = true;
+                        node = g;
+                    } else {
+                        if (node == p.right) {
+                            node = p;
+                            rotateLeft(node);
+                        }
+                        var zP = node.parent;
+                        if (zP != nil) {
+                            var zG = zP.parent;
+                            if (zG != nil) {
+                                zP.red = false;
+                                zG.red = true;
+                                rotateRight(zG);
+                            }
+                        }
+                    }
+                } else {
+                    var uncle = g.left;
+                    if (uncle != nil && uncle.red) {
+                        p.red = false;
+                        uncle.red = false;
+                        g.red = true;
+                        node = g;
+                    } else {
+                        if (node == p.left) {
+                            node = p;
+                            rotateRight(node);
+                        }
+                        var zP = node.parent;
+                        if (zP != nil) {
+                            var zG = zP.parent;
+                            if (zG != nil) {
+                                zP.red = false;
+                                zG.red = true;
+                                rotateLeft(zG);
+                            }
+                        }
+                    }
+                }
+            }
+            p = node.parent;
+        }
+        var r = root;
+        if (r != nil) { r.red = false; }
+    }
+
+    export func insert(value T) bool {
+        var parent *?TreeNode`T` = nil;
+        var cur = root;
+        for (cur != nil) {
+            parent = cur;
+            var c = cmp(value, cur.value);
+            if (c == 0) { return false; }
+            var next = cur.left;
+            if (c > 0) { next = cur.right; }
+            cur = next;
+        }
+        var node = new(TreeNode`T`, {value=value, red=true});
+        node.parent = parent;
+        if (parent == nil) {
+            root = node;
+        } else if (cmp(value, parent.value) < 0) {
+            parent.left = node;
+        } else {
+            parent.right = node;
+        }
+        size += 1;
+        insertFixup(node);
+        return true;
+    }
+
+    // ===== 删除 =====
+
+    func transplant(u *?TreeNode`T`, v *?TreeNode`T`) {
+        if (u == nil) { return; }
+        var up = u.parent;
+        if (up == nil) { root = v; }
+        else if (u == up.left) { up.left = v; }
+        else { up.right = v; }
+        if (v != nil) { v.parent = up; }
+    }
+
+    func deleteFixup(x *?TreeNode`T`, xp *?TreeNode`T`, isLeft bool) {
+        var nx = x;
+        var nxp = xp;
+        var nl = isLeft;
+        for (nx != root && !isRed(nx)) {
+            if (nxp == nil) { return; }
+            var moveUp = false;
+            if (nl) {
+                var w = nxp.right;
+                if (w == nil) { return; }
+                if (w.red) {
+                    w.red = false;
+                    nxp.red = true;
+                    rotateLeft(nxp);
+                    var w1 = nxp.right;
+                    if (w1 == nil) { return; }
+                    w = w1;
+                }
+                var wl = w.left;
+                var wr = w.right;
+                if (!isRed(wl) && !isRed(wr)) {
+                    w.red = true;
+                    moveUp = true;
+                } else {
+                    if (!isRed(wr)) {
+                        if (wl != nil) { wl.red = false; }
+                        w.red = true;
+                        rotateRight(w);
+                        var w2 = nxp.right;
+                        if (w2 == nil) { return; }
+                        w = w2;
+                        wr = w.right;
+                    }
+                    w.red = nxp.red;
+                    nxp.red = false;
+                    if (wr != nil) { wr.red = false; }
+                    rotateLeft(nxp);
+                    nx = root;
+                }
+            } else {
+                var w = nxp.left;
+                if (w == nil) { return; }
+                if (w.red) {
+                    w.red = false;
+                    nxp.red = true;
+                    rotateRight(nxp);
+                    var w1 = nxp.left;
+                    if (w1 == nil) { return; }
+                    w = w1;
+                }
+                var wl = w.left;
+                var wr = w.right;
+                if (!isRed(wr) && !isRed(wl)) {
+                    w.red = true;
+                    moveUp = true;
+                } else {
+                    if (!isRed(wl)) {
+                        if (wr != nil) { wr.red = false; }
+                        w.red = true;
+                        rotateLeft(w);
+                        var w2 = nxp.left;
+                        if (w2 == nil) { return; }
+                        w = w2;
+                        wl = w.left;
+                    }
+                    w.red = nxp.red;
+                    nxp.red = false;
+                    if (wl != nil) { wl.red = false; }
+                    rotateRight(nxp);
+                    nx = root;
+                }
+            }
+            if (moveUp) {
+                var newX = nxp;
+                var newXp = nxp.parent;
+                if (newXp != nil) { nl = (newX == newXp.left); }
+                else { nl = false; }
+                nx = newX;
+                nxp = newXp;
+            }
+        }
+        if (nx != nil) { nx.red = false; }
+    }
+
+    func deleteNode(z *?TreeNode`T`) {
+        if (z == nil) { return; }
+        var y = z;
+        var yWasRed = y.red;
+        var x *?TreeNode`T` = nil;
+        var xp *?TreeNode`T` = nil;
+        var isLeft = false;
+
+        if (z.left == nil) {
+            x = z.right;
+            var zp = z.parent;
+            xp = zp;
+            if (zp != nil) { isLeft = (z == zp.left); }
+            transplant(z, z.right);
+        } else if (z.right == nil) {
+            x = z.left;
+            var zp = z.parent;
+            xp = zp;
+            if (zp != nil) { isLeft = (z == zp.left); }
+            transplant(z, z.left);
+        } else {
+            var m = minimum(z.right);
+            if (m != nil) {
+                y = m;
+                yWasRed = y.red;
+                x = y.right;
+                var yp = y.parent;
+                if (yp == z) {
+                    xp = y;
+                    isLeft = false;
+                } else {
+                    xp = yp;
+                    if (yp != nil) { isLeft = (y == yp.left); }
+                    transplant(y, y.right);
+                    y.right = z.right;
+                    var zr = z.right;
+                    if (zr != nil) { zr.parent = y; }
+                }
+                transplant(z, y);
+                y.left = z.left;
+                var zl = z.left;
+                if (zl != nil) { zl.parent = y; }
+                y.red = z.red;
+            }
+        }
+
+        if (!yWasRed) {
+            deleteFixup(x, xp, isLeft);
+        }
+    }
+
+    export func remove(value T) bool {
+        var z = find(value);
+        if (z == nil) { return false; }
+        deleteNode(z);
+        size -= 1;
+        return true;
+    }
+
+    // ===== 查询 =====
+
+    export func contains(value T) bool {
+        return find(value) != nil;
+    }
+
+    export func size() int {
+        return size;
+    }
+
+    export func isEmpty() bool {
+        return size == 0;
+    }
+
+    export func clear() {
+        root = nil;
+        size = 0;
+    }
+
+    export func min() (T, bool) {
+        var m = minimum(root);
+        if (m == nil) {
+            var zero T;
+            return (zero, false);
+        }
+        return (m.value, true);
+    }
+
+    export func max() (T, bool) {
+        var m = maximum(root);
+        if (m == nil) {
+            var zero T;
+            return (zero, false);
+        }
+        return (m.value, true);
+    }
+
+    // 小于等于 value 的最大元素
+    export func floor(value T) (T, bool) {
+        var cur = root;
+        var found *?TreeNode`T` = nil;
+        for (cur != nil) {
+            var c = cmp(value, cur.value);
+            if (c == 0) { return (cur.value, true); }
+            var next = cur.left;
+            if (c > 0) {
+                found = cur;
+                next = cur.right;
+            }
+            cur = next;
+        }
+        if (found == nil) {
+            var zero T;
+            return (zero, false);
+        }
+        return (found.value, true);
+    }
+
+    // 大于等于 value 的最小元素
+    export func ceiling(value T) (T, bool) {
+        var cur = root;
+        var found *?TreeNode`T` = nil;
+        for (cur != nil) {
+            var c = cmp(value, cur.value);
+            if (c == 0) { return (cur.value, true); }
+            var next = cur.right;
+            if (c < 0) {
+                found = cur;
+                next = cur.left;
+            }
+            cur = next;
+        }
+        if (found == nil) {
+            var zero T;
+            return (zero, false);
+        }
+        return (found.value, true);
+    }
+
+    // 小于 value 的最大元素
+    export func lower(value T) (T, bool) {
+        var cur = root;
+        var found *?TreeNode`T` = nil;
+        for (cur != nil) {
+            var next = cur.left;
+            if (cmp(cur.value, value) < 0) {
+                found = cur;
+                next = cur.right;
+            }
+            cur = next;
+        }
+        if (found == nil) {
+            var zero T;
+            return (zero, false);
+        }
+        return (found.value, true);
+    }
+
+    // 大于 value 的最小元素
+    export func higher(value T) (T, bool) {
+        var cur = root;
+        var found *?TreeNode`T` = nil;
+        for (cur != nil) {
+            var next = cur.right;
+            if (cmp(cur.value, value) > 0) {
+                found = cur;
+                next = cur.left;
+            }
+            cur = next;
+        }
+        if (found == nil) {
+            var zero T;
+            return (zero, false);
+        }
+        return (found.value, true);
+    }
+
+    // ===== 校验（调试/测试用）=====
+
+    func blackHeight(node *?TreeNode`T`) int {
+        if (node == nil) { return 1; }
+        var lh = blackHeight(node.left);
+        if (lh < 0) { return -1; }
+        var rh = blackHeight(node.right);
+        if (rh < 0) { return -1; }
+        if (lh != rh) { return -1; }
+        if (node.red) {
+            if (isRed(node.left) || isRed(node.right)) { return -1; }
+            return lh;
+        }
+        return lh + 1;
+    }
+
+    export func check() bool {
+        var r = root;
+        if (r == nil) { return true; }
+        if (r.red) { return false; }
+        return blackHeight(r) >= 0;
+    }
+
+    // ===== 迭代 =====
+
+    export func iterator() *TreeIter`T` {
+        return new(TreeIter`T`, {cur=minimum(root)});
+    }
+}
+
+// ===== 中序遍历迭代器 =====
+
+export
+class TreeIter`T` {
+    var cur *?TreeNode`T`;
+
+    export func hasNext() bool {
+        return cur != nil;
+    }
+
+    export func next() {
+        var c = cur;
+        if (c == nil) { return; }
+        if (c.right != nil) {
+            var s = c.right;
+            for (s != nil && s.left != nil) { s = s.left; }
+            cur = s;
+        } else {
+            var p = c.parent;
+            for (p != nil && c == p.right) {
+                c = p;
+                p = p.parent;
+            }
+            cur = p;
+        }
+    }
+
+    export func value() T {
+        var c = cur;
+        if (c == nil) { throw new(error$IllegalStateException); }
+        return c.value;
+    }
+}
+
+// ===== 工厂函数 =====
+
+export
+func newTree`T`(cmp func(T,T)int) *Tree`T` {
+    return new(Tree`T`, {cmp=cmp});
+}

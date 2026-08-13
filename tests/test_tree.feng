@@ -1,0 +1,293 @@
+import std$testing;
+import std$tree;
+
+func cmpInt(a, b int) int {
+    if (a < b) { return -1; }
+    if (a > b) { return 1; }
+    return 0;
+}
+
+// 简单可复现的伪随机数生成器（LCG）
+var rngState int = 42;
+
+func nextRand() int {
+    rngState = (rngState * 1103515245 + 12345) & 0x7fffffff;
+    return rngState;
+}
+
+// ===== 插入 / 查找 / 大小 =====
+
+@Test
+func testInsertContains() {
+    var t = tree$newTree`int`(cmpInt);
+    testing$assertTrue(t.isEmpty());
+    testing$assertTrue(t.insert(3));
+    testing$assertTrue(t.insert(1));
+    testing$assertTrue(t.insert(2));
+    testing$assertTrue(t.size() == 3);
+    testing$assertTrue(t.contains(1));
+    testing$assertTrue(t.contains(2));
+    testing$assertTrue(t.contains(3));
+    testing$assertFalse(t.contains(4));
+    testing$assertTrue(t.check());
+}
+
+@Test
+func testInsertDuplicate() {
+    var t = tree$newTree`int`(cmpInt);
+    testing$assertTrue(t.insert(5));
+    testing$assertFalse(t.insert(5));
+    testing$assertTrue(t.size() == 1);
+    testing$assertTrue(t.check());
+}
+
+// ===== 删除 =====
+
+@Test
+func testRemoveLeaf() {
+    var t = tree$newTree`int`(cmpInt);
+    t.insert(2);
+    t.insert(1);
+    t.insert(3);
+    testing$assertTrue(t.remove(1));
+    testing$assertFalse(t.contains(1));
+    testing$assertTrue(t.size() == 2);
+    testing$assertTrue(t.check());
+}
+
+@Test
+func testRemoveOneChild() {
+    var t = tree$newTree`int`(cmpInt);
+    t.insert(3);
+    t.insert(2);
+    t.insert(1);
+    // 删除有一个子节点的节点
+    testing$assertTrue(t.remove(2));
+    testing$assertFalse(t.contains(2));
+    testing$assertTrue(t.size() == 2);
+    testing$assertTrue(t.contains(1));
+    testing$assertTrue(t.contains(3));
+    testing$assertTrue(t.check());
+}
+
+@Test
+func testRemoveTwoChildren() {
+    var t = tree$newTree`int`(cmpInt);
+    t.insert(5);
+    t.insert(3);
+    t.insert(7);
+    t.insert(1);
+    t.insert(4);
+    t.insert(6);
+    t.insert(8);
+    // 删除有两个子节点的根
+    testing$assertTrue(t.remove(5));
+    testing$assertFalse(t.contains(5));
+    testing$assertTrue(t.size() == 6);
+    testing$assertTrue(t.check());
+}
+
+@Test
+func testRemoveRoot() {
+    var t = tree$newTree`int`(cmpInt);
+    t.insert(10);
+    testing$assertTrue(t.remove(10));
+    testing$assertTrue(t.isEmpty());
+    testing$assertTrue(t.check());
+}
+
+@Test
+func testRemoveNotFound() {
+    var t = tree$newTree`int`(cmpInt);
+    t.insert(1);
+    t.insert(2);
+    testing$assertFalse(t.remove(99));
+    testing$assertTrue(t.size() == 2);
+}
+
+// ===== 最值 =====
+
+@Test
+func testMinMax() {
+    var t = tree$newTree`int`(cmpInt);
+    t.insert(5);
+    t.insert(2);
+    t.insert(8);
+    t.insert(1);
+    t.insert(9);
+    var mn = t.min();
+    testing$assertTrue(mn.1);
+    testing$assertTrue(mn.0 == 1);
+    var mx = t.max();
+    testing$assertTrue(mx.1);
+    testing$assertTrue(mx.0 == 9);
+}
+
+@Test
+func testMinMaxEmpty() {
+    var t = tree$newTree`int`(cmpInt);
+    var mn = t.min();
+    testing$assertFalse(mn.1);
+    var mx = t.max();
+    testing$assertFalse(mx.1);
+}
+
+// ===== floor / ceiling / lower / higher =====
+
+@Test
+func testFloorCeiling() {
+    var t = tree$newTree`int`(cmpInt);
+    t.insert(10);
+    t.insert(20);
+    t.insert(30);
+    // 精确命中
+    var f1 = t.floor(20);
+    testing$assertTrue(f1.1 && f1.0 == 20);
+    var c1 = t.ceiling(20);
+    testing$assertTrue(c1.1 && c1.0 == 20);
+    // 不命中
+    var f2 = t.floor(25);
+    testing$assertTrue(f2.1 && f2.0 == 20);
+    var c2 = t.ceiling(25);
+    testing$assertTrue(c2.1 && c2.0 == 30);
+    // 越界
+    var f3 = t.floor(5);
+    testing$assertFalse(f3.1);
+    var c3 = t.ceiling(35);
+    testing$assertFalse(c3.1);
+}
+
+@Test
+func testLowerHigher() {
+    var t = tree$newTree`int`(cmpInt);
+    t.insert(10);
+    t.insert(20);
+    t.insert(30);
+    var l1 = t.lower(20);
+    testing$assertTrue(l1.1 && l1.0 == 10);
+    var h1 = t.higher(20);
+    testing$assertTrue(h1.1 && h1.0 == 30);
+    var l2 = t.lower(10);
+    testing$assertFalse(l2.1);
+    var h2 = t.higher(30);
+    testing$assertFalse(h2.1);
+}
+
+// ===== 中序遍历 =====
+
+@Test
+func testIterator() {
+    var t = tree$newTree`int`(cmpInt);
+    t.insert(5);
+    t.insert(3);
+    t.insert(7);
+    t.insert(1);
+    t.insert(4);
+    t.insert(6);
+    t.insert(8);
+    var it = t.iterator();
+    var prev = 0;
+    var count = 0;
+    for (it.hasNext()) {
+        testing$assertTrue(prev < it.value());
+        prev = it.value();
+        it.next();
+        count += 1;
+    }
+    testing$assertTrue(count == 7);
+    testing$assertTrue(prev == 8);
+}
+
+@Test
+func testIteratorEmpty() {
+    var t = tree$newTree`int`(cmpInt);
+    var it = t.iterator();
+    testing$assertFalse(it.hasNext());
+}
+
+// ===== clear =====
+
+@Test
+func testClear() {
+    var t = tree$newTree`int`(cmpInt);
+    t.insert(1);
+    t.insert(2);
+    t.insert(3);
+    t.clear();
+    testing$assertTrue(t.isEmpty());
+    testing$assertTrue(t.size() == 0);
+    testing$assertFalse(t.contains(1));
+    testing$assertTrue(t.check());
+}
+
+// ===== 随机化压力测试：每次操作后校验红黑性质 =====
+
+@Test
+func testRandomized() {
+    var n = 128;
+    var arr = new([n]int);
+    for (var i = 0; i < n; i += 1) { arr[i] = i; }
+    // Fisher-Yates 洗牌
+    for (var i = n - 1; i > 0; i -= 1) {
+        var j = nextRand() % (i + 1);
+        var tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+
+    var t = tree$newTree`int`(cmpInt);
+    for (var i = 0; i < n; i += 1) {
+        testing$assertTrue(t.insert(arr[i]));
+        testing$assertTrue(t.check());
+    }
+    testing$assertTrue(t.size() == n);
+
+    // 中序遍历应为严格递增
+    var it = t.iterator();
+    var prev = -1;
+    var count = 0;
+    for (it.hasNext()) {
+        testing$assertTrue(prev < it.value());
+        prev = it.value();
+        it.next();
+        count += 1;
+    }
+    testing$assertTrue(count == n);
+
+    // 再次洗牌，按随机顺序删除
+    for (var i = n - 1; i > 0; i -= 1) {
+        var j = nextRand() % (i + 1);
+        var tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+    for (var i = 0; i < n; i += 1) {
+        testing$assertTrue(t.remove(arr[i]));
+        testing$assertTrue(t.check());
+    }
+    testing$assertTrue(t.isEmpty());
+}
+
+@Test
+func testAscendingDescending() {
+    var t = tree$newTree`int`(cmpInt);
+    // 升序插入（触发大量右旋/重着色）
+    for (var i = 0; i < 64; i += 1) {
+        t.insert(i);
+        testing$assertTrue(t.check());
+    }
+    testing$assertTrue(t.size() == 64);
+    // 降序插入
+    var t2 = tree$newTree`int`(cmpInt);
+    for (var i = 63; i >= 0; i -= 1) {
+        t2.insert(i);
+        testing$assertTrue(t2.check());
+    }
+    testing$assertTrue(t2.size() == 64);
+    // 顺序删除
+    for (var i = 0; i < 64; i += 1) {
+        testing$assertTrue(t.remove(i));
+        testing$assertTrue(t.check());
+    }
+    testing$assertTrue(t.isEmpty());
+}
