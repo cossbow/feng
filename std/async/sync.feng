@@ -1,0 +1,78 @@
+// ===== std$async — Mutex, Condition Variable =====
+
+import std$async$c;
+import std$error;
+
+// ===== Mutex =====
+
+export
+class Mutex {
+    var _h uint64;
+
+    macro resource free() {
+        _destroy();
+    }
+
+    func _destroy() {
+        if (_h != uint64(0)) {
+            c$mutexDestroy(_h);
+            _h = uint64(0);
+        }
+    }
+
+    export func lock() {
+        c$mutexLock(_h);
+    }
+
+    export func tryLock() bool {
+        return c$mutexTryLock(_h) != 0;
+    }
+
+    export func unlock() {
+        c$mutexUnlock(_h);
+    }
+}
+
+export
+func newMutex() *Mutex {
+    var h = c$mutexCreate();
+    if (h == uint64(0)) { throw new(error$IllegalStateException); }
+    return new(Mutex, {_h = h});
+}
+
+// ===== Cond =====
+
+export
+class Cond {
+    var _h uint64;
+
+    macro resource free() {
+        _destroy();
+    }
+
+    func _destroy() {
+        if (_h != uint64(0)) {
+            c$condDestroy(_h);
+            _h = uint64(0);
+        }
+    }
+
+    export func wait(m *Mutex) {
+        c$condWait(_h, m._h);
+    }
+
+    export func signal() {
+        c$condSignal(_h);
+    }
+
+    export func broadcast() {
+        c$condBroadcast(_h);
+    }
+}
+
+export
+func newCond() *Cond {
+    var h = c$condCreate();
+    if (h == uint64(0)) { throw new(error$IllegalStateException); }
+    return new(Cond, {_h = h});
+}

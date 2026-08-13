@@ -1,0 +1,100 @@
+// ===== std$async — Atomic types =====
+// Wraps GCC __atomic builtins via C module std$async$c.
+// Uses phantom reference &int32 → uint64(ptr) to get C pointer.
+
+import std$async$c;
+
+// ===== AtomicInt32 =====
+
+export
+class AtomicInt32 final {
+    var value int32;
+
+    func cptr() uint64 {
+        const r &int32 = value;
+        return uint64(r);
+    }
+
+    export func load() int32 {
+        return c$atomicLoad(cptr());
+    }
+
+    export func store(v int32) {
+        c$atomicStore(cptr(), v);
+    }
+
+    export func swap(v int32) int32 {
+        return c$atomicSwap(cptr(), v);
+    }
+
+    export func compareSwap(old, desired int32) bool {
+        var exp [1]int32;
+        exp[0] = old;
+        return c$atomicCAS(cptr(), exp.values, desired) != 0;
+    }
+
+    export func fetchAdd(v int32) int32 {
+        return c$atomicFetchAdd(cptr(), v);
+    }
+
+    export func fetchSub(v int32) int32 {
+        return c$atomicFetchSub(cptr(), v);
+    }
+}
+
+export
+func newAtomicInt32(v int32) *AtomicInt32 {
+    return new(AtomicInt32, {value = v});
+}
+
+// ===== AtomicBool =====
+// int32-backed; 0=false, 1=true.
+
+export
+class AtomicBool final {
+    var value int32;
+
+    func cptr() uint64 {
+        const r &int32 = value;
+        return uint64(r);
+    }
+
+    export func load() bool {
+        return c$atomicLoad(cptr()) != 0;
+    }
+
+    export func store(v bool) {
+        if (v)  { c$atomicStore(cptr(), int32(1)); }
+        else    { c$atomicStore(cptr(), int32(0)); }
+    }
+
+    export func swap(v bool) bool {
+        var cv int32 = 0;
+        if (v) { cv = 1; }
+        return c$atomicSwap(cptr(), cv) != 0;
+    }
+
+    export func compareSwap(old, desired bool) bool {
+        var exp [1]int32;
+        if (old)     { exp[0] = 1; }
+        if (!old)    { exp[0] = 0; }
+        var cd int32 = 0;
+        if (desired) { cd = 1; }
+        return c$atomicCAS(cptr(), exp.values, cd) != 0;
+    }
+
+    export func setTrue() bool {
+        return c$atomicSwap(cptr(), int32(1)) != 0;
+    }
+
+    export func setFalse() bool {
+        return c$atomicSwap(cptr(), int32(0)) != 0;
+    }
+}
+
+export
+func newAtomicBool(v bool) *AtomicBool {
+    var val int32 = 0;
+    if (v) { val = 1; }
+    return new(AtomicBool, {value = val});
+}

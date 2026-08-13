@@ -1,0 +1,30 @@
+// ===== std$async — Mutex, Condition Variable =====
+// Wraps pthread via C module std$async$c.
+
+import std$async$c;
+import std$error;
+
+// Thread wrap
+
+@Sync
+export
+interface Task {
+    @Async
+    run();
+}
+
+class Thread {
+    @Sync
+    const task *Task;
+}
+
+func threadEntry(thread *Thread) {
+    thread.task.run();
+}
+
+@Async
+export
+func start(task *Task) {
+    var th = new(Thread, {task=task});
+    c$threadCreate(uint64(threadEntry), uint64(th));
+}

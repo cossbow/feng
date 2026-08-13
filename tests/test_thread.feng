@@ -1,0 +1,88 @@
+import std$testing;
+import std$async;
+
+// ===== Mutex =====
+
+@Test
+func testMutexLockUnlock() {
+    var m = async$newMutex();
+    m.lock();
+    m.unlock();
+    m.lock();
+    m.unlock();
+}
+
+@Test
+func testMutexTryLock() {
+    var m = async$newMutex();
+    var ok = m.tryLock();
+    testing$assertTrue(ok);
+    var ok2 = m.tryLock();
+    testing$assertFalse(ok2);
+    m.unlock();
+    ok = m.tryLock();
+    testing$assertTrue(ok);
+    m.unlock();
+}
+
+// ===== Cond: signal / broadcast (local vars only) =====
+
+@Test
+func testCondSignal() {
+    var mu = async$newMutex();
+    var cv = async$newCond();
+
+    mu.lock();
+    cv.signal();
+    mu.unlock();
+}
+
+@Test
+func testCondBroadcast() {
+    var mu = async$newMutex();
+    var cv = async$newCond();
+
+    mu.lock();
+    cv.broadcast();
+    mu.unlock();
+}
+
+// ===== Cond: wait pattern (single-thread, no actual waiter) =====
+
+@Test
+func testCondWaitSetup() {
+    var mu = async$newMutex();
+    var cv = async$newCond();
+
+    // Just verify calling wait doesn't crash (will wait forever without signaler)
+    // Skip actual wait — instead just test lock/unlock around cond
+    mu.lock();
+    mu.unlock();
+}
+
+// ===== Mutex RAII via resource free =====
+
+@Test
+func testMutexRAII() {
+    {
+        var m = async$newMutex();
+        m.lock();
+        testing$assertTrue(!m.tryLock());
+        m.unlock();
+        m.lock();
+        m.unlock();
+    }
+}
+
+// ===== Multiple mutexes =====
+
+@Test
+func testMultipleMutexes() {
+    var m1 = async$newMutex();
+    var m2 = async$newMutex();
+
+    m1.lock();
+    m2.lock();
+    m2.unlock();
+    m1.unlock();
+}

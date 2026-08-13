@@ -1,0 +1,86 @@
+import std$testing;
+import std$async;
+
+// ===== 真实多线程测试 =====
+// std$async 把 pthread 封装成 Task/start 接口。线程没有 join，
+// 因此每个子线程在末尾对 done 计数 +1，主线程忙等 done 达到线程数即表示全部完成。
+// 注意：共享引用字段用字段级 @Sync 标注，编译器会自动将引用计数优化为原子操作。
+
+// 原子自增任务：counter 每线程 +1，done 记录已完成线程数
+class IncAtomicTask (async$Task) {
+    @Sync
+    var counter *async$AtomicInt32;
+    @Sync
+    var done *async$AtomicInt32;
+    @Async func run() {
+        counter.fetchAdd(int32(1));
+        done.fetchAdd(int32(1));
+    }
+}
+
+// 互斥自增任务：shared.value 为非原子计数器，靠 mutex 保护，times 为每线程自增次数
+class SharedCounter {
+    var value int;
+    @Sync
+    var mu *async$Mutex;
+}
+
+class IncMutexTask (async$Task) {
+    @Sync
+    var shared *SharedCounter;
+    @Sync
+    var done *async$AtomicInt32;
+    var times int;
+    @Async func run() {
+        for (var i = 0; i < times; i += 1) {
+            shared.mu.lock();
+            shared.value = shared.value + 1;
+            shared.mu.unlock();
+        }
+        done.fetchAdd(int32(1));
+    }
+}
+
+// ===== 线程启动 =====
+
+@Test
+func testThreadStart() {
+    @Sync var counter = async$newAtomicInt32(int32(0));
+    @Sync var done = async$newAtomicInt32(int32(0));
+    @Sync var t = new(IncAtomicTask, {counter = counter, done = done});
+    async$start(t);
+    for (done.load() == int32(0)) { }
+    testing$assertTrue(counter.load() == int32(1));
+}
+
+// ===== 并发原子自增 =====
+
+@Test
+func testConcurrentAtomicIncrement() {
+    @Sync var counter = async$newAtomicInt32(int32(0));
+    @Sync var done = async$newAtomicInt32(int32(0));
+    var n = 8;
+    for (var i = 0; i < n; i += 1) {
+        @Sync var t = new(IncAtomicTask, {counter = counter, done = done});
+        async$start(t);
+    }
+    for (done.load() < int32(n)) { }
+    testing$assertTrue(counter.load() == int32(n));
+}
+
+// ===== 互斥保护非原子计数器 =====
+
+@Test
+func testMutexMutualExclusion() {
+    @Sync var mu = async$newMutex();
+    @Sync var shared = new(SharedCounter, {mu = mu});
+    @Sync var done = async$newAtomicInt32(int32(0));
+    var threads = 8;
+    var per = 1000;
+    for (var i = 0; i < threads; i += 1) {
+        @Sync var t = new(IncMutexTask, {shared = shared, done = done, times = per});
+        async$start(t);
+    }
+    for (done.load() < int32(threads)) { }
+    testing$assertTrue(shared.value == threads * per);
+}
