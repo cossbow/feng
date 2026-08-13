@@ -247,10 +247,11 @@ public class Compiler {
         }
 
         // Collect link libraries from all modules, deduplicate keeping order
-        var allLinkLibs = new java.util.LinkedHashSet<String>();
+        var allLinkLibs = new LinkedHashSet<String>(dag.size()+2);
         for (var fm : dag) {
             allLinkLibs.addAll(fm.linkLibs());
         }
+        allLinkLibs.add("m");
 
         if (build == Build.MAKE) {
             generateMakefile(dir, moduleNames, allCSources, hasMain,
