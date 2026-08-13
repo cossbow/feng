@@ -351,7 +351,7 @@ final class SourceParseVisitor
         if (dt instanceof PrimitiveType pt)
             return pt.primitive().declarer(pt.pos(), refer);
         if (dt instanceof GenericType gt)
-            return new GenericTypeDeclarer(posOf(ctx), gt);
+            return new GenericTypeDeclarer(posOf(ctx), gt, refer);
         return new DerivedTypeDeclarer(posOf(ctx),
                 (DerivedType) dt, refer);
     }

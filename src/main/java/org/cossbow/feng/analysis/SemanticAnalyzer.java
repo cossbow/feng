@@ -478,6 +478,7 @@ public class SemanticAnalyzer {
             case DerivedTypeDeclarer ee -> analyse(ee);
             case FuncTypeDeclarer ee -> analyse(ee);
             case TupleTypeDeclarer ee -> analyse(ee);
+            case GenericTypeDeclarer ee -> analyse(ee);
             default -> td;
         };
     }
@@ -575,6 +576,14 @@ public class SemanticAnalyzer {
             elements.add(nt);
         }
         return new TupleTypeDeclarer(td.pos(), elements);
+    }
+
+    private GenericTypeDeclarer analyse(GenericTypeDeclarer td) {
+        if (td.refer().has()) {
+            semantic("can't use type-parameter '%s' as value-type: '%s'",
+                    td.type(), td.pos());
+        }
+        return td;
     }
 
     private void analyse(TypeParameters e) {
