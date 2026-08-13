@@ -3484,9 +3484,13 @@ public class SemanticAnalyzerTest {
 
         checkSucc("func f(v bool)int{for(true){if(v){break;}}return 1;}");
         checkSucc("func f(v bool)int{for(true){if(v){}else{break;}}return 1;}");
+        checkSucc("func f(v bool)int{for(true){if(v){break;}return 0;}return 1;}");
+        checkSucc("func f(v bool)int{for(true){if(v){}else{break;}return 0;}return 1;}");
 
         checkSucc("func f()int{for(true){if(true){break;}}return 1;}");
         checkFail("func f()int{for(true){if(false){break;}}return 1;}");
+        checkFail("func f()int{for(true){if(true){break;}return 0;}return 1;}");
+        checkFail("func f()int{for(true){if(false){break;}return 0;}return 1;}");
 
         checkSucc("func f(v int)int{for(true){switch(v){case 0{break;}default{}}}return 1;}");
         checkSucc("func f(v int)int{for(true){switch(v){case 0{}default{break;}}}return 1;}");

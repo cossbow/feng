@@ -3005,13 +3005,13 @@ public class SemanticAnalyzer {
         // If the condition is a constant true, it will inevitably
         // enter the loop, so the loop body must be checked.
         if (!s.cond().match(BoolLiteral::value)) return false;
-        // An infinite-loop is equivalent to termination,
-        // so we need to check the termination within
-        // the loop body:
-        if (terminated(s.body())) return true;
-        // Even without a termination, but the
-        // break-statement will break infinite-loop:
-        return !loopBroken(s.body());
+        // Check for unreachable statements within the loop body
+        // after unconditional break/return/throw:
+        terminated(s.body());
+        loopBroken(s.body());
+        // An infinite-loop is equivalent to termination unless
+        // the body can exit via break:
+        return !mayBreak(s.body());
     }
 
     private boolean terminated(IfStatement s) {
@@ -3090,7 +3090,7 @@ public class SemanticAnalyzer {
         if (s.cond().none()) {
             // In the case of nonconstant conditions,
             // any branch needs to have a break-statement:
-            return loopBroken(s.yes()) ||
+            return loopBroken(s.yes()) &&
                     loopBroken(s.not());
         }
         // If it is a constant condition, only the branch
@@ -3103,16 +3103,80 @@ public class SemanticAnalyzer {
     }
 
     private boolean loopBroken(SwitchStatement s) {
-        // Break is required in any branch
-        return loopBroken(s.branches()) ||
-                loopBroken(s.defaultBranch());
+        // All branches must have a break:
+        var allBroken = true;
+        for (var b : s.branches()) {
+            allBroken = allBroken && loopBroken(b.body());
+        }
+        if (s.defaultBranch().none()) return allBroken;
+        return allBroken && loopBroken(s.defaultBranch().get().body());
     }
 
     private boolean loopBroken(TryStatement s) {
-        // Break is required in any branch
-        return loopBroken(s.body()) ||
-                loopBroken(s.catchClauses()) ||
-                loopBroken(s.finallyClause());
+        var allBroken = loopBroken(s.body());
+        for (var c : s.catchClauses()) {
+            allBroken = allBroken && loopBroken(c.body());
+        }
+        if (allBroken) return true;
+        // If try/catch don't guarantee a break,
+        // the finally branch must do:
+        return loopBroken(s.finallyClause());
+    }
+
+    /**
+     * Check if any path may reach a break-statement (existential check).
+     * Unlike {@link #loopBroken} which requires ALL paths to break,
+     * this returns true if AT LEAST ONE path can break.
+     * <p>
+     * Used to determine if a {@code for (true) { ... }} loop can exit.
+     */
+    private boolean mayBreak(Statement s) {
+        return switch (s) {
+            case BlockStatement ee -> mayBreak(ee.list());
+            case IfStatement ee -> mayBreak(ee);
+            case LabeledStatement ee -> mayBreak(ee.target());
+            case SwitchStatement ee -> mayBreak(ee);
+            case Branch ee -> mayBreak(ee.body());
+            case TryStatement ee -> mayBreak(ee);
+            case BreakStatement ee -> true;
+            case null, default -> false;
+        };
+    }
+
+    private boolean mayBreak(
+            Optional<? extends Statement> o) {
+        return o.has() && mayBreak(o.get());
+    }
+
+    private boolean mayBreak(List<? extends Statement> list) {
+        for (var s : list) {
+            if (mayBreak(s)) return true;
+        }
+        return false;
+    }
+
+    private boolean mayBreak(IfStatement s) {
+        if (s.cond().none()) {
+            return mayBreak(s.yes()) || mayBreak(s.not());
+        }
+        if (s.cond().must().value()) {
+            return mayBreak(s.yes());
+        } else {
+            return mayBreak(s.not());
+        }
+    }
+
+    private boolean mayBreak(SwitchStatement s) {
+        for (var b : s.branches()) {
+            if (mayBreak(b.body())) return true;
+        }
+        return mayBreak(s.defaultBranch());
+    }
+
+    private boolean mayBreak(TryStatement s) {
+        return mayBreak(s.body()) ||
+                mayBreak(s.catchClauses()) ||
+                mayBreak(s.finallyClause());
     }
 
     //
