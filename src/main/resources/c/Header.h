@@ -33,15 +33,32 @@ typedef bool     Bool;
 //   - sync types:  atomic ops via (atomic_int*)&refcnt cast
 //   - non-sync:    plain ++/-- access
 typedef struct Feng$Header {
+#ifdef FENG_DEBUG_MEMORY
+    struct Feng$Header* next;   // leak-check linked list (populated only under FENG_DEBUG_MEMORY)
+    void* site;                 // allocation site (return address; recorded under FENG_DEBUG_MEMORY)
+    int64_t size;               // requested data size (recorded under FENG_DEBUG_MEMORY)
+#endif
     _Alignas(max_align_t)
     int refcnt;
 } Feng$Header;
+
+#ifdef FENG_DEBUG_MEMORY
+// ===== leak checker (single shared list + report, defined in builtin.c) =====
+extern Feng$Header* Feng$debug_list;
+extern void feng$debug(bool all);
+#endif
 
 static inline void* Feng$alloc(int64_t size) {
     void* p = malloc(sizeof(Feng$Header) + size);
     if (!p) abort();
     Feng$Header* fh = (Feng$Header*) p;
     fh->refcnt = 1;
+#ifdef FENG_DEBUG_MEMORY
+    fh->next = Feng$debug_list;
+    Feng$debug_list = fh;
+    fh->site = __builtin_return_address(0);
+    fh->size = size;
+#endif
     void* o = ((uint8_t*) p) + sizeof(Feng$Header);
     memset(o, 0, size);
     return o;
@@ -53,7 +70,9 @@ static inline Feng$Header* Feng$headerOf(void* p) {
 
 static inline void Feng$free(void* p) {
     if (!p) return;
+#ifndef FENG_DEBUG_MEMORY
     free(Feng$headerOf(p));
+#endif
 }
 
 // atomic inc/dec — cast plain int* to atomic_int* (Linux kernel style)
@@ -71,7 +90,11 @@ static inline bool Feng$dec(void* p) {
     int* prc = &Feng$headerOf(p)->refcnt;
     int ref = atomic_fetch_sub((atomic_int*)prc, 1) - 1;
     if (ref == 0) return true;
+#ifdef FENG_DEBUG_MEMORY
+    if (ref < 0) return false;  // allow over-release so the leak report still prints
+#else
     if (ref < 0) abort();
+#endif
     return false;
 }
 

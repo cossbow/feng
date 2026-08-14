@@ -47,6 +47,7 @@ public class CGenerator implements Generator {
     private Appendable out;
     private final boolean header;   // true = header file, false = source file
     private final boolean debug;
+    private final boolean memchk;   // leak checker: -Dfeng.memchk → FENG_DEBUG_MEMORY
 
     public CGenerator(AnalyseSymbolTable table,
                       Appendable out, boolean header,
@@ -55,6 +56,7 @@ public class CGenerator implements Generator {
         this.out = out;
         this.header = header;
         this.debug = debug;
+        this.memchk = Boolean.parseBoolean(System.getProperty("feng.memchk"));
     }
 
     public CGenerator(AnalyseSymbolTable table,
@@ -714,6 +716,7 @@ public class CGenerator implements Generator {
             return;
         }
         if (debug) write("#define FENG_DEBUG").newLine();
+        if (memchk) write("#define FENG_DEBUG_MEMORY").newLine();
     }
 
     private void includeHeaders() {

@@ -16,6 +16,24 @@ static inline void Feng$cleanup_arr_ArraySRef_Byte(Feng$ArraySRef_ArraySRef_Byte
 #endif
 #endif
 
+#ifdef FENG_DEBUG_MEMORY
+// ===== leak checker =====
+Feng$Header* Feng$debug_list = NULL;
+
+void feng$debug(bool all) {
+    printf("==== memory stat ====\n");
+    int total = 0, leaked = 0;
+    for (Feng$Header* h = Feng$debug_list; h; h = h->next) {
+        total++;
+        int c = atomic_load((atomic_int*)&h->refcnt);
+        if (all || c != 0) {
+            printf("ref=%d site=%p size=%lld\n", c, h->site, (long long)h->size);
+            if (c != 0) leaked++;
+        }
+    }
+    printf("==== end memory stat (total=%d, leaked=%d) ====\n", total, leaked);
+}
+#endif
 
 int main(int argc, char **argv) {
 	{
@@ -36,5 +54,8 @@ int main(int argc, char **argv) {
 		$main();
 #endif
 	}
+#ifdef FENG_DEBUG_MEMORY
+	feng$debug(false);
+#endif
 	return 0;
 }
