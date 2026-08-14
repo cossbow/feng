@@ -1289,6 +1289,10 @@ Resource classes can only be instantiated via `new`. This restriction prevents d
 For example, in the `CBuffer` class above, if a value type variable copies the `buf` value, multiple instances would
 call `cFree(buf);` repeatedly.
 
+Destruction follows a "derived-first" order: for a class hierarchy, the most-derived class's `free` runs first, then
+its own fields are released, then the superclass destructor runs (recursing upward). Within each class, `free` runs
+before its own fields are released, so a derived `free` can safely access inherited fields (still alive at that point).
+
 Some external resource releases, like file closures, are often time-consuming and may involve I/O errors or exceptions.
 Such operations should be handled with [exception statements](#exception-statements) rather than in `free`.
 

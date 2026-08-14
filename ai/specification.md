@@ -457,6 +457,10 @@ classMemberMethod  = functionDefinition
 #### Resource Class
 [MAY] A class with a `macro resource free()` method is a resource class. The macro is called when the instance is released.
 [MUST] Resource classes can only be instantiated via `new` (to avoid double-free from value-type copies).
+[MUST] Destruction is in "derived-first" order: for a class hierarchy, the most-derived class's `free` runs first,
+then its own fields are released, then its superclass destructor runs (recursing upward). Within each class, `free`
+runs before its own fields are released. This mirrors the "construction is base-first, destruction is the reverse"
+principle and guarantees a derived `free` can still access inherited fields (they are not yet released).
 
 ### 4.4 Interfaces
 
