@@ -4891,15 +4891,10 @@ public class SemanticAnalyzer {
         }
         for (var f : fields) {
             if (oe.entries().exists(f.name())) continue;
-            if (f.immutable()) {
-                error("const field '%s' must init: %s",
+            var ft = dtd.gm().mapIf(f.type());
+            if (requiredInit(ft)) {
+                error("non-null field '%s' must be init: %s",
                         f.name(), oe.pos());
-            } else {
-                var ft = dtd.gm().mapIf(f.type());
-                if (requiredInit(ft)) {
-                    error("non-null field '%s' must be init: %s",
-                            f.name(), oe.pos());
-                }
             }
         }
         var entries = new IdentifierMap<Expression>(oe.entries().size());
