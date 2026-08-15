@@ -30,7 +30,6 @@ class Stack`T` {
 // ===== factory =====
 
 export func newStack`T`() *Stack`T` {
-    var s = new(Stack`T`);
-    s.list = newVector`T`();
+    var s = new(Stack`T`, {list=newVector()});
     return s;
 }

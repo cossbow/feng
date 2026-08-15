@@ -4,38 +4,52 @@ import std$error;
 
 export
 class Vector`T` {
-    var buf [*]T;    // internal buffer
+    var buf [*?]T;    // internal buffer
     var len int;      // current element count
 
     // ===== helpers =====
 
-    func ensureCapacity(need int) {
+    func getInitBuf(need int) [*]T {
+        var buf = this.buf;
         if (buf == nil) {
             var cap = 8;
             if (need > cap) { cap = need; }
             buf = new([cap]T);
-            return;
+            this.buf = buf;
+            return buf;
         }
-        if (len + need <= buf.length) { return; }
+
+        if (len + need <= buf.length) { return buf; }
         var newCap = buf.length * 2;
         if (newCap < len + need) { newCap = len + need; }
         var nb = new([newCap]T);
         for (var i = 0; i < len; i += 1) { nb[i] = buf[i]; }
         buf = nb;
+        this.buf = buf;
+        return buf;
     }
 
-    func checkIndex(index int) {
-        if (index < 0 || index >= len) { throw new(OutOfBoundsException); }
+    func checkIndex(index int) [*]T {
+        var buf = this.buf;
+        if (index < 0 || index >= len || buf==nil) {
+            throw new(OutOfBoundsException);
+        }
+        return buf;
     }
 
-    func checkInsertIndex(index int) {
-        if (index < 0 || index > len) { throw new(OutOfBoundsException); }
+    func checkInsertIndex(index int) [*]T {
+        var buf = this.buf;
+        if (index < 0 || index > len || buf==nil) {
+            throw new(OutOfBoundsException);
+        }
+        return buf;
     }
 
     // ===== capacity =====
 
     export func length() int { return len; }
     export func capacity() int {
+        var buf = this.buf;
         if (buf == nil) { return 0; }
         return buf.length;
     }
@@ -44,21 +58,21 @@ class Vector`T` {
     // ===== add =====
 
     export func append(e T) {
-        ensureCapacity(1);
+        var buf = getInitBuf(1);
         buf[len] = e;
         len += 1;
     }
 
     export func appendAll(src [&#]T) {
         var srcLen = src.length;
-        ensureCapacity(srcLen);
+        var buf = getInitBuf(srcLen);
         for (var i = 0; i < srcLen; i += 1) { buf[len + i] = src[i]; }
         len += srcLen;
     }
 
     export func insert(index int, e T) {
         checkInsertIndex(index);
-        ensureCapacity(1);
+        var buf = getInitBuf(1);
         for (var i = len; i > index; i -= 1) { buf[i] = buf[i - 1]; }
         buf[index] = e;
         len += 1;
@@ -66,17 +80,23 @@ class Vector`T` {
 
     // ===== access =====
 
-    export func get(index int) T { checkIndex(index); return buf[index]; }
-    export func set(index int, value T) { checkIndex(index); buf[index] = value; }
+    export func get(index int) T {
+        var buf = checkIndex(index);
+        return buf[index];
+    }
+    export func set(index int, value T) {
+        var buf = checkIndex(index);
+        buf[index] = value;
+    }
 
     export func removeLast() T {
-        if (len == 0) { throw new(error$IllegalStateException); }
+        var buf = checkIndex(len-1);
         len -= 1;
         return buf[len];
     }
 
     export func removeAt(index int) T {
-        checkIndex(index);
+        var buf = checkIndex(index);
         var old = buf[index];
         for (var i = index; i < len - 1; i += 1) { buf[i] = buf[i + 1]; }
         len -= 1;
@@ -86,11 +106,15 @@ class Vector`T` {
     // ===== search =====
 
     export func indexOf(value T) int {
+        var buf = this.buf;
+        if (buf == nil) { return -1; }
         for (var i = 0; i < len; i += 1) { if (buf[i] == value) { return i; } }
         return -1;
     }
 
     export func lastIndexOf(value T) int {
+        var buf = this.buf;
+        if (buf == nil) { return -1; }
         var i = len - 1;
         for (i >= 0) { if (buf[i] == value) { return i; } i -= 1; }
         return -1;
@@ -105,6 +129,8 @@ class Vector`T` {
     export func truncate(newLen int) { if (newLen < len) { len = newLen; } }
 
     export func reverse() {
+        var buf = this.buf;
+        if (buf == nil) { return; }
         var i = 0;
         var j = len - 1;
         for (i < j) {
@@ -118,6 +144,8 @@ class Vector`T` {
     // ===== bulk =====
 
     export func copyTo(dst [&]T) int {
+        var buf = this.buf;
+        if (buf == nil) { return 0; }
         var n = len;
         if (dst.length < n) { n = dst.length; }
         for (var i = 0; i < n; i += 1) { dst[i] = buf[i]; }
@@ -130,7 +158,7 @@ class Vector`T` {
 export func newVector`T`() *Vector`T` { return new(Vector`T`); }
 
 export func newVectorCap`T`(cap int) *Vector`T` {
-    var v = new(Vector`T`);
+    var v = new(Vector`T`, {buf=new([cap]T)});
     if (cap > 0) { v.buf = new([cap]T); }
     return v;
 }

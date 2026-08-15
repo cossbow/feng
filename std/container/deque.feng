@@ -87,13 +87,12 @@ class Deque`T` {
 // ===== factory functions =====
 
 export func newDeque`T`() *Deque`T` {
-    var d = new(Deque`T`);
-    d.buf = new([8]T);
+    var d = new(Deque`T`, {buf=new([8]T)});
     return d;
 }
 
 export func newDequeCap`T`(cap int) *Deque`T` {
-    var d = new(Deque`T`);
+    var d = new(Deque`T`, {buf=new([cap]T)});
     var initCap = 8;
     if (cap > initCap) { initCap = cap; }
     d.buf = new([initCap]T);
