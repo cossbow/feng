@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.oop.ClassDefinition;
+import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.proc.Procedure;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.var.*;
@@ -49,13 +50,18 @@ public class RelayLowering {
 
     public void lower() {
         for (var fd : ast.functionList) {
-            fd.procedure().use(this::lowerProcedure);
+            lowerFunction(fd);
         }
+        ast.main.use(this::lowerFunction);
         for (var cd : ast.dagClasses.all()) {
             for (var cm : cd.allMethods().values()) {
                 cm.procedure().use(this::lowerProcedure);
             }
         }
+    }
+
+    private void lowerFunction(FunctionDefinition fd) {
+        fd.procedure().use(this::lowerProcedure);
     }
 
     // ---- procedure ----
@@ -199,14 +205,10 @@ public class RelayLowering {
      */
     private Operand makePinnedOperand(Operand op, PrimaryExpression pinnedSubject) {
         Operand result = switch (op) {
-            case FieldOperand fo ->
-                new FieldOperand(fo.pos(), pinnedSubject, fo.field());
-            case IndexOperand io ->
-                new IndexOperand(io.pos(), pinnedSubject, io.index());
-            case DereferOperand dor ->
-                new DereferOperand(dor.pos(), pinnedSubject);
-            case TupleOperand to ->
-                new TupleOperand(to.pos(), pinnedSubject, to.index());
+            case FieldOperand fo -> new FieldOperand(fo.pos(), pinnedSubject, fo.field());
+            case IndexOperand io -> new IndexOperand(io.pos(), pinnedSubject, io.index());
+            case DereferOperand dor -> new DereferOperand(dor.pos(), pinnedSubject);
+            case TupleOperand to -> new TupleOperand(to.pos(), pinnedSubject, to.index());
             default -> op;
         };
         // Copy type from original operand to the new one
@@ -522,7 +524,8 @@ public class RelayLowering {
         }
 
         // 2: collect all sub-expressions that need pinning
-        record Pin(Expression source, int argIndex) {}
+        record Pin(Expression source, int argIndex) {
+        }
         var pins = new ArrayList<Pin>();
 
         if (current.callee() instanceof MethodExpression me) {
