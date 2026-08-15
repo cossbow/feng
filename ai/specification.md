@@ -208,6 +208,13 @@ typeArguments     = "`" TypeDeclarer {"," TypeDeclarer} "`"
 
 ### 3.3 Reference Markers
 
+There are two kinds of references, both default to **non-null**:
+
+1. **Single-instance reference** — `*T`, points to one instance.
+2. **Array reference** — `[*]T`, points to a variable-length array (multiple instances laid out side by side).
+
+Both can be made nullable by placing `?` directly after the `*`: `*?T` and `[*?]T`.
+
 | Marker | Meaning | Syntax Example |
 |--------|---------|---------------|
 | `*` | Strong reference (affects memory management) | `*int` |
@@ -357,7 +364,7 @@ declaration = VarSpec {"," VarSpec} [":" TypeDeclarer] ["=" ExpressionList]
 VarSpec     = Identifier
 ```
 
-[MUST] `var` declares a mutable variable. [MAY] Initialize with `=`. Without initialization, the variable is zeroed (references get `nil`).
+[MUST] `var` declares a mutable variable. [MAY] Initialize with `=`. Without initialization, the variable is zeroed (references get `nil`) — except non-null references, which [MUST] be explicitly initialized with a non-null value.
 [MUST] `const` declares an immutable variable. [MUST] Must be initialized at declaration. Cannot be reassigned.
 [MUST] Type inference: if type is omitted and initializers are present, types are inferred from expressions.
 
@@ -522,14 +529,15 @@ structureFieldsDef  = fields type ";" | "[" expression "]" elementType ";"
 
 [MUST] The size expression must be a compile-time constant (integer literal or const expression).
 [MUST] Fixed-size arrays are value types. Assignment copies all elements.
-[MUST] Initialization: `[4]int[1, 2, 3, 4]`. Fewer elements than capacity → remaining elements are zeroed.
+[MUST] Initialization: `[4]int[1, 2, 3, 4]`. Fewer elements than capacity → remaining elements are zeroed (not allowed for non-null reference elements, which must all be explicitly initialized).
 
 #### Variable-Length Array (Array Reference)
-**Syntax:** `[] Type`
+**Syntax:** `[*]Type`
 
-[MUST] Variable-length arrays are reference types. They are declared as `[]T` but point to instances created via `new`.
+[MUST] Variable-length arrays are reference types. They are declared as `[*]T` (array reference) but point to instances created via `new`.
+[MUST] An array reference defaults to non-null; the nullable form is `[*?]T` (`?` follows the `*`).
 [MUST] Creation: `new([size]Type)` where `size` can be runtime expression.
-[MUST] The `values` built-in field of a `[]` array provides a `uint64` pointer for C interop.
+[MUST] The `values` built-in field of a `[*]T` array provides a `uint64` pointer for C interop.
 
 ### 4.8 Tuples
 
@@ -647,7 +655,7 @@ macroProcedure = name "(" [params] ")" [type] "{" statementList [expression] "}"
 1. [MUST] `Type` is a `DefinedType` or an array type `[size]ElementType`.
 2. [MAY] Optional second argument for initialization: field expression for classes/structs, array expression for arrays.
 3. [MUST] Returns a strong reference to the newly allocated instance.
-4. [MUST] Without init expression, the instance is default-initialized (zeroed).
+4. [MUST] Without init expression, the instance is default-initialized (zeroed) — unless the type contains a non-null reference, in which case an init expression is required.
 
 ### 5.8 `is` Expression
 
@@ -726,7 +734,7 @@ macroProcedure = name "(" [params] ")" [type] "{" statementList [expression] "}"
 
 **Rules:**
 1. [MUST] Elements are listed in order inside `[...]`.
-2. [MUST] If element count is less than array size, remaining elements are zeroed.
+2. [MUST] If element count is less than array size, remaining elements are zeroed — except non-null reference elements, which must all be explicitly provided.
 3. [MUST] If array size and type are omitted from the prefix, element count determines the length: `[]int[1,2,3]` → `[3]int`.
 4. [MUST] Literal-only arrays without type prefix cannot infer type: `[1,2,3]` alone is invalid.
 5. [MUST] Elements must be type-compatible with the declared element type.
@@ -961,6 +969,14 @@ Applies to: primitives, structs, unions, fixed-size arrays, tuples, and class va
 3. [MUST] Cannot index (for array references).
 4. [MUST] Cannot call (for function prototypes).
 
+#### Non-null Initialization
+
+[MUST] A non-null reference cannot hold `nil`; therefore every non-null reference must be explicitly initialized with a non-null value.
+
+1. [MUST] A variable of non-null reference type must be initialized at declaration.
+2. [MUST] If a class, tuple, or fixed-size array contains a non-null reference (directly or transitively through a nested value type), the whole value must be explicitly initialized — every such non-null member must receive a non-null value.
+3. [MUST] The element type of a variable-length array (`[*]T`) cannot be a non-null reference type, because a variable-length array cannot guarantee that every element is explicitly initialized.
+
 #### Unmodifiable Reference (`#`)
 [MUST] Cannot modify the instance through this reference (cannot assign to fields, cannot dereference-assign, cannot call non-`#` methods).
 [MUST] Modifiable → Unmodifiable: allowed. Reverse: forbidden.
@@ -1023,7 +1039,7 @@ The concurrency model is based on `@Sync`/`@Async` attribute-based compile-time 
 [MUST] Marked `@Sync` on the interface means it can only reference syncable implementing classes.
 
 **Conditionally syncable — Arrays:**
-[MUST] Variable-length arrays (`[]`) are NEVER syncable.
+[MUST] Variable-length arrays (`[*]T`) are NEVER syncable.
 [MUST] Fixed-size arrays are syncable only if every nesting level is fixed-size and the innermost element type is syncable.
 
 **Conditionally syncable — Tuples:**
