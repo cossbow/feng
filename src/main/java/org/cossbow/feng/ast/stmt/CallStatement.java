@@ -11,7 +11,6 @@ public class CallStatement extends Statement {
                          CallExpression call) {
         super(pos);
         this.call = call;
-        call.asExpr(true);
     }
 
     public CallExpression call() {

@@ -110,28 +110,12 @@ public class CallExpression extends PrimaryExpression {
 
     //
 
-    /**
-     * true: the call-expression use in expressions,
-     * false: directly call as call-statement
-     */
-    private boolean asExpr;
-
-    public boolean asExpr() {
-        return asExpr;
-    }
-
-    public void asExpr(boolean asExpr) {
-        this.asExpr = asExpr;
-    }
-
     @Override
     public CallExpression mirror() {
         var c = callee.mirror();
         var a = new ArrayList<Expression>(arguments.size());
         for (var arg : arguments) a.add(arg.mirror());
-        var n = new CallExpression(pos(), c, a, variadic);
-        n.asExpr = false;
-        return n;
+        return new CallExpression(pos(), c, a, variadic);
     }
 
     //

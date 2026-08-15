@@ -501,6 +501,7 @@ public class RelayLowering {
                     newME.resultType.set(me.resultType.must());
                     current = new CallExpression(ce.pos(), newME,
                             ce.arguments(), ce.variadic(), ce.prototype().must());
+                    current.resultType.set(ce.resultType);
                 }
             }
         }
@@ -516,6 +517,7 @@ public class RelayLowering {
             if (lowered != me && lowered instanceof PrimaryExpression pe) {
                 current = new CallExpression(ce.pos(), pe, current.arguments(),
                         current.variadic(), current.prototype().must());
+                current.resultType.set(ce.resultType);
             }
         }
 
