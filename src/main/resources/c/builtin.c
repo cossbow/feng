@@ -14,18 +14,26 @@ _Noreturn void Feng$throw(void* ex) {
     longjmp(Feng$ex_top->buf, 1);
 }
 
+// ===== built-in class destructors (empty recursion; keep the
+//      "non-final class destroy non-NULL" invariant required by Feng$vDestroy) =====
+static void Feng$destroy_$Object(void* self) {}
+static void Feng$destroy_$Exception(void* self) {}
+static void Feng$destroy_$NilException(void* self) {}
+static void Feng$destroy_$OutOfBoundsException(void* self) {}
+static void Feng$destroy_$AssertException(void* self) {}
+
 // ===== runtime exception types =====
 const Feng$Meta Feng$meta_$Exception = {
-    sizeof($Exception), &Feng$meta_$Object, 0, NULL, NULL
+    sizeof($Exception), &Feng$meta_$Object, 0, NULL, Feng$destroy_$Exception
 };
 const Feng$Meta Feng$meta_$NilException = {
-    sizeof($NilException), &Feng$meta_$Exception, 0, NULL, NULL
+    sizeof($NilException), &Feng$meta_$Exception, 0, NULL, Feng$destroy_$NilException
 };
 const Feng$Meta Feng$meta_$OutOfBoundsException = {
-    sizeof($OutOfBoundsException), &Feng$meta_$Exception, 0, NULL, NULL
+    sizeof($OutOfBoundsException), &Feng$meta_$Exception, 0, NULL, Feng$destroy_$OutOfBoundsException
 };
 const Feng$Meta Feng$meta_$AssertException = {
-    sizeof($AssertException), &Feng$meta_$Exception, 0, NULL, NULL
+    sizeof($AssertException), &Feng$meta_$Exception, 0, NULL, Feng$destroy_$AssertException
 };
 
 void Feng$throwNullPointer(Uint64 fn, Uint32 line) {
@@ -45,7 +53,7 @@ void Feng$throwIndexOutOfBounds(Uint64 fn, Uint32 line) {
 }
 
 // ===== built-in type metadata =====
-const Feng$Meta Feng$meta_$Object = {sizeof(struct $Object), NULL, 0, NULL, NULL};
+const Feng$Meta Feng$meta_$Object = {sizeof(struct $Object), NULL, 0, NULL, Feng$destroy_$Object};
 
 const Feng$Meta_$Writer Feng$meta_$Writer = {{0}};
 const Feng$Meta_$Writable Feng$meta_$Writable = {{0}};

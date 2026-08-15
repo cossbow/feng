@@ -1,17 +1,31 @@
-import std$container c;
 
-func intHash(n &#c$Node`int,int`) int {
+class Node`K,V` {
+    var key K;
+    var value V;
+}
+class Hashing`K, V` final {
+    const hash func(&#Node`K, V`) int;
+    const equal func(a,b &#Node`K, V`) bool;
+}
+class Map`K,V` {
+    const hashing Hashing`K,V`;
+}
+func newMap`K,V`(hashing Hashing`K,V`) *Map`K,V` {
+    return new(Map`K,V`, {hashing=hashing});
+}
+
+func intHash(n &#Node`int,int`) int {
     return n.key;
 }
-func intEq(a,b &#c$Node`int,int`) bool {
+func intEq(a,b &#Node`int,int`) bool {
     return a.key == b.key;
 }
 func use`T`(f func(T)) {}
 func fff(i int) {}
 func main(args [&#][*?#]byte) {
-    var hashing = c$Hashing`int,int` {
+    var hashing = Hashing`int,int` {
         hash=intHash, equal=intEq
     };
-    var map = c$newHashmap(hashing);
+    var map = newMap(hashing);
     use(fff);
 }

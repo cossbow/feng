@@ -2,6 +2,7 @@ package org.cossbow.feng.coder;
 
 import org.cossbow.feng.Compiler;
 import org.cossbow.feng.mod.ModuleParserTest;
+import org.cossbow.feng.util.Command;
 import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.ResourceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -36,18 +37,17 @@ public class GeneratorTest {
                 return;
             }
         }
-        try {
-            var pb = new ProcessBuilder(exe.toString())
-                    .directory(dir.toFile())
-                    .redirectErrorStream(true);
-            var p = pb.start();
-            var out = new String(p.getInputStream().readAllBytes());
-            int code = p.waitFor();
-            if (code != 0) {
-                Assertions.fail("execution failed (exit " + code + ")\n" + out);
+        var re = new Command(dir, exe.toString()).quiet(true).exec();
+        if (re.code() != 0) {
+            Assertions.fail("execution failed (exit " + re.code() + ")\n" + re.err());
+        } else {
+            var refs = re.out().lines().filter(s -> s.startsWith("ref="))
+                    .toList();
+            if (refs.isEmpty()) return;
+            for (String ref : refs) {
+                System.err.println(ref);
             }
-        } catch (IOException | InterruptedException e) {
-            Assertions.fail("execution error: " + e.getMessage());
+            Assertions.fail("reference-count %s wrong".formatted(refs.size()));
         }
     }
 

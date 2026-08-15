@@ -117,7 +117,7 @@ func test(n int) {
             }]
         });
         var d2 = new(Disk`[4]Box`*?int``);
-        var d3 = new(Disk`[*]Box`*?int``);
+        var d3 = new(Disk`[*?]Box`*?int``);
     }
 
 }

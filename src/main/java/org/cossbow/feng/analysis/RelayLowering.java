@@ -82,6 +82,7 @@ public class RelayLowering {
             }
             case IfStatement is -> {
                 is.init().use(this::lowerStatement);
+                is.condition(lowerExpression(is.condition()));
                 lowerBlockStatement(is.yes());
                 is.not().use(this::lowerBodied);
                 yield is;
@@ -118,7 +119,7 @@ public class RelayLowering {
             case AssignmentsStatement as -> lowerAssignment(as);
             case DeclarationStatement ds -> {
                 for (var v : ds.variables()) {
-                    v.value().use(this::lowerExpression);
+                    v.value().update(this::lowerExpression);
                 }
                 yield ds;
             }
@@ -144,26 +145,38 @@ public class RelayLowering {
         }
 
         // check each operand for transient subjects that need pinning
+        var preStmts = new ArrayList<Statement>();
         var pins = new ArrayList<Variable>();
         for (var a : as.list()) {
             var operand = a.operand();
             var subject = operandSubject(operand);
-            if (subject != null && needPinOperandSubject(subject)) {
-                var tmpVar = makePinVar(subject);
-                var tmpVarExpr = new VariableExpression(subject.pos(), tmpVar);
-                tmpVarExpr.resultType.set(subject.resultType);
-                var newOperand = makePinnedOperand(operand, tmpVarExpr);
-                a.operand(newOperand);
+            if (subject == null) continue;
+
+            // Lower the subject first so a nested temporary (e.g. the array
+            // in `alloc(4)[0].id = 1`) is pinned at its root.
+            var lowered = lowerSubject(subject, preStmts);
+            var finalSubject = lowered;
+
+            if (needPinOperandSubject(lowered)) {
+                var tmpVar = makePinVar(lowered);
+                var tmpVarExpr = new VariableExpression(lowered.pos(), tmpVar);
+                tmpVarExpr.resultType.set(lowered.resultType);
                 pins.add(tmpVar);
+                finalSubject = tmpVarExpr;
+            }
+
+            if (finalSubject != subject) {
+                a.operand(makePinnedOperand(operand,
+                        (PrimaryExpression) finalSubject));
             }
         }
 
-        if (pins.isEmpty()) return as;
+        if (pins.isEmpty() && preStmts.isEmpty()) return as;
 
-        // wrap in BlockStatement with declarations
-        var ds = new DeclarationStatement(as.pos(), pins);
-        return new BlockStatement(as.pos(),
-                new ArrayList<>(List.of(ds, as)));
+        var stmts = new ArrayList<Statement>(preStmts);
+        if (!pins.isEmpty()) stmts.add(new DeclarationStatement(as.pos(), pins));
+        stmts.add(as);
+        return new BlockStatement(as.pos(), stmts);
     }
 
     /**
@@ -215,21 +228,42 @@ public class RelayLowering {
     private Statement lowerCallStatement(CallStatement cs) {
         var lowered = lowerCallExpression(cs.call());
         if (lowered instanceof BlockExpression be) {
-            // the call was wrapped with temp vars.
-            // convert BlockExpression to BlockStatement.
-            var bs = new BlockStatement(cs.pos(), new ArrayList<>(be.block()));
-            // add the call as a statement (including void calls)
+            // the call was wrapped with temp vars; convert the block's
+            // statements to a BlockStatement and re-add the call.
+            var stmts = new ArrayList<Statement>(be.block());
             var re = be.result();
             if (re instanceof CallExpression rce) {
-                bs.list().add(new CallStatement(rce.pos(), rce));
+                addCallAsStatement(stmts, rce);
             }
-            cs.replace().set(bs);
+            cs.replace().set(new BlockStatement(cs.pos(), stmts));
             return cs;
         }
         if (lowered instanceof CallExpression lce) {
-            cs.call(lce);
+            if (needDiscardResult(lce)) {
+                cs.replace().set(new BlockStatement(cs.pos(),
+                        new ArrayList<>(List.of(
+                                new DeclarationStatement(lce.pos(),
+                                        List.of(makePinVar(lce)))))));
+            } else {
+                cs.call(lce);
+            }
         }
         return cs;
+    }
+
+    /**
+     * Add a call as a statement, releasing a discarded strong-ref result.
+     */
+    private void addCallAsStatement(List<Statement> stmts, CallExpression ce) {
+        if (needDiscardResult(ce)) {
+            stmts.add(new DeclarationStatement(ce.pos(), List.of(makePinVar(ce))));
+        } else {
+            stmts.add(new CallStatement(ce.pos(), ce));
+        }
+    }
+
+    private boolean needDiscardResult(Expression e) {
+        return e.resultType.match(t -> t.checkRefer(ReferKind.STRONG));
     }
 
     // ---- expression lowering ----
@@ -238,10 +272,29 @@ public class RelayLowering {
         return switch (e) {
             case CallExpression ce -> lowerCallExpression(ce);
             case BinaryExpression be -> {
-                be.left(lowerExpression(be.left()));
-                be.right(lowerExpression(be.right()));
+                be.left(pinOperand(lowerExpression(be.left())));
+                be.right(pinOperand(lowerExpression(be.right())));
                 yield be;
             }
+            case ReferEqualExpression re -> {
+                var pins = new ArrayList<Variable>();
+                var left = pinOperand(re.left(), pins);
+                var right = pinOperand(re.right(), pins);
+                if (pins.isEmpty()) {
+                    yield re;
+                }
+                var n = new ReferEqualExpression(re.pos(),
+                        (PrimaryExpression) left,
+                        (PrimaryExpression) right, re.same());
+                re.resultType.use(n.resultType::set);
+                var ds = new DeclarationStatement(re.pos(), pins);
+                var be = new BlockExpression(re.pos(), List.of(ds), n);
+                be.resultType.set(n.resultType.must());
+                yield be;
+            }
+            case MemberOfExpression me -> lowerMemberOf(me);
+            case IndexOfExpression ie -> lowerIndexOf(ie);
+            case DereferExpression de -> lowerDerefer(de);
             case BlockExpression be -> {
                 var newBlock = new ArrayList<Statement>(be.block().size());
                 for (var s : be.block()) newBlock.add(lowerStatement(s));
@@ -267,10 +320,7 @@ public class RelayLowering {
             }
             case ObjectExpression oe -> {
                 for (var n : oe.entries().nodes()) {
-                    var lowered = lowerExpression(n.value());
-                    // Node.value is final in record, but we can
-                    // still modify the Expression's internal state
-                    // if the lowered result is the same object
+                    lowerExpression(n.value());
                 }
                 yield oe;
             }
@@ -278,6 +328,143 @@ public class RelayLowering {
             // (they don't typically contain UAF-vulnerable patterns)
             default -> e;
         };
+    }
+
+    /**
+     * Pin an unbound operand (temporary strong-ref result) so its lifetime
+     * extends to the enclosing scope.
+     */
+    private Expression pinOperand(Expression e) {
+        if (needPinOperandSubject(e)) {
+            return makePin(e, e.resultType.must(), tmp -> tmp);
+        }
+        return e;
+    }
+
+    /**
+     * Pin an operand that needs a stable lifetime, collecting the created
+     * pin variable into {@code pins} so the caller can declare them all in
+     * one enclosing block. The returned expression is the pin variable (a
+     * borrow), not a block whose result owns the reference.
+     */
+    private Expression pinOperand(Expression e, List<Variable> pins) {
+        var lowered = lowerExpression(e);
+        if (!needPinOperandSubject(lowered)) return lowered;
+        var pin = makePinVar(lowered);
+        var pinExpr = new VariableExpression(lowered.pos(), pin);
+        pinExpr.resultType.set(lowered.resultType);
+        pins.add(pin);
+        return pinExpr;
+    }
+
+    /**
+     * Lower a subject expression, hoisting any pin block it produces into
+     * {@code preStmts}. Returns the (possibly rebuilt) subject expression.
+     */
+    private Expression lowerSubject(Expression subject, List<Statement> preStmts) {
+        var lowered = lowerExpression(subject);
+        if (lowered instanceof BlockExpression be) {
+            preStmts.addAll(be.block());
+            var result = be.result();
+            be.resultType.use(t -> result.resultType.set(t));
+            return result;
+        }
+        return lowered;
+    }
+
+    private Expression lowerMemberOf(MemberOfExpression me) {
+        var preStmts = new ArrayList<Statement>();
+        var subject = lowerSubject(me.subject(), preStmts);
+        var rt = me.resultType.must();
+
+        var base = new MemberOfExpression(me.pos(), (PrimaryExpression) subject,
+                me.member(), me.generic(), me.field());
+        base.resultType.set(rt);
+
+        Expression result;
+        if (needPinOperandSubject(subject)) {
+            result = makePin(subject, rt, pinned -> {
+                var n = new MemberOfExpression(me.pos(), (PrimaryExpression) pinned,
+                        me.member(), me.generic(), me.field());
+                n.resultType.set(rt);
+                return n;
+            });
+        } else {
+            result = base;
+        }
+
+        if (preStmts.isEmpty()) return result;
+        if (result instanceof BlockExpression be) {
+            preStmts.addAll(be.block());
+            var inner = be.result();
+            be.resultType.use(inner.resultType::set);
+            result = inner;
+        }
+        var be = new BlockExpression(me.pos(), preStmts, result);
+        be.resultType.set(rt);
+        return be;
+    }
+
+    private Expression lowerIndexOf(IndexOfExpression ie) {
+        var preStmts = new ArrayList<Statement>();
+        var subject = lowerSubject(ie.subject(), preStmts);
+        var rt = ie.resultType.must();
+
+        var base = new IndexOfExpression(ie.pos(), (PrimaryExpression) subject, ie.index());
+        base.resultType.set(rt);
+
+        Expression result;
+        if (needPinOperandSubject(subject)) {
+            result = makePin(subject, rt, pinned -> {
+                var n = new IndexOfExpression(ie.pos(), (PrimaryExpression) pinned, ie.index());
+                n.resultType.set(rt);
+                return n;
+            });
+        } else {
+            result = base;
+        }
+
+        if (preStmts.isEmpty()) return result;
+        if (result instanceof BlockExpression be) {
+            preStmts.addAll(be.block());
+            var inner = be.result();
+            be.resultType.use(inner.resultType::set);
+            result = inner;
+        }
+        var be = new BlockExpression(ie.pos(), preStmts, result);
+        be.resultType.set(rt);
+        return be;
+    }
+
+    private Expression lowerDerefer(DereferExpression de) {
+        var preStmts = new ArrayList<Statement>();
+        var subject = lowerSubject(de.subject(), preStmts);
+        var rt = de.resultType.must();
+
+        var base = new DereferExpression(de.pos(), (PrimaryExpression) subject);
+        base.resultType.set(rt);
+
+        Expression result;
+        if (needPinOperandSubject(subject)) {
+            result = makePin(subject, rt, pinned -> {
+                var n = new DereferExpression(de.pos(), (PrimaryExpression) pinned);
+                n.resultType.set(rt);
+                return n;
+            });
+        } else {
+            result = base;
+        }
+
+        if (preStmts.isEmpty()) return result;
+        if (result instanceof BlockExpression be) {
+            preStmts.addAll(be.block());
+            var inner = be.result();
+            be.resultType.use(inner.resultType::set);
+            result = inner;
+        }
+        var be = new BlockExpression(de.pos(), preStmts, result);
+        be.resultType.set(rt);
+        return be;
     }
 
     // ---- core: call expression pinning ----
@@ -292,16 +479,53 @@ public class RelayLowering {
         for (var arg : ce.arguments()) newArgs.add(lowerExpression(arg));
         ce.arguments(newArgs);
 
+        // 1.5: lower receiver recursively — a chained call's receiver is itself
+        // a call whose result must be pinned, so hoist its nested pins here.
+        var preStmts = new ArrayList<Statement>();
+        var current = ce;
+        if (current.callee() instanceof MethodExpression me) {
+            var receiver = me.subject();
+            var lowered = lowerExpression(receiver);
+            if (lowered != receiver) {
+                if (lowered instanceof BlockExpression be) {
+                    preStmts.addAll(be.block());
+                    var result = be.result();
+                    // the rebuilt call expression's resultType may be unset;
+                    // carry the block's type down so needPinReceiver can see it
+                    be.resultType.use(t -> result.resultType.set(t));
+                    lowered = result;
+                }
+                if (lowered instanceof PrimaryExpression pe) {
+                    var newME = new MethodExpression(me.pos(), pe,
+                            me.method(), me.generic());
+                    newME.resultType.set(me.resultType.must());
+                    current = new CallExpression(ce.pos(), newME,
+                            ce.arguments(), ce.variadic(), ce.prototype().must());
+                }
+            }
+        }
+
+        // 1.6: lower a func-field callee (MemberOfExpression) to pin its subject
+        // (e.g. new(A).cb(), make(n).cb())
+        if (current.callee() instanceof MemberOfExpression me) {
+            var lowered = lowerMemberOf(me);
+            if (lowered instanceof BlockExpression be) {
+                preStmts.addAll(be.block());
+                lowered = be.result();
+            }
+            if (lowered != me && lowered instanceof PrimaryExpression pe) {
+                current = new CallExpression(ce.pos(), pe, current.arguments(),
+                        current.variadic(), current.prototype().must());
+            }
+        }
+
         // 2: collect all sub-expressions that need pinning
         record Pin(Expression source, int argIndex) {}
         var pins = new ArrayList<Pin>();
-        boolean pinReceiver = false;
 
-        var callee = ce.callee();
-        if (callee instanceof MethodExpression me) {
+        if (current.callee() instanceof MethodExpression me) {
             var receiver = me.subject();
             if (needPinReceiver(receiver)) {
-                pinReceiver = true;
                 pins.add(new Pin(receiver, -1)); // -1 = receiver
             }
         }
@@ -313,14 +537,20 @@ public class RelayLowering {
             }
         }
 
-        if (pins.isEmpty()) return ce;
+        if (pins.isEmpty()) {
+            if (preStmts.isEmpty()) return current;
+            if (!ce.resultType.has()) return current;
+            current.resultType.set(ce.resultType.must());
+            var be = new BlockExpression(ce.pos(), preStmts, current);
+            be.resultType.set(ce.resultType.must());
+            return be;
+        }
 
         // Guard: if CallExpression has no resultType, skip pinning (shouldn't happen after analysis)
-        if (!ce.resultType.has()) return ce;
+        if (!ce.resultType.has()) return current;
 
         // 3: pin all collected expressions in one BlockExpression
         var tmpVars = new ArrayList<Variable>();
-        var current = ce;
         for (var pin : pins) {
             var tmpVar = makePinVar(pin.source);
             var tmpVarExpr = new VariableExpression(
@@ -333,8 +563,10 @@ public class RelayLowering {
                     : pinArgument(current, pin.argIndex, tmpVarExpr);
         }
 
-        var ds = new DeclarationStatement(ce.pos(), tmpVars);
-        var be = new BlockExpression(ce.pos(), List.of(ds), current);
+        var stmts = new ArrayList<Statement>(preStmts);
+        stmts.add(new DeclarationStatement(ce.pos(), tmpVars));
+        current.resultType.set(ce.resultType.must());
+        var be = new BlockExpression(ce.pos(), stmts, current);
         be.resultType.set(ce.resultType.must());
         return be;
     }
@@ -386,11 +618,17 @@ public class RelayLowering {
     // ---- predicates ----
 
     /**
-     * A method-call receiver needs pinning if its type contains
-     * managed references AND it's not a simple variable/this reference.
+     * A method-call receiver needs pinning if it is a direct reference
+     * (strong/phantom) and not a simple variable/this reference.
+     * <p>
+     * Value-type receivers (e.g. {@code obj.r.see()} where {@code r} is an
+     * embedded final class) must NOT be pinned: pinning would shallow-copy the
+     * value without inc'ing its embedded strong-ref fields, then the copy and
+     * the original would both release those refs (double-free). Their subject
+     * is already pinned by {@link #lowerSubject}, so they are stable lvalues.
      */
     private boolean needPinReceiver(Expression receiver) {
-        if (!needPin(receiver.resultType.must())) return false;
+        if (receiver.resultType.must().maybeRefer().none()) return false;
         // safe in non-concurrent code: simple var or 'this'
         return !(receiver instanceof VariableExpression)
                 && !(receiver instanceof CurrentExpression);

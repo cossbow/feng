@@ -56,7 +56,7 @@ public class CGenerator implements Generator {
         this.out = out;
         this.header = header;
         this.debug = debug;
-        this.memchk = Boolean.parseBoolean(System.getProperty("feng.memchk"));
+        this.memchk = System.getProperties().containsKey("feng.memchk");
     }
 
     public CGenerator(AnalyseSymbolTable table,
@@ -135,6 +135,7 @@ public class CGenerator implements Generator {
     private final Set<String> emittedCleanups = new HashSet<>();
     // runtime global variable initializers (emitted in a constructor function)
     private final List<Runnable> globalInits = new ArrayList<>();
+    private final List<Runnable> globalCleanups = new ArrayList<>();
     // per-type cleanup: track which array SRef types need cleanup functions
     private final Set<TypeDeclarer> cleanupTypes = new LinkedHashSet<>();
     // concrete types deferred because they need complete struct definitions
@@ -225,6 +226,16 @@ public class CGenerator implements Generator {
     private final List<Runnable> classCleanups = new ArrayList<>();
     // forward declarations for array cleanup functions (deferred until typedefs are emitted)
     private final List<Runnable> classCleanupForwards = new ArrayList<>();
+    // pending per-class destructors (Feng$destroy_X, extern, cross-module)
+    private final List<Runnable> classDestroys = new ArrayList<>();
+    // forward declarations for destructors (must precede metaDefinitions, which reference them)
+    private final List<Runnable> classDestroyForwards = new ArrayList<>();
+    private final Set<String> emittedDestroys = new HashSet<>();
+    // pending value-type cleanup functions (fixed arrays/tuples/embedded-class values
+    // whose content holds strong refs) — attached to local variables via FENG$DEC
+    private final List<Runnable> valueCleanups = new ArrayList<>();
+    private final List<Runnable> valueCleanupForwards = new ArrayList<>();
+    private final Set<String> emittedValueCleanups = new HashSet<>();
 
     /**
      * emit file-scope class cleanup functions
@@ -242,61 +253,94 @@ public class CGenerator implements Generator {
         }
     }
 
-    /**
-     * Register the cleanup function for a resolved strong-ref field type and return
-     * its name, or null when the generic {@code Feng$cleanup_sref} applies.
-     */
-    private String fieldCleanupFn(TypeDeclarer ft) {
-        if (ft instanceof ArrayTypeDeclarer atd) {
-            var elem = monoResolve(atd.element());
-            var ek = typeKey(elem);
-            // ensure the array cleanup gets defined even when no local
-            // variable of this array type exists
-            addCleanupType(elem);
-            // forward-declare: deferred until array typedefs are available
-            // (skip unresolved type vars — concrete instantiations register
-            //  their own resolved element types)
-            if (!elem.hasTypeVar() && emittedCleanups.add("fwd_arr_" + ek)) {
-                classCleanupForwards.add(() ->
-                        write("static inline void Feng$cleanup_arr_").write(ek)
-                                .write("(Feng$ArraySRef_").write(ek)
-                                .write(" *p)").endStmt());
-            }
-            return "Feng$cleanup_arr_" + ek;
-        }
-        if (ft instanceof DerivedTypeDeclarer dtd
-                && dtd.def() instanceof ClassDefinition fcd && !fcd.isFinal()) {
-            var fck = "Feng$cleanup_" + typeKey(ft);
-            if (fcd.generic().isEmpty()) needClassCleanup(fcd, fck);
-            else needConcreteClassCleanup(fcd, dtd.derivedType(), fck);
-            return fck;
-        }
-        return null;
-    }
-
     // ---- sync-aware inc/dec/cleanup routing ----
 
-    /** "Feng$inc" or "Feng$inc_ns" based on type's sync mark. */
+    /**
+     * "Feng$inc" or "Feng$inc_ns" based on type's sync mark.
+     */
     private String incFn(TypeDeclarer t) {
         return t.markSync() ? "Feng$inc" : "Feng$inc_ns";
     }
 
-    /** "Feng$dec" or "Feng$dec_ns" based on type's sync mark. */
+    /**
+     * "Feng$dec" or "Feng$dec_ns" based on type's sync mark.
+     */
     private String decFn(TypeDeclarer t) {
         return t.markSync() ? "Feng$dec" : "Feng$dec_ns";
     }
 
-    /** "Feng$dec" or "Feng$dec_ns" based on class sync status. */
-    private String decFn(ClassDefinition cd) {
-        return cd.syncable() ? "Feng$dec" : "Feng$dec_ns";
-    }
-
-    /** "Feng$cleanup_sref" or "Feng$cleanup_sref_ns" based on type's sync mark. */
+    /**
+     * "Feng$cleanup_sref" or "Feng$cleanup_sref_ns" based on type's sync mark.
+     */
     private String cleanupSrefFn(TypeDeclarer t) {
         return t.markSync() ? "Feng$cleanup_sref" : "Feng$cleanup_sref_ns";
     }
 
-    /** true if e accesses a sync var field (not const, not non-sync). */
+    /** "Feng$cleanup_free" or "Feng$cleanup_free_ns" (plain dec→free, no destructor dispatch). */
+    private String cleanupFreeFn(TypeDeclarer t) {
+        return t.markSync() ? "Feng$cleanup_free" : "Feng$cleanup_free_ns";
+    }
+
+    /** true if the strong-ref target is a class/interface (has $meta → virtual dispatch is safe). */
+    private boolean isClassLikeStrongRef(TypeDeclarer t) {
+        t = monoResolve(t);
+        return t instanceof DerivedTypeDeclarer dtd
+                && dtd.refer().match(r -> r.isKind(STRONG))
+                && (dtd.def() instanceof ClassDefinition || dtd.def() instanceof InterfaceDefinition);
+    }
+
+    /**
+     * Cleanup function name for a strong-ref slot (variable/param/assignment):
+     * array SRef → Feng$cleanup_arr_<ek>; final class → Feng$cleanup_X;
+     * non-final class / interface → Feng$cleanup_sref/_ns (virtual dispatch);
+     * boxed primitive/struct/enum → Feng$cleanup_free/_ns (plain dec→free, no $meta).
+     */
+    private String strongRefCleanupFn(TypeDeclarer t) {
+        if (t instanceof ArrayTypeDeclarer atd) {
+            return "Feng$cleanup_arr_" + typeKey(monoResolve(atd.element()));
+        }
+        var cleanupFn = classCleanupFnFor(t);
+        if (cleanupFn != null) return cleanupFn;
+        if (isClassLikeStrongRef(t)) return cleanupSrefFn(t);
+        return cleanupFreeFn(t);
+    }
+
+    /**
+     * Write the FENG$DEC cleanup attribute for a strong-ref variable/parameter,
+     * or nothing for non-strong-ref types.
+     */
+    private CGenerator writeCleanupAttr(TypeDeclarer t) {
+        var ref = t.maybeRefer();
+        if (ref.none() || !ref.get().isKind(STRONG)) return this;
+        return write(" FENG$DEC(").write(strongRefCleanupFn(t)).write(")");
+    }
+
+    /**
+     * Emit shadow local cleanup variables for strong-ref parameters at function-body entry.
+     * __attribute__((cleanup)) does NOT apply to function parameters, so each strong-ref
+     * parameter is aliased into a local that carries the cleanup attribute (缺口 G).
+     */
+    private void writeParamCleanupDecls(Prototype pt) {
+        for (var p : pt.parameterSet()) {
+            if (!(p instanceof FixedParameter fp)) continue;
+            var vo = fp.var();
+            if (vo.none()) continue;
+            var v = vo.get();
+            var t = monoResolve(v.type().must());
+            var ref = t.maybeRefer();
+            if (ref.none() || !ref.get().isKind(STRONG)) continue;
+            write(t).write(' ');
+            write('$').write(v.name().value()).write('_').write(v.id()).write("_own");
+            writeCleanupAttr(t);
+            write(" = ");
+            varName(v);
+            endStmt();
+        }
+    }
+
+    /**
+     * true if e accesses a sync var field (not const, not non-sync).
+     */
     private boolean isSyncVarField(MemberOfExpression e) {
         if (!e.resultType.must().markSync()) return false;
         var st = e.subject().resultType.must();
@@ -307,91 +351,144 @@ public class CGenerator implements Generator {
     }
 
     /**
-     * register class cleanup for later file-scope emission.
-     * generates cascade release for all strong-ref fields in the hierarchy.
+     * Register the FINAL-class cleanup callback: dec → 归零 → Feng$destroy_X → free.
+     * Non-final strong refs use the generic Feng$release/_ns instead (no per-class callback).
      */
-    private void needClassCleanup(ClassDefinition cd, String ck) {
+    private void needClassCleanup(ClassDefinition cd, String ck, boolean atomic) {
         if (!emittedCleanups.add(ck)) return;
         classCleanupForwards.add(() ->
                 write("static inline void ").write(ck).write("(")
                         .write(cd.symbol()).write(" **p)").endStmt());
-        // eagerly register nested field cleanups so all forward declarations
-        // are emitted before any cleanup body that references them
-        for (var cf : cd.allFields().values()) {
-            var ft = cf.type();
-            var fr = ft.maybeRefer();
-            if (fr.has() && fr.get().isKind(STRONG)) fieldCleanupFn(ft);
-        }
         classCleanups.add(() -> {
             write("static inline void ").write(ck).write("(")
                     .write(cd.symbol()).write(" **p) {").indent();
-            write("if (*p && ").write(decFn(cd)).write("(*p)) {").indent();
-            // resource free macro first (if exists) — custom cleanup
-            // (e.g. linked-list traversal) must run before fields are released
-            cd.resourceFree().use(rf -> {
-                write(cd.symbol()).write(rf.name()).write("(*p)").endStmt();
-            });
-            // cascade: release all strong-ref fields in class hierarchy
-            for (var cf : cd.allFields().values()) {
-                var ft = cf.type();
-                var fr = ft.maybeRefer();
-                if (fr.none() || !fr.get().isKind(STRONG)) continue;
-                if (ft.markSync() && !cf.immutable()) {
-                    // sync var field → Feng$cleanup_sfield (no lock needed at destruction)
-                    write("Feng$cleanup_sfield((void**)&(*p)->").write(cf.name()).write(")").endStmt();
-                } else {
-                    var fck = fieldCleanupFn(ft);
-                    write(fck != null ? fck : cleanupSrefFn(ft))
-                            .write("(&(*p)->").write(cf.name()).write(")").endStmt();
-                }
-            }
-            write("Feng$free(*p)").endStmt();
-            dedent().write('}').newLine();
+            write("if (*p && ").write(atomic ? "Feng$dec" : "Feng$dec_ns").write("(*p)) { Feng$destroy_")
+                    .write(cd.symbol()).write("(*p); Feng$free(*p); }").newLine();
             dedent().write('}').newLine();
         });
     }
 
     /**
-     * Concrete-instantiation variant of {@link #needClassCleanup} for generic classes:
-     * the parameter struct uses the mangled concrete name and field types are resolved
-     * positionally from the instantiation's type arguments.
+     * Concrete-instantiation variant of {@link #needClassCleanup} for generic final classes.
      */
-    private void needConcreteClassCleanup(ClassDefinition cd, DerivedType dt, String ck) {
+    private void needConcreteClassCleanup(ClassDefinition cd, DerivedType dt, String ck, boolean atomic) {
         if (!emittedCleanups.add(ck)) return;
         classCleanupForwards.add(() ->
                 write("static inline void ").write(ck).write("(")
                         .writeMangledName(dt).write(" **p)").endStmt());
-        // eagerly register nested field cleanups (resolved to concrete types)
-        for (var cf : cd.allFields().values()) {
-            var ft = resolveFromMap(cf.type(), buildTypeMap(cd.generic(), dt.generic()));
-            var fr = ft.maybeRefer();
-            if (fr.has() && fr.get().isKind(STRONG)) fieldCleanupFn(ft);
-        }
         classCleanups.add(() -> {
             write("static inline void ").write(ck).write("(")
                     .writeMangledName(dt).write(" **p) {").indent();
-            write("if (*p && ").write(decFn(cd)).write("(*p)) {").indent();
-            // resource free macro first (if exists) — custom cleanup
-            // (e.g. linked-list traversal) must run before fields are released
-            cd.resourceFree().use(rf -> {
-                writeMangledName(dt).write('$').write(rf.name()).write("(*p)").endStmt();
-            });
-            for (var cf : cd.allFields().values()) {
-                var ft = resolveFromMap(cf.type(), buildTypeMap(cd.generic(), dt.generic()));
-                var fr = ft.maybeRefer();
-                if (fr.none() || !fr.get().isKind(STRONG)) continue;
-                if (ft.markSync() && !cf.immutable()) {
-                    write("Feng$cleanup_sfield((void**)&(*p)->").write(cf.name()).write(")").endStmt();
-                } else {
-                    var fck = fieldCleanupFn(ft);
-                    write(fck != null ? fck : cleanupSrefFn(ft))
-                            .write("(&(*p)->").write(cf.name()).write(")").endStmt();
-                }
-            }
-            write("Feng$free(*p)").endStmt();
-            dedent().write('}').newLine();
+            write("if (*p && ").write(atomic ? "Feng$dec" : "Feng$dec_ns").write("(*p)) { Feng$destroy_")
+                    .writeMangledName(dt).write("(*p); Feng$free(*p); }").newLine();
             dedent().write('}').newLine();
         });
+    }
+
+    // ==== destructor generation (Feng$destroy_X) ====
+
+    /** Full C identifier for a class symbol: module path + '$' + name (matches write(Symbol)). */
+    private String symbolCName(Symbol s) {
+        var sb = new StringBuilder();
+        s.module().use(mp -> sb.append(mp.toString()));
+        sb.append('$').append(s.name().value());
+        return sb.toString();
+    }
+
+    /**
+     * Register the destructor for a non-generic class (final or non-final).
+     * void Feng$destroy_X(void *self): resource → release own fields → parent destroy.
+     */
+    private void needClassDestroy(ClassDefinition cd) {
+        if (!emittedDestroys.add(symbolCName(cd.symbol()))) return;
+        classDestroyForwards.add(() ->
+                write("void Feng$destroy_").write(cd.symbol()).write("(void *self);").newLine());
+        // Only the defining module emits the destructor body (it is extern,
+        // not static); importing modules resolve it via the defining module's
+        // header (already #include'd). Registering the body here too would
+        // produce a duplicate symbol at link time.
+        if (isLocalClass(cd)) {
+            classDestroys.add(() -> emitDestroyBody(cd, null));
+        }
+    }
+
+    /**
+     * True if {@code cd} is defined in the current module (vs imported from
+     * another module). {@link #table}.dagClasses holds only this module's own
+     * class definitions.
+     */
+    private boolean isLocalClass(ClassDefinition cd) {
+        return table.dagClasses.all().contains(cd);
+    }
+
+    /**
+     * Concrete-instantiation variant of {@link #needClassDestroy} for generic classes.
+     */
+    private void needConcreteClassDestroy(ClassDefinition cd, DerivedType dt) {
+        if (!emittedDestroys.add(mangledName(dt))) return;
+        classDestroyForwards.add(() ->
+                write("void Feng$destroy_").writeMangledName(dt).write("(void *self);").newLine());
+        classDestroys.add(() ->
+                withMono(cd.generic(), dt.generic(), () -> emitDestroyBody(cd, dt)));
+    }
+
+    /**
+     * Emit the body of Feng$destroy_X. dt == null → non-generic; else generic (within mono context).
+     * Order: resource macro → own fields → parent destructor (子先父后).
+     * Layout invariant: flat struct layout (meta at offset 0 for non-final), so passing
+     * void* self up the chain reinterprets (Parent*)self correctly.
+     */
+    private void emitDestroyBody(ClassDefinition cd, DerivedType dt) {
+        Runnable typeRef = () -> {
+            if (dt == null) write(cd.symbol());
+            else writeMangledName(dt);
+        };
+        write("void Feng$destroy_");
+        typeRef.run();
+        write("(void *self) {").indent();
+        typeRef.run();
+        write(" *const _self = self;").newLine();
+        // 1. resource macro (before fields are released)
+        cd.resourceFree().use(rf -> {
+            typeRef.run();
+            if (dt != null) write('$');
+            write(rf.name()).write("(self)").endStmt();
+        });
+        // 2. release own fields (cd.fields(), not allFields())
+        for (var cf : cd.fields().values()) {
+            var ft = cf.type();
+            if (dt != null) ft = monoResolve(ft);
+            writeValueDestroy(ft, "_self->$" + cf.name().value(), 0, ft.markSync() && !cf.immutable());
+        }
+        // 3. recurse into parent destructor (skip Object/builtin root)
+        cd.parent().use(p -> {
+            if (p == ClassDefinition.ObjectClass || p.builtin()) return;
+            write("Feng$destroy_");
+            if (p.generic().isEmpty()) write(p.symbol());
+            else if (dt != null) writeMangledName(ancestorDt(cd, dt, p));
+            else writeMangledName(cd.inherit().must());
+            write("(self);").newLine();
+        });
+        dedent().write('}').newLine();
+    }
+
+    /**
+     * Flush destructor forward declarations (extern). Must run before metaDefinitions()
+     * because meta .destroy fields reference Feng$destroy_X.
+     */
+    private void emitDestroyForwardDecls() {
+        var fwds = new ArrayList<>(classDestroyForwards);
+        classDestroyForwards.clear();
+        for (var r : fwds) r.run();
+    }
+
+    /**
+     * Flush destructor bodies (source only).
+     */
+    private void emitDestroyFunctions() {
+        var batch = new ArrayList<>(classDestroys);
+        classDestroys.clear();
+        for (var r : batch) r.run();
     }
 
     /**
@@ -449,21 +546,6 @@ public class CGenerator implements Generator {
             classCleanupForwards.clear();
             for (var r : fwds) r.run();
         }
-        // forward-declare class cleanups that array cleanups may reference
-        for (var elem : cleanupTypes) {
-            if (elem instanceof DerivedTypeDeclarer dtd
-                    && dtd.refer().has() // pointer elements only — value elements cascade per-field
-                    && dtd.def() instanceof ClassDefinition cd && !cd.isFinal()
-                    && !isSimple(elem) && !isArraySRef(elem)) {
-                var fck = "Feng$cleanup_" + typeKey(elem);
-                if (emittedCleanups.add("fwd_" + fck)) {
-                    write("static inline void ").write(fck).write("(");
-                    if (dtd.derivedType().generic().isEmpty()) write(cd.symbol());
-                    else writeMangledName(dtd.derivedType());
-                    write(" **p);").newLine();
-                }
-            }
-        }
         // forward-declare all array cleanups (they may call each other)
         for (var elem : cleanupTypes) {
             var ek = typeKey(elem);
@@ -472,25 +554,18 @@ public class CGenerator implements Generator {
             write("static inline void Feng$cleanup_arr_").write(ek)
                     .write("(Feng$ArraySRef_").write(ek).write(" *p)").endStmt();
         }
+        // forward-declare value-type cleanups (fixed arrays/tuples with strong-ref content)
+        {
+            var fwds = new ArrayList<>(valueCleanupForwards);
+            valueCleanupForwards.clear();
+            for (var r : fwds) r.run();
+        }
     }
 
     private void emitCleanupFunctions() {
         // Emit forward declarations first (in case any were added during classMethods)
         emitCleanupForwardDecls();
 
-        // Now emit the function bodies
-        var extraCleanups = new ArrayList<Runnable>();
-        for (var elem : cleanupTypes) {
-            if (elem instanceof DerivedTypeDeclarer dtd
-                    && dtd.refer().has()
-                    && dtd.def() instanceof ClassDefinition cd && !cd.isFinal()
-                    && !isSimple(elem) && !isArraySRef(elem)) {
-                var fck = "Feng$cleanup_" + typeKey(elem);
-                extraCleanups.add(() -> {
-                    needClassCleanup(cd, fck);
-                });
-            }
-        }
         for (var elem : cleanupTypes) {
             var ek = typeKey(elem);
             var ck = "Feng$ArraySRef_" + ek;
@@ -501,7 +576,7 @@ public class CGenerator implements Generator {
             write("static inline void Feng$cleanup_arr_").write(ek)
                     .write("(").write(ck).write(" *p) {").indent();
             write("if (p->$values && Feng$dec(p->$values)) {").indent();
-            if (!isSimple(elem)) {
+            if (!isLeafValue(elem)) {
                 write("for (Int64 i0 = 0; i0 < p->$length; i0++) {").indent();
                 writeElemCleanup(elem, "p->$values[i0]", 1);
                 dedent().write('}').newLine();
@@ -511,9 +586,13 @@ public class CGenerator implements Generator {
             dedent().write('}').newLine();
             write("#endif").newLine();
         }
-        // register class cleanups that were deferred (forward-declared above)
-        for (var r : extraCleanups) r.run();
         cleanupTypes.clear();
+        // value-type cleanup bodies (fixed arrays/tuples with strong-ref content)
+        {
+            var batch = new ArrayList<>(valueCleanups);
+            valueCleanups.clear();
+            for (var r : batch) r.run();
+        }
     }
 
     /**
@@ -522,7 +601,8 @@ public class CGenerator implements Generator {
      * declarations + nested array cleanup types) without emitting output.
      */
     private void preRegisterElemCleanup(TypeDeclarer elem) {
-        if (isSimple(elem)) return;
+        elem = monoResolve(elem);
+        if (isLeafValue(elem)) return;
         if (isArraySRef(elem)) {
             addCleanupType(((ArrayTypeDeclarer) elem).element());
             return;
@@ -531,22 +611,16 @@ public class CGenerator implements Generator {
             preRegisterElemCleanup(atd.element());
             return;
         }
+        if (elem instanceof TupleTypeDeclarer ttd) {
+            for (var et : ttd.elements()) preRegisterElemCleanup(et);
+            return;
+        }
         if (elem instanceof DerivedTypeDeclarer dtd
                 && dtd.def() instanceof ClassDefinition cd) {
-            if (dtd.refer().none()) {
-                // class value element: cascade registers its strong-ref fields
-                for (var cf : cd.allFields().values()) {
-                    var ft = cf.type();
-                    var fr = ft.maybeRefer();
-                    if (fr.has() && fr.get().isKind(STRONG)) fieldCleanupFn(ft);
-                }
-                return;
-            }
-            if (!cd.isFinal()) {
-                var ck = "Feng$cleanup_" + typeKey(elem);
-                if (dtd.derivedType().generic().isEmpty()) needClassCleanup(cd, ck);
-                else needConcreteClassCleanup(cd, dtd.derivedType(), ck);
-            }
+            // value-embedded or final class → ensure its destructor is generated
+            // (destroys are registered upfront; this covers lazy discovery for arrays)
+            if (cd.generic().isEmpty()) needClassDestroy(cd);
+            else needConcreteClassDestroy(cd, dtd.derivedType());
         }
     }
 
@@ -556,56 +630,154 @@ public class CGenerator implements Generator {
      * class value elements (cascade into strong-ref fields).
      */
     private void writeElemCleanup(TypeDeclarer elem, String lv, int depth) {
-        if (isSimple(elem)) return;
-        if (isArraySRef(elem)) {
-            // element is SRef array → call its cleanup on each item
-            var iek = typeKey(((ArrayTypeDeclarer) elem).element());
-            write("Feng$cleanup_arr_").write(iek)
-                    .write("(&").write(lv).write(")").endStmt();
+        writeValueDestroy(elem, lv, depth, false);
+    }
+
+    /**
+     * True if the type is a leaf requiring no destruction (primitive/enum/func/struct/unresolved).
+     */
+    private boolean isLeafValue(TypeDeclarer td) {
+        td = monoResolve(td);
+        if (td instanceof PrimitiveTypeDeclarer ptd) return ptd.refer().none();
+        if (td instanceof EnumTypeDeclarer) return true;
+        if (td instanceof FuncTypeDeclarer) return true;
+        if (td instanceof GenericTypeDeclarer) return true;
+        if (td instanceof DerivedTypeDeclarer dtd && dtd.refer().none()
+                && dtd.def() instanceof StructureDefinition) return true;
+        return false;
+    }
+
+    /**
+     * Emit destruction of a value at lvalue (unified value-type rule, semantics consensus 10).
+     * - leaf → no-op
+     * - SRef array [*]A → Feng$cleanup_arr_<ek>(&lv)
+     * - fixed array [N]A → inline loop over lv.$values[i]
+     * - tuple (T0,T1) → per-element lv.v<i>
+     * - embedded class A → Feng$destroy_A(&lv) (no dec/free)
+     * - strong class ref *A → final: inline dec→destroy→free; non-final: Feng$release/_ns (or cleanup_sfield for sync var)
+     * - phantom &A → borrow, no-op
+     */
+    private void writeValueDestroy(TypeDeclarer ft, String lv, int depth, boolean syncVarField) {
+        ft = monoResolve(ft);
+        if (isLeafValue(ft)) return;
+        if (isArraySRef(ft)) {
+            var ek = typeKey(((ArrayTypeDeclarer) ft).element());
+            write("Feng$cleanup_arr_").write(ek).write("(&").write(lv).write(")").endStmt();
             return;
         }
-        if (elem instanceof ArrayTypeDeclarer atd && atd.refer().none()) {
-            // fixed-array value element: cascade into inner elements
+        if (ft instanceof ArrayTypeDeclarer atd && atd.refer().none()) {
             var iv = "i" + depth;
             write("for (Int64 ").write(iv).write(" = 0; ").write(iv)
-                    .write(" < ").write(atd.len()).write("; ").write(iv)
-                    .write("++) {").indent();
-            writeElemCleanup(atd.element(), lv + ".$values[" + iv + "]", depth + 1);
+                    .write(" < ").write(atd.len()).write("; ").write(iv).write("++) {").indent();
+            writeValueDestroy(atd.element(), lv + ".$values[" + iv + "]", depth + 1, false);
             dedent().write('}').newLine();
             return;
         }
-        if (elem instanceof DerivedTypeDeclarer dtd
-                && dtd.def() instanceof ClassDefinition cd) {
-            if (dtd.refer().none()) {
-                // class value element: cascade strong-ref fields
-                for (var cf : cd.allFields().values()) {
-                    var ft = cf.type();
-                    var fr = ft.maybeRefer();
-                    if (fr.none() || !fr.get().isKind(STRONG)) continue;
-                    if (ft.markSync() && !cf.immutable()) {
-                        write("Feng$cleanup_sfield((void**)&").write(lv).write(".")
-                                .write(cf.name()).write(")").endStmt();
-                    } else {
-                        var fck = fieldCleanupFn(ft);
-                        write(fck != null ? fck : cleanupSrefFn(ft))
-                                .write("(&").write(lv).write(".")
-                                .write(cf.name()).write(")").endStmt();
-                    }
-                }
-                return;
+        if (ft instanceof TupleTypeDeclarer ttd) {
+            int i = 0;
+            for (var et : ttd.elements()) {
+                writeValueDestroy(et, lv + ".v" + i, depth, false);
+                i++;
             }
-            if (!cd.isFinal()) {
-                // non-final class pointer: use per-class cleanup for cascade
-                var fck = "Feng$cleanup_" + typeKey(elem);
-                if (dtd.derivedType().generic().isEmpty()) needClassCleanup(cd, fck);
-                else needConcreteClassCleanup(cd, dtd.derivedType(), fck);
-                write("if (").write(lv).write(") ").write(fck)
+            return;
+        }
+        if (ft instanceof DerivedTypeDeclarer dtd && dtd.def() instanceof ClassDefinition cd) {
+            if (dtd.refer().none()) {
+                // embedded class value → static destroy (no dec/free)
+                write("Feng$destroy_").writeMangledName(dtd.derivedType())
                         .write("(&").write(lv).write(")").endStmt();
                 return;
             }
+            if (dtd.refer().get().isKind(PHANTOM)) return;  // borrow
+            if (cd.isFinal()) {
+                if (syncVarField) {
+                    // @Sync var final field: mask lock bit, dec, destroy, free
+                    write("{ uintptr_t _raw = atomic_load((atomic_uintptr_t*)&").write(lv)
+                            .write("); void* _p = (void*)(_raw & ~(uintptr_t)1); if (_p && ").write(decFn(ft))
+                            .write("(_p)) { Feng$destroy_").writeMangledName(dtd.derivedType())
+                            .write("(_p); Feng$free(_p); } ").write(lv).write(" = NULL; }").endStmt();
+                } else {
+                    write("if (").write(lv).write(" && ").write(decFn(ft)).write("(").write(lv)
+                            .write(")) { Feng$destroy_").writeMangledName(dtd.derivedType())
+                            .write("(").write(lv).write("); Feng$free(").write(lv).write("); }").endStmt();
+                }
+                return;
+            }
+            // non-final strong ref → release entry (virtual dispatch)
+            if (syncVarField) {
+                write("Feng$cleanup_sfield((void**)&").write(lv).write(")").endStmt();
+            } else {
+                write("Feng$release").write(ft.markSync() ? "" : "_ns")
+                        .write("((void**)&").write(lv).write(")").endStmt();
+            }
+            return;
         }
-        // pointer reference → cascade dec
-        write("if (").write(lv).write(") ").write(decFn(elem)).write("(").write(lv).write(")").endStmt();
+        // remaining strong references: interface → release (virtual dispatch);
+        // boxed primitive/struct/enum → plain dec → free (no destructor)
+        if (ft.maybeRefer().match(r -> r.isKind(STRONG))) {
+            if (isClassLikeStrongRef(ft)) {
+                write("Feng$release").write(ft.markSync() ? "" : "_ns")
+                        .write("((void**)&").write(lv).write(")").endStmt();
+            } else {
+                write(cleanupFreeFn(ft)).write("(&").write(lv).write(")").endStmt();
+            }
+        }
+    }
+
+    /**
+     * True if the type requires destruction (as a value or element): a strong ref
+     * (*T / [*]T), a fixed array [N]T / tuple whose element requires destruction,
+     * or an embedded class value (value type with no top-level refer). Phantom
+     * borrows and leaf types need nothing.
+     */
+    private boolean needsDestroy(TypeDeclarer t) {
+        t = monoResolve(t);
+        var ref = t.maybeRefer();
+        if (ref.match(r -> r.isKind(STRONG))) return true;
+        if (ref.match(r -> r.isKind(PHANTOM))) return false;  // borrow, no-op
+        if (isLeafValue(t)) return false;
+        if (t instanceof ArrayTypeDeclarer atd) return needsDestroy(atd.element());
+        if (t instanceof TupleTypeDeclarer ttd) {
+            for (var et : ttd.elements()) if (needsDestroy(et)) return true;
+            return false;
+        }
+        return t instanceof DerivedTypeDeclarer dtd
+                && dtd.def() instanceof ClassDefinition;
+    }
+
+    /**
+     * Cleanup function name for a value-type local (fixed array/tuple/embedded
+     * class) that carries strong-ref content; mirrors Feng$cleanup_arr_<ek> but
+     * keyed by the full value type.
+     */
+    private String valueCleanupFn(TypeDeclarer t) {
+        return "Feng$cleanup_val_" + typeKey(monoResolve(t));
+    }
+
+    /**
+     * Register the cleanup function for a value-type local: generates
+     * static inline void Feng$cleanup_val_<key>(T *p) whose body destroys the
+     * value in place, reusing the unified value-type rule via writeValueDestroy.
+     */
+    private void registerValueCleanup(TypeDeclarer t) {
+        var resolved = monoResolve(t);
+        if (resolved.hasTypeVar()) return;
+        // value types only — strong/phantom refs use strongRefCleanupFn instead
+        if (resolved.maybeRefer().has()) return;
+        var key = typeKey(resolved);
+        if (!emittedValueCleanups.add(key)) return;
+        // ensure element destroys / nested SRef cleanup types are registered
+        preRegisterElemCleanup(resolved);
+        var fn = valueCleanupFn(resolved);
+        valueCleanupForwards.add(() ->
+                write("static inline void ").write(fn).write("(")
+                        .write(resolved).write(" *p)").endStmt());
+        valueCleanups.add(() -> {
+            write("static inline void ").write(fn).write("(")
+                    .write(resolved).write(" *p) {").indent();
+            writeValueDestroy(resolved, "(*p)", 0, false);
+            dedent().write('}').newLine();
+        });
     }
 
     /**
@@ -1472,33 +1644,43 @@ public class CGenerator implements Generator {
         return write('_').write(v.id());
     }
 
+    private String varNameStr(Variable v) {
+        var saved = out;
+        var sb = new StringBuilder();
+        out = sb;
+        try {
+            varName(v);
+        } finally {
+            out = saved;
+        }
+        return sb.toString();
+    }
+
     private CGenerator declare(Variable v) {
         return write(v.type().must()).write(' ').varName(v);
     }
 
     private CGenerator declareVar(Variable v) {
-        var t = v.type().must();
+        var raw = v.type().must();
+        var t = monoResolve(raw);
         // pre-register per-type cleanup before writing declaration
         var ref = t.maybeRefer();
-        String cleanupFn = null;
         if (ref.has() && ref.get().isKind(STRONG)) {
-            // handles both plain classes and concrete generic instantiations
-            cleanupFn = classCleanupFnFor(t);
+            classCleanupFnFor(t); // registers final-class cleanup callback
+        } else if (ref.none() && needsDestroy(t)) {
+            registerValueCleanup(t);
         }
 
         declare(v);
         // attach cleanup attribute
         if (ref.has() && ref.get().isKind(STRONG)) {
-            if (t instanceof ArrayTypeDeclarer atd)
-                write(" FENG$DEC(Feng$cleanup_arr_").write(typeKey(monoResolve(atd.element()))).write(")");
-            else if (cleanupFn != null)
-                write(" FENG$DEC(").write(cleanupFn).write(")");
-            else
-                write(" FENG$DEC(").write(cleanupSrefFn(t)).write(")");
+            write(" FENG$DEC(").write(strongRefCleanupFn(t)).write(")");
+        } else if (ref.none() && needsDestroy(t)) {
+            write(" FENG$DEC(").write(valueCleanupFn(t)).write(")");
         }
         write(" = ");
-        v.value().use(e -> writeValue(e, t), () -> {
-            if (t instanceof ArrayTypeDeclarer) write("{}");
+        v.value().use(e -> writeValue(e, raw), () -> {
+            if (raw instanceof ArrayTypeDeclarer) write("{}");
             else if (t.maybeRefer().has()) write("NULL");
             else write("{}");
         });
@@ -1534,6 +1716,7 @@ public class CGenerator implements Generator {
 
     private CGenerator writeValue(Expression v, TypeDeclarer t, boolean noRefInc) {
         if (v instanceof LiteralExpression le) return writeLiteral(le, t);
+        t = monoResolve(t);
         var r = t.maybeRefer();
         if (r.none()) return write(v);
         if (r.get().isKind(PHANTOM)) return referPhantom(v, t);
@@ -1545,7 +1728,7 @@ public class CGenerator implements Generator {
     }
 
     private CGenerator castRef(Expression v, TypeDeclarer t, boolean noRefInc) {
-        var rt = v.resultType.must();
+        var rt = monoResolve(v.resultType.must());
         if (t.baseTypeSame(rt)) {
             // SRef array → PRef array: wrap .$values & .$length fields
             if (t instanceof ArrayTypeDeclarer tat && rt instanceof ArrayTypeDeclarer rat
@@ -1948,13 +2131,39 @@ public class CGenerator implements Generator {
             ArrayTypeDeclarer.MethodMove.name(), "FENG$MOVE"
     );
 
+    /** Render an expression to its C string (used to build composite lvalues). */
+    private String render(Expression e) {
+        var saved = out;
+        var sb = new StringBuilder();
+        out = sb;
+        try {
+            write(e);
+        } finally {
+            out = saved;
+        }
+        return sb.toString();
+    }
+
     private CGenerator write(CallExpression e) {
         if (e.callee() instanceof MethodExpression me) {
             var td = me.subject().resultType.must();
             // array built-in methods swap/move → Header.h macros
-            if (td instanceof ArrayTypeDeclarer) {
+            if (td instanceof ArrayTypeDeclarer atd) {
                 var mn = ArrayMethods.get(me.method().name());
                 assert mn != null;
+                // move overwrites the destination slot; release the old destination
+                // element first when it holds a strong reference (the macro only
+                // zeroes the source slot).
+                if (mn.equals("FENG$MOVE") && needsDestroy(atd.element())
+                        && e.arguments().size() == 2) {
+                    var subj = render(me.subject());
+                    var j = render(e.arguments().get(1));
+                    write("({ ");
+                    writeValueDestroy(atd.element(), subj + ".$values[" + j + "]", 0, false);
+                    write(" FENG$MOVE(").write(me.subject());
+                    for (var a : e.arguments()) write(", ").write(a);
+                    return write("); })");
+                }
                 write(mn).write('(').write(me.subject());
                 for (var a : e.arguments()) {
                     write(", ").write(a);
@@ -2186,6 +2395,17 @@ public class CGenerator implements Generator {
             } else {
                 // copy the entire value (struct copy or reference copy with inc)
                 write("*_p = ").write(a).endStmt();
+                if (nonFinal) {
+                    // whole-struct copy also overwrites the $meta pointer set by
+                    // Feng$newObject (source value's $meta may be NULL or a different
+                    // class); restore the meta of the *new* type so vDestroy dispatches
+                    // to the correct destructor instead of dereferencing NULL.
+                    var cd = (ClassDefinition) def;
+                    write("_p->$meta = ");
+                    if (isBuiltin) write("&Feng$meta_").write(cd.symbol());
+                    else writeMetaBaseRef(cd, (DerivedType) ndt.type());
+                    write(";").endStmt();
+                }
             }
             write("_p; })");
         }, () -> {
@@ -2911,7 +3131,7 @@ public class CGenerator implements Generator {
     }
 
     private CGenerator writeAssign(Operand o, Expression v) {
-        var t = o.type.must();
+        var t = monoResolve(o.type.must());
         var r = t.maybeRefer();
         if (r.has()) {
             if (r.get().isKind(PHANTOM)) {
@@ -2936,10 +3156,10 @@ public class CGenerator implements Generator {
                 write(o);
                 write("); _t; })");
             } else {
-                // simple pointer: use void* temp + generic cleanup
+                // simple pointer: use void* temp + typed cleanup
                 write(o).write(" = ({ void* _t = (void*)(");
                 castRef(v, t);
-                write("); ").write(cleanupSrefFn(t)).write("(&");
+                write("); ").write(strongRefCleanupFn(t)).write("(&");
                 write(o);
                 write("); _t; })");
             }
@@ -3093,24 +3313,6 @@ public class CGenerator implements Generator {
         return write(s.label()).write(':').write(s.target());
     }
 
-    /**
-     * Check whether a return expression is a direct reference to a
-     * parameter variable. Parameters have no cleanup attribute, so
-     * returning one must skip Feng$inc — the caller already inc'd
-     * when passing the argument.
-     */
-    private static boolean isParameterOf(Expression re, Prototype prot) {
-        if (!(re instanceof VariableExpression ve)) return false;
-        var v = ve.variable();
-        for (var p : prot.parameterSet()) {
-            if (p instanceof FixedParameter fp
-                    && fp.var().has() && fp.var().must().equals(v)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private CGenerator write(ReturnStatement rs) {
         // Inside try-with-finally: defer return until after finally executes
         if (insideTryFinally) {
@@ -3130,9 +3332,9 @@ public class CGenerator implements Generator {
         var re = rs.result().get();
         var prot = rs.procedure().must().prototype();
         var rt = prot.returnSet().must();
-        // Parameters have no cleanup — skip Feng$inc, caller already inc'd
-        var noRefInc = isParameterOf(re, prot);
-        return write("return ").writeValue(re, rt, noRefInc).endStmt();
+        // Parameters now carry cleanup (dec on exit): returning one incs the
+        // return value, and the parameter's cleanup dec balances that inc.
+        return write("return ").writeValue(re, rt, false).endStmt();
     }
 
     private CGenerator write(ThrowStatement ts) {
@@ -3790,7 +3992,7 @@ public class CGenerator implements Generator {
                     write(".iface_count = ").write(ifaces.size()).write(',').newLine();
                     write(".ifaces = Feng$meta_").write(mName).write("_ifaces,").newLine();
                 }
-                write(".destroy = NULL").newLine();
+                write(".destroy = Feng$destroy_").write(mName).write(',').newLine();
                 if (parentIsObject) {
                     dedent().write("},").newLine();
                     // method pointers
@@ -3883,12 +4085,7 @@ public class CGenerator implements Generator {
             write(".iface_count = ").write(allIfaces(cd).size()).write(',').newLine();
             write(".ifaces = Feng$meta_").write(cd.symbol()).write("_ifaces,").newLine();
         }
-        if (cd.resource()) {
-            write(".destroy = ").write(cd.symbol())
-                    .write(cd.resourceFree().must().name()).write(',').newLine();
-        } else {
-            write(".destroy = NULL,").newLine();
-        }
+        write(".destroy = Feng$destroy_").write(cd.symbol()).write(',').newLine();
     }
 
     /**
@@ -4655,7 +4852,7 @@ public class CGenerator implements Generator {
             write("static struct { Feng$Header header; struct { Byte $values[")
                     .write(sl.length()).write("]; } array; } ");
             literalString(sl);
-            write(" = {{1}, {{");
+            write(" = {{.refcnt = 1}, {{");
             for (byte b : sl.value()) write(b).write(',');
             write("}}}").endStmt();
         }
@@ -4773,9 +4970,14 @@ public class CGenerator implements Generator {
      * Monomorphization already handles type discovery.
      */
     private void registerClassCleanup(TypeDeclarer td) {
+        td = monoResolve(td);
         var ref = td.maybeRefer();
-        if (!ref.has() || !ref.get().isKind(STRONG)) return;
-        classCleanupFnFor(td);
+        if (ref.has() && ref.get().isKind(STRONG)) {
+            classCleanupFnFor(td);
+            return;
+        }
+        // value type (fixed array/tuple/embedded class) with strong-ref content
+        if (needsDestroy(td)) registerValueCleanup(td);
     }
 
     /**
@@ -4789,14 +4991,12 @@ public class CGenerator implements Generator {
         if (td.hasTypeVar()) return null;
         if (!(td instanceof DerivedTypeDeclarer dtd)
                 || !(dtd.def() instanceof ClassDefinition cd)) return null;
+        // non-final → generic Feng$cleanup_sref/_ns (release entry); final → per-class callback
+        if (!cd.isFinal()) return null;
         var dt = dtd.derivedType();
-        var needCascade = !cd.isFinal() && cd.allFields().values().stream()
-                .map(cf -> resolveFromMap(cf.type(), buildTypeMap(cd.generic(), dt.generic())))
-                .anyMatch(ft -> ft.maybeRefer().match(r -> r.isKind(STRONG)));
-        if (!cd.resource() && !needCascade) return null;
-        var ck = "Feng$cleanup_" + typeKey(td);
-        if (cd.generic().isEmpty()) needClassCleanup(cd, ck);
-        else needConcreteClassCleanup(cd, dt, ck);
+        var ck = "Feng$cleanup_" + typeKey(td) + (td.markSync() ? "" : "_ns");
+        if (cd.generic().isEmpty()) needClassCleanup(cd, ck, td.markSync());
+        else needConcreteClassCleanup(cd, dt, ck, td.markSync());
         return ck;
     }
 
@@ -4808,6 +5008,7 @@ public class CGenerator implements Generator {
         if (stmt instanceof DeclarationStatement ds) {
             for (var v : ds.variables()) {
                 registerClassCleanup(v.type().must());
+                v.value().use(this::preScanCleanupExpr);
             }
         } else if (stmt instanceof BlockStatement bs) {
             for (var s : bs.list()) preScanCleanupStmts(s);
@@ -4828,6 +5029,41 @@ public class CGenerator implements Generator {
                 preScanCleanupStmts(cc.body());
             }
             ts.finallyClause().use(this::preScanCleanupStmts);
+        } else if (stmt instanceof ReturnStatement rs) {
+            rs.result().use(this::preScanCleanupExpr);
+        } else if (stmt instanceof CallStatement cs) {
+            preScanCleanupExpr(cs.call());
+        } else if (stmt instanceof AssignmentsStatement as) {
+            for (var a : as.list()) preScanCleanupExpr(a.value());
+        }
+    }
+
+    /**
+     * Descend into expressions to register cleanup types for pinned temporaries.
+     * RelayLowering wraps call results in BlockExpressions whose pin declarations
+     * must be registered before classMethods()/functionDefinition() emit bodies.
+     */
+    private void preScanCleanupExpr(Expression e) {
+        if (e instanceof BlockExpression be) {
+            for (var s : be.block()) preScanCleanupStmts(s);
+            preScanCleanupExpr(be.result());
+        } else if (e instanceof CallExpression ce) {
+            preScanCleanupExpr(ce.callee());
+            for (var a : ce.arguments()) preScanCleanupExpr(a);
+        } else if (e instanceof BinaryExpression be) {
+            preScanCleanupExpr(be.left());
+            preScanCleanupExpr(be.right());
+        } else if (e instanceof TupleExpression te) {
+            for (var el : te.elements()) preScanCleanupExpr(el);
+        } else if (e instanceof ArrayExpression ae) {
+            for (var el : ae.elements()) preScanCleanupExpr(el);
+        } else if (e instanceof MemberOfExpression me) {
+            preScanCleanupExpr(me.subject());
+        } else if (e instanceof IndexOfExpression ie) {
+            preScanCleanupExpr(ie.subject());
+            preScanCleanupExpr(ie.index());
+        } else if (e instanceof MethodExpression me) {
+            preScanCleanupExpr(me.subject());
         }
     }
 
@@ -4860,6 +5096,11 @@ public class CGenerator implements Generator {
         {
             var fwds = new ArrayList<>(classCleanupForwards);
             classCleanupForwards.clear();
+            for (var r : fwds) r.run();
+        }
+        {
+            var fwds = new ArrayList<>(valueCleanupForwards);
+            valueCleanupForwards.clear();
             for (var r : fwds) r.run();
         }
 
@@ -5043,7 +5284,10 @@ public class CGenerator implements Generator {
     private void implFunc(FunctionDefinition fd) {
         if (!fd.generic().isEmpty()) return; // generic: concrete instantiations only
         if (fd.procedure().none()) return;   // metadata-only (e.g. from C header): no body
-        write(fd.symbol(), fd.prototype());
+        var pt = fd.prototype();
+        pt.returnSet().use(this::write, () -> write("void"));
+        write(' ').write(fd.symbol());
+        write('(').write(pt.parameterSet()).write(')');
         write(' ').write(fd.procedure().must());
     }
 
@@ -5110,6 +5354,7 @@ public class CGenerator implements Generator {
         write('{').indent();
         // for exceptions
         write("_feng_fn_label:;").newLine();
+        writeParamCleanupDecls(proc.prototype());
         write((Statement) proc.body());
         if (noTerminal(proc.body().list())) exitScope(proc);
         dedent().write('}').newLine();
@@ -5126,6 +5371,12 @@ public class CGenerator implements Generator {
             write("static ");
         }
         var t = v.type().must();
+        // release global strong-ref/destructible values at program exit
+        // (const globals may still hold heap strong refs, e.g. const stdout = file(...))
+        if (!header && (t.maybeRefer().match(r -> r.isKind(STRONG)) || needsDestroy(t))) {
+            var lv = varNameStr(v);
+            globalCleanups.add(() -> writeValueDestroy(t, lv, 0, false));
+        }
         declare(v);
         if (v.export() && header) return endStmt();
         write(" = ");
@@ -5181,13 +5432,23 @@ public class CGenerator implements Generator {
      * Emit the constructor that performs runtime global initialization.
      */
     private void emitGlobalInits() {
-        if (globalInits.isEmpty()) return;
-        write("__attribute__((constructor)) static void Feng$globals_init(void) {")
-                .indent();
-        var batch = new ArrayList<>(globalInits);
-        globalInits.clear();
-        for (var r : batch) r.run();
-        dedent().write('}').newLine();
+        if (globalInits.isEmpty() && globalCleanups.isEmpty()) return;
+        if (!globalInits.isEmpty()) {
+            write("__attribute__((constructor)) static void Feng$globals_init(void) {").indent();
+            var batch = new ArrayList<>(globalInits);
+            globalInits.clear();
+            for (var r : batch) r.run();
+            dedent().write('}').newLine();
+        }
+        // release global strong-ref values before the leak checker (destructor
+        // priority 102 runs before the Feng$debug_fini destructor at 101)
+        if (!globalCleanups.isEmpty()) {
+            write("__attribute__((destructor(102))) static void Feng$globals_cleanup(void) {").indent();
+            var batch = new ArrayList<>(globalCleanups);
+            globalCleanups.clear();
+            for (var r : batch) r.run();
+            dedent().write('}').newLine();
+        }
     }
 
     private void declareGlobalVar(List<GlobalVariable> vars) {
@@ -5268,6 +5529,33 @@ public class CGenerator implements Generator {
         // Pre-register cleanup types for imported class method bodies,
         // so that FENG$DEC references can be forward-declared before method bodies.
         if (!header) preRegisterImportedClassCleanups();
+        // Register value-type cleanup for every class's embedded-value form, so
+        // Feng$cleanup_val_X forward decls are flushed before classMethods().
+        if (!header) {
+            for (var cd : table.dagClasses) {
+                if (cd.builtin() || !cd.generic().isEmpty()) continue;
+                var dt = new DerivedType(cd.symbol().pos(), cd.symbol(), TypeArguments.EMPTY);
+                dt.def(cd);
+                registerValueCleanup(new DerivedTypeDeclarer(dt.pos(), dt));
+            }
+            // generic concrete class instantiations (e.g. Pair<int,bool>) also
+            // need their embedded-value cleanup registered before classMethods()
+            for (var dt : table.concreteInstantiations) {
+                if (!(dt.def() instanceof ClassDefinition cd) || cd.builtin()) continue;
+                registerValueCleanup(new DerivedTypeDeclarer(dt.pos(), dt));
+            }
+        }
+        // Pre-scan LOCAL (non-generic) class method bodies too, so value-type
+        // cleanups used there get forward-declared before classMethods() emits them.
+        if (!header) {
+            for (var cd : table.dagClasses) {
+                if (!cd.generic().isEmpty()) continue;
+                for (var cm : cd.methods()) {
+                    if (!cm.generic().isEmpty()) continue;
+                    cm.procedure().use(proc -> preScanCleanupStmts(proc.body()));
+                }
+            }
+        }
 
         // Emit forward declarations for cleanup functions BEFORE classMethods()
         // so that FENG$DEC references in method bodies can resolve the function names.
@@ -5276,6 +5564,16 @@ public class CGenerator implements Generator {
         classMethods();
         functionDefinition();
 
+        // Register + forward-declare destructors BEFORE metaDefinitions (meta .destroy references them)
+        for (var cd : table.dagClasses) {
+            if (cd.builtin() || !cd.generic().isEmpty()) continue;
+            needClassDestroy(cd);
+        }
+        for (var dt : table.concreteInstantiations) {
+            if (dt.def() instanceof ClassDefinition cd) needConcreteClassDestroy(cd, dt);
+        }
+        emitDestroyForwardDecls();
+
         metaDefinitions();
 
         writeComment("global variable");
@@ -5283,8 +5581,9 @@ public class CGenerator implements Generator {
         // runtime global initializers → GCC constructor (runs before main)
         if (!header) emitGlobalInits();
 
-        // emit cleanup functions at end of file
+        // emit cleanup + destroy functions at end of file
         if (!header) {
+            emitDestroyFunctions();
             emitCleanupFunctions();
             emitClassCleanups();
         }

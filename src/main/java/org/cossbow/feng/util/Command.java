@@ -18,7 +18,7 @@ import java.util.function.Supplier;
 public class Command {
     private final Path dir;
     private final List<String> cmd;
-    private final boolean quiet;
+    private boolean quiet;
 
     public Command(Path dir, List<String> cmd) {
         this(dir, cmd, false);
@@ -32,6 +32,11 @@ public class Command {
         this.dir = dir;
         this.cmd = cmd;
         this.quiet = quiet;
+    }
+
+    public Command quiet(boolean quiet) {
+        this.quiet = quiet;
+        return this;
     }
 
     // ---- factories ----

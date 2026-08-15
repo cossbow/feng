@@ -1669,33 +1669,34 @@ public class SemanticAnalyzer {
     // 协变分析
     private TypeValid assignable(
             DerivedTypeDeclarer lt, ObjectDefinition ld,
-            DerivedTypeDeclarer rt, ObjectDefinition rd) {
+            DerivedTypeDeclarer rt, ObjectDefinition rd,
+            Entity e) {
 
         if (ld.equals(rd)) {
-            return lt.generic().equals(rt.generic()) ?
-                    TypeValid.ok() :
-                    TypeValid.err("type-arguments not match: '%s' <--> '%s' %s",
-                            lt.generic(), rt.generic(), rt.pos());
+            if (lt.generic().equals(rt.generic()))
+                return TypeValid.ok();
+            return TypeValid.err("type-arguments not match: '%s' <--> '%s' %s",
+                    lt.generic(), rt.generic(), e.pos());
         }
         if (typeNest > 0)
             return TypeValid.err("can't use '%s' as '%s': %s",
-                    rt, lt, rt.pos());
+                    rt, lt, e.pos());
 
         if (ClassDefinition.ObjectClass.equals(ld)) {
             if (rd instanceof InterfaceDefinition)
                 return TypeValid.ok();
             if (rd instanceof ClassDefinition rc) {
                 return !rc.isFinal() ? TypeValid.ok() : TypeValid.err(
-                        "final-class not support covariant: %s", rd.pos());
+                        "final-class not support covariant: %s", e.pos());
             }
         }
 
         if (ld instanceof ClassDefinition lc) {
             if (lc.isFinal()) return TypeValid.err(
-                    "final-class not support covariant: %s", rd.pos());
+                    "final-class not support covariant: %s", e.pos());
             if (rd instanceof InterfaceDefinition) {
                 return TypeValid.err("need cast by is-expression '%s'?('%s'): %s",
-                        rt, lt, rt.pos());
+                        rt, lt, e.pos());
             }
             if (rd instanceof ClassDefinition rc) {
                 var ok = checkInherited(lt.derivedType(),
@@ -1703,13 +1704,13 @@ public class SemanticAnalyzer {
                         .match(a -> lt.generic().equals(a));
                 if (ok) return TypeValid.ok();
                 return TypeValid.err("'%s' doesn't inherit '%s': %s",
-                        rc, lc, rc.pos());
+                        rc, lc, e.pos());
             }
             return unreachable();
         }
         if (rd instanceof ClassDefinition rc && rc.isFinal()) {
             return TypeValid.err(
-                    "final-class not support covariant: %s", rd.pos());
+                    "final-class not support covariant: %s", e.pos());
         }
 
         var li = (InterfaceDefinition) ld;
@@ -1718,7 +1719,7 @@ public class SemanticAnalyzer {
                 .match(a -> lt.generic().equals(a));
         if (ok) return TypeValid.ok();
         return TypeValid.err("'%s' doesn't implement '%s': %s",
-                rd, ld, rd.pos());
+                rd, ld, e.pos());
     }
 
     private TypeValid assignable(DerivedTypeDeclarer l,
@@ -1728,7 +1729,7 @@ public class SemanticAnalyzer {
         var rt = r.def();
         if (lt instanceof ObjectDefinition lo &&
                 rt instanceof ObjectDefinition ro)
-            return assignable(l, lo, r, ro);
+            return assignable(l, lo, r, ro, e);
 
         if (lt instanceof EnumDefinition le &&
                 rt instanceof EnumDefinition re) {
@@ -3553,7 +3554,7 @@ public class SemanticAnalyzer {
         }
         if (l instanceof DerivedTypeDeclarer ld &&
                 r instanceof DerivedTypeDeclarer rd) {
-            if (objectBinOp(ld, rd)) return TypeValid.ok();
+            if (objectBinOp(ld, rd, e)) return TypeValid.ok();
         } else if (l instanceof ArrayTypeDeclarer la &&
                 r instanceof ArrayTypeDeclarer ra) {
             return assignable(la.element(), ra.element(),
@@ -3632,11 +3633,12 @@ public class SemanticAnalyzer {
     }
 
     private boolean objectBinOp(
-            DerivedTypeDeclarer l, DerivedTypeDeclarer r) {
+            DerivedTypeDeclarer l, DerivedTypeDeclarer r,
+            Entity e) {
         if (l.def() instanceof ObjectDefinition lo &&
                 r.def() instanceof ObjectDefinition ro)
-            return assignable(l, lo, r, ro).ok ||
-                    assignable(r, ro, l, lo).ok;
+            return assignable(l, lo, r, ro, e).ok ||
+                    assignable(r, ro, l, lo, e).ok;
         return false;
     }
 
@@ -3840,7 +3842,7 @@ public class SemanticAnalyzer {
         invalidFinalClass(srcDef, e);
         invalidFinalClass(tgtDef, e);
 
-        if (assignable(dstType, tgtDef, srcType, srcDef).ok) {
+        if (assignable(dstType, tgtDef, srcType, srcDef, e).ok) {
             return Groups.g2(n, dstType);
         }
         if (tgtDef instanceof InterfaceDefinition ||
@@ -3850,7 +3852,7 @@ public class SemanticAnalyzer {
         }
         if (tgtDef instanceof ClassDefinition td &&
                 srcDef instanceof ClassDefinition sd) {
-            if (assignable(srcType, srcDef, dstType, tgtDef).ok) {
+            if (assignable(srcType, srcDef, dstType, tgtDef, e).ok) {
                 n.needCheck(true);
                 return Groups.g2(n, dstType);
             }

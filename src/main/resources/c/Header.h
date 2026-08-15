@@ -153,14 +153,29 @@ static inline Float64 Feng$fastPowF(Float64 a, Int64 b) {
 // ===== RAII cleanup via __attribute__((cleanup)) =====
 #define FENG$DEC(c) __attribute__((__cleanup__(c)))
 
-// generic cleanup for strong references (*T)
+// 析构派发实体与释放入口（定义见 Feng$objMeta 之后）。此处先前置声明，
+// 因 cleanup_sref / store_sl / cleanup_sfield 定义早于 Feng$Meta / Feng$objMeta。
+static inline void Feng$vDestroy(void* p);
+static inline void Feng$release(void** slot);
+static inline void Feng$release_ns(void** slot);
+
+// generic cleanup for strong references (*T) — adapter to Feng$release
 static inline void Feng$cleanup_sref(void* p) {
+    Feng$release((void**) p);
+}
+
+// non-atomic cleanup for non-sync types — adapter to Feng$release_ns
+static inline void Feng$cleanup_sref_ns(void* p) {
+    Feng$release_ns((void**) p);
+}
+
+// plain boxed-value cleanup: dec → free (NO destructor dispatch).
+// Used for boxed primitives / structs / enums (new(int) etc.), which have no $meta.
+static inline void Feng$cleanup_free(void* p) {
     void** pp = (void**) p;
     if (*pp && Feng$dec(*pp)) Feng$free(*pp);
 }
-
-// non-atomic cleanup for non-sync types
-static inline void Feng$cleanup_sref_ns(void* p) {
+static inline void Feng$cleanup_free_ns(void* p) {
     void** pp = (void**) p;
     if (*pp && Feng$dec_ns(*pp)) Feng$free(*pp);
 }
@@ -213,8 +228,8 @@ static inline void Feng$store_sl(void** f, void* src) {
         int* prc = &Feng$headerOf(src)->refcnt;
         atomic_fetch_add((atomic_int*)prc, 1);
     }
-    // dec old & free if zero
-    if (old && Feng$dec(old)) Feng$free(old);
+    // dec old & free if zero (dispatch virtual destructor before free)
+    if (old && Feng$dec(old)) { Feng$vDestroy(old); Feng$free(old); }
     // store & unlock in one atomic write (bit 0 always 0 for stored src)
     atomic_store((atomic_uintptr_t*)f, (uintptr_t)src);
 }
@@ -225,7 +240,7 @@ static inline void Feng$store_sl(void** f, void* src) {
 static inline void Feng$cleanup_sfield(void** f) {
     uintptr_t raw = atomic_load((atomic_uintptr_t*)f);
     void* p = (void*)(raw & ~(uintptr_t)1);
-    if (p && Feng$dec(p)) Feng$free(p);
+    if (p && Feng$dec(p)) { Feng$vDestroy(p); Feng$free(p); }
     *f = NULL;
 }
 
@@ -290,6 +305,21 @@ _Noreturn void Feng$throw(void* ex);
 // get the object meta pointer (first field of every feng object)
 static inline const struct Feng$Meta* Feng$objMeta(void* p) {
     return *(const struct Feng$Meta**)p;
+}
+
+// ===== destructor dispatch (Issue 1 root fix) =====
+// 非 final 虚派发实体；final 类不经过它（无 $meta），由 codegen 静态调 Feng$destroy_X。
+static inline void Feng$vDestroy(void* p) {
+    Feng$objMeta(p)->destroy(p);
+}
+
+// 非 final 强引用释放入口（原子/非原子），唯一定义点：
+//   dec 归零 → 派发析构（虚派发到最派生类）→ free
+static inline void Feng$release(void** slot) {
+    if (*slot && Feng$dec(*slot)) { Feng$vDestroy(*slot); Feng$free(*slot); }
+}
+static inline void Feng$release_ns(void** slot) {
+    if (*slot && Feng$dec_ns(*slot)) { Feng$vDestroy(*slot); Feng$free(*slot); }
 }
 
 // runtime exception types

@@ -812,6 +812,11 @@ public class Monomorphization {
             preScanExpr(be.right());
         } else if (e instanceof UnaryExpression ue) {
             preScanExpr(ue.operand());
+        } else if (e instanceof BlockExpression be) {
+            // RelayLowering wraps temporaries (incl. generic calls) into block
+            // expressions; recurse so their concrete instantiations are found.
+            for (var s : be.block()) preScanStmt(s);
+            preScanExpr(be.result());
         }
     }
 

@@ -54,8 +54,14 @@ int main(int argc, char **argv) {
 		$main();
 #endif
 	}
-#ifdef FENG_DEBUG_MEMORY
-	feng$debug(false);
-#endif
 	return 0;
 }
+
+#ifdef FENG_DEBUG_MEMORY
+// leak report runs as a destructor (priority 101) so it executes AFTER every
+// module's Feng$globals_cleanup destructor (priority 102), which releases
+// global strong-reference values first.
+__attribute__((destructor(101))) static void Feng$debug_fini(void) {
+	feng$debug(false);
+}
+#endif
