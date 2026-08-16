@@ -1,0 +1,87 @@
+import std$testing;
+
+// 将字符串字面量（[*#]byte）复制为可变 [*]byte，作为 Dict 的 key。
+func mkBytes(s [*#]byte) [*]byte {
+    var r = new([s.length]byte);
+    for (var i = 0; i < s.length; i += 1) {
+        r[i] = s[i];
+    }
+    return r;
+}
+
+// ===== hashBytes =====
+
+@Test
+func testHashBytes() {
+    var a = mkBytes("hello");
+    var b = mkBytes("hello");
+    testing$assertTrue(hashBytes(a) == hashBytes(b));
+    var c = mkBytes("world");
+    testing$assertTrue(hashBytes(a) != hashBytes(c));
+    var e = new([0]byte);
+    testing$assertTrue(hashBytes(e) == hashBytes(e));
+}
+
+// ===== bytesEqual =====
+
+@Test
+func testBytesEqual() {
+    testing$assertTrue(bytesEqual(mkBytes("abc"), mkBytes("abc")));
+    testing$assertFalse(bytesEqual(mkBytes("abc"), mkBytes("abd")));
+    testing$assertFalse(bytesEqual(mkBytes("abc"), mkBytes("ab")));
+    testing$assertTrue(bytesEqual(mkBytes(""), mkBytes("")));
+}
+
+// ===== length =====
+
+@Test
+func testLength() {
+    testing$assertTrue(length("hello") == 5);
+    testing$assertTrue(length("") == 0);
+    // 中文 UTF-8：每个汉字 3 字节
+    testing$assertTrue(length("你好") == 6);
+}
+
+// ===== substr =====
+
+@Test
+func testSubstr() {
+    var s = "hello";
+    var r = substr(s, 1, 4);
+    testing$assertTrue(length(r) == 3);
+    testing$assertTrue(r[0] == 101);   // 'e'
+    testing$assertTrue(r[1] == 108);   // 'l'
+    testing$assertTrue(r[2] == 108);   // 'l'
+    // 越界钳制
+    testing$assertTrue(length(substr(s, -5, 100)) == 5);
+    testing$assertTrue(length(substr(s, 3, 2)) == 0);
+}
+
+// ===== Dict`[*]byte, int`：字节串作 key 的 set/get/remove =====
+
+@Test
+func testDictBytes() {
+    var d = newDict`[*]byte,int`(hashBytes, bytesEqual);
+    var k1 = mkBytes("foo");
+    var k2 = mkBytes("bar");
+    var k3 = mkBytes("foo");   // 与 k1 内容相同但不同实例
+
+    var r1 = d.set(k1, 100);
+    testing$assertTrue(r1.ok);
+    var r2 = d.set(k2, 200);
+    testing$assertTrue(r2.ok);
+    // 内容相同视为同一 key，覆盖
+    var r3 = d.set(k3, 300);
+    testing$assertFalse(r3.ok);
+    testing$assertTrue(r3.v == 100);
+
+    testing$assertTrue(d.size() == 2);
+    testing$assertTrue(d.get(k1).v == 300);
+    testing$assertTrue(d.get(k2).v == 200);
+    testing$assertFalse(d.get(mkBytes("baz")).ok);
+
+    var rm = d.remove(k1);
+    testing$assertTrue(rm.ok && rm.v == 300);
+    testing$assertTrue(d.size() == 1);
+    testing$assertFalse(d.get(k1).ok);
+}

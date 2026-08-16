@@ -1,0 +1,268 @@
+// ===== Dict`K,V` — 可扩容缩容的哈希表（渐进式 rehash）=====
+//
+// 与 HashMap 的差异：
+//   1. hash/equal 直接作用于 key（而非 Node），调用方无需构造假 Node；
+//   2. 支持缩容：负载因子 < 0.25 时减半（下限 16 桶）；
+//   3. 渐进式 rehash：ht0 + ht1 + rehashIdx，每次操作迁移少量桶，
+//      避免一次性 rehash 带来的 O(n) 长停顿。
+//
+// 扩容阈值 0.75、缩容阈值 0.25 之间留有滞回带，避免在阈值附近抖动。
+
+export
+class Result`V` final {
+    export
+    var v V;
+    export
+    var ok bool;
+}
+
+const dictMinBuckets = 16;
+
+export
+class DictEntry`K, V` final {
+    export
+    const key K;
+    export
+    var value V;
+    var next *?DictEntry`K, V`;
+}
+
+export
+class Dict`K, V` {
+    const hash func(K) int;
+    const equal func(a, b K) bool;
+    var ht0 [*?]*?DictEntry`K, V`;
+    var ht1 [*?]*?DictEntry`K, V`;
+    var rehashIdx int;   // -1 = 未在 rehash
+    var size int;
+
+    // ===== 内部 =====
+
+    func isRehashing() bool {
+        return rehashIdx != -1;
+    }
+
+    // 迁移最多 n 个桶（含空桶），若迁移完则收尾交换。
+    func rehashStep(n int) {
+        if (!isRehashing()) { return; }
+        var h0 = ht0;
+        var h1 = ht1;
+        if (h0 == nil) { return; }
+        if (h1 == nil) { return; }
+        var idx = rehashIdx;
+        var moved = 0;
+        for (moved < n && idx < h0.length) {
+            var cur = h0[idx];
+            if (cur != nil) {
+                h0[idx] = nil;
+                for (cur != nil) {
+                    var next = cur.next;
+                    var ni = hash(cur.key) & (h1.length - 1);
+                    cur.next = h1[ni];
+                    h1[ni] = cur;
+                    cur = next;
+                }
+            }
+            idx += 1;
+            moved += 1;
+        }
+        rehashIdx = idx;
+        if (idx >= h0.length) {
+            ht0 = h1;
+            ht1 = nil;
+            rehashIdx = -1;
+        }
+    }
+
+    // 首次分配或负载过高时触发扩容。
+    func maybeGrow() {
+        if (isRehashing()) { return; }
+        var h0 = ht0;
+        if (h0 == nil) {
+            ht0 = new([dictMinBuckets]*?DictEntry`K, V`);
+            return;
+        }
+        if (size * 4 >= h0.length * 3) {   // size >= length * 0.75
+            var newLen = h0.length * 2;
+            ht1 = new([newLen]*?DictEntry`K, V`);
+            rehashIdx = 0;
+        }
+    }
+
+    // 负载过低时触发缩容（保留至少 dictMinBuckets 桶）。
+    func maybeShrink() {
+        if (isRehashing()) { return; }
+        var h0 = ht0;
+        if (h0 == nil || h0.length <= dictMinBuckets) { return; }
+        if (size * 4 < h0.length) {   // size < length * 0.25
+            var newLen = h0.length / 2;
+            ht1 = new([newLen]*?DictEntry`K, V`);
+            rehashIdx = 0;
+        }
+    }
+
+    func findIn(bk [*?]*?DictEntry`K, V`, key K) *?DictEntry`K, V` {
+        if (bk == nil) { return nil; }
+        var idx = hash(key) & (bk.length - 1);
+        var cur = bk[idx];
+        for (cur != nil) {
+            if (equal(cur.key, key)) { return cur; }
+            cur = cur.next;
+        }
+        return nil;
+    }
+
+    func find(key K) *?DictEntry`K, V` {
+        var h0 = ht0;
+        if (h0 == nil) { return nil; }
+        var e = findIn(h0, key);
+        if (e != nil) { return e; }
+        var h1 = ht1;
+        if (h1 == nil) { return nil; }
+        return findIn(h1, key);
+    }
+
+    func removeIn(bk [*?]*?DictEntry`K, V`, key K) Result`V` {
+        if (bk == nil) { return {}; }
+        var idx = hash(key) & (bk.length - 1);
+        var cur = bk[idx];
+        var prev *?DictEntry`K, V` = nil;
+        for (cur != nil) {
+            if (equal(cur.key, key)) {
+                if (prev == nil) { bk[idx] = cur.next; }
+                else { prev.next = cur.next; }
+                return {ok=true, v=cur.value};
+            }
+            prev = cur;
+            cur = cur.next;
+        }
+        return {};
+    }
+
+    // ===== 公共 API =====
+
+    export
+    func set(key K, value V) Result`V` {
+        rehashStep(1);
+        var e = find(key);
+        if (e != nil) {
+            var old = e.value;
+            e.value = value;
+            return {v=old};
+        }
+        maybeGrow();
+        // rehash 进行时新元素插入 ht1，避免被再次迁移。
+        var target = ht0;
+        if (isRehashing()) { target = ht1; }
+        if (target == nil) { throw new(NilException); }
+        var ni = hash(key) & (target.length - 1);
+        var node = new(DictEntry`K, V`, {key=key, value=value, next=target[ni]});
+        target[ni] = node;
+        size += 1;
+        return {ok=true};
+    }
+
+    export
+    func get(key K) Result`V` {
+        rehashStep(1);
+        var e = find(key);
+        if (e == nil) { return {}; }
+        return {ok=true, v=e.value};
+    }
+
+    export
+    func remove(key K) Result`V` {
+        rehashStep(1);
+        var h0 = ht0;
+        if (h0 != nil) {
+            var r = removeIn(h0, key);
+            if (r.ok) { size -= 1; maybeShrink(); return r; }
+        }
+        var h1 = ht1;
+        if (h1 != nil) {
+            var r = removeIn(h1, key);
+            if (r.ok) { size -= 1; maybeShrink(); return r; }
+        }
+        return {};
+    }
+
+    export func size() int {
+        return size;
+    }
+
+    export func isEmpty() bool {
+        return size == 0;
+    }
+
+    export func clear() {
+        ht0 = nil;
+        ht1 = nil;
+        rehashIdx = -1;
+        size = 0;
+    }
+
+    export func iterator() *DictIter`K, V` {
+        return new(DictIter`K, V`, {bk=ht0, bk2=ht1});
+    }
+}
+
+// ===== 迭代器：依次遍历 ht0、ht1 两张表 =====
+
+export
+class DictIter`K, V` {
+    var bk [*?]*?DictEntry`K, V`;
+    var bk2 [*?]*?DictEntry`K, V`;
+    var idx int;
+    var cur *?DictEntry`K, V`;
+
+    func advance() {
+        var b = bk;
+        if (b == nil) { cur = nil; return; }
+        for (cur == nil && idx < b.length) {
+            cur = b[idx];
+            idx += 1;
+        }
+        if (cur == nil) {
+            var b2 = bk2;
+            if (b2 != nil) {
+                bk = b2;
+                bk2 = nil;
+                idx = 0;
+                for (cur == nil && idx < b2.length) {
+                    cur = b2[idx];
+                    idx += 1;
+                }
+            }
+        }
+    }
+
+    export func hasNext() bool {
+        advance();
+        return cur != nil;
+    }
+
+    export func next() {
+        var c = cur;
+        if (c != nil) { cur = c.next; }
+        advance();
+    }
+
+    export func key() K {
+        var c = cur;
+        if (c == nil) throw new(NilException);
+        return c.key;
+    }
+
+    export func value() V {
+        var c = cur;
+        if (c == nil) throw new(NilException);
+        return c.value;
+    }
+}
+
+// ===== 工厂函数 =====
+
+export
+func newDict`K,V`(hash func(K) int, equal func(a, b K) bool) *Dict`K,V` {
+    return new(Dict`K,V`, {hash=hash, equal=equal, rehashIdx=-1});
+}

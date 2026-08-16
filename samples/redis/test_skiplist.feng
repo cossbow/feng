@@ -1,0 +1,218 @@
+import std$testing;
+import std$tree;
+import std$rand;
+
+// ===== member 比较（int）=====
+
+func intCmp(a, b int) int {
+    if (a < b) { return -1; }
+    if (a > b) { return 1; }
+    return 0;
+}
+
+// ===== 用于与 std$tree 对照的复合键 (score, member) =====
+// 跳表排序键为 (score, member)，先比 score 再比 member，与 pairCmp 一致。
+
+struct SPair {
+    score float64;
+    member int;
+}
+
+func pairCmp(a, b SPair) int {
+    if (a.score < b.score) { return -1; }
+    if (a.score > b.score) { return 1; }
+    if (a.member < b.member) { return -1; }
+    if (a.member > b.member) { return 1; }
+    return 0;
+}
+
+// ===== 基本插入 / 查找 / 删除 =====
+
+@Test
+func testSkiplistBasic() {
+    var sl = newSkiplist`int`(intCmp);
+    testing$assertTrue(sl.isEmpty());
+
+    testing$assertTrue(sl.insert(1.5, 10));
+    testing$assertTrue(sl.insert(2.5, 20));
+    testing$assertTrue(sl.insert(3.5, 30));
+    testing$assertTrue(sl.size() == 3);
+    testing$assertFalse(sl.isEmpty());
+
+    // 查找
+    testing$assertTrue(sl.find(1.5, 10));
+    testing$assertTrue(sl.find(2.5, 20));
+    testing$assertTrue(sl.find(3.5, 30));
+    testing$assertFalse(sl.find(1.5, 99));    // 同 score 不同 member
+    testing$assertFalse(sl.find(9.9, 10));    // 不同 score 同 member
+
+    // 删除
+    testing$assertTrue(sl.remove(2.5, 20));
+    testing$assertTrue(sl.size() == 2);
+    testing$assertFalse(sl.find(2.5, 20));
+    testing$assertFalse(sl.remove(2.5, 20));  // 已删
+    testing$assertTrue(sl.find(1.5, 10));
+    testing$assertTrue(sl.find(3.5, 30));
+
+    // clear
+    sl.clear();
+    testing$assertTrue(sl.isEmpty());
+    testing$assertTrue(sl.size() == 0);
+    testing$assertFalse(sl.find(1.5, 10));
+}
+
+// ===== 重复插入拒绝（(score, member) 相同）=====
+
+@Test
+func testSkiplistDuplicate() {
+    var sl = newSkiplist`int`(intCmp);
+    testing$assertTrue(sl.insert(1.0, 1));
+    testing$assertFalse(sl.insert(1.0, 1));
+    testing$assertTrue(sl.size() == 1);
+}
+
+// ===== 同 score 多 member：按 member 排序 =====
+
+@Test
+func testSkiplistSameScore() {
+    var sl = newSkiplist`int`(intCmp);
+    // 全部 score 相同，靠 member 区分顺序
+    sl.insert(5.0, 30);
+    sl.insert(5.0, 10);
+    sl.insert(5.0, 20);
+    testing$assertTrue(sl.size() == 3);
+
+    var g1 = sl.getByRank(1);
+    testing$assertTrue(g1.2 && g1.0 == 10);
+    var g2 = sl.getByRank(2);
+    testing$assertTrue(g2.2 && g2.0 == 20);
+    var g3 = sl.getByRank(3);
+    testing$assertTrue(g3.2 && g3.0 == 30);
+
+    // rank 反查
+    testing$assertTrue(sl.rank(5.0, 10) == 1);
+    testing$assertTrue(sl.rank(5.0, 20) == 2);
+    testing$assertTrue(sl.rank(5.0, 30) == 3);
+    testing$assertTrue(sl.rank(5.0, 99) == 0);   // 不存在
+}
+
+// ===== rank 与 getByRank =====
+
+@Test
+func testSkiplistRank() {
+    var sl = newSkiplist`int`(intCmp);
+    for (var i = 0; i < 100; i += 1) {
+        sl.insert(float64(i), i * 10);
+    }
+    testing$assertTrue(sl.size() == 100);
+
+    for (var i = 0; i < 100; i += 1) {
+        testing$assertTrue(sl.rank(float64(i), i * 10) == i + 1);
+        var g = sl.getByRank(i + 1);
+        testing$assertTrue(g.2 && g.0 == i * 10 && g.1 == float64(i));
+    }
+
+    // 越界
+    var g0 = sl.getByRank(0);
+    testing$assertFalse(g0.2);
+    var g101 = sl.getByRank(101);
+    testing$assertFalse(g101.2);
+}
+
+// ===== 区间定位 firstInRange / lastInRange =====
+
+@Test
+func testSkiplistRange() {
+    var sl = newSkiplist`int`(intCmp);
+    sl.insert(1.0, 1);
+    sl.insert(3.0, 3);
+    sl.insert(5.0, 5);
+    sl.insert(7.0, 7);
+
+    var f = sl.firstInRange(3.0, 6.0);
+    testing$assertTrue(f.2 && f.0 == 3 && f.1 == 3.0);
+    var l = sl.lastInRange(3.0, 6.0);
+    testing$assertTrue(l.2 && l.0 == 5 && l.1 == 5.0);
+
+    // 覆盖整区间
+    var f2 = sl.firstInRange(0.0, 100.0);
+    testing$assertTrue(f2.2 && f2.0 == 1);
+    var l2 = sl.lastInRange(0.0, 100.0);
+    testing$assertTrue(l2.2 && l2.0 == 7);
+
+    // 空区间
+    var f3 = sl.firstInRange(8.0, 9.0);
+    testing$assertFalse(f3.2);
+    var l3 = sl.lastInRange(0.0, 0.5);
+    testing$assertFalse(l3.2);
+
+    // 空表
+    var empty = newSkiplist`int`(intCmp);
+    var fe = empty.firstInRange(0.0, 1.0);
+    testing$assertFalse(fe.2);
+}
+
+// ===== 与 std$tree 红黑树对照：随机序列结果一致 =====
+
+@Test
+func testSkiplistCrossCheckTree() {
+    var sl = newSkiplist`int`(intCmp);
+    var tr = tree$newTree`SPair`(pairCmp);
+    var n = 1000;
+
+    // 随机 score（可重复），member 唯一 0..n-1，顺序插入。
+    var scores = new([n]float64);
+    for (var i = 0; i < n; i += 1) {
+        scores[i] = float64(rand$intn(200));
+    }
+
+    for (var i = 0; i < n; i += 1) {
+        var s = scores[i];
+        testing$assertTrue(sl.insert(s, i));
+        testing$assertTrue(tr.insert(SPair{score = s, member = i}));
+    }
+    testing$assertTrue(sl.size() == n);
+    testing$assertTrue(tr.size() == n);
+
+    // 中序遍历 Tree，逐项对照跳表 getByRank 与 rank。
+    var it = tr.iterator();
+    var r = 1;
+    for (it.hasNext()) {
+        var p = it.value();
+        var g = sl.getByRank(r);
+        testing$assertTrue(g.2);
+        testing$assertTrue(g.0 == p.member && g.1 == p.score);
+        testing$assertTrue(sl.rank(p.score, p.member) == r);
+        r += 1;
+        it.next();
+    }
+    testing$assertTrue(r - 1 == n);
+
+    // 随机删除一半，再次对照。
+    var removed = new([n]bool);
+    var remain = 0;
+    for (var i = 0; i < n; i += 1) {
+        if (rand$intn(2) == 0) {
+            var s = scores[i];
+            testing$assertTrue(sl.remove(s, i));
+            testing$assertTrue(tr.remove(SPair{score = s, member = i}));
+            removed[i] = true;
+        } else {
+            remain += 1;
+        }
+    }
+    testing$assertTrue(sl.size() == remain);
+    testing$assertTrue(tr.size() == remain);
+
+    var it2 = tr.iterator();
+    var r2 = 1;
+    for (it2.hasNext()) {
+        var p = it2.value();
+        var g = sl.getByRank(r2);
+        testing$assertTrue(g.2);
+        testing$assertTrue(g.0 == p.member && g.1 == p.score);
+        r2 += 1;
+        it2.next();
+    }
+    testing$assertTrue(r2 - 1 == remain);
+}

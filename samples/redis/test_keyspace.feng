@@ -1,0 +1,267 @@
+import std$testing;
+import std$rand;
+
+// 复用 test_list.feng 的 toBytes / deref、test_zset.feng 的 mkByte、
+// string.feng 的 bytesEqual（同模块全局可见）。
+
+// 将可空 *?Value 解包为非空 *Value（测试用，nil 则抛异常）。
+func derefValue(v *?Value) *Value {
+    if (v == nil) { throw new(NilException); }
+    return v;
+}
+
+// 将可空 *?List 解包为非空 *List。
+func derefList(l *?List) *List {
+    if (l == nil) { throw new(NilException); }
+    return l;
+}
+
+// 将可空 *?Hash 解包为非空 *Hash。
+func derefHash(h *?Hash) *Hash {
+    if (h == nil) { throw new(NilException); }
+    return h;
+}
+
+// 将可空 *?Set 解包为非空 *Set。
+func derefSet(s *?Set) *Set {
+    if (s == nil) { throw new(NilException); }
+    return s;
+}
+
+// 将可空 *?ZSet 解包为非空 *ZSet。
+func derefZSet(z *?ZSet) *ZSet {
+    if (z == nil) { throw new(NilException); }
+    return z;
+}
+
+// 按类型标记构造一个 Value，内容用单字节 i 表示。
+func mkValue(t int, i int) *Value {
+    if (t == valueTypeStr) {
+        return newStringValue(mkByte(i));
+    }
+    if (t == valueTypeList) {
+        var l = newList();
+        l.rpush(mkByte(i));
+        return newListValue(l);
+    }
+    if (t == valueTypeHash) {
+        var h = newHash();
+        h.set(mkByte(i), mkByte(i));
+        return newHashValue(h);
+    }
+    if (t == valueTypeSet) {
+        var s = newSet();
+        s.add(mkByte(i));
+        return newSetValue(s);
+    }
+    var z = newZSet();
+    z.add(mkByte(i), float64(i));
+    return newZSetValue(z);
+}
+
+// ===== SET / GET / TYPE：五类值按 key 存取 =====
+
+@Test
+func testKeyspaceSetGetTypes() {
+    var db = newKeyspace();
+    testing$assertTrue(db.isEmpty());
+
+    // String
+    testing$assertTrue(db.set(toBytes("s"), newStringValue(toBytes("hello"))));
+    // List
+    var l = newList();
+    l.rpush(toBytes("a"));
+    l.rpush(toBytes("b"));
+    testing$assertTrue(db.set(toBytes("l"), newListValue(l)));
+    // Hash
+    var h = newHash();
+    h.set(toBytes("f1"), toBytes("v1"));
+    testing$assertTrue(db.set(toBytes("h"), newHashValue(h)));
+    // Set
+    var st = newSet();
+    st.add(toBytes("m1"));
+    testing$assertTrue(db.set(toBytes("st"), newSetValue(st)));
+    // ZSet
+    var z = newZSet();
+    z.add(toBytes("zm"), 1.5);
+    testing$assertTrue(db.set(toBytes("z"), newZSetValue(z)));
+
+    testing$assertTrue(db.size() == 5);
+    testing$assertFalse(db.isEmpty());
+
+    // 逐类取回并校验类型与内容
+    var gs = derefValue(db.get(toBytes("s")));
+    testing$assertTrue(gs.kind == valueTypeStr);
+    testing$assertTrue(bytesEqual(deref(gs.str), toBytes("hello")));
+
+    var gl = derefValue(db.get(toBytes("l")));
+    testing$assertTrue(gl.kind == valueTypeList);
+    testing$assertTrue(derefList(gl.list).length() == 2);
+    testing$assertTrue(bytesEqual(deref(derefList(gl.list).index(0)), toBytes("a")));
+
+    var gh = derefValue(db.get(toBytes("h")));
+    testing$assertTrue(gh.kind == valueTypeHash);
+    testing$assertTrue(bytesEqual(deref(derefHash(gh.hash).get(toBytes("f1"))), toBytes("v1")));
+
+    var gst = derefValue(db.get(toBytes("st")));
+    testing$assertTrue(gst.kind == valueTypeSet);
+    testing$assertTrue(derefSet(gst.set).contains(toBytes("m1")));
+
+    var gz = derefValue(db.get(toBytes("z")));
+    testing$assertTrue(gz.kind == valueTypeZSet);
+    testing$assertTrue(derefZSet(gz.zset).score(toBytes("zm")).0 == 1.5);
+
+    // 不存在的 key 返回 nil
+    testing$assertTrue(db.get(toBytes("nope")) == nil);
+}
+
+// ===== TYPE / DEL / EXISTS =====
+
+@Test
+func testKeyspaceTypeDelExists() {
+    var db = newKeyspace();
+    db.set(toBytes("a"), newStringValue(toBytes("1")));
+    db.set(toBytes("b"), newListValue(newList()));
+    db.set(toBytes("c"), newHashValue(newHash()));
+
+    var t1 = db.typeOf(toBytes("a"));
+    testing$assertTrue(t1.1 && t1.0 == valueTypeStr);
+    var t2 = db.typeOf(toBytes("b"));
+    testing$assertTrue(t2.1 && t2.0 == valueTypeList);
+    var t3 = db.typeOf(toBytes("c"));
+    testing$assertTrue(t3.1 && t3.0 == valueTypeHash);
+    var tn = db.typeOf(toBytes("zz"));
+    testing$assertFalse(tn.1);
+
+    testing$assertTrue(db.exists(toBytes("a")));
+    testing$assertTrue(db.del(toBytes("a")));
+    testing$assertFalse(db.exists(toBytes("a")));
+    testing$assertFalse(db.del(toBytes("a")));   // 已删
+    testing$assertTrue(db.size() == 2);
+}
+
+// ===== 覆盖：同 key 换类型 =====
+
+@Test
+func testKeyspaceOverwriteType() {
+    var db = newKeyspace();
+
+    // 先存 String，再用 List 覆盖
+    testing$assertTrue(db.set(toBytes("k"), newStringValue(toBytes("v"))));
+    var g1 = derefValue(db.get(toBytes("k")));
+    testing$assertTrue(g1.kind == valueTypeStr);
+
+    testing$assertFalse(db.set(toBytes("k"), newListValue(newList())));
+    testing$assertTrue(db.size() == 1);
+    var g2 = derefValue(db.get(toBytes("k")));
+    testing$assertTrue(g2.kind == valueTypeList);
+    // 旧 str 字段已被替换为 List 值，list 字段应非空
+    testing$assertTrue(g2.list != nil);
+}
+
+// ===== 随机一致性：随机类型 set / del / typeOf 与镜像一致 =====
+
+@Test
+func testKeyspaceRandomConsistency() {
+    var db = newKeyspace();
+    var n = 100;
+    var present = new([n]bool);
+    var kinds = new([n]int);
+    var count = 0;
+
+    for (var k = 0; k < 2000; k += 1) {
+        var i = rand$intn(n);
+        var op = rand$intn(3);
+        if (op == 0) {
+            // SET：随机类型（0..4）
+            var t = rand$intn(5);
+            var added = db.set(mkByte(i), mkValue(t, i));
+            if (present[i]) {
+                testing$assertFalse(added);
+            } else {
+                testing$assertTrue(added);
+                count += 1;
+            }
+            present[i] = true;
+            kinds[i] = t;
+        } else if (op == 1) {
+            // DEL
+            var removed = db.del(mkByte(i));
+            if (present[i]) {
+                testing$assertTrue(removed);
+                present[i] = false;
+                count -= 1;
+            } else {
+                testing$assertFalse(removed);
+            }
+        } else {
+            // TYPE 校验
+            var t = db.typeOf(mkByte(i));
+            if (present[i]) {
+                testing$assertTrue(t.1);
+                testing$assertTrue(t.0 == kinds[i]);
+            } else {
+                testing$assertFalse(t.1);
+            }
+        }
+    }
+
+    testing$assertTrue(db.size() == count);
+
+    // 全量反查：typeOf 与镜像一致
+    for (var i = 0; i < n; i += 1) {
+        var t = db.typeOf(mkByte(i));
+        if (present[i]) {
+            testing$assertTrue(t.1 && t.0 == kinds[i]);
+        } else {
+            testing$assertFalse(t.1);
+        }
+    }
+}
+
+// ===== 类型安全访问器：typeName / asXxx 按 kind 判别 =====
+
+@Test
+func testKeyspaceTypedAccessors() {
+    var db = newKeyspace();
+    db.set(toBytes("s"), newStringValue(toBytes("v")));
+    db.set(toBytes("l"), newListValue(newList()));
+    db.set(toBytes("h"), newHashValue(newHash()));
+    db.set(toBytes("st"), newSetValue(newSet()));
+    db.set(toBytes("z"), newZSetValue(newZSet()));
+
+    // typeName 对齐 Redis TYPE 命令返回的类型名（返回 [*#]byte，需 toBytes 转为可写再比较）
+    testing$assertTrue(bytesEqual(
+        toBytes(derefValue(db.get(toBytes("s"))).typeName()), toBytes("string")));
+    testing$assertTrue(bytesEqual(
+        toBytes(derefValue(db.get(toBytes("l"))).typeName()), toBytes("list")));
+    testing$assertTrue(bytesEqual(
+        toBytes(derefValue(db.get(toBytes("h"))).typeName()), toBytes("hash")));
+    testing$assertTrue(bytesEqual(
+        toBytes(derefValue(db.get(toBytes("st"))).typeName()), toBytes("set")));
+    testing$assertTrue(bytesEqual(
+        toBytes(derefValue(db.get(toBytes("z"))).typeName()), toBytes("zset")));
+
+    // asXxx：kind 匹配返回非 nil，不匹配返回 nil
+    var gs = derefValue(db.get(toBytes("s")));
+    testing$assertTrue(gs.asString() != nil);
+    testing$assertTrue(gs.asList() == nil);
+    testing$assertTrue(gs.asHash() == nil);
+
+    var gl = derefValue(db.get(toBytes("l")));
+    testing$assertTrue(gl.asList() != nil);
+    testing$assertTrue(gl.asSet() == nil);
+    testing$assertTrue(gl.asZSet() == nil);
+
+    var gh = derefValue(db.get(toBytes("h")));
+    testing$assertTrue(gh.asHash() != nil);
+    testing$assertTrue(gh.asString() == nil);
+
+    var gst = derefValue(db.get(toBytes("st")));
+    testing$assertTrue(gst.asSet() != nil);
+    testing$assertTrue(gst.asHash() == nil);
+
+    var gz = derefValue(db.get(toBytes("z")));
+    testing$assertTrue(gz.asZSet() != nil);
+    testing$assertTrue(gz.asList() == nil);
+}

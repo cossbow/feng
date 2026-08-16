@@ -1,0 +1,143 @@
+import std$testing;
+import std$rand;
+
+// 复用：
+//   - test_list.feng 的 toBytes / deref
+//   - test_string.feng 的 bytesEqual
+//   - test_zset.feng 的 mkByte（单字节 member，值 0..255，内容唯一）
+
+// ===== HSET / HGET / HLEN =====
+
+@Test
+func testHashSetGet() {
+    var h = newHash();
+    testing$assertTrue(h.isEmpty());
+
+    // 新增返回 true
+    testing$assertTrue(h.set(toBytes("f1"), toBytes("v1")));
+    testing$assertTrue(h.set(toBytes("f2"), toBytes("v2")));
+    testing$assertTrue(h.len() == 2);
+    testing$assertFalse(h.isEmpty());
+
+    var v1 = h.get(toBytes("f1"));
+    testing$assertTrue(v1 != nil);
+    testing$assertTrue(bytesEqual(deref(v1), toBytes("v1")));
+    var v2 = h.get(toBytes("f2"));
+    testing$assertTrue(v2 != nil && bytesEqual(deref(v2), toBytes("v2")));
+
+    // 不存在返回 nil
+    testing$assertTrue(h.get(toBytes("nope")) == nil);
+
+    // 覆盖已有 field 返回 false，值已更新
+    testing$assertFalse(h.set(toBytes("f1"), toBytes("v1x")));
+    testing$assertTrue(h.len() == 2);
+    testing$assertTrue(bytesEqual(deref(h.get(toBytes("f1"))), toBytes("v1x")));
+}
+
+// ===== HDEL / HEXISTS =====
+
+@Test
+func testHashDelExists() {
+    var h = newHash();
+    h.set(toBytes("a"), toBytes("1"));
+    h.set(toBytes("b"), toBytes("2"));
+    h.set(toBytes("c"), toBytes("3"));
+
+    testing$assertTrue(h.exists(toBytes("a")));
+    testing$assertTrue(h.exists(toBytes("c")));
+    testing$assertFalse(h.exists(toBytes("z")));
+
+    testing$assertTrue(h.del(toBytes("b")));
+    testing$assertTrue(h.len() == 2);
+    testing$assertFalse(h.exists(toBytes("b")));
+    testing$assertFalse(h.del(toBytes("b")));   // 已删，返回 false
+    testing$assertTrue(h.exists(toBytes("a")));
+    testing$assertTrue(h.exists(toBytes("c")));
+}
+
+// ===== HGETALL =====
+
+@Test
+func testHashGetAll() {
+    var h = newHash();
+    var n = 100;
+    for (var i = 0; i < n; i += 1) {
+        h.set(mkByte(i), mkByte(i));   // field=value=单字节 i
+    }
+    testing$assertTrue(h.len() == n);
+
+    var all = h.all();
+    // field/value 交错，共 2n 项
+    testing$assertTrue(all.length() == n * 2);
+
+    // 每对 (field, value) 中 field 与 value 内容一致（本测试约定），
+    // 且能通过 h.get 反查回来。
+    var seen = 0;
+    for (var j = 0; j < n * 2; j += 2) {
+        var f = deref(all.index(j));
+        var v = deref(all.index(j + 1));
+        testing$assertTrue(bytesEqual(f, v));
+        testing$assertTrue(h.exists(f));
+        testing$assertTrue(bytesEqual(deref(h.get(f)), v));
+        seen += 1;
+    }
+    testing$assertTrue(seen == n);
+}
+
+// ===== 随机一致性：set / del / get 与镜像一致 =====
+
+@Test
+func testHashRandomConsistency() {
+    var h = newHash();
+    var n = 200;
+    var present = new([n]bool);
+    var count = 0;
+
+    for (var k = 0; k < 2000; k += 1) {
+        var i = rand$intn(n);
+        var op = rand$intn(3);
+        if (op == 0) {
+            // HSET
+            var added = h.set(mkByte(i), mkByte(i));
+            if (present[i]) {
+                testing$assertFalse(added);
+            } else {
+                testing$assertTrue(added);
+                present[i] = true;
+                count += 1;
+            }
+        } else if (op == 1) {
+            // HDEL
+            var removed = h.del(mkByte(i));
+            if (present[i]) {
+                testing$assertTrue(removed);
+                present[i] = false;
+                count -= 1;
+            } else {
+                testing$assertFalse(removed);
+            }
+        } else {
+            // HGET
+            var g = h.get(mkByte(i));
+            if (present[i]) {
+                testing$assertTrue(g != nil);
+                testing$assertTrue(bytesEqual(deref(g), mkByte(i)));
+            } else {
+                testing$assertTrue(g == nil);
+            }
+        }
+    }
+
+    // 校验：元素数与镜像一致
+    testing$assertTrue(h.len() == count);
+
+    // 全量反查
+    for (var i = 0; i < n; i += 1) {
+        var g = h.get(mkByte(i));
+        if (present[i]) {
+            testing$assertTrue(g != nil && bytesEqual(deref(g), mkByte(i)));
+        } else {
+            testing$assertTrue(g == nil);
+        }
+    }
+}

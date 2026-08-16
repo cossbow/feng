@@ -1,0 +1,124 @@
+import std$testing;
+import std$rand;
+
+// 复用：
+//   - test_list.feng 的 toBytes / deref
+//   - test_string.feng 的 bytesEqual
+//   - test_zset.feng 的 mkByte（单字节 member，值 0..255，内容唯一）
+
+// ===== SADD / SISMEMBER / SCARD =====
+
+@Test
+func testSetAddCard() {
+    var s = newSet();
+    testing$assertTrue(s.isEmpty());
+
+    testing$assertTrue(s.add(toBytes("a")));
+    testing$assertTrue(s.add(toBytes("b")));
+    testing$assertTrue(s.add(toBytes("c")));
+    testing$assertTrue(s.card() == 3);
+    testing$assertFalse(s.isEmpty());
+
+    testing$assertTrue(s.contains(toBytes("a")));
+    testing$assertTrue(s.contains(toBytes("c")));
+    testing$assertFalse(s.contains(toBytes("z")));
+
+    // 重复 add 返回 false，不改变数量
+    testing$assertFalse(s.add(toBytes("a")));
+    testing$assertTrue(s.card() == 3);
+}
+
+// ===== SREM =====
+
+@Test
+func testSetRemove() {
+    var s = newSet();
+    s.add(toBytes("a"));
+    s.add(toBytes("b"));
+    s.add(toBytes("c"));
+
+    testing$assertTrue(s.remove(toBytes("b")));
+    testing$assertTrue(s.card() == 2);
+    testing$assertFalse(s.contains(toBytes("b")));
+    testing$assertFalse(s.remove(toBytes("b")));   // 已删
+    testing$assertTrue(s.contains(toBytes("a")));
+    testing$assertTrue(s.contains(toBytes("c")));
+}
+
+// ===== SMEMBERS =====
+
+@Test
+func testSetMembers() {
+    var s = newSet();
+    var n = 100;
+    for (var i = 0; i < n; i += 1) {
+        s.add(mkByte(i));
+    }
+    // 重复 add 不增加
+    s.add(mkByte(0));
+    s.add(mkByte(99));
+    testing$assertTrue(s.card() == n);
+
+    var mem = s.members();
+    testing$assertTrue(mem.length() == n);
+
+    // 每个 member 都在集合中，且内容唯一（用 Dict 判重）。
+    // 直接用 h 判重逻辑：逐项 contains 且不同项内容互异。
+    for (var j = 0; j < n; j += 1) {
+        var m = deref(mem.index(j));
+        testing$assertTrue(s.contains(m));
+    }
+
+    // 内容唯一性：两两比较，无重复。
+    var dup = false;
+    for (var j = 0; j < n; j += 1) {
+        var mj = deref(mem.index(j));
+        for (var k = j + 1; k < n; k += 1) {
+            if (bytesEqual(mj, deref(mem.index(k)))) { dup = true; }
+        }
+    }
+    testing$assertFalse(dup);
+}
+
+// ===== 随机一致性：add / remove 与镜像一致 =====
+
+@Test
+func testSetRandomConsistency() {
+    var s = newSet();
+    var n = 200;
+    var present = new([n]bool);
+    var count = 0;
+
+    for (var k = 0; k < 2000; k += 1) {
+        var i = rand$intn(n);
+        var op = rand$intn(2);
+        if (op == 0) {
+            // SADD
+            var added = s.add(mkByte(i));
+            if (present[i]) {
+                testing$assertFalse(added);
+            } else {
+                testing$assertTrue(added);
+                present[i] = true;
+                count += 1;
+            }
+        } else {
+            // SREM
+            var removed = s.remove(mkByte(i));
+            if (present[i]) {
+                testing$assertTrue(removed);
+                present[i] = false;
+                count -= 1;
+            } else {
+                testing$assertFalse(removed);
+            }
+        }
+    }
+
+    testing$assertTrue(s.card() == count);
+
+    // 全量反查
+    for (var i = 0; i < n; i += 1) {
+        testing$assertTrue(s.contains(mkByte(i)) == present[i]);
+    }
+}

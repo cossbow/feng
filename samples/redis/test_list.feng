@@ -1,0 +1,157 @@
+import std$testing;
+
+// 将字符串字面量（[*#]byte）复制为可变 [*]byte。
+// 注意：test_string.feng 已定义同名 mkBytes，此处用 toBytes 避免重复符号。
+func toBytes(s [*#]byte) [*]byte {
+    var r = new([s.length]byte);
+    for (var i = 0; i < s.length; i += 1) {
+        r[i] = s[i];
+    }
+    return r;
+}
+
+// 将可空 [*?]byte 解包为非空 [*]byte（测试用，nil 则抛异常）。
+func deref(b [*?]byte) [*]byte {
+    if (b == nil) { throw new(NilException); }
+    return b;
+}
+
+// ===== 双端 push/pop =====
+
+@Test
+func testListPushPop() {
+    var l = newList();
+    l.rpush(toBytes("a"));
+    l.rpush(toBytes("b"));
+    l.rpush(toBytes("c"));
+    testing$assertTrue(l.length() == 3);
+    // FIFO：rpush + lpop
+    testing$assertTrue(bytesEqual(deref(l.lpop()), toBytes("a")));
+    testing$assertTrue(bytesEqual(deref(l.rpop()), toBytes("c")));
+    testing$assertTrue(bytesEqual(deref(l.lpop()), toBytes("b")));
+    testing$assertTrue(l.isEmpty());
+}
+
+@Test
+func testListPushFront() {
+    var l = newList();
+    l.lpush(toBytes("a"));
+    l.lpush(toBytes("b"));
+    l.lpush(toBytes("c"));
+    // lpush 后头部是最后 push 的
+    testing$assertTrue(bytesEqual(deref(l.lpop()), toBytes("c")));
+    testing$assertTrue(bytesEqual(deref(l.rpop()), toBytes("a")));
+    testing$assertTrue(bytesEqual(deref(l.lpop()), toBytes("b")));
+}
+
+@Test
+func testListPopEmpty() {
+    var l = newList();
+    testing$assertTrue(l.lpop() == nil);
+    testing$assertTrue(l.rpop() == nil);
+}
+
+// ===== 按索引读写 =====
+
+@Test
+func testListIndex() {
+    var l = newList();
+    l.rpush(toBytes("a"));
+    l.rpush(toBytes("b"));
+    l.rpush(toBytes("c"));
+    testing$assertTrue(bytesEqual(deref(l.index(0)), toBytes("a")));
+    testing$assertTrue(bytesEqual(deref(l.index(2)), toBytes("c")));
+    // 负索引
+    testing$assertTrue(bytesEqual(deref(l.index(-1)), toBytes("c")));
+    testing$assertTrue(bytesEqual(deref(l.index(-3)), toBytes("a")));
+    // 越界返回 nil
+    testing$assertTrue(l.index(3) == nil);
+    testing$assertTrue(l.index(-4) == nil);
+}
+
+@Test
+func testListSet() {
+    var l = newList();
+    l.rpush(toBytes("a"));
+    l.rpush(toBytes("b"));
+    l.rpush(toBytes("c"));
+    l.set(1, toBytes("x"));
+    testing$assertTrue(bytesEqual(deref(l.index(1)), toBytes("x")));
+    l.set(-1, toBytes("z"));
+    testing$assertTrue(bytesEqual(deref(l.index(2)), toBytes("z")));
+    // 其它元素不变
+    testing$assertTrue(bytesEqual(deref(l.index(0)), toBytes("a")));
+}
+
+// ===== 区间截取 =====
+
+@Test
+func testListRange() {
+    var l = newList();
+    l.rpush(toBytes("a"));
+    l.rpush(toBytes("b"));
+    l.rpush(toBytes("c"));
+    l.rpush(toBytes("d"));
+    l.rpush(toBytes("e"));
+
+    var r1 = l.range(0, 2);
+    testing$assertTrue(r1.length() == 3);
+    testing$assertTrue(bytesEqual(deref(r1.index(0)), toBytes("a")));
+    testing$assertTrue(bytesEqual(deref(r1.index(2)), toBytes("c")));
+
+    // 负索引
+    var r2 = l.range(-2, -1);
+    testing$assertTrue(r2.length() == 2);
+    testing$assertTrue(bytesEqual(deref(r2.index(0)), toBytes("d")));
+    testing$assertTrue(bytesEqual(deref(r2.index(1)), toBytes("e")));
+
+    // 越界钳制
+    var r3 = l.range(-100, 100);
+    testing$assertTrue(r3.length() == 5);
+
+    // start > stop → 空
+    var r4 = l.range(3, 1);
+    testing$assertTrue(r4.length() == 0);
+    testing$assertTrue(r4.isEmpty());
+}
+
+@Test
+func testListTrim() {
+    var l = newList();
+    l.rpush(toBytes("a"));
+    l.rpush(toBytes("b"));
+    l.rpush(toBytes("c"));
+    l.rpush(toBytes("d"));
+    l.rpush(toBytes("e"));
+
+    l.trim(1, 3);   // 保留 b,c,d
+    testing$assertTrue(l.length() == 3);
+    testing$assertTrue(bytesEqual(deref(l.index(0)), toBytes("b")));
+    testing$assertTrue(bytesEqual(deref(l.index(2)), toBytes("d")));
+
+    l.trim(-2, -1); // 在 [b,c,d] 上保留 c,d
+    testing$assertTrue(l.length() == 2);
+    testing$assertTrue(bytesEqual(deref(l.index(0)), toBytes("c")));
+    testing$assertTrue(bytesEqual(deref(l.index(1)), toBytes("d")));
+
+    // start > stop → 清空
+    l.trim(2, 1);
+    testing$assertTrue(l.isEmpty());
+}
+
+// ===== 长度 / 清空 =====
+
+@Test
+func testListLengthClear() {
+    var l = newList();
+    testing$assertTrue(l.isEmpty());
+    l.rpush(toBytes("a"));
+    l.rpush(toBytes("b"));
+    testing$assertTrue(l.length() == 2);
+    l.clear();
+    testing$assertTrue(l.isEmpty());
+    testing$assertTrue(l.length() == 0);
+    // clear 后可继续使用
+    l.rpush(toBytes("c"));
+    testing$assertTrue(l.length() == 1);
+}

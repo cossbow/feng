@@ -1,0 +1,104 @@
+// ===== list.feng — Redis List（基于 std$container 的 Deque）=====
+//
+// 阶段 2：封装 Redis list 语义，元素类型为 [*]byte（字节串）。
+//   - lpush / rpush / lpop / rpop：双端 push/pop（O(1)）；
+//   - index / set：按索引读写，支持负索引（-1 = 尾元素），
+//     index 越界返回 nil，set 越界抛 OutOfBoundsException；
+//   - range / trim：区间截取（含负索引，越界钳制，start > stop 为空）。
+//
+// 底层复用 std$container 的 Deque（环形缓冲区），并为其补充了
+// get/set 随机访问方法。
+
+import std$container c;
+
+export
+class List {
+    var dq *c$Deque`[*]byte`;
+
+    // 负索引归一化：-1 = 尾元素。仅做 i<0 的换算，不做钳制。
+    func norm(i int) int {
+        if (i < 0) { return dq.length() + i; }
+        return i;
+    }
+
+    // ===== 双端 push/pop =====
+
+    export func lpush(e [*]byte) {
+        dq.pushFront(e);
+    }
+
+    export func rpush(e [*]byte) {
+        dq.pushBack(e);
+    }
+
+    export func lpop() [*?]byte {
+        if (dq.isEmpty()) { return nil; }
+        return dq.popFront();
+    }
+
+    export func rpop() [*?]byte {
+        if (dq.isEmpty()) { return nil; }
+        return dq.popBack();
+    }
+
+    // ===== 按索引读写 =====
+
+    export func index(i int) [*?]byte {
+        var n = dq.length();
+        var r = norm(i);
+        if (r < 0 || r >= n) { return nil; }
+        return dq.get(r);
+    }
+
+    export func set(i int, v [*]byte) {
+        var n = dq.length();
+        var r = norm(i);
+        if (r < 0 || r >= n) { throw new(OutOfBoundsException); }
+        dq.set(r, v);
+    }
+
+    // ===== 区间截取 =====
+
+    export func range(start, stop int) *List {
+        var n = dq.length();
+        var s = norm(start);
+        var e = norm(stop);
+        if (s < 0) { s = 0; }
+        if (e >= n) { e = n - 1; }
+        var r = new(List, {dq=c$newDeque`[*]byte`()});
+        if (n == 0 || s > e) { return r; }
+        for (var i = s; i <= e; i += 1) {
+            r.dq.pushBack(dq.get(i));
+        }
+        return r;
+    }
+
+    export func trim(start, stop int) {
+        var n = dq.length();
+        var s = norm(start);
+        var e = norm(stop);
+        if (s < 0) { s = 0; }
+        if (e >= n) { e = n - 1; }
+        if (n == 0 || s > e) { dq.clear(); return; }
+        // 去掉头部 s 个
+        for (var i = 0; i < s; i += 1) {
+            dq.popFront();
+        }
+        // 去掉尾部多余元素，保留 e - s + 1 个
+        var keep = e - s + 1;
+        for (dq.length() > keep) {
+            dq.popBack();
+        }
+    }
+
+    // ===== 属性 =====
+
+    export func length() int { return dq.length(); }
+    export func isEmpty() bool { return dq.isEmpty(); }
+    export func clear() { dq.clear(); }
+}
+
+export
+func newList() *List {
+    return new(List, {dq=c$newDeque`[*]byte`()});
+}

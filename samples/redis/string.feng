@@ -1,0 +1,73 @@
+// ===== string.feng — byte 基础（String 类型的依赖）=====
+//
+// 阶段 1：byte-slice 的 hash/equal 辅助与基本操作。
+// String 类型本体直接使用 [*]byte（可空 [*?]byte），不额外封装类。
+//
+// 参数类型分两层：
+//   - hashBytes / bytesEqual 用 [*]byte：与 Dict`[*]byte, V` 的
+//     hash func([*]byte) int / equal func([*]byte, [*]byte) bool 精确匹配；
+//   - length / substr 用 [&#]byte（只读视图）：可接受
+//     [*]byte、[*#]byte（字符串字面量）、[&]byte 等任意字节数组。
+
+const fnvOffsetBasis uint64 = 0xcbf29ce484222325;
+const fnvPrime      uint64 = 0x100000001b3;
+
+// FNV-1a 64-bit，结果截断为 int，供 Dict`[*]byte, V` 作 hash。
+export
+func hashBytes(data [*]byte) int {
+    var h = fnvOffsetBasis;
+    for (var i = 0; i < data.length; i += 1) {
+        h = h ~ uint64(data[i]);
+        h = h * fnvPrime;
+    }
+    return int(h);
+}
+
+// 字节数组逐字节相等比较。
+export
+func bytesEqual(a, b [*]byte) bool {
+    if (a.length != b.length) { return false; }
+    for (var i = 0; i < a.length; i += 1) {
+        if (a[i] != b[i]) { return false; }
+    }
+    return true;
+}
+
+// 字节字典序比较（memcmp 语义），供 Skiplist`[*]byte` 作 member 比较。
+// 返回 -1（a<b）/ 0（相等）/ 1（a>b）。
+export
+func bytesCmp(a, b [*]byte) int {
+    var n = a.length;
+    if (b.length < n) { n = b.length; }
+    for (var i = 0; i < n; i += 1) {
+        if (a[i] < b[i]) { return -1; }
+        if (a[i] > b[i]) { return 1; }
+    }
+    if (a.length < b.length) { return -1; }
+    if (a.length > b.length) { return 1; }
+    return 0;
+}
+
+// 字节数。
+export
+func length(data [&#]byte) int {
+    return data.length;
+}
+
+// 按字节区间 [start, end) 切片，返回新的可变字节数组。
+// 越界自动钳制到 [0, data.length]。
+export
+func substr(data [&#]byte, start, end int) [*]byte {
+    var n = data.length;
+    var s = start;
+    var e = end;
+    if (s < 0) { s = 0; }
+    if (s > n) { s = n; }
+    if (e < s) { e = s; }
+    if (e > n) { e = n; }
+    var r = new([e - s]byte);
+    for (var i = 0; i < e - s; i += 1) {
+        r[i] = data[s + i];
+    }
+    return r;
+}

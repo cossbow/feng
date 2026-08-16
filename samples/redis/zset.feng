@@ -1,0 +1,234 @@
+// ===== zset.feng — Redis ZSet（sorted set，sort 表）=====
+//
+// 阶段 5：双索引结构，两者始终保持一致：
+//   - dict（Dict`*ZMember, float64`）：member → score，O(1) 查分/判存在/ZINCRBY；
+//   - sl（Skiplist`*ZMember`）：按 (score, member) 有序 + span，O(log n)
+//     范围查询 / rank / 有序遍历。
+//
+// member 的「身份」是字节内容：dict 的 hash/equal、跳表的 cmp 都按
+// ZMember.data 的内容比较，因此不同实例、相同内容的 member 视为同一元素。
+//
+// 说明：member 不能直接用 [*]byte 作 Skiplist 的泛型实参——编译后端对
+// 「泛型零值 var zero M」在 M=[*]byte（变长数组，C 侧为结构体）时错误地
+// 生成 `= NULL` 而无法编译。故用包装类 *ZMember（指针，零值 = NULL 合法）
+// 规避，语义不变。
+
+// 成员包装：持有字节内容（const，内容即身份）。
+class ZMember final {
+    const data [*]byte;
+}
+
+// ===== member 的 hash / equal / cmp（内容语义） =====
+
+func zmemberHash(m *ZMember) int {
+    return hashBytes(m.data);
+}
+
+func zmemberEqual(a, b *ZMember) bool {
+    return bytesEqual(a.data, b.data);
+}
+
+func zmemberCmp(a, b *ZMember) int {
+    return bytesCmp(a.data, b.data);
+}
+
+export
+class ZSet {
+    var dict *Dict`*ZMember, float64`;
+    var sl *Skiplist`*ZMember`;
+
+    // 将外部传入的字节串包装为成员（内容即身份）。
+    func wrap(member [*]byte) *ZMember {
+        return new(ZMember, {data=member});
+    }
+
+    // ===== 增删 =====
+
+    // ZADD：新增元素返回 true；已存在（改分或分数不变）返回 false。
+    // score 变更时：先从跳表删旧节点，再插新节点，最后写回 dict。
+    export
+    func add(member [*]byte, score float64) bool {
+        var key = wrap(member);
+        var g = dict.get(key);
+        if (g.ok) {
+            if (g.v == score) { return false; }
+            sl.remove(g.v, key);
+            sl.insert(score, key);
+            dict.set(key, score);
+            return false;
+        }
+        dict.set(key, score);
+        sl.insert(score, key);
+        return true;
+    }
+
+    // ZREM：删除并返回是否删除成功。
+    export
+    func remove(member [*]byte) bool {
+        var key = wrap(member);
+        var g = dict.get(key);
+        if (!g.ok) { return false; }
+        sl.remove(g.v, key);
+        dict.remove(key);
+        return true;
+    }
+
+    // ===== 查询 =====
+
+    // ZSCORE：返回 member 的 score，不存在 ok=false。
+    export
+    func score(member [*]byte) (float64, bool) {
+        var key = wrap(member);
+        var g = dict.get(key);
+        if (!g.ok) { return (0.0, false); }
+        return (g.v, true);
+    }
+
+    // ZCARD：元素数量。
+    export func card() int { return dict.size(); }
+    export func size() int { return dict.size(); }
+    export func isEmpty() bool { return dict.isEmpty(); }
+
+    // ZINCRBY：把 member 的 score 加 delta，返回新 score（不存在视为 0）。
+    export
+    func incrBy(member [*]byte, delta float64) float64 {
+        var key = wrap(member);
+        var g = dict.get(key);
+        var old float64 = 0.0;
+        if (g.ok) {
+            old = g.v;
+            sl.remove(old, key);
+        }
+        var ns = old + delta;
+        sl.insert(ns, key);
+        dict.set(key, ns);
+        return ns;
+    }
+
+    // ZRANK：0-based 升序名次，不存在返回 -1。
+    export
+    func rank(member [*]byte) int {
+        var key = wrap(member);
+        var g = dict.get(key);
+        if (!g.ok) { return -1; }
+        var r = sl.rank(g.v, key);
+        if (r == 0) { return -1; }
+        return r - 1;
+    }
+
+    // ZREVRANK：0-based 降序名次（0 = 最高分），不存在返回 -1。
+    export
+    func revRank(member [*]byte) int {
+        var key = wrap(member);
+        var g = dict.get(key);
+        if (!g.ok) { return -1; }
+        var r = sl.rank(g.v, key);
+        if (r == 0) { return -1; }
+        return card() - r;
+    }
+
+    // ===== 有序遍历 =====
+
+    // 负索引归一化（-1 = 尾）。
+    func norm(i, n int) int {
+        if (i < 0) { return n + i; }
+        return i;
+    }
+
+    // ZRANGE by rank（升序），0-based 闭区间 [start, stop]，支持负索引。
+    export
+    func rangeByRank(start, stop int) *List {
+        var n = card();
+        var r = newList();
+        if (n == 0) { return r; }
+        var s = norm(start, n);
+        var e = norm(stop, n);
+        if (s < 0) { s = 0; }
+        if (e >= n) { e = n - 1; }
+        if (s > e) { return r; }
+        for (var i = s; i <= e; i += 1) {
+            var g = sl.getByRank(i + 1);
+            if (g.2) { r.rpush(g.0.data); }
+        }
+        return r;
+    }
+
+    // ZREVRANGE by rank（降序），start/stop 为降序名次（0 = 最高分）。
+    export
+    func revRangeByRank(start, stop int) *List {
+        var n = card();
+        var r = newList();
+        if (n == 0) { return r; }
+        var s = norm(start, n);
+        var e = norm(stop, n);
+        if (s < 0) { s = 0; }
+        if (e >= n) { e = n - 1; }
+        if (s > e) { return r; }
+        for (var i = s; i <= e; i += 1) {
+            var g = sl.getByRank(n - i);
+            if (g.2) { r.rpush(g.0.data); }
+        }
+        return r;
+    }
+
+    // ZRANGEBYSCORE（升序），score 闭区间 [min, max]。
+    export
+    func rangeByScore(min, max float64) *List {
+        var r = newList();
+        var f = sl.firstInRange(min, max);
+        if (!f.2) { return r; }
+        var fr = sl.rank(f.1, f.0);
+        if (fr == 0) { return r; }
+        for (var i = fr; i <= sl.size(); i += 1) {
+            var g = sl.getByRank(i);
+            if (!g.2) { break; }
+            if (g.1 > max) { break; }
+            r.rpush(g.0.data);
+        }
+        return r;
+    }
+
+    // ZREVRANGEBYSCORE（降序），score 闭区间 [min, max]。
+    export
+    func revRangeByScore(min, max float64) *List {
+        var r = newList();
+        var l = sl.lastInRange(min, max);
+        if (!l.2) { return r; }
+        var lr = sl.rank(l.1, l.0);
+        if (lr == 0) { return r; }
+        for (var i = lr; i >= 1; i -= 1) {
+            var g = sl.getByRank(i);
+            if (!g.2) { break; }
+            if (g.1 < min) { break; }
+            r.rpush(g.0.data);
+        }
+        return r;
+    }
+
+    // ZCOUNT：score 落在闭区间 [min, max] 的元素数。
+    export
+    func count(min, max float64) int {
+        var f = sl.firstInRange(min, max);
+        if (!f.2) { return 0; }
+        var l = sl.lastInRange(min, max);
+        if (!l.2) { return 0; }
+        var fr = sl.rank(f.1, f.0);
+        var lr = sl.rank(l.1, l.0);
+        return lr - fr + 1;
+    }
+
+    export func clear() {
+        dict.clear();
+        sl.clear();
+    }
+}
+
+// ===== 工厂函数 =====
+
+export
+func newZSet() *ZSet {
+    return new(ZSet, {
+        dict=newDict`*ZMember,float64`(zmemberHash, zmemberEqual),
+        sl=newSkiplist`*ZMember`(zmemberCmp),
+    });
+}

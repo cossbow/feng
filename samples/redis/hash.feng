@@ -1,0 +1,64 @@
+// ===== hash.feng — Redis Hash（field→value 映射）=====
+//
+// 阶段 6：基于 Dict`[*]byte, [*]byte` 封装 Redis hash 语义：
+//   - field 与 value 均为 [*]byte（字节串），身份是「内容」；
+//   - 复用 string.feng 的 hashBytes / bytesEqual 作 hash/equal；
+//   - 命令映射：set(HSET) / get(HGET) / del(HDEL) / len(HLEN) /
+//     exists(HEXISTS) / all(HGETALL，返回 field1,value1,field2,value2,...)。
+
+export
+class Hash {
+    var dict *Dict`[*]byte, [*]byte`;
+
+    // HSET：新增 field 返回 true，覆盖已有 field 返回 false（值已更新）。
+    export
+    func set(field, value [*]byte) bool {
+        return dict.set(field, value).ok;
+    }
+
+    // HGET：返回 field 的值，不存在返回 nil。
+    export
+    func get(field [*]byte) [*?]byte {
+        var g = dict.get(field);
+        if (!g.ok) { return nil; }
+        return g.v;
+    }
+
+    // HDEL：删除 field，返回是否删除成功。
+    export
+    func del(field [*]byte) bool {
+        return dict.remove(field).ok;
+    }
+
+    // HLEN：field 数量。
+    export
+    func len() int { return dict.size(); }
+
+    // HEXISTS：field 是否存在。
+    export
+    func exists(field [*]byte) bool {
+        return dict.get(field).ok;
+    }
+
+    // HGETALL：返回所有 field/value 交错的 List（顺序不保证）。
+    export
+    func all() *List {
+        var r = newList();
+        var it = dict.iterator();
+        for (it.hasNext()) {
+            r.rpush(it.key());
+            r.rpush(it.value());
+            it.next();
+        }
+        return r;
+    }
+
+    export func size() int { return dict.size(); }
+    export func isEmpty() bool { return dict.isEmpty(); }
+    export func clear() { dict.clear(); }
+}
+
+export
+func newHash() *Hash {
+    return new(Hash, {dict=newDict`[*]byte,[*]byte`(hashBytes, bytesEqual)});
+}

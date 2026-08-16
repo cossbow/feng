@@ -1,0 +1,146 @@
+import std$testing;
+
+// ===== int key 的 hash/equal（hash 直接作用于 key） =====
+
+func intHash(k int) int {
+    return k;
+}
+func intEq(a, b int) bool {
+    return a == b;
+}
+
+// ===== 基本 set/get/remove =====
+
+@Test
+func testDictBasic() {
+    var d = newDict`int,int`(intHash, intEq);
+    testing$assertTrue(d.isEmpty());
+
+    var r1 = d.set(1, 10);
+    testing$assertTrue(r1.ok);          // 新增
+    var r2 = d.set(2, 20);
+    testing$assertTrue(r2.ok);
+    var r3 = d.set(1, 11);
+    testing$assertFalse(r3.ok);         // 覆盖已有
+    testing$assertTrue(r3.v == 10);     // 返回旧值
+
+    testing$assertTrue(d.size() == 2);
+
+    var g = d.get(1);
+    testing$assertTrue(g.ok && g.v == 11);
+    var g2 = d.get(2);
+    testing$assertTrue(g2.ok && g2.v == 20);
+    var g3 = d.get(99);
+    testing$assertFalse(g3.ok);
+
+    var rm = d.remove(1);
+    testing$assertTrue(rm.ok && rm.v == 11);
+    testing$assertTrue(d.size() == 1);
+    var rm2 = d.remove(1);
+    testing$assertFalse(rm2.ok);
+    testing$assertFalse(d.get(1).ok);
+}
+
+// ===== 扩容：超过 0.75 负载触发，且渐进 rehash 后数据完整 =====
+
+@Test
+func testDictGrow() {
+    var d = newDict`int,int`(intHash, intEq);
+    var n = 1000;
+    for (var i = 0; i < n; i += 1) {
+        d.set(i, i * 10);
+    }
+    testing$assertTrue(d.size() == n);
+    for (var i = 0; i < n; i += 1) {
+        var g = d.get(i);
+        testing$assertTrue(g.ok && g.v == i * 10);
+    }
+    // 覆盖写，验证 rehash 期间的查找正确
+    d.set(500, -1);
+    testing$assertTrue(d.get(500).v == -1);
+}
+
+// ===== 缩容：删除到 < 0.25 负载时桶数减半（但不低于下限） =====
+
+@Test
+func testDictShrink() {
+    var d = newDict`int,int`(intHash, intEq);
+    var n = 1000;
+    for (var i = 0; i < n; i += 1) {
+        d.set(i, i);
+    }
+    // 删除到只剩 1 个元素，触发多次缩容
+    for (var i = 0; i < n - 1; i += 1) {
+        var r = d.remove(i);
+        testing$assertTrue(r.ok);
+    }
+    testing$assertTrue(d.size() == 1);
+    // 剩余元素仍可访问
+    testing$assertTrue(d.get(n - 1).ok && d.get(n - 1).v == n - 1);
+    // 再插入少量元素，验证缩容后的表正常工作
+    d.set(1, 100);
+    d.set(2, 200);
+    testing$assertTrue(d.get(1).v == 100);
+    testing$assertTrue(d.get(2).v == 200);
+    testing$assertTrue(d.size() == 3);
+}
+
+// ===== 迭代器：遍历全部元素（含 rehash 双表场景） =====
+
+@Test
+func testDictIterator() {
+    var d = newDict`int,int`(intHash, intEq);
+    var n = 500;
+    for (var i = 0; i < n; i += 1) {
+        d.set(i, i + 1);
+    }
+    var count = 0;
+    var sum = 0;
+    var it = d.iterator();
+    for (it.hasNext()) {
+        count += 1;
+        sum += it.key();
+        it.next();
+    }
+    testing$assertTrue(count == n);
+    testing$assertTrue(sum == n * (n - 1) / 2);
+}
+
+// ===== clear =====
+
+@Test
+func testDictClear() {
+    var d = newDict`int,int`(intHash, intEq);
+    d.set(1, 1);
+    d.set(2, 2);
+    d.clear();
+    testing$assertTrue(d.isEmpty());
+    testing$assertFalse(d.get(1).ok);
+    d.set(3, 3);
+    testing$assertTrue(d.get(3).ok && d.get(3).v == 3);
+}
+
+// ===== 哈希冲突（相同 hash 值不同 key） =====
+
+func sameHash(k int) int {
+    return 42;   // 所有 key 落到同一桶，验证链式处理
+}
+
+@Test
+func testDictCollision() {
+    var d = newDict`int,int`(sameHash, intEq);
+    var n = 100;
+    for (var i = 0; i < n; i += 1) {
+        d.set(i, i);
+    }
+    testing$assertTrue(d.size() == n);
+    for (var i = 0; i < n; i += 1) {
+        testing$assertTrue(d.get(i).v == i);
+    }
+    d.remove(50);
+    testing$assertFalse(d.get(50).ok);
+    testing$assertTrue(d.size() == n - 1);
+    for (var i = 0; i < n; i += 1) {
+        if (i != 50) { testing$assertTrue(d.get(i).v == i); }
+    }
+}

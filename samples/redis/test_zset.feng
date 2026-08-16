@@ -1,0 +1,270 @@
+import std$testing;
+import std$rand;
+
+// 复用 test_list.feng 中的 toBytes / deref（同模块全局可见）。
+// 复用 string.feng 中的 bytesEqual / bytesCmp。
+
+// 单字节 member（值 0..255），保证内容唯一，用于随机一致性测试。
+func mkByte(v int) [*]byte {
+    var r = new([1]byte);
+    r[0] = byte(v & 0xff);
+    return r;
+}
+
+// ===== ZADD / ZSCORE / ZCARD =====
+
+@Test
+func testZsetAddScoreCard() {
+    var z = newZSet();
+    testing$assertTrue(z.isEmpty());
+
+    testing$assertTrue(z.add(toBytes("a"), 1.0));
+    testing$assertTrue(z.add(toBytes("b"), 2.0));
+    testing$assertTrue(z.add(toBytes("c"), 3.0));
+    testing$assertTrue(z.card() == 3);
+    testing$assertFalse(z.isEmpty());
+
+    var s = z.score(toBytes("b"));
+    testing$assertTrue(s.1 && s.0 == 2.0);
+    var s2 = z.score(toBytes("zz"));
+    testing$assertFalse(s2.1);
+
+    // 已存在：改分返回 false，分数更新
+    testing$assertFalse(z.add(toBytes("a"), 10.0));
+    testing$assertTrue(z.score(toBytes("a")).0 == 10.0);
+    testing$assertTrue(z.card() == 3);
+
+    // 已存在：分数不变也返回 false
+    testing$assertFalse(z.add(toBytes("a"), 10.0));
+    testing$assertTrue(z.card() == 3);
+}
+
+// ===== ZREM =====
+
+@Test
+func testZsetRemove() {
+    var z = newZSet();
+    z.add(toBytes("a"), 1.0);
+    z.add(toBytes("b"), 2.0);
+    z.add(toBytes("c"), 3.0);
+
+    testing$assertTrue(z.remove(toBytes("b")));
+    testing$assertTrue(z.card() == 2);
+    testing$assertFalse(z.score(toBytes("b")).1);
+    testing$assertFalse(z.remove(toBytes("b")));  // 已删
+    testing$assertTrue(z.score(toBytes("a")).1);
+    testing$assertTrue(z.score(toBytes("c")).1);
+}
+
+// ===== ZINCRBY =====
+
+@Test
+func testZsetIncrBy() {
+    var z = newZSet();
+    z.add(toBytes("a"), 1.0);
+    z.add(toBytes("b"), 2.0);
+
+    var n1 = z.incrBy(toBytes("a"), 2.5);
+    testing$assertTrue(n1 == 3.5);
+    testing$assertTrue(z.score(toBytes("a")).0 == 3.5);
+
+    // 不存在视为 0
+    var n2 = z.incrBy(toBytes("new"), float64(-1));
+    testing$assertTrue(n2 == float64(-1));
+    testing$assertTrue(z.card() == 3);
+
+    // 加分后顺序变化：new(-1.0) < b(2.0) < a(3.5)
+    testing$assertTrue(z.rank(toBytes("new")) == 0);
+    testing$assertTrue(z.rank(toBytes("b")) == 1);
+    testing$assertTrue(z.rank(toBytes("a")) == 2);
+}
+
+// ===== ZRANK / ZREVRANK =====
+
+@Test
+func testZsetRank() {
+    var z = newZSet();
+    z.add(toBytes("a"), 1.0);
+    z.add(toBytes("b"), 3.0);
+    z.add(toBytes("c"), 2.0);
+
+    // 升序：a(1.0), c(2.0), b(3.0)
+    testing$assertTrue(z.rank(toBytes("a")) == 0);
+    testing$assertTrue(z.rank(toBytes("c")) == 1);
+    testing$assertTrue(z.rank(toBytes("b")) == 2);
+    testing$assertTrue(z.rank(toBytes("zz")) == -1);
+
+    testing$assertTrue(z.revRank(toBytes("a")) == 2);
+    testing$assertTrue(z.revRank(toBytes("c")) == 1);
+    testing$assertTrue(z.revRank(toBytes("b")) == 0);
+    testing$assertTrue(z.revRank(toBytes("zz")) == -1);
+}
+
+// ===== ZRANGE / ZREVRANGE by rank =====
+
+@Test
+func testZsetRangeByRank() {
+    var z = newZSet();
+    z.add(toBytes("a"), 1.0);
+    z.add(toBytes("b"), 2.0);
+    z.add(toBytes("c"), 3.0);
+    z.add(toBytes("d"), 4.0);
+    z.add(toBytes("e"), 5.0);
+
+    var r1 = z.rangeByRank(0, 2);
+    testing$assertTrue(r1.length() == 3);
+    testing$assertTrue(bytesEqual(deref(r1.index(0)), toBytes("a")));
+    testing$assertTrue(bytesEqual(deref(r1.index(2)), toBytes("c")));
+
+    // 负索引
+    var r2 = z.rangeByRank(-2, -1);
+    testing$assertTrue(r2.length() == 2);
+    testing$assertTrue(bytesEqual(deref(r2.index(0)), toBytes("d")));
+    testing$assertTrue(bytesEqual(deref(r2.index(1)), toBytes("e")));
+
+    // 越界钳制
+    var r3 = z.rangeByRank(-100, 100);
+    testing$assertTrue(r3.length() == 5);
+
+    // start > stop → 空
+    testing$assertTrue(z.rangeByRank(3, 1).length() == 0);
+
+    // 降序
+    var r4 = z.revRangeByRank(0, 2);
+    testing$assertTrue(r4.length() == 3);
+    testing$assertTrue(bytesEqual(deref(r4.index(0)), toBytes("e")));
+    testing$assertTrue(bytesEqual(deref(r4.index(1)), toBytes("d")));
+    testing$assertTrue(bytesEqual(deref(r4.index(2)), toBytes("c")));
+}
+
+// ===== ZRANGEBYSCORE / ZCOUNT =====
+
+@Test
+func testZsetRangeByScore() {
+    var z = newZSet();
+    z.add(toBytes("a"), 1.0);
+    z.add(toBytes("b"), 3.0);
+    z.add(toBytes("c"), 5.0);
+    z.add(toBytes("d"), 7.0);
+
+    var r = z.rangeByScore(3.0, 6.0);
+    testing$assertTrue(r.length() == 2);
+    testing$assertTrue(bytesEqual(deref(r.index(0)), toBytes("b")));
+    testing$assertTrue(bytesEqual(deref(r.index(1)), toBytes("c")));
+
+    var rr = z.revRangeByScore(3.0, 6.0);
+    testing$assertTrue(rr.length() == 2);
+    testing$assertTrue(bytesEqual(deref(rr.index(0)), toBytes("c")));
+    testing$assertTrue(bytesEqual(deref(rr.index(1)), toBytes("b")));
+
+    testing$assertTrue(z.count(3.0, 6.0) == 2);
+    testing$assertTrue(z.count(0.0, 100.0) == 4);
+    testing$assertTrue(z.count(8.0, 9.0) == 0);
+}
+
+// ===== 同 score 按 member 字典序 =====
+
+@Test
+func testZsetSameScoreOrder() {
+    var z = newZSet();
+    z.add(toBytes("c"), 5.0);
+    z.add(toBytes("a"), 5.0);
+    z.add(toBytes("b"), 5.0);
+    testing$assertTrue(z.card() == 3);
+
+    var r = z.rangeByRank(0, -1);
+    testing$assertTrue(r.length() == 3);
+    testing$assertTrue(bytesEqual(deref(r.index(0)), toBytes("a")));
+    testing$assertTrue(bytesEqual(deref(r.index(1)), toBytes("b")));
+    testing$assertTrue(bytesEqual(deref(r.index(2)), toBytes("c")));
+
+    // 同 score 的 rank 也按字典序
+    testing$assertTrue(z.rank(toBytes("a")) == 0);
+    testing$assertTrue(z.rank(toBytes("b")) == 1);
+    testing$assertTrue(z.rank(toBytes("c")) == 2);
+}
+
+// ===== 随机一致性：Dict 与跳表一致 =====
+
+@Test
+func testZsetRandomConsistency() {
+    var z = newZSet();
+    var n = 200;
+    var scores = new([n]float64);
+    var present = new([n]bool);
+    var count = 0;
+
+    // 随机 ZADD / ZREM / ZINCRBY，维护镜像 scores/present。
+    for (var k = 0; k < 2000; k += 1) {
+        var i = rand$intn(n);
+        var op = rand$intn(3);
+        if (op == 0) {
+            // ZADD：不存在则新增，存在则改分
+            var s = float64(rand$intn(20));
+            var added = z.add(mkByte(i), s);
+            if (present[i]) {
+                testing$assertFalse(added);
+                scores[i] = s;
+            } else {
+                testing$assertTrue(added);
+                present[i] = true;
+                scores[i] = s;
+                count += 1;
+            }
+        } else if (op == 1) {
+            // ZREM
+            var removed = z.remove(mkByte(i));
+            if (present[i]) {
+                testing$assertTrue(removed);
+                present[i] = false;
+                count -= 1;
+            } else {
+                testing$assertFalse(removed);
+            }
+        } else {
+            // ZINCRBY：delta ∈ [-2, 2]
+            var d = float64(rand$intn(5) - 2);
+            var ns = z.incrBy(mkByte(i), d);
+            if (present[i]) {
+                scores[i] = scores[i] + d;
+            } else {
+                present[i] = true;
+                scores[i] = d;
+                count += 1;
+            }
+            testing$assertTrue(ns == scores[i]);
+        }
+    }
+
+    // 校验 1：元素数一致
+    testing$assertTrue(z.card() == count);
+
+    // 校验 2：每个 member 的 score 与镜像一致
+    for (var i = 0; i < n; i += 1) {
+        var g = z.score(mkByte(i));
+        if (present[i]) {
+            testing$assertTrue(g.1 && g.0 == scores[i]);
+        } else {
+            testing$assertFalse(g.1);
+        }
+    }
+
+    // 校验 3：有序遍历 (score, member) 非降序、元素数一致、rank 正确
+    var r = z.rangeByRank(0, -1);
+    testing$assertTrue(r.length() == count);
+    var prevScore float64 = float64(-1);
+    var prevMember = new([0]byte);
+    for (var j = 0; j < count; j += 1) {
+        var m = deref(r.index(j));
+        var sc = z.score(m);
+        testing$assertTrue(sc.1);
+        if (j > 0) {
+            var inOrder = prevScore < sc.0
+                || (prevScore == sc.0 && bytesCmp(prevMember, m) <= 0);
+            testing$assertTrue(inOrder);
+        }
+        testing$assertTrue(z.rank(m) == j);
+        prevScore = sc.0;
+        prevMember = m;
+    }
+}

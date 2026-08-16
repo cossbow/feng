@@ -1,0 +1,55 @@
+// ===== set.feng — Redis Set（无序去重集合）=====
+//
+// 阶段 6：基于 Dict`[*]byte, bool` 封装 Redis set 语义：
+//   - member 为 [*]byte（字节串），身份是「内容」，value 用 bool 占位；
+//   - 复用 string.feng 的 hashBytes / bytesEqual 作 hash/equal；
+//   - 命令映射：add(SADD) / remove(SREM) / contains(SISMEMBER) /
+//     card(SCARD) / members(SMEMBERS)。
+
+export
+class Set {
+    var dict *Dict`[*]byte, bool`;
+
+    // SADD：新增 member 返回 true，已存在返回 false。
+    export
+    func add(member [*]byte) bool {
+        return dict.set(member, true).ok;
+    }
+
+    // SREM：删除 member，返回是否删除成功。
+    export
+    func remove(member [*]byte) bool {
+        return dict.remove(member).ok;
+    }
+
+    // SISMEMBER：member 是否存在。
+    export
+    func contains(member [*]byte) bool {
+        return dict.get(member).ok;
+    }
+
+    // SCARD：成员数量。
+    export
+    func card() int { return dict.size(); }
+
+    // SMEMBERS：返回所有 member 的 List（顺序不保证）。
+    export
+    func members() *List {
+        var r = newList();
+        var it = dict.iterator();
+        for (it.hasNext()) {
+            r.rpush(it.key());
+            it.next();
+        }
+        return r;
+    }
+
+    export func size() int { return dict.size(); }
+    export func isEmpty() bool { return dict.isEmpty(); }
+    export func clear() { dict.clear(); }
+}
+
+export
+func newSet() *Set {
+    return new(Set, {dict=newDict`[*]byte,bool`(hashBytes, bytesEqual)});
+}

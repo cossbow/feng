@@ -1,0 +1,277 @@
+// ===== skiplist.feng — 带 span 的顺序统计跳表（zset 有序层）=====
+//
+// 阶段 4：专为 ZSet 服务的跳表，节点存 (score, member)，排序键先比 score
+// 再比 member（member 比较用外部传入的 cmp）。每条 forward 指针附带 span
+// （跨越的节点数），使 rank / getByRank 达到 O(log n)。
+//
+// 参考 Redis zskiplist 实现：层高按 1/2 概率随机晋升，header 为满层哨兵。
+
+import std$rand;
+
+const skiplistMaxLevel = 32;
+
+export
+class SkipNode`M` {
+    const score float64;
+    const member M;
+    const level int;                // 该节点的层数（forward/span 数组长度）
+    var forward [*]*?SkipNode`M`;   // forward[i]：第 i 层下一节点
+    var span [*]int;                // span[i]：forward[i] 跨越的节点数
+}
+
+export
+class Skiplist`M` {
+    const cmp func(M, M) int;
+    var header *SkipNode`M`;
+    var level int;                  // 当前最高层（1-based，至少 1）
+    var size int;
+
+    // ===== 内部比较 =====
+    // 排序键为 (score, member)：先比 score，相等再比 member。
+
+    func less(scoreA float64, memberA M, scoreB float64, memberB M) bool {
+        if (scoreA < scoreB) { return true; }
+        if (scoreA > scoreB) { return false; }
+        return cmp(memberA, memberB) < 0;
+    }
+
+    func equal(scoreA float64, memberA M, scoreB float64, memberB M) bool {
+        if (scoreA != scoreB) { return false; }
+        return cmp(memberA, memberB) == 0;
+    }
+
+    func lessEqual(scoreA float64, memberA M, scoreB float64, memberB M) bool {
+        if (scoreA < scoreB) { return true; }
+        if (scoreA > scoreB) { return false; }
+        return cmp(memberA, memberB) <= 0;
+    }
+
+    func randomLevel() int {
+        var lvl = 1;
+        for (rand$intn(2) == 0 && lvl < skiplistMaxLevel) {
+            lvl += 1;
+        }
+        return lvl;
+    }
+
+    // update 数组每个元素在搜索后必为 header 或某节点（非 nil），
+    // 但数组元素类型为可空引用，编译器要求使用前判 nil，故集中断言。
+    func updAt(update [*]*?SkipNode`M`, i int) *SkipNode`M` {
+        var u = update[i];
+        if (u == nil) { throw new(NilException); }
+        return u;
+    }
+
+    // ===== 插入 =====
+
+    export
+    func insert(score float64, member M) bool {
+        var update = new([skiplistMaxLevel]*?SkipNode`M`);
+        var rank = new([skiplistMaxLevel]int);
+        var x *?SkipNode`M` = header;
+        for (var i = level - 1; i >= 0; i -= 1) {
+            if (i == level - 1) { rank[i] = 0; }
+            else { rank[i] = rank[i + 1]; }
+            var fwd = x.forward[i];
+            for (fwd != nil && less(fwd.score, fwd.member, score, member)) {
+                rank[i] = rank[i] + x.span[i];
+                x = fwd;
+                fwd = x.forward[i];
+            }
+            update[i] = x;
+        }
+        // 重复元素拒绝（(score, member) 相同）
+        var first = x.forward[0];
+        if (first != nil && equal(first.score, first.member, score, member)) {
+            return false;
+        }
+        var newLevel = randomLevel();
+        if (newLevel > level) {
+            for (var i = level; i < newLevel; i += 1) {
+                rank[i] = 0;
+                update[i] = header;
+                header.span[i] = size;
+            }
+            level = newLevel;
+        }
+        var node = new(SkipNode`M`, {
+            score=score, member=member, level=newLevel,
+            forward=new([newLevel]*?SkipNode`M`),
+            span=new([newLevel]int),
+        });
+        for (var i = 0; i < newLevel; i += 1) {
+            var u = updAt(update, i);
+            node.forward[i] = u.forward[i];
+            u.forward[i] = node;
+            node.span[i] = u.span[i] - (rank[0] - rank[i]);
+            u.span[i] = (rank[0] - rank[i]) + 1;
+        }
+        for (var i = newLevel; i < level; i += 1) {
+            var u = updAt(update, i);
+            u.span[i] = u.span[i] + 1;
+        }
+        size += 1;
+        return true;
+    }
+
+    // ===== 删除 =====
+
+    export
+    func remove(score float64, member M) bool {
+        var update = new([skiplistMaxLevel]*?SkipNode`M`);
+        var x *?SkipNode`M` = header;
+        for (var i = level - 1; i >= 0; i -= 1) {
+            var fwd = x.forward[i];
+            for (fwd != nil && less(fwd.score, fwd.member, score, member)) {
+                x = fwd;
+                fwd = x.forward[i];
+            }
+            update[i] = x;
+        }
+        var target = x.forward[0];
+        if (target == nil || !equal(target.score, target.member, score, member)) {
+            return false;
+        }
+        for (var i = 0; i < level; i += 1) {
+            var u = updAt(update, i);
+            if (u.forward[i] == target) {
+                u.span[i] = u.span[i] + target.span[i] - 1;
+                u.forward[i] = target.forward[i];
+            } else {
+                u.span[i] = u.span[i] - 1;
+            }
+        }
+        for (level > 1 && header.forward[level - 1] == nil) {
+            level -= 1;
+        }
+        size -= 1;
+        return true;
+    }
+
+    // ===== 查询 =====
+
+    export
+    func find(score float64, member M) bool {
+        var x *?SkipNode`M` = header;
+        for (var i = level - 1; i >= 0; i -= 1) {
+            var fwd = x.forward[i];
+            for (fwd != nil && less(fwd.score, fwd.member, score, member)) {
+                x = fwd;
+                fwd = x.forward[i];
+            }
+        }
+        var target = x.forward[0];
+        return target != nil && equal(target.score, target.member, score, member);
+    }
+
+    // 返回 (score, member) 的 1-based rank，不存在返回 0。
+    export
+    func rank(score float64, member M) int {
+        var x *?SkipNode`M` = header;
+        var r = 0;
+        for (var i = level - 1; i >= 0; i -= 1) {
+            var fwd = x.forward[i];
+            for (fwd != nil && lessEqual(fwd.score, fwd.member, score, member)) {
+                r = r + x.span[i];
+                x = fwd;
+                fwd = x.forward[i];
+            }
+            if (x != header && equal(x.score, x.member, score, member)) {
+                return r;
+            }
+        }
+        return 0;
+    }
+
+    // 返回第 r（1-based）个元素，越界 ok=false。
+    export
+    func getByRank(r int) (M, float64, bool) {
+        if (r <= 0 || r > size) {
+            var zero M;
+            return (zero, 0.0, false);
+        }
+        var x *?SkipNode`M` = header;
+        var traversed = 0;
+        for (var i = level - 1; i >= 0; i -= 1) {
+            var fwd = x.forward[i];
+            for (fwd != nil && (traversed + x.span[i]) <= r) {
+                traversed = traversed + x.span[i];
+                x = fwd;
+                fwd = x.forward[i];
+            }
+            if (traversed == r) {
+                return (x.member, x.score, true);
+            }
+        }
+        var zero M;
+        return (zero, 0.0, false);
+    }
+
+    // score 落在闭区间 [min, max] 的第一个元素。
+    export
+    func firstInRange(min, max float64) (M, float64, bool) {
+        var x *?SkipNode`M` = header;
+        for (var i = level - 1; i >= 0; i -= 1) {
+            var fwd = x.forward[i];
+            for (fwd != nil && fwd.score < min) {
+                x = fwd;
+                fwd = x.forward[i];
+            }
+        }
+        var first = x.forward[0];
+        if (first == nil || first.score > max) {
+            var zero M;
+            return (zero, 0.0, false);
+        }
+        return (first.member, first.score, true);
+    }
+
+    // score 落在闭区间 [min, max] 的最后一个元素。
+    export
+    func lastInRange(min, max float64) (M, float64, bool) {
+        var x *?SkipNode`M` = header;
+        for (var i = level - 1; i >= 0; i -= 1) {
+            var fwd = x.forward[i];
+            for (fwd != nil && fwd.score <= max) {
+                x = fwd;
+                fwd = x.forward[i];
+            }
+        }
+        if (x == header || x.score < min) {
+            var zero M;
+            return (zero, 0.0, false);
+        }
+        return (x.member, x.score, true);
+    }
+
+    // ===== 属性 =====
+
+    export func size() int { return size; }
+    export func isEmpty() bool { return size == 0; }
+
+    export
+    func clear() {
+        var zero M;
+        var h = new(SkipNode`M`, {
+            score=0.0, member=zero, level=skiplistMaxLevel,
+            forward=new([skiplistMaxLevel]*?SkipNode`M`),
+            span=new([skiplistMaxLevel]int),
+        });
+        header = h;
+        level = 1;
+        size = 0;
+    }
+}
+
+// ===== 工厂函数 =====
+
+export
+func newSkiplist`M`(cmp func(M, M) int) *Skiplist`M` {
+    var zero M;
+    var header = new(SkipNode`M`, {
+        score=0.0, member=zero, level=skiplistMaxLevel,
+        forward=new([skiplistMaxLevel]*?SkipNode`M`),
+        span=new([skiplistMaxLevel]int),
+    });
+    return new(Skiplist`M`, {cmp=cmp, header=header, level=1, size=0});
+}

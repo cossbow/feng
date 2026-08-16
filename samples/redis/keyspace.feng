@@ -1,0 +1,167 @@
+// ===== keyspace.feng — Redis 顶层 keyspace（统一键值容器）=====
+//
+// 阶段 7：Redis 顶层是 Dict(key → 值)，值需区分类型
+// （String / List / Hash / Set / ZSet）。
+//
+// 设计说明：文档建议「enum + union 或 interface」。Fēng 的 union 字段
+// 只能为整数/浮点/结构类型，不能持有引用，无法直接存 *List / *Hash 等。
+// 枚举在当前编译后端尚未可用，故用 int 常量做类型标记（0..4），
+// 配合 tagged union 包装类 Value 表达「带类型标签的值」：
+//   - Value.kind（int 常量）标记实际类型；
+//   - Value 持有各类型的可空引用，仅 kind 对应者非空。
+//
+// 顶层容器 Keyspace = Dict`[*]byte, *Value`（key 身份为「字节内容」）。
+
+// ===== 值类型标记（int 常量）=====
+
+export
+const valueTypeStr  = 0;
+export
+const valueTypeList = 1;
+export
+const valueTypeHash = 2;
+export
+const valueTypeSet  = 3;
+export
+const valueTypeZSet = 4;
+
+// ===== 值包装：tagged union（int 判别 + 各类型可空引用）=====
+
+export
+class Value final {
+    export
+    var kind int;
+
+    export
+    var str [*?]byte;      // valueTypeStr
+    export
+    var list *?List;       // valueTypeList
+    export
+    var hash *?Hash;       // valueTypeHash
+    export
+    var set *?Set;         // valueTypeSet
+    export
+    var zset *?ZSet;       // valueTypeZSet
+
+    // 类型名（对齐 enum 的 .name 语义，供调试/日志/TYPE 命令）。
+    export
+    func typeName() [*#]byte {
+        if (kind == valueTypeList) { return "list"; }
+        if (kind == valueTypeHash) { return "hash"; }
+        if (kind == valueTypeSet) { return "set"; }
+        if (kind == valueTypeZSet) { return "zset"; }
+        return "string";
+    }
+
+    // ===== 类型安全取值：kind 匹配返回对应引用，否则返回 nil =====
+    // 调用方无需再裸比较 int 标记——强类型由这些访问器统一收口。
+    // （枚举当前后端不可用，故以访问器承担「判别 + 强类型转型」职责。）
+
+    export
+    func asString() [*?]byte {
+        if (kind != valueTypeStr) { return nil; }
+        return str;
+    }
+
+    export
+    func asList() *?List {
+        if (kind != valueTypeList) { return nil; }
+        return list;
+    }
+
+    export
+    func asHash() *?Hash {
+        if (kind != valueTypeHash) { return nil; }
+        return hash;
+    }
+
+    export
+    func asSet() *?Set {
+        if (kind != valueTypeSet) { return nil; }
+        return set;
+    }
+
+    export
+    func asZSet() *?ZSet {
+        if (kind != valueTypeZSet) { return nil; }
+        return zset;
+    }
+}
+
+// ===== 顶层 keyspace =====
+
+export
+class Keyspace {
+    var dict *Dict`[*]byte, *Value`;
+
+    // SET：新增 key 返回 true，覆盖已有 key 返回 false（值已更新）。
+    export
+    func set(key [*]byte, v *Value) bool {
+        return dict.set(key, v).ok;
+    }
+
+    // GET：返回 key 的值，不存在返回 nil。
+    export
+    func get(key [*]byte) *?Value {
+        var g = dict.get(key);
+        if (!g.ok) { return nil; }
+        return g.v;
+    }
+
+    // TYPE：返回 key 的值类型标记；不存在时 ok=false（kind 为 STR 占位）。
+    export
+    func typeOf(key [*]byte) (int, bool) {
+        var g = dict.get(key);
+        if (!g.ok) { return (valueTypeStr, false); }
+        return (g.v.kind, true);
+    }
+
+    // DEL：删除 key，返回是否删除成功。
+    export
+    func del(key [*]byte) bool {
+        return dict.remove(key).ok;
+    }
+
+    // EXISTS：key 是否存在。
+    export
+    func exists(key [*]byte) bool {
+        return dict.get(key).ok;
+    }
+
+    // DBSIZE：key 数量。
+    export func size() int { return dict.size(); }
+    export func isEmpty() bool { return dict.isEmpty(); }
+    export func clear() { dict.clear(); }
+}
+
+// ===== 工厂函数 =====
+
+export
+func newKeyspace() *Keyspace {
+    return new(Keyspace, {dict=newDict`[*]byte,*Value`(hashBytes, bytesEqual)});
+}
+
+export
+func newStringValue(data [*]byte) *Value {
+    return new(Value, {kind=valueTypeStr, str=data});
+}
+
+export
+func newListValue(l *List) *Value {
+    return new(Value, {kind=valueTypeList, list=l});
+}
+
+export
+func newHashValue(h *Hash) *Value {
+    return new(Value, {kind=valueTypeHash, hash=h});
+}
+
+export
+func newSetValue(s *Set) *Value {
+    return new(Value, {kind=valueTypeSet, set=s});
+}
+
+export
+func newZSetValue(z *ZSet) *Value {
+    return new(Value, {kind=valueTypeZSet, zset=z});
+}
