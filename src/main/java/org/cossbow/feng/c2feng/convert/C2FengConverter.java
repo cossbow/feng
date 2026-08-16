@@ -188,6 +188,7 @@ public class C2FengConverter {
             Map.entry("unsigned int", Primitive.UINT32),
             Map.entry("long", Primitive.INT64),
             Map.entry("unsigned long", Primitive.UINT64),
+            Map.entry("unsigned long long", Primitive.UINT64),
             Map.entry("long long", Primitive.INT64),
             Map.entry("float", Primitive.FLOAT32),
             Map.entry("double", Primitive.FLOAT64),
