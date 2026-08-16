@@ -5545,14 +5545,32 @@ public class CGenerator implements Generator {
                 registerValueCleanup(new DerivedTypeDeclarer(dt.pos(), dt));
             }
         }
-        // Pre-scan LOCAL (non-generic) class method bodies too, so value-type
+        // Pre-scan LOCAL class method bodies too, so value-type / strong-ref
         // cleanups used there get forward-declared before classMethods() emits them.
         if (!header) {
             for (var cd : table.dagClasses) {
-                if (!cd.generic().isEmpty()) continue;
-                for (var cm : cd.methods()) {
-                    if (!cm.generic().isEmpty()) continue;
-                    cm.procedure().use(proc -> preScanCleanupStmts(proc.body()));
+                if (cd.generic().isEmpty()) {
+                    for (var cm : cd.methods()) {
+                        if (!cm.generic().isEmpty()) continue;
+                        cm.procedure().use(proc -> preScanCleanupStmts(proc.body()));
+                    }
+                } else {
+                    // Generic class: pre-scan each concrete instantiation's
+                    // (non-method-generic) method bodies under the mono context,
+                    // mirroring implClass()'s per-instantiation emission. Without
+                    // this, cleanup forward decls for strong-ref locals (e.g. a
+                    // final generic class inside a generic class method) are only
+                    // discovered while emitting the body — too late to be
+                    // forward-declared before classMethods().
+                    for (var dt : table.concreteInstantiations) {
+                        if (dt.def() != cd || dt.hasTypeVar()) continue;
+                        withMono(cd.generic(), dt.generic(), () -> {
+                            for (var cm : cd.methods()) {
+                                if (!cm.generic().isEmpty()) continue;
+                                cm.procedure().use(proc -> preScanCleanupStmts(proc.body()));
+                            }
+                        });
+                    }
                 }
             }
         }
