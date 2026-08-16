@@ -1,0 +1,43 @@
+class Item { var id int; }
+
+class Base { var p *?Item; }
+class Derived : Base { var q *?Item; }
+
+class FinalBox final { var p *?Item; }
+
+class GBox`T` { var p *?Item; }
+
+class R1 {
+    var id int;
+    macro resource free() { id = 0; }
+}
+class R2 : R1 {
+    macro resource free() { id = 1; }
+}
+
+func use(x *Item) {
+    x.id += 1;
+}
+
+func main() {
+    // 1. 协变基类 (Issue 1)
+    var b *Base = new(Derived);
+    b.p = new(Item, {id=1});
+    var d = b?(*?Derived);
+    if (d != nil) { d.q = new(Item, {id=2}); }
+
+    // 2. final 类持强引用字段 (缺口 A)
+    var fb = new(FinalBox);
+    fb.p = new(Item, {id=3});
+
+    // 3. 泛型实例 (缺口 D)
+    var box = new(GBox`int`);
+    box.p = new(Item, {id=4});
+
+    // 4. resource 顺序 (子先父后)
+    var r = new(R2);
+
+    // 6. 强引用参数 (缺口 G)
+    var it = new(Item, {id=5});
+    use(it);
+}

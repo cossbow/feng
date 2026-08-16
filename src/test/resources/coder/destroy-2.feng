@@ -1,0 +1,9 @@
+class Item { var id int; }
+
+class Box final { var p *?Item; }
+class Holder final { var b Box; }
+
+func main() {
+    var h = new(Holder);
+    h.b.p = new(Item, {id=1});
+}
