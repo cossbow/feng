@@ -799,17 +799,15 @@ from [struct types](#struct-types).
 
 #### Instance Initialization
 
-When instantiating, `const` fields must be initialized; `var` fields are optional.
-In the `Cat` class above, `id` must be initialized, while `name` is optional:
+When instantiating, fields can optionally be initialized. For the `Cat` class above:
 
 ```feng
 func test() {
    var c1 Cat = {id=1001};
    var c2 Cat = {id=1001, name="Tom"};
-   // Incorrect usage below
-   // var c3 Cat = {name="Tom"};
-   // var c4 Cat;
-   // var c5 Cat = {};
+   var c3 Cat = {name="Tom"};
+   var c4 Cat;
+   var c5 Cat = {};
 }
 ```
 
@@ -818,46 +816,13 @@ The same applies to dynamic instantiation via `new`:
 ```feng
 func test() {
    var c1 *Cat = new(Cat, {id=1001, name="Tom"});
-   // Incorrect usage below
-   // var c2 *Cat = new(Cat);
-   // var c3 *Cat = new(Cat, {name="Tom"});
-}
-```
-
-If a class has no `const` fields, initialization is not required.
-
-```feng
-class Mouse {
-   var id int;
-   var name [*#]byte;
-}
-func test() {
-   var m1 Mouse;
-   var m2 *Mouse = new(Mouse);
+   var c2 *Cat = new(Cat);
+   var c3 *Cat = new(Cat, {name="Tom"});
 }
 ```
 
 If not initialized, or if a field is not specified in initialization, it is set to the default state: all memory set to
 `0`, and reference types set to `nil`.
-
-Side effect: If an exported class has unexported `const` fields, it cannot be instantiated in other modules.
-For example, the `Dog` class below can only be instantiated in the current module:
-
-```feng
-export
-class Dog {
-    const id int;
-    var name [*#]byte;
-}
-export
-func newDog(id int) *Dog {
-    return new(Dog, {id=id});
-}
-export
-func dog(id int, name [*#]byte) Dog {
-    return {id=id, name=name};
-}
-```
 
 ### Methods
 

@@ -750,17 +750,15 @@ class Cat {
 
 #### 实例初始化
 
-在实例化时，`const`字段则必须初始化指定，`var`字段则可选初始化。
-比如上面的`Cat`类，`id`必须指定初始化值，`name`则不强制：
+在实例化时，字段则可指定初始化。比如上面的`Cat`类：
 
 ```feng
 func test() {
    var c1 Cat = {id=1001};
    var c2 Cat = {id=1001, name="Tom"};
-   // 下面是错误用法
-   // var c3 Cat = {name="Tom"};
-   // var c4 Cat;
-   // var c5 Cat = {};
+   var c3 Cat = {name="Tom"};
+   var c4 Cat;
+   var c5 Cat = {};
 }
 ```
 
@@ -769,45 +767,12 @@ func test() {
 ```feng
 func test() {
    var c1 *Cat = new(Cat, {id=1001, name="Tom"});
-   // 下面是错误用法
-   // var c2 *Cat = new(Cat);
-   // var c3 *Cat = new(Cat, {name="Tom"});
-}
-```
-
-显然如果类里面没有`const`的字段则不强制要求初始化。
-
-```feng
-class Mouse {
-   var id int;
-   var name [*#]byte;
-}
-func test(name [*#]byte) {
-   var m1 Mouse;
-   var m2 *Mouse = new(Mouse, {name=name});
+   var c2 *Cat = new(Cat);
+   var c3 *Cat = new(Cat, {name="Tom"});
 }
 ```
 
 如果没有初始化，或者初始化中没有指定的字段，一律置为默认状态：对应内存全`0`，引用类型则是`nil`值。
-
-副作用：一个被导出类的，但它有未导出`const`字段，在其他模块就无法实例化该类。
-比如下面的`Dog`类就只能在当前模块实例化：
-
-```feng
-export
-class Dog {
-    const id int;
-    var name [*#]byte;
-}
-export
-func newDog(id int) *Dog {
-    return new(Dog, {id=id});
-}
-export
-func dog(id int, name [*#]byte) Dog {
-    return {id=id, name=name};
-}
-```
 
 ### 方法
 

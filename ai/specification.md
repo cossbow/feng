@@ -424,10 +424,8 @@ classMemberMethod  = functionDefinition
 1. [MUST] Can be instantiated as a value type or via `new` for strong references.
 2. [MUST] Fields: all variable types are allowed except phantom references (`&`).
 3. [MUST] Field order does NOT correspond to memory layout order.
-4. [MUST] `const` fields must be initialized at instantiation.
-5. [MUST] A class with unexported `const` fields cannot be instantiated from other modules.
-6. [MUST] `this` refers to the current instance inside methods.
-7. [MUST] `super` refers to the direct parent class.
+4. [MUST] `this` refers to the current instance inside methods.
+5. [MUST] `super` refers to the direct parent class.
 
 #### Inheritance
 1. [MUST] Single inheritance only. For non-final classes, the root class is `Object` (built-in, no members). Final classes do NOT inherit from `Object`.

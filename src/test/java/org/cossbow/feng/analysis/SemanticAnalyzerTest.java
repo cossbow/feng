@@ -90,16 +90,16 @@ public class SemanticAnalyzerTest {
 
     @Test
     public void testClass4() {
-        var def = "class A { var code int; const type int8; } ";
-        checkFail(def + "func f(){ var a A = { code=100 }; }");
-        checkFail(def + "func f(){ var a *A = new(A,{code=100}); }");
+        var def = "class A { var code int; } ";
+        checkSucc(def + "func f(){ var a A = { }; }");
+        checkSucc(def + "func f(){ var a *A = new(A,{}); }");
     }
 
     @Test
     public void testClass5() {
-        var def = "class A { const type int8; var code int; } ";
-        checkFail(def + "func f(){ var a A = {code=100}; }");
-        checkFail(def + "func f(){ var a *A = new(A,{code=100}); }");
+        var def = "class A {  var code int; } ";
+        checkSucc(def + "func f(){ var a A = {code=100}; }");
+        checkSucc(def + "func f(){ var a *A = new(A,{code=100}); }");
     }
 
     @Test
@@ -1997,15 +1997,15 @@ public class SemanticAnalyzerTest {
 
     @Test
     public void testFieldInitMultipleFields() {
-        var def = "class A{ var id *int; var name *?int; const age int; } ";
+        var def = "class A{ var id *int; var name *?int; } ";
         // ✗ multiple required fields missing (id and age)
         checkFail(def + "func f(){ var a A = {}; }");
         // ✗ partial init (age missing)
-        checkFail(def + "func f(){ var a A = {id=new(int)}; }");
+        checkSucc(def + "func f(){ var a A = {id=new(int)}; }");
         // ✓ all required fields initialized
-        checkSucc(def + "func f(){ var a A = {id=new(int),age=18}; }");
+        checkSucc(def + "func f(){ var a A = {id=new(int),name=new(int)}; }");
         // ✓ nullable name also provided
-        checkSucc(def + "func f(){ var a A = {id=new(int),name=nil,age=18}; }");
+        checkSucc(def + "func f(){ var a A = {id=new(int),name=nil}; }");
     }
 
     @Test
