@@ -4267,10 +4267,11 @@ public class CGenerator implements Generator {
             dedent().write("} ").write(cd.symbol()).endStmt();
             newLine();
         } else {
-            // flat layout: only one $meta at offset 0, all fields (inherited+own) in order
+            // flat layout: only one $meta at offset 0; fields parent-first so
+            // a Derived* reinterprets as Parent* (vtable dispatch / upcasting)
             write("typedef struct ").write(cd.symbol()).write(" {").indent();
             write("const Feng$Meta* $meta").endStmt();
-            for (var f : cd.allFields().values()) write(f);
+            writeFlatStructFields(cd, cd);
             dedent().write("} ").write(cd.symbol()).endStmt();
             newLine();
 
@@ -4501,12 +4502,7 @@ public class CGenerator implements Generator {
             write("#define ").write(structGuard).newLine();
             write("typedef struct ").writeMangledName(dt).write(" {").indent();
             write("const Feng$Meta* $meta").endStmt();
-            var prevNF = insideStructBody;
-            insideStructBody = true;
-            for (var f : cd.allFields().values()) {
-                write(f.type()).write(' ').write(f.name()).endStmt();
-            }
-            insideStructBody = prevNF;
+            writeFlatStructFields(cd, cd);
             dedent().write("} ").writeMangledName(dt).endStmt();
             write("#endif").newLine();
             newLine();
@@ -4703,6 +4699,36 @@ public class CGenerator implements Generator {
         write(cf.type()).write(' ');
         insideStructBody = prev;
         return write(cf.name()).endStmt();
+    }
+
+    /**
+     * Emit the flat struct-body fields of a non-final class in memory-layout
+     * order: ancestor fields first (root-most ancestor first), then the class's
+     * own fields. Keeping inherited fields at the same offsets as the parent
+     * struct lets a Derived* be reinterpreted as Parent* (vtable dispatch /
+     * covariant upcasting).
+     * <p>
+     * {@code leaf} is the concrete class being declared; {@code cur} is the
+     * ancestor whose own fields are emitted at this recursion level. Field
+     * types are resolved from {@code cur}'s parameter space through the
+     * inheritance chain to {@code leaf}'s concrete type arguments.
+     */
+    private void writeFlatStructFields(ClassDefinition leaf, ClassDefinition cur) {
+        cur.parent().use(p -> {
+            // skip only the Object root; builtin parents (Exception) still
+            // contribute their fn/line fields so the flat layout matches the
+            // builtin struct in Header.h when reinterpreting as the parent
+            if (p != ClassDefinition.ObjectClass) {
+                writeFlatStructFields(leaf, p);
+            }
+        });
+        for (var cf : cur.fields().values()) {
+            var ft = resolveArgFromAncestor(leaf, cur, cf.type());
+            var prev = insideStructBody;
+            insideStructBody = true;
+            write(ft).write(' ').write(cf.name()).endStmt();
+            insideStructBody = prev;
+        }
     }
 
     private void implClass(ClassDefinition cd) {
