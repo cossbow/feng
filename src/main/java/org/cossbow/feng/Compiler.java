@@ -247,7 +247,7 @@ public class Compiler {
         }
 
         // Collect link libraries from all modules, deduplicate keeping order
-        var allLinkLibs = new LinkedHashSet<String>(dag.size()+2);
+        var allLinkLibs = new LinkedHashSet<String>(dag.size() + 2);
         for (var fm : dag) {
             allLinkLibs.addAll(fm.linkLibs());
         }
@@ -515,7 +515,8 @@ public class Compiler {
 
         var moreFlags = (sanitizer == null || sanitizer.isEmpty())
                 ? "" : " -fsanitize=" + sanitizer + " -fno-omit-frame-pointer";
-        if (!debug) moreFlags += " -g -O2";
+        if (debug) moreFlags += " -g";
+        if (!debug) moreFlags += " -O2";
 
         // cross-compilation: add target triple + OS define so C #ifdef matches
         if (os.isCross()) {

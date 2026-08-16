@@ -228,6 +228,11 @@ public class RelayLowering {
     // ---- call statement ----
 
     private Statement lowerCallStatement(CallStatement cs) {
+        if (cs.replace().has()) {
+            // If has replace(), analyze the replace statement
+            return lowerStatement(cs.replace().must());
+        }
+
         var lowered = lowerCallExpression(cs.call());
         if (lowered instanceof BlockExpression be) {
             // the call was wrapped with temp vars; convert the block's
