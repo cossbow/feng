@@ -74,6 +74,22 @@ class Deque`T` {
         return buf[dec(tail)];
     }
 
+    // ===== random access =====
+
+    export func get(index int) T {
+        if (index < 0 || index >= size) {
+            throw new(OutOfBoundsException);
+        }
+        return buf[(head + index) % buf.length];
+    }
+
+    export func set(index int, value T) {
+        if (index < 0 || index >= size) {
+            throw new(OutOfBoundsException);
+        }
+        buf[(head + index) % buf.length] = value;
+    }
+
     // ===== properties =====
 
     export func length() int { return size; }
