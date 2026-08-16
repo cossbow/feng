@@ -1470,6 +1470,8 @@ public class SemanticAnalyzer {
                     semantic("parameter of async procedure must be sync '%s': %s",
                             fp.type(), fp.type().pos());
                 }
+            } else {
+                markSync(fp.modifier(), fp.type());
             }
             if (addVar) fp.var().use(context::putVar);
         }

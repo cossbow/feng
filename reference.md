@@ -3447,6 +3447,7 @@ the [concurrency boundary](#concurrency-boundary).
 
 Some types are syncable by default, while others require the explicit `@Sync` attribute. See
 [Syncable Instances](#syncable-instances) for details.
+Currently, `@Sync` can be applied to variables, parameters, and fields.
 
 For example, when calling an async function, only a syncable instance can be passed as an argument:
 
@@ -3478,6 +3479,15 @@ func test1() {
 func test2() {
     var t = new(Thread);        // Variable t without @Sync cannot be shared concurrently
     // t.start();               // ✖：Therefore the async method cannot be called
+}
+```
+
+Annotating a parameter means the argument passed must be a sync instance:
+
+```feng
+func exec(@Sync a *int, b *int) {   // Note that `exec` is not a concurrency boundary
+   startThread(a);                  // ✔：Parameter a is marked sync, so it can cross
+   // startThread(b);               // ✖：Parameter b is not marked sync, so it cannot cross
 }
 ```
 
@@ -3533,6 +3543,21 @@ func test() {
    var a A;                  // ✔：Value type is automatically synced, no @Sync needed
    // @Sync var b A;         // ✖：Cannot annotate @Sync, to avoid ambiguity
    startThread(a);
+}
+```
+
+Here are two examples of parameters with the sync attribute:
+
+```feng
+func exec(@Sync a *int) {}
+func test() {
+   exec(new(int));         // ✔：
+
+   @Sync var i = new(int);
+   exec(i);                // ✔：Both variable i and parameter a are synced, so it can be passed
+
+   var j = new(int);
+   // exec(j);             // ✖：Variable j is not synced, so it cannot be passed
 }
 ```
 

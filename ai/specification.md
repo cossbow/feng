@@ -1017,6 +1017,9 @@ The concurrency model is based on `@Sync`/`@Async` attribute-based compile-time 
 3. [MUST] An `@Async` method can only be called on a syncable instance.
 4. [MUST] Inside an `@Async` method, `this` is syncable.
 5. [MUST] A non-`@Async` method cannot call an `@Async` method on `this` (syncability unknown).
+6. [MUST] A parameter of any function can be explicitly annotated `@Sync` (e.g. `func exec(@Sync a *int)`).
+   The argument passed to it must be a sync instance, and the parameter can then be used across a
+   concurrency boundary. (`@Async` parameters are implicitly `@Sync` per rule 1.)
 
 ### 8.3 Sync Assignment Rules
 
@@ -1064,7 +1067,7 @@ The concurrency model is based on `@Sync`/`@Async` attribute-based compile-time 
 The concurrency check is purely a compile-time check. The compiler backend treats `@Sync`
 differently depending on where it is applied:
 
-1. [MUST] `@Sync` on a field or variable: the compiler generates the concurrent
+1. [MUST] `@Sync` on a field, variable, or parameter: the compiler generates the concurrent
    operations — atomic reference counting, and (for fields) spinlock-protected
    load/store.
 2. [MUST] `@Sync` on a class: the compiler only marks the type as syncable and
@@ -1340,7 +1343,7 @@ func load(c &Counter) int32 {
 |-----------|-----------|---------|
 | `@Test` | Functions | Marks a test case (see §10) |
 | `@Async` | Functions, Methods | Marks a concurrency boundary (see §8) |
-| `@Sync` | Variables, Fields, Classes, Interfaces | Marks syncable (see §8) |
+| `@Sync` | Variables, Parameters, Fields, Classes, Interfaces | Marks syncable (see §8) |
 
 ---
 

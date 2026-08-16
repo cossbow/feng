@@ -4181,12 +4181,20 @@ public class SemanticAnalyzerTest {
     }
 
     @Test
-    public void testAsyncMark() {
+    public void testAsyncMark1() {
         var d = "class A{} ";
         checkFail(d + "func f() { @Sync var v A; }");
         checkFail(d + "func f() { @Sync var v = new(A); @Sync const r &A = a; }");
         checkFail(d + "func f() { @Sync var v A; const r &A = v; }");
         checkFail(d + "@Async func th(a &A) {}");
+    }
+
+    @Test
+    public void testAsyncMark2() {
+        checkSucc("func f(a *int) { var i *int = a; }");
+        checkFail("func f(a *int) { @Sync var i *int = a; }");
+        checkFail("func f(@Sync a *int) { var i *int = a; }");
+        checkSucc("func f(@Sync a *int) { @Sync var i *int = a; }");
     }
 
 }
