@@ -6,7 +6,7 @@ import org.cossbow.feng.ast.dcl.PrimitiveTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.ast.proc.FixedParameter;
-import org.cossbow.feng.coder.CppGenerator;
+import org.cossbow.feng.coder.CGenerator;
 import org.cossbow.feng.coder.Generator;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.mod.ModuleAnalysis;
@@ -607,7 +607,7 @@ public class Compiler {
 
     static String cTypeOf(TypeDeclarer td) {
         if (td instanceof PrimitiveTypeDeclarer ptd) {
-            return CppGenerator.PrimitiveName.get(ptd.primitive());
+            return CGenerator.PrimitiveName.get(ptd.primitive());
         }
         return "Uint64";
     }

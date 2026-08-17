@@ -1,4 +1,4 @@
-package org.cossbow.feng.analysis;
+package org.cossbow.feng.analysis.mono;
 
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.gen.TypeArguments;

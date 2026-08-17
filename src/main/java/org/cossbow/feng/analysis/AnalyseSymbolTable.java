@@ -1,5 +1,8 @@
 package org.cossbow.feng.analysis;
 
+import org.cossbow.feng.analysis.mono.ConcreteTypeInst;
+import org.cossbow.feng.analysis.mono.FuncInstantiation;
+import org.cossbow.feng.analysis.mono.MethodInstantiation;
 import org.cossbow.feng.ast.EnumDefinition;
 import org.cossbow.feng.ast.GlobalVariable;
 import org.cossbow.feng.ast.Symbol;

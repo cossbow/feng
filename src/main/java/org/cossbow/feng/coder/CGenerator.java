@@ -1,9 +1,9 @@
 package org.cossbow.feng.coder;
 
 import org.cossbow.feng.analysis.AnalyseSymbolTable;
-import org.cossbow.feng.analysis.ConcreteTypeInst;
-import org.cossbow.feng.analysis.FuncInstantiation;
-import org.cossbow.feng.analysis.MethodInstantiation;
+import org.cossbow.feng.analysis.mono.ConcreteTypeInst;
+import org.cossbow.feng.analysis.mono.FuncInstantiation;
+import org.cossbow.feng.analysis.mono.MethodInstantiation;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;

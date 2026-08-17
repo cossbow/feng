@@ -1,5 +1,8 @@
 package org.cossbow.feng.analysis;
 
+import org.cossbow.feng.analysis.mono.ConcreteTypeInst;
+import org.cossbow.feng.analysis.mono.FuncInstantiation;
+import org.cossbow.feng.analysis.mono.MethodInstantiation;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.Symbol;
@@ -13,7 +16,7 @@ import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.proc.ParameterSet;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.ast.stmt.*;
-import org.cossbow.feng.coder.CppGenerator;
+import org.cossbow.feng.coder.CGenerator;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Groups;
@@ -914,7 +917,7 @@ public class Monomorphization {
 
     private String typeKey(TypeDeclarer td) {
         if (td instanceof PrimitiveTypeDeclarer ptd) {
-            var name = CppGenerator.PrimitiveName.get(ptd.primitive());
+            var name = CGenerator.PrimitiveName.get(ptd.primitive());
             return ptd.refer().has() ? name + "Ptr" : name;
         }
         if (td instanceof DerivedTypeDeclarer dtd) {

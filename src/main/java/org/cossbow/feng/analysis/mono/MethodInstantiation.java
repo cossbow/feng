@@ -1,4 +1,4 @@
-package org.cossbow.feng.analysis;
+package org.cossbow.feng.analysis.mono;
 
 import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.oop.ClassMethod;
