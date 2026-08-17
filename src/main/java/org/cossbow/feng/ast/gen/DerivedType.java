@@ -9,6 +9,7 @@ import org.cossbow.feng.util.CommonUtil;
 /**
  * Symbol link to a custom derived-type.
  */
+final
 public class DerivedType extends DefinedType {
     private final Symbol symbol;
     private TypeArguments generic;

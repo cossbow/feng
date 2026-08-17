@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
 
@@ -63,7 +64,13 @@ public class ObjectExpression extends PrimaryExpression {
         return new ObjectExpression(pos(), m, type);
     }
 
-    //
+    @Override
+    public ObjectExpression mono(GenericMap gm) {
+        var m = new IdentifierMap<Expression>(entries.size());
+        for (var n : entries.nodes()) m.add(n.key(), n.value().mono(gm));
+        var t = type.map(gm::mapIf);
+        return monoCopy(new ObjectExpression(pos(), m, t), gm);
+    }
 
     @Override
     public String toString() {

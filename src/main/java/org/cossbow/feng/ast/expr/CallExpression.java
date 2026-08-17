@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.util.Optional;
 
@@ -116,6 +117,15 @@ public class CallExpression extends PrimaryExpression {
         var a = new ArrayList<Expression>(arguments.size());
         for (var arg : arguments) a.add(arg.mirror());
         return new CallExpression(pos(), c, a, variadic);
+    }
+
+    @Override
+    public CallExpression mono(GenericMap gm) {
+        var a = new ArrayList<Expression>(arguments.size());
+        for (var arg : arguments) a.add(arg.mono(gm));
+        var n = new CallExpression(pos(), callee.mono(gm), a,
+                variadic, prototype.map(gm::instantiate));
+        return monoCopy(n, gm);
     }
 
     //

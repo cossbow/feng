@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Scope;
 import org.cossbow.feng.ast.dcl.Variable;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.stmt.Statement;
 import org.cossbow.feng.util.Lazy;
 
@@ -105,6 +106,13 @@ public class BlockExpression extends PrimaryExpression
         n.stack = List.of();
         n.origin.set(Lazy.nil());
         return n;
+    }
+
+    @Override
+    public BlockExpression mono(GenericMap gm) {
+        var block = new ArrayList<Statement>(this.block.size());
+        for (var s : this.block) block.add(s.mono(gm));
+        return monoCopy(new BlockExpression(pos(), block, result.mono(gm)), gm);
     }
 
     //

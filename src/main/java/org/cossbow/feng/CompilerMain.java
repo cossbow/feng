@@ -69,16 +69,9 @@ public class CompilerMain {
             description = "testcase name filter (repeatable)")
     private List<String> testNames = new ArrayList<>();
 
-    // backend selector — controlled by JVM property: -Dfeng.target=c|nc
-    private static final String TARGET_PROP = "feng.target";
 
     private Compiler compiler() {
-        var t = System.getProperty(TARGET_PROP, "c");
-        var factory = switch (t) {
-            case "c" -> CGenerator.FACTORY;
-            default -> CGenerator.FACTORY;
-        };
-        var c = new Compiler(factory);
+        var c = new Compiler(CGenerator.FACTORY);
         c.debug(debug);
         c.sanitizer(System.getProperty("san"));
         c.test(test).testFilter(testNames);

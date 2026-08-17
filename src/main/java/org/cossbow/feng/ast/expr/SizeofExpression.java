@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * Memory size occupied by the acquisition type.
@@ -40,6 +41,13 @@ public class SizeofExpression extends PrimaryExpression {
         var n = new SizeofExpression(pos(), type);
         n.size = -1;
         return n;
+    }
+
+    @Override
+    public SizeofExpression mono(GenericMap gm) {
+        var n = new SizeofExpression(pos(), gm.mapIf(type));
+        n.size = -1;
+        return monoCopy(n, gm);
     }
 
     //

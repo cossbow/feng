@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.util.Lazy;
 
 import java.util.ArrayList;
@@ -38,4 +39,17 @@ public class Operand extends Entity {
      * Resets mutable state: type.
      */
     public abstract Operand mirror();
+
+    /**
+     * Rebuild a fully monomorphized copy of this operand.
+     */
+    public abstract Operand mono(GenericMap gm);
+
+    /**
+     * Remap this operand's cached type onto a freshly constructed operand.
+     */
+    protected Operand monoCopy(Operand n, GenericMap gm) {
+        type.use(t -> n.type.set(gm.mapIf(t)));
+        return n;
+    }
 }

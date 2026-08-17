@@ -56,15 +56,26 @@ public class GeneratorTest {
     @Test
     public void testSampleSource(@TempDir Path tempDir) throws IOException {
         var dir = ResourceUtil.getDir("coder");
+        var failures = new java.util.ArrayList<String>();
         for (var file : ResourceUtil.list(dir)) {
             var fn = file.getFileName().toString();
-            System.out.println("=== compile " + fn + " ===");
             var name = CommonUtil.trimExt(fn);
             name = name.replace("-", "_");
             var subDir = tempDir.resolve(name);
             Files.createDirectories(subDir);
-            compiler(PkgName).compileFile(file, subDir);
-            exec(subDir, PkgName);
+            try {
+                System.out.println("=== compile " + fn + " ===");
+                compiler(PkgName).compileFile(file, subDir);
+                exec(subDir, PkgName);
+                System.out.println("=== PASS " + fn + " ===");
+            } catch (Throwable t) {
+                System.err.println("=== FAIL " + fn + ": " + t + " ===");
+                failures.add(fn + " -> " + t);
+            }
+        }
+        if (!failures.isEmpty()) {
+            Assertions.fail(failures.size() + " sample(s) failed:\n"
+                    + String.join("\n", failures));
         }
     }
 

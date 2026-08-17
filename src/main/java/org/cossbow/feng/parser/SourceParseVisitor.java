@@ -778,7 +778,7 @@ final class SourceParseVisitor
         var isFinal = ext.FINAL() != null;
         var inherit = parseClassInherit(ext.classInherit());
         if (!isFinal && inherit.none())
-            inherit = Optional.of(ClassDefinition.ObjectType);
+            inherit = Optional.of(ClassDefinition.ObjectClass.link());
         var impl = parseClassImpl(ext.classImpl());
 
         var methods = new IdentifierMap<ClassMethod>();

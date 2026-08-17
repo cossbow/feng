@@ -87,7 +87,7 @@ public class RelayLowering {
                 yield bs;
             }
             case IfStatement is -> {
-                is.init().use(this::lowerStatement);
+                is.init(is.init().map(this::lowerStatement));
                 is.condition(lowerExpression(is.condition()));
                 lowerBlockStatement(is.yes());
                 is.not().use(this::lowerBodied);
@@ -95,7 +95,7 @@ public class RelayLowering {
             }
             case ForStatement fs -> {
                 if (fs instanceof ConditionalForStatement cfs) {
-                    cfs.initializer().use(this::lowerStatement);
+                    cfs.initializer(cfs.initializer().map(this::lowerStatement));
                     lowerBlockStatement(cfs.body());
                 } else if (fs instanceof IterableForStatement ifs) {
                     lowerBlockStatement(ifs.body());
@@ -107,7 +107,7 @@ public class RelayLowering {
                 yield rs;
             }
             case SwitchStatement ss -> {
-                ss.init().use(this::lowerStatement);
+                ss.init(ss.init().map(this::lowerStatement));
                 for (var br : ss.branches()) {
                     lowerBlockStatement(br.body());
                 }
@@ -229,31 +229,29 @@ public class RelayLowering {
 
     private Statement lowerCallStatement(CallStatement cs) {
         if (cs.replace().has()) {
-            // If has replace(), analyze the replace statement
+            // 前序 pass（SemanticAnalyzer 展开）已设置 replace()：lower 替换后的语句
             return lowerStatement(cs.replace().must());
         }
 
         var lowered = lowerCallExpression(cs.call());
         if (lowered instanceof BlockExpression be) {
-            // the call was wrapped with temp vars; convert the block's
-            // statements to a BlockStatement and re-add the call.
+            // 调用被临时变量包裹：转成 BlockStatement 并重加调用。
             var stmts = new ArrayList<Statement>(be.block());
             var re = be.result();
             if (re instanceof CallExpression rce) {
                 addCallAsStatement(stmts, rce);
             }
-            cs.replace().set(new BlockStatement(cs.pos(), stmts));
-            return cs;
+            return new BlockStatement(cs.pos(), stmts);
         }
         if (lowered instanceof CallExpression lce) {
             if (needDiscardResult(lce)) {
-                cs.replace().set(new BlockStatement(cs.pos(),
+                // 丢弃 STRONG 返回：物化为 pin 声明以释放引用。
+                return new BlockStatement(cs.pos(),
                         new ArrayList<>(List.of(
                                 new DeclarationStatement(lce.pos(),
-                                        List.of(makePinVar(lce)))))));
-            } else {
-                cs.call(lce);
+                                        List.of(makePinVar(lce))))));
             }
+            cs.call(lce);
         }
         return cs;
     }
@@ -628,17 +626,20 @@ public class RelayLowering {
     // ---- predicates ----
 
     /**
-     * A method-call receiver needs pinning if it is a direct reference
-     * (strong/phantom) and not a simple variable/this reference.
+     * A method-call receiver needs pinning if it is an unbound temporary whose
+     * lifetime must extend across the call——receiver 是 phantom {@code self}
+     * 参数，语义上（rule 6）允许引用临时实例，须物化为稳定 lvalue。
      * <p>
-     * Value-type receivers (e.g. {@code obj.r.see()} where {@code r} is an
-     * embedded final class) must NOT be pinned: pinning would shallow-copy the
-     * value without inc'ing its embedded strong-ref fields, then the copy and
-     * the original would both release those refs (double-free). Their subject
-     * is already pinned by {@link #lowerSubject}, so they are stable lvalues.
+     * 值类型 receiver <b>仅在 unbound 时 pin</b>（如 {@code makeBox(3).area()}）：
+     * 走与实参 pin 相同的 {@code const} 声明，由 ReleaserBuilder 正确处理内嵌
+     * 强引用字段的引用计数（后端 {@code _self} 文本层物化不 inc，已废弃）。
+     * Bound 值类型 lvalue（{@code obj.r.see()}）不 pin——拷贝会 double-free，
+     * 且它已是稳定 lvalue、可直接 {@code &}。
      */
     private boolean needPinReceiver(Expression receiver) {
-        if (receiver.resultType.must().maybeRefer().none()) return false;
+        if (receiver.resultType.must().maybeRefer().none()) {
+            return receiver.unbound();
+        }
         // safe in non-concurrent code: simple var or 'this'
         return !(receiver instanceof VariableExpression)
                 && !(receiver instanceof CurrentExpression);

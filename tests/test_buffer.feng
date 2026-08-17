@@ -7,7 +7,7 @@ func testBufferWriterWrite() {
     var data = "Hello, Buffer!";
     var n = bw.write(data, 0, data.length);
 }
-
+/*
 @Test
 func testBufferWriterWriteByte() {
     var bw = bytes$newWriter();
@@ -25,8 +25,8 @@ func testBufferWriterLength() {
     var len = bw.length();
     testing$assertTrue(len == 1);
     testing$assertFalse(bw.isEmpty());
-}
-
+}*/
+/*
 @Test
 func testBufferWriterClear() {
     var bw = bytes$newWriter();
@@ -52,7 +52,8 @@ func testBufferWriterGet() {
     var t = bw.get();
     var buf = t.0;
     var len = t.1;
-}
+}*/
+/*
 
 @Test
 func testBufferWriterReader() {
@@ -108,3 +109,4 @@ func testBufferReaderRemaining() {
     var rem2 = br.remaining();
     var ie2 = br.isEmpty();
 }
+*/

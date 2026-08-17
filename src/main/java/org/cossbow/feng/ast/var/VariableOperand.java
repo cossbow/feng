@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.var;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.SymbolExpression;
@@ -50,5 +51,14 @@ public class VariableOperand extends Operand {
     @Override
     public VariableOperand mirror() {
         return new VariableOperand(pos(), symbol);
+    }
+
+    @Override
+    public VariableOperand mono(GenericMap gm) {
+        var n = new VariableOperand(pos(), symbol);
+        // 保留语义分析挂上的 variable 引用（VariableExpression.mono 同理）——
+        // 丢失会 NoSuchElementException（StmtWriter.write(VariableOperand) 读 variable）。
+        n.variable().set(variable);
+        return (VariableOperand) monoCopy(n, gm);
     }
 }

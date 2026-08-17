@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 import org.cossbow.feng.util.Lazy;
 
@@ -40,5 +41,11 @@ public class IterableForStatement extends ForStatement {
     public IterableForStatement mirror() {
         return new IterableForStatement(pos(), body().mirror(),
                 arguments, iterable.mirror());
+    }
+
+    @Override
+    public IterableForStatement mono(GenericMap gm) {
+        return new IterableForStatement(pos(), body().mono(gm),
+                arguments, iterable.mono(gm));
     }
 }

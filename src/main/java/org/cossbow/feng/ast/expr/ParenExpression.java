@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * {@code var v = (a);}
@@ -26,6 +27,11 @@ public class ParenExpression extends PrimaryExpression {
     @Override
     public ParenExpression mirror() {
         return new ParenExpression(pos(), child.mirror());
+    }
+
+    @Override
+    public ParenExpression mono(GenericMap gm) {
+        return monoCopy(new ParenExpression(pos(), child.mono(gm)), gm);
     }
 
     //

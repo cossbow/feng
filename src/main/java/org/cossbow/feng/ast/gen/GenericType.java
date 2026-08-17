@@ -6,6 +6,7 @@ import org.cossbow.feng.ast.Position;
 /**
  * Type Variance: reference the type-paratemer in the generic-type
  */
+final
 public class GenericType extends DefinedType {
     private final TypeParameter param;
 

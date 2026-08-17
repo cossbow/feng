@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Primitive;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * Only primitive-types support conversion expressions:
@@ -33,6 +34,11 @@ public class ConvertExpression extends PrimaryExpression {
     @Override
     public ConvertExpression mirror() {
         return new ConvertExpression(pos(), primitive, operand.mirror());
+    }
+
+    @Override
+    public ConvertExpression mono(GenericMap gm) {
+        return monoCopy(new ConvertExpression(pos(), primitive, operand.mono(gm)), gm);
     }
 
     //

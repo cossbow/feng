@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.Field;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.util.Optional;
 
@@ -71,6 +72,12 @@ public class MemberOfExpression extends PrimaryExpression {
     public MemberOfExpression mirror() {
         return new MemberOfExpression(pos(), subject.mirror(),
                 member, generic, field);
+    }
+
+    @Override
+    public MemberOfExpression mono(GenericMap gm) {
+        return monoCopy(new MemberOfExpression(pos(), subject.mono(gm),
+                member, gm.mapAll(generic), field), gm);
     }
 
     //

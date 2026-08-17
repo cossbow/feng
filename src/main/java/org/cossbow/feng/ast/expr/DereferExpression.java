@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * Dereference-Operation is used to directly read an instance
@@ -29,6 +30,11 @@ public class DereferExpression extends PrimaryExpression {
     @Override
     public DereferExpression mirror() {
         return new DereferExpression(pos(), subject.mirror());
+    }
+
+    @Override
+    public DereferExpression mono(GenericMap gm) {
+        return monoCopy(new DereferExpression(pos(), subject.mono(gm)), gm);
     }
 
     //

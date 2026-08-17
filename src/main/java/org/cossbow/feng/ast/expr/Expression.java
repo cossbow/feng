@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.util.Lazy;
 
 /**
@@ -62,5 +63,22 @@ public class Expression extends Entity {
      * (expectType, resultType, expectCallable).
      */
     public abstract Expression mirror();
+
+    /**
+     * Rebuild a fully monomorphized copy of this expression: substitute type
+     * variables through {@code gm}, rewrite generic call sites, and remap
+     * {@link #resultType}/{@link #expectType}.
+     */
+    public abstract Expression mono(GenericMap gm);
+
+    /**
+     * Map this node's {@code resultType}/{@code expectType} through {@code gm}
+     * onto a freshly constructed node {@code n}, returning {@code n}.
+     */
+    protected <E extends Expression> E monoCopy(E n, GenericMap gm) {
+        resultType.use(t -> n.resultType.set(gm.mapIf(t)));
+        expectType.use(t -> n.expectType.set(gm.mapIf(t)));
+        return n;
+    }
 
 }

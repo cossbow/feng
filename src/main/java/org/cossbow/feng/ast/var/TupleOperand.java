@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.var;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TupleTypeDeclarer;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 import org.cossbow.feng.ast.expr.TupleIndexExpression;
@@ -54,5 +55,11 @@ public class TupleOperand extends Operand {
     @Override
     public TupleOperand mirror() {
         return new TupleOperand(pos(), (PrimaryExpression) subject.mirror(), index);
+    }
+
+    @Override
+    public TupleOperand mono(GenericMap gm) {
+        return (TupleOperand) monoCopy(
+                new TupleOperand(pos(), subject.mono(gm), index), gm);
     }
 }

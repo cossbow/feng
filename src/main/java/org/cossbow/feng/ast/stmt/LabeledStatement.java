@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.util.ErrorUtil;
 
 public class LabeledStatement extends Statement {
@@ -26,5 +27,10 @@ public class LabeledStatement extends Statement {
     @Override
     public LabeledStatement mirror() {
         return ErrorUtil.unsupported("mirror not support label");
+    }
+
+    @Override
+    public LabeledStatement mono(GenericMap gm) {
+        return new LabeledStatement(pos(), label, target.mono(gm));
     }
 }

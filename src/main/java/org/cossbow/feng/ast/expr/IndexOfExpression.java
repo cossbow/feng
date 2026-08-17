@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * Get value by index, for example: {@code arr[1]}
@@ -43,6 +44,11 @@ public class IndexOfExpression extends PrimaryExpression {
     @Override
     public IndexOfExpression mirror() {
         return new IndexOfExpression(pos(), subject.mirror(), index.mirror());
+    }
+
+    @Override
+    public IndexOfExpression mono(GenericMap gm) {
+        return monoCopy(new IndexOfExpression(pos(), subject.mono(gm), index.mono(gm)), gm);
     }
 
     //

@@ -5,14 +5,8 @@
 
 // ===== array typedefs for built-in interface signatures =====
 // (guards match the generator's per-type array typedefs)
-#ifndef FENG_TYPEDEF_ArraySRef_Byte
-#define FENG_TYPEDEF_ArraySRef_Byte
 typedef struct { Byte* $values; Int64 $length; } Feng$ArraySRef_Byte;
-#endif
-#ifndef FENG_TYPEDEF_ArrayPRef_Byte
-#define FENG_TYPEDEF_ArrayPRef_Byte
 typedef struct { Byte* $values; Int64 $length; } Feng$ArrayPRef_Byte;
-#endif
 
 // ===== Object: the root class =====
 typedef struct $Object {

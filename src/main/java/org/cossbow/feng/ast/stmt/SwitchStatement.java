@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Scope;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.util.Optional;
@@ -29,6 +30,10 @@ public class SwitchStatement extends Statement implements Scope {
 
     public Optional<Statement> init() {
         return init;
+    }
+
+    public void init(Optional<Statement> init) {
+        this.init = init;
     }
 
     public Expression value() {
@@ -66,6 +71,15 @@ public class SwitchStatement extends Statement implements Scope {
         for (var b : this.branches) branches.add(b.mirror());
         var def = this.defaultBranch.map(Branch::mirror);
         return new SwitchStatement(pos(), init, value.mirror(), branches, def);
+    }
+
+    @Override
+    public SwitchStatement mono(GenericMap gm) {
+        var init = this.init.map(s -> s.mono(gm));
+        var branches = new ArrayList<SwitchBranch>(this.branches.size());
+        for (var b : this.branches) branches.add(b.mono(gm));
+        var def = this.defaultBranch.map(b -> b.mono(gm));
+        return new SwitchStatement(pos(), init, value.mono(gm), branches, def);
     }
 
 }

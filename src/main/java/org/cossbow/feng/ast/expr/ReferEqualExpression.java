@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * The internal type of the compiler cannot be defined syntactically.
@@ -37,6 +38,12 @@ public class ReferEqualExpression extends PrimaryExpression {
     public ReferEqualExpression mirror() {
         return new ReferEqualExpression(pos(),
                 left.mirror(), right.mirror(), same);
+    }
+
+    @Override
+    public ReferEqualExpression mono(GenericMap gm) {
+        return monoCopy(new ReferEqualExpression(pos(),
+                left.mono(gm), right.mono(gm), same), gm);
     }
 
     //

@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.CallExpression;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.util.Lazy;
 
 public class CallStatement extends Statement {
@@ -34,6 +35,11 @@ public class CallStatement extends Statement {
     public CallStatement mirror() {
         // replace reset to nil via new construction
         return new CallStatement(pos(), call.mirror());
+    }
+
+    @Override
+    public CallStatement mono(GenericMap gm) {
+        return new CallStatement(pos(), call.mono(gm));
     }
 
 }

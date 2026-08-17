@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TupleTypeDeclarer;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * Get the element value of a tuple through the index.
@@ -47,6 +48,11 @@ public class TupleIndexExpression extends PrimaryExpression {
     @Override
     public TupleIndexExpression mirror() {
         return new TupleIndexExpression(pos(), subject.mirror(), index);
+    }
+
+    @Override
+    public TupleIndexExpression mono(GenericMap gm) {
+        return monoCopy(new TupleIndexExpression(pos(), subject.mono(gm), index), gm);
     }
 
     //

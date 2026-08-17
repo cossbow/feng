@@ -1,0 +1,23 @@
+
+class A final {
+    @Sync var i *int;
+}
+
+func test(n int) {
+    @Sync var a *A = new(A, {i=new(int, n)});
+    // sync 字段读取 → Feng$load_sl（返回值已 +1，赋给 sync 引用）
+    @Sync var x *int = a.i;
+    if (*x != n) { throw new(NilException); }
+    // sync 字段写入 → Feng$store_sl（ReleaserBuilder 前置为 replacer）
+    a.i = new(int, n + 1);
+    x = a.i;
+    if (*x != n + 1) { throw new(NilException); }
+    // 再次写入后读取，验证 load_sl 每次 +1 / store_sl 释放旧值
+    a.i = new(int, 100);
+    @Sync var y *int = a.i;
+    if (*y != 100) { throw new(NilException); }
+}
+
+func main() {
+    test(42);
+}

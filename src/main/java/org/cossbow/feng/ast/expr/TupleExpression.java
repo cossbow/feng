@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.expr;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TupleTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.util.Optional;
 
 import java.util.ArrayList;
@@ -52,12 +53,24 @@ public class TupleExpression extends PrimaryExpression {
         return types;
     }
 
+    public boolean unbound() {
+        return true;
+    }
 
     @Override
     public TupleExpression mirror() {
         var e = new ArrayList<Expression>(elements.size());
         for (var el : elements) e.add(el.mirror());
         return new TupleExpression(pos(), e, types);
+    }
+
+    @Override
+    public TupleExpression mono(GenericMap gm) {
+        var e = new ArrayList<Expression>(elements.size());
+        for (var el : elements) e.add(el.mono(gm));
+        var ts = new ArrayList<Optional<TypeDeclarer>>(types.size());
+        for (var t : types) ts.add(t.map(gm::mapIf));
+        return monoCopy(new TupleExpression(pos(), e, ts), gm);
     }
 
     //

@@ -132,17 +132,19 @@ public class GenericMap {
         return new TypeArguments(tps.pos(), list);
     }
 
-    public Prototype instantiate(Prototype p0) {
-        var vs = new ArrayList<Parameter>(p0.parameterSet().size());
-        for (var v0 : p0.parameterSet()) {
-            var v = (FixedParameter) v0;
-            var t = mapIf(v.type());
-            var v1 = new FixedParameter(v0.pos(), v.modifier(), v.name(), t);
-            vs.add(v1);
+    public Prototype instantiate(Prototype prot) {
+        var li = new ArrayList<Parameter>(prot.parameterSet().size());
+        for (var p0 : prot.parameterSet()) {
+            var p = (FixedParameter) p0;
+            var t = mapIf(p.type());
+            var p1 = p.clone();
+            p1.type(t);
+            p1.var().use(v -> v.type().update(this::mapIf));
+            li.add(p1);
         }
-        var ps = new ParameterSet(p0.parameterSet().pos(), vs);
-        var rs = p0.returnSet().map(mapper());
-        return new Prototype(p0.pos(), ps, rs);
+        var ps = new ParameterSet(prot.parameterSet().pos(), li);
+        var rs = prot.returnSet().map(mapper());
+        return new Prototype(prot.pos(), ps, rs);
     }
 
     public boolean isEmpty() {

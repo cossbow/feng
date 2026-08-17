@@ -138,6 +138,12 @@ public class ArrayTypeDeclarer extends TypeDeclarer
                 r, false);
     }
 
+    public static boolean isByteArray(TypeDeclarer td) {
+        return td instanceof ArrayTypeDeclarer atd &&
+                atd.element instanceof PrimitiveTypeDeclarer ptd
+                && ptd.primitive() == Primitive.BYTE;
+    }
+
     public static final ArrayField FieldLength = new ArrayField(ZERO,
             new Identifier("length"),
             Primitive.INT.declarer());

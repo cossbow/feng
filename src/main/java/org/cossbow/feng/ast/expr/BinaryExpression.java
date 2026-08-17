@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * Unified class of all binary operation expressions
@@ -56,5 +57,11 @@ public class BinaryExpression extends Expression {
     @Override
     public BinaryExpression mirror() {
         return new BinaryExpression(pos(), operator, left.mirror(), right.mirror());
+    }
+
+    @Override
+    public BinaryExpression mono(GenericMap gm) {
+        return monoCopy(new BinaryExpression(pos(), operator,
+                left.mono(gm), right.mono(gm)), gm);
     }
 }

@@ -893,6 +893,7 @@ public class SemanticAnalyzer {
                 var cm = new ClassMethod(pm.pos(), pm.modifier(),
                         pm.name(), pm.generic(), pm.escaped(),
                         pm.unmodifiable(), pp, pm.returnThis());
+                cm.dynamic(pm.dynamic());
                 cm.master(cd);
                 cd.inheritMethods().add(cm.name(), cm);
                 cd.allMethods().add(cm.name(), cm);
@@ -1839,7 +1840,8 @@ public class SemanticAnalyzer {
 
         if (re.literal() instanceof StringLiteral) {
             // 字符串字面量可以传递给数组引用，当然必须是不可修改的
-            if (l instanceof ArrayTypeDeclarer la && isByteArray(la)) {
+            if (l instanceof ArrayTypeDeclarer la &&
+                    ArrayTypeDeclarer.isByteArray(l)) {
                 if (la.refer().none()) return TypeValid.ok();
                 var r = la.refer().get();
                 if (r.unmodifiable()) return TypeValid.ok();
@@ -2017,7 +2019,8 @@ public class SemanticAnalyzer {
 
         if (r.literal() instanceof StringLiteral sl) {
             // 字符串字面量只能传递给[N]byte类型
-            if (l instanceof ArrayTypeDeclarer la && isByteArray(la)) {
+            if (l instanceof ArrayTypeDeclarer la &&
+                    ArrayTypeDeclarer.isByteArray(l)) {
                 if (la.len() >= sl.length())
                     return TypeValid.ok();
                 return TypeValid.err("string overflow: %s", r.pos());
@@ -2484,8 +2487,6 @@ public class SemanticAnalyzer {
                     e.arguments().get(1).pos());
 
         var a = e.arguments().getFirst();
-        var dt = new DerivedType(a.pos(), ed.symbol(), TypeArguments.EMPTY);
-        dt.def(ed);
         var t = new EnumTypeDeclarer(a.pos(), ed);
 
         var size = new IntegerLiteral(ZERO, ed.values().size()).expr();
@@ -2863,9 +2864,7 @@ public class SemanticAnalyzer {
                         e.typeSet().get(1).pos());
             }
             var fdt = (DerivedTypeDeclarer) e.typeSet().getFirst();
-            var dt = new DerivedType(fdt.pos(), lca.get().symbol(),
-                    TypeArguments.EMPTY);
-            findDef(dt);
+            var dt = lca.get().link(fdt.pos());
             var udt = new DerivedTypeDeclarer(fdt.pos(), dt, fdt.refer());
             v.type().set(udt);
         }
@@ -4137,8 +4136,7 @@ public class SemanticAnalyzer {
         assert enterClass != null;
         assert enterMethod != null;
         var def = e.isSelf() ? enterClass : enterClass.parent().must();
-        var dt = new DerivedType(e.pos(), def.symbol(), TypeArguments.EMPTY);
-        dt.def(def);
+        var dt = def.link(e.pos());
         var kind = enterMethod.escaped() ? STRONG : PHANTOM;
         var ref = new Refer(e.pos(), kind, true, false);
         var td = new DerivedTypeDeclarer(e.pos(), dt, Optional.of(ref));
@@ -5173,12 +5171,7 @@ public class SemanticAnalyzer {
 
     private ClassMethod operatorMethod(
             ClassDefinition cd, MacroFunc mf, boolean returnBool) {
-        var tds = new ArrayList<TypeDeclarer>(cd.generic().size());
-        for (var p : cd.generic()) {
-            tds.add(new GenericTypeDeclarer(ZERO, new GenericType(ZERO, p)));
-        }
-        var tas = new TypeArguments(ZERO, tds);
-        var dt = new DerivedType(ZERO, cd.symbol(), tas);
+        var dt = cd.link(mf.pos());
 
         var mp = mf.procedure();
         var params = new ArrayList<Parameter>(mp.params().size());
@@ -5284,6 +5277,7 @@ public class SemanticAnalyzer {
         var cm = new ClassMethod(mf.pos(), Modifier.empty(), mf.makeId(),
                 TypeParameters.empty(), false, unmodifiable, proc, false);
         cm.master(cd);
+        cm.dynamic(false);   // 运算符 / 索引宏不参与动态派发
         return cm;
     }
 
@@ -5419,7 +5413,7 @@ public class SemanticAnalyzer {
             return formatPrimitive(ptd.primitive(), (PrimaryExpression) ag.a(), out);
         }
         // Byte array: out.write(data, 0, data.length)
-        if (ag.b() instanceof ArrayTypeDeclarer td && isByteArray(td)) {
+        if (ArrayTypeDeclarer.isByteArray(ag.b())) {
             var name = new Identifier("write");
             var me = new MemberOfExpression(ZERO, out, name, TypeArguments.EMPTY);
             var zero = new LiteralExpression(ZERO, new IntegerLiteral(ZERO, 0));

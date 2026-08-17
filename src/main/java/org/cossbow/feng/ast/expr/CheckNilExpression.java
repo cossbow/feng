@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * Expressions used to determine nil are generated
@@ -29,6 +30,11 @@ public class CheckNilExpression extends PrimaryExpression {
     @Override
     public CheckNilExpression mirror() {
         return new CheckNilExpression(pos(), subject.mirror(), nil);
+    }
+
+    @Override
+    public CheckNilExpression mono(GenericMap gm) {
+        return monoCopy(new CheckNilExpression(pos(), subject.mono(gm), nil), gm);
     }
 
     //

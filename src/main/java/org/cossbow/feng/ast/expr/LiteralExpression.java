@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.lit.Literal;
 
 /**
@@ -42,6 +43,11 @@ public class LiteralExpression extends PrimaryExpression {
     @Override
     public LiteralExpression mirror() {
         return this;
+    }
+
+    @Override
+    public LiteralExpression mono(GenericMap gm) {
+        return monoCopy(new LiteralExpression(pos(), literal), gm);
     }
 
     //

@@ -2,9 +2,12 @@ package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Scope;
+import org.cossbow.feng.ast.gen.GenericMap;
+import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.dcl.Variable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class CatchClause extends Statement implements Scope {
@@ -49,5 +52,17 @@ public class CatchClause extends Statement implements Scope {
     @Override
     public CatchClause mirror() {
         return new CatchClause(pos(), argument.mirror(), typeSet, body.mirror());
+    }
+
+    @Override
+    public CatchClause mono(GenericMap gm) {
+        var types = new ArrayList<TypeDeclarer>(typeSet.size());
+        for (var t : typeSet) types.add(gm.mapIf(t));
+        Lazy<TypeDeclarer> argType = argument.type().has()
+                ? Lazy.of(gm.mapIf(argument.type().must()))
+                : Lazy.nil();
+        var arg = new Variable(argument.pos(), argument.modifier(), argument.declare(),
+                argument.name(), argType, argument.value());
+        return new CatchClause(pos(), arg, types, body.mono(gm));
     }
 }

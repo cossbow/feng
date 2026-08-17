@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.util.Optional;
 
 import java.util.ArrayList;
@@ -41,6 +42,14 @@ public class TryStatement extends Statement {
         for (var c : catchClauses) catches.add(c.mirror());
         return new TryStatement(pos(), body.mirror(), catches,
                 finallyClause.map(BlockStatement::mirror));
+    }
+
+    @Override
+    public TryStatement mono(GenericMap gm) {
+        var catches = new ArrayList<CatchClause>(catchClauses.size());
+        for (var c : catchClauses) catches.add(c.mono(gm));
+        return new TryStatement(pos(), body.mono(gm), catches,
+                finallyClause.map(b -> b.mono(gm)));
     }
 
 }

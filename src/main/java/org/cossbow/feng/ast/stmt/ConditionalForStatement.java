@@ -5,6 +5,7 @@ import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 public class ConditionalForStatement extends ForStatement {
     private Optional<Statement> initializer;
@@ -24,6 +25,10 @@ public class ConditionalForStatement extends ForStatement {
 
     public Optional<Statement> initializer() {
         return initializer;
+    }
+
+    public void initializer(Optional<Statement> initializer) {
+        this.initializer = initializer;
     }
 
     public Expression condition() {
@@ -52,5 +57,13 @@ public class ConditionalForStatement extends ForStatement {
         var cond = condition.mirror();
         var upd = updater.map(Statement::mirror);
         return new ConditionalForStatement(pos(), body().mirror(), init, cond, upd);
+    }
+
+    @Override
+    public ConditionalForStatement mono(GenericMap gm) {
+        var init = initializer.map(s -> s.mono(gm));
+        var cond = condition.mono(gm);
+        var upd = updater.map(s -> s.mono(gm));
+        return new ConditionalForStatement(pos(), body().mono(gm), init, cond, upd);
     }
 }

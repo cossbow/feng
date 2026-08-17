@@ -2,6 +2,8 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
+import org.cossbow.feng.ast.gen.GenericMap;
+import org.cossbow.feng.ast.Mangle;
 import org.cossbow.feng.ast.gen.TypeArguments;
 
 /**
@@ -38,6 +40,16 @@ public class SymbolExpression extends PrimaryExpression {
     @Override
     public SymbolExpression mirror() {
         return this;
+    }
+
+    @Override
+    public SymbolExpression mono(GenericMap gm) {
+        var mapped = gm.mapAll(generic);
+        if (!mapped.isEmpty() && !mapped.hasTypeVar()) {
+            return monoCopy(new SymbolExpression(pos(),
+                    Mangle.symbol(symbol, mapped), TypeArguments.EMPTY), gm);
+        }
+        return monoCopy(new SymbolExpression(pos(), symbol, mapped), gm);
     }
 
     //

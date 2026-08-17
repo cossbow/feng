@@ -53,6 +53,11 @@ public class ClassMethod extends Method
      * [imcompleted]
      */
     private final boolean returnThis;
+    /**
+     * 该方法是否参与动态派发（在非 final 类中被放入 vtable 槽、可被覆盖并走 $meta 派发）。
+     * 默认 true（用户方法、free 宏）；运算符 / 索引宏 / mono 方法级实例化设为 false。
+     */
+    private boolean dynamic = true;
 
     public ClassMethod(Position pos,
                        Modifier modifier,
@@ -134,6 +139,14 @@ public class ClassMethod extends Method
 
     public boolean unmodifiable() {
         return unmodifiable;
+    }
+
+    public boolean dynamic() {
+        return dynamic;
+    }
+
+    public void dynamic(boolean v) {
+        this.dynamic = v;
     }
 
     public Position pos() {

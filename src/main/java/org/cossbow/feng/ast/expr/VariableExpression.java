@@ -4,6 +4,7 @@ import org.cossbow.feng.ast.GlobalVariable;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.dcl.Variable;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
@@ -61,6 +62,11 @@ public class VariableExpression extends PrimaryExpression {
         // Local variables need to be parsed again after expansion
         return new SymbolExpression(pos(), symbol.get(),
                 TypeArguments.EMPTY);
+    }
+
+    @Override
+    public PrimaryExpression mono(GenericMap gm) {
+        return monoCopy(new VariableExpression(pos(), variable, symbol), gm);
     }
 
     //

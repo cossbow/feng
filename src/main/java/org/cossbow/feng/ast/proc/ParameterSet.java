@@ -89,8 +89,8 @@ public class ParameterSet extends Entity
         for (var p : params) {
             if (p instanceof VariadicParameter)
                 return ErrorUtil.unreachable();
-            var fp = (FixedParameter) p;
-            if (fp.type().hasTypeVar())
+            if (p instanceof FixedParameter fp
+                    && fp.type().hasTypeVar())
                 return true;
         }
         return false;

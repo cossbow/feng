@@ -110,7 +110,11 @@ static inline bool Feng$dec_ns(void* p) {
     if (!p) return false;
     int ref = --Feng$headerOf(p)->refcnt;
     if (ref == 0) return true;
+#ifdef FENG_DEBUG_MEMORY
+    if (ref < 0) return false;  // allow over-release so the leak report still prints
+#else
     if (ref < 0) abort();
+#endif
     return false;
 }
 
@@ -241,6 +245,16 @@ static inline void Feng$cleanup_sfield(void** f) {
     uintptr_t raw = atomic_load((atomic_uintptr_t*)f);
     void* p = (void*)(raw & ~(uintptr_t)1);
     if (p && Feng$dec(p)) { Feng$vDestroy(p); Feng$free(p); }
+    *f = NULL;
+}
+
+// cleanup for sync var fields of FINAL classes — same defensive bit-0 mask,
+// but dispatch through an explicit static destructor (final classes have no $meta,
+// so Feng$vDestroy would read garbage). destroy must be Feng$destroy_X.
+static inline void Feng$cleanup_sfield_final(void** f, void (*destroy)(void*)) {
+    uintptr_t raw = atomic_load((atomic_uintptr_t*)f);
+    void* p = (void*)(raw & ~(uintptr_t)1);
+    if (p && Feng$dec(p)) { destroy(p); Feng$free(p); }
     *f = NULL;
 }
 

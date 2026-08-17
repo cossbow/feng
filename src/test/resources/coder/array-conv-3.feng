@@ -1,0 +1,29 @@
+
+// 缺陷 #4 复现（长度换算部分）：[16]byte 定长数组 → [&]int 虚引用参数。
+// Int 在 C 层是 int64（8 字节），16 字节换算 length=2，
+// 生成 { (Int*)$values, (sizeof(Byte)*len)/sizeof(Int) }。
+// 注：数组元素协变 [&]B→[&]A 在语义层被拒（assignRefer 仅允许元素 equals），
+// 到不了代码生成层，故此处只验证合法路径长度换算。
+
+func sumInts(a [&]int) int {
+    var s = 0;
+    for (var i = 0; i < a.length; i += 1) {
+        s += a[i];
+    }
+    return s;
+}
+
+func test(n int) {
+    // 小端字节序：8 字节一个 int64 → [1,0,0,0,0,0,0,0, 2,0,0,0,0,0,0,0] = int[2]{1,2}
+    var bytes [16]byte = [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0];
+    var v = sumInts(bytes);
+    if (v != 3) { throw new(NilException); }
+    // 直接构造 int 数组对照
+    var ints [2]int = [1,2];
+    var w = sumInts(ints);
+    if (w != 3) { throw new(NilException); }
+}
+
+func main(args [&#][*?#]byte) {
+    test(1);
+}

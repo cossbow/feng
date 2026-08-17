@@ -4,6 +4,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Primitive;
 
+final
 public class PrimitiveType extends DefinedType {
     private final Identifier name;
     private final Primitive primitive;

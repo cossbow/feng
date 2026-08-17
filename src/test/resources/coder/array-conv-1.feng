@@ -1,0 +1,20 @@
+
+// 缺陷 #2 复现：字符串字面量作为调用实参传给 [&#]byte 虚引用数组参数。
+// 旧路径 writeArg 绕过 LiteralExpression → baseTypeSymbol(LiteralType) unreachable。
+
+func write(b [&#]byte) int {
+    return b.length;
+}
+
+func test(n int) {
+    var l = write("Hello!\n");
+    if (l != 7) { throw new(NilException); }
+    var m = write("xxxyyy");
+    if (m != 6) { throw new(NilException); }
+    var e = write("");
+    if (e != 0) { throw new(NilException); }
+}
+
+func main(args [&#][*?#]byte) {
+    test(1);
+}

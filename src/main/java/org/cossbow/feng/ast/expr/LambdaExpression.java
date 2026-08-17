@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.proc.Procedure;
 
 /**
@@ -21,6 +22,11 @@ public class LambdaExpression extends PrimaryExpression {
 
     @Override
     public LambdaExpression mirror() {
+        return this;
+    }
+
+    @Override
+    public LambdaExpression mono(GenericMap gm) {
         return this;
     }
 

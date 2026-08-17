@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * Type Checking and Conversion:
@@ -64,6 +65,13 @@ public class IsExpression extends PrimaryExpression {
         var n = new IsExpression(pos(), subject.mirror(), type);
         n.needCheck = false;
         return n;
+    }
+
+    @Override
+    public IsExpression mono(GenericMap gm) {
+        var n = new IsExpression(pos(), subject.mono(gm), gm.mapIf(type));
+        n.needCheck = false;
+        return monoCopy(n, gm);
     }
 
     //

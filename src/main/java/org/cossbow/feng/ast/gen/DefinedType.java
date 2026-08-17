@@ -8,8 +8,9 @@ import org.cossbow.feng.ast.TypeDefinition;
 /**
  * A symbol link to a {@link TypeDefinition} or a gengeric type paramster
  */
-abstract
-public class DefinedType extends Entity {
+abstract sealed
+public class DefinedType extends Entity
+        permits DerivedType, GenericType, PrimitiveType {
     public DefinedType(Position pos) {
         super(pos);
     }

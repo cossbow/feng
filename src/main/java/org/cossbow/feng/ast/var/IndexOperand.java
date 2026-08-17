@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.var;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.expr.IndexOfExpression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 
@@ -68,5 +69,11 @@ public class IndexOperand extends Operand {
     @Override
     public IndexOperand mirror() {
         return new IndexOperand(pos(), (PrimaryExpression) subject.mirror(), index.mirror());
+    }
+
+    @Override
+    public IndexOperand mono(GenericMap gm) {
+        return (IndexOperand) monoCopy(
+                new IndexOperand(pos(), subject.mono(gm), index.mono(gm)), gm);
     }
 }

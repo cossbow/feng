@@ -1,0 +1,35 @@
+
+// 缺陷 #3 复现：baseTypeSame 只比 element、忽略 refer/len。
+// 数组引用 [&]/[*] 转换必须按胖指针处理（保留 $length），定长数组→引用按长度换算；
+// 定长数组长度不同不得视为"完全相同"（语义层拒绝，此处验证合法路径不误伤）。
+
+func sum(a [&]int) int {
+    var s = 0;
+    for (var i = 0; i < a.length; i += 1) {
+        s += a[i];
+    }
+    return s;
+}
+
+func test(n int) {
+    // 定长 [3]int → [&]int 虚引用参数（PRef 包装，长度 3）
+    var fixed [3]int = [1,2,3];
+    if (sum(fixed) != 6) { throw new(NilException); }
+
+    // [*]int（SRef）→ [&]int（PRef）参数：长度必须保留（4）
+    var sref [*]int = new([4]int, [9,8,7,6]);
+    if (sum(sref) != 30) { throw new(NilException); }
+
+    // [*]int → [&]int 常量引用（SRef→PRef 包装，length=4）
+    const pref [&]int = sref;
+    if (pref.length != 4) { throw new(NilException); }
+    if (pref[3] != 6) { throw new(NilException); }
+
+    // 定长数组字面量 → 定长目标（较短字面量合法初始化，长度 5）
+    var x [5]int = [1,2,3];
+    if (x[0] + x[2] != 4) { throw new(NilException); }
+}
+
+func main(args [&#][*?#]byte) {
+    test(1);
+}

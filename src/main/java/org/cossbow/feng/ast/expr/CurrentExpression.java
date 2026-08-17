@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * Create by parse keywords {@code this} or {@code super}
@@ -51,6 +52,11 @@ public class CurrentExpression extends PrimaryExpression {
     @Override
     public CurrentExpression mirror() {
         return this;
+    }
+
+    @Override
+    public CurrentExpression mono(GenericMap gm) {
+        return monoCopy(new CurrentExpression(pos(), className, isSelf), gm);
     }
 
     //

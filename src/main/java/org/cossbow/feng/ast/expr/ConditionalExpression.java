@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * Unlike if..else statements, conditional expressions can
@@ -52,5 +53,11 @@ public class ConditionalExpression extends Expression {
     @Override
     public ConditionalExpression mirror() {
         return new ConditionalExpression(pos(), condition.mirror(), yes.mirror(), not.mirror());
+    }
+
+    @Override
+    public ConditionalExpression mono(GenericMap gm) {
+        return monoCopy(new ConditionalExpression(pos(),
+                condition.mono(gm), yes.mono(gm), not.mono(gm)), gm);
     }
 }

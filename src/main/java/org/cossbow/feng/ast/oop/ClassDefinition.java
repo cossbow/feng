@@ -5,7 +5,6 @@ import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.Declare;
 import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.ast.gen.DerivedType;
-import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.micro.MacroTable;
 import org.cossbow.feng.ast.proc.FixedParameter;
@@ -266,25 +265,16 @@ public class ClassDefinition extends ObjectDefinition {
 
     // static
 
-    public static final Symbol ObjectSymbol = new Symbol(new Identifier("Object"));
-    public static final DerivedType ObjectType = new DerivedType(
-            Position.ZERO, ObjectSymbol, TypeArguments.EMPTY);
     // The root class of all non-final class
     public static final ClassDefinition ObjectClass =
             new ClassDefinition(Position.ZERO, Modifier.empty(),
-                    ObjectSymbol, TypeParameters.empty(),
+                    new Symbol(new Identifier("Object")),
+                    TypeParameters.empty(),
                     Optional.empty(), new SymbolMap<>(),
                     new IdentifierMap<>(), new IdentifierMap<>(),
                     new MacroTable());
 
     // --- built-in exception classes ---
-
-    /**
-     * The built-in Exception class — base of all exception types.
-     * The standard library {@code std$error$Exception} overlays this definition.
-     */
-    public static final Symbol ExceptionSymbol =
-            new Symbol(new Identifier("Exception"));
 
     private static IdentifierMap<ClassField> _exFields() {
         var m = new IdentifierMap<ClassField>(2);
@@ -321,18 +311,16 @@ public class ClassDefinition extends ObjectDefinition {
         var exMethods = new IdentifierMap<ClassMethod>(1);
         exMethods.add(traceMethod.name(), traceMethod);
         ExceptionClass = new ClassDefinition(Position.ZERO,
-                Modifier.empty(), ExceptionSymbol,
+                Modifier.empty(), new Symbol(new Identifier("Exception")),
                 TypeParameters.empty(), false,
-                Optional.of(new DerivedType(Position.ZERO,
-                        ObjectSymbol, TypeArguments.EMPTY)),
+                Optional.of(ObjectClass.link()),
                 new SymbolMap<>(), exFields, exMethods, new MacroTable());
 
         // -- NilException (inherits fn/line fields from Exception) --
         NilExceptionClass = new ClassDefinition(Position.ZERO, Modifier.empty(),
                 new Symbol(new Identifier("NilException")),
                 TypeParameters.empty(), false,
-                Optional.of(new DerivedType(Position.ZERO,
-                        ExceptionSymbol, TypeArguments.EMPTY)),
+                Optional.of(ExceptionClass.link()),
                 new SymbolMap<>(), new IdentifierMap<>(),
                 new IdentifierMap<>(), new MacroTable());
 
@@ -340,8 +328,7 @@ public class ClassDefinition extends ObjectDefinition {
         OutOfBoundsExceptionClass = new ClassDefinition(Position.ZERO, Modifier.empty(),
                 new Symbol(new Identifier("OutOfBoundsException")),
                 TypeParameters.empty(), false,
-                Optional.of(new DerivedType(Position.ZERO,
-                        ExceptionSymbol, TypeArguments.EMPTY)),
+                Optional.of(ExceptionClass.link()),
                 new SymbolMap<>(), new IdentifierMap<>(),
                 new IdentifierMap<>(), new MacroTable());
 
@@ -349,8 +336,7 @@ public class ClassDefinition extends ObjectDefinition {
         AssertExceptionClass = new ClassDefinition(Position.ZERO, Modifier.empty(),
                 new Symbol(new Identifier("AssertException")),
                 TypeParameters.empty(), false,
-                Optional.of(new DerivedType(Position.ZERO,
-                        ExceptionSymbol, TypeArguments.EMPTY)),
+                Optional.of(ExceptionClass.link()),
                 new SymbolMap<>(), new IdentifierMap<>(),
                 new IdentifierMap<>(), new MacroTable());
 

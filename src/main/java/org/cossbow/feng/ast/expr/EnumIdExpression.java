@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.EnumDefinition;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
  * The internal expressions of a compiler cannot be syntactically defined.
@@ -28,6 +29,11 @@ public class EnumIdExpression extends EnumExpression {
     @Override
     public EnumIdExpression mirror() {
         return new EnumIdExpression(pos(), def(), index.mirror());
+    }
+
+    @Override
+    public EnumIdExpression mono(GenericMap gm) {
+        return monoCopy(new EnumIdExpression(pos(), def(), index.mono(gm)), gm);
     }
 
     //

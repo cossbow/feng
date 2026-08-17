@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Method;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.gen.TypeArguments;
 
 /**
@@ -48,6 +49,12 @@ public class MethodExpression extends PrimaryExpression {
     @Override
     public MethodExpression mirror() {
         return new MethodExpression(pos(), subject.mirror(), method, generic);
+    }
+
+    @Override
+    public MethodExpression mono(GenericMap gm) {
+        return monoCopy(new MethodExpression(pos(), subject.mono(gm), method,
+                gm.mapAll(generic)), gm);
     }
 
     //

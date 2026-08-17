@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.var;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.DereferExpression;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 
@@ -49,5 +50,11 @@ public class DereferOperand extends Operand {
     @Override
     public DereferOperand mirror() {
         return new DereferOperand(pos(), (PrimaryExpression) subject.mirror());
+    }
+
+    @Override
+    public DereferOperand mono(GenericMap gm) {
+        return (DereferOperand) monoCopy(
+                new DereferOperand(pos(), subject.mono(gm)), gm);
     }
 }

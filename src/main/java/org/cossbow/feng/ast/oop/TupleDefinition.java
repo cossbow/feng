@@ -4,6 +4,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
+import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.gen.TypeParameter;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.util.Groups;
@@ -24,21 +25,47 @@ import static org.cossbow.feng.ast.Position.ZERO;
 public class TupleDefinition extends BuiltinTypeDefinition {
 
     private final List<TypeParameter> elementParams;
+    /**
+     * Concrete element types when this is a monomorphized instance, else null.
+     */
+    private final List<TypeDeclarer> elementTypes;
 
+    /**
+     * Generic template form ({@code elementParams} + typeMap), used by the
+     * legacy pass.
+     */
     public TupleDefinition(List<TypeParameter> elementParams) {
-        super(ZERO, new Symbol(new Identifier("Tuple" + elementParams.size())),
-                new TypeParameters(ZERO, new IdentifierMap<>(
+        this(new Symbol(new Identifier("Tuple" + elementParams.size())),
+                elementParams, null);
+    }
+
+    /**
+     * Monomorphized form: unique symbol + concrete element types, no typeMap.
+     */
+    public TupleDefinition(Symbol symbol, List<TypeDeclarer> elementTypes) {
+        this(symbol, null, elementTypes);
+    }
+
+    private TupleDefinition(Symbol symbol, List<TypeParameter> elementParams,
+                            List<TypeDeclarer> elementTypes) {
+        super(ZERO, symbol, elementParams == null ? TypeParameters.empty()
+                : new TypeParameters(ZERO, new IdentifierMap<>(
                         elementParams.stream()
                                 .map(tp -> Groups.g2(tp.name(), tp))
                                 .toList())));
-        this.elementParams = new ArrayList<>(elementParams);
+        this.elementParams = elementParams == null ? List.of() : new ArrayList<>(elementParams);
+        this.elementTypes = elementTypes == null ? null : new ArrayList<>(elementTypes);
     }
 
     public List<TypeParameter> elementParams() {
         return elementParams;
     }
 
+    public List<TypeDeclarer> elementTypes() {
+        return elementTypes;
+    }
+
     public int arity() {
-        return elementParams.size();
+        return elementTypes != null ? elementTypes.size() : elementParams.size();
     }
 }

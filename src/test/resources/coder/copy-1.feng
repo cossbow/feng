@@ -1,0 +1,92 @@
+
+class A  { var i *int; }     // 一个有引用的类
+class P final { var x int; } // 纯值类型 → 不生成 copy
+class B : A { var j *int; }  // 继承字段（B 含 A 的 i + 自己的 j）
+class C { var a A; }         // 内嵌类值字段（嵌套）
+
+
+func test1() {
+    var a1 A = {i=new(int)};
+    var a2 A = a1;
+}
+func test2() {
+    var a1 A = {i=new(int)};
+    var a2 A = {i=new(int)};
+    const r &A = a2;
+    *r = a1;
+}
+
+func test3() {
+    var i = new(int);
+    var a1 [2]*int = [i,i];
+    var a2 [2]*int = a1;
+}
+
+func test4() {
+    var i = new(int);
+    var j = new(bool);
+    var a1 (*int,*bool) = (i,j);
+    var a2 = a1;
+}
+
+func test5() {
+    var a1 A = {i=new(int)};
+    var ar = new(A, a1);
+    *ar = {i=new(int)};
+}
+
+func testAssign() {             // 补 1、2
+    var a1 A = {i=new(int)};
+    var a2 A = {i=new(int)};
+    a2 = a1;       // 普通赋值复制
+    a2 = a2;       // 自赋值
+}
+
+func testNested() {
+    var b1 B = {i=new(int), j=new(int)};
+    var b2 B = b1;   // copy_B 递归 inc i、j
+    var c1 C = {a={i=new(int)}};
+    var c2 C = c1;   // copy_C 递归 inc a.i
+}
+
+func testValueElem() {
+    var x A = {i=new(int)};
+    var a1 [2]A = [x, x];
+    var a2 [2]A = a1;       // 元素是值类型 A → 递归 copy_A
+    var t1 (A, [2]A) = (x, a1);
+    var t2 = t1;            // 元组元素含值类型
+}
+
+func testPureValue() {
+    var p1 P = {x=1};
+    var p2 P = p1;   // needsCopy=false → 裸拷贝，无 Feng$copy_P
+}
+
+func testParent() {
+    var i = new(int);
+    var j = new(int);
+    var a1 *A = new(B,{i=i,j=j});
+
+    i = new(int);
+    j = new(int);
+    *a1 = {i=i};
+    var b B = {i=i,j=j};
+    var a A = {i=new(int)};
+    const a2 &A = b;
+    *a2 = a;
+    assert(b.j==j);
+}
+
+func main() {
+    test1();
+    test2();
+    test3();
+    test4();
+    test5();
+
+    testAssign();
+    testNested();
+    testValueElem();
+    testPureValue();
+    testParent();
+}

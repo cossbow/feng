@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.var;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.expr.MemberOfExpression;
 import org.cossbow.feng.ast.expr.PrimaryExpression;
 import org.cossbow.feng.ast.gen.TypeArguments;
@@ -61,5 +62,11 @@ public class FieldOperand extends Operand {
     @Override
     public FieldOperand mirror() {
         return new FieldOperand(pos(), (PrimaryExpression) subject.mirror(), field);
+    }
+
+    @Override
+    public FieldOperand mono(GenericMap gm) {
+        return (FieldOperand) monoCopy(
+                new FieldOperand(pos(), subject.mono(gm), field), gm);
     }
 }

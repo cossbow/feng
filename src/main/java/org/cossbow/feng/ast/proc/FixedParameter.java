@@ -88,6 +88,13 @@ public class FixedParameter extends Parameter {
         return Optional.of(v);
     }
 
+    public FixedParameter clone() {
+        var p = (FixedParameter) super.clone();
+        if (variable == null) return p;
+        p.variable = variable.clone();
+        return p;
+    }
+
     // creator
 
     public static FixedParameter create(

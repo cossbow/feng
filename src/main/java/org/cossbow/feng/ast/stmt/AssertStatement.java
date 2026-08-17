@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.gen.GenericMap;
 
 public class AssertStatement extends Statement {
     private Expression condition;
@@ -22,5 +23,10 @@ public class AssertStatement extends Statement {
     @Override
     public AssertStatement mirror() {
         return new AssertStatement(pos(), condition.mirror());
+    }
+
+    @Override
+    public AssertStatement mono(GenericMap gm) {
+        return new AssertStatement(pos(), condition.mono(gm));
     }
 }

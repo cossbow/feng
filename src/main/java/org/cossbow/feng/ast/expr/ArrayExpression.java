@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.ArrayTypeDeclarer;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.util.Optional;
 
 import java.util.ArrayList;
@@ -63,6 +64,14 @@ public class ArrayExpression extends PrimaryExpression {
         var e = new ArrayList<Expression>(elements.size());
         for (var el : elements) e.add(el.mirror());
         return new ArrayExpression(pos(), e, type);
+    }
+
+    @Override
+    public ArrayExpression mono(GenericMap gm) {
+        var e = new ArrayList<Expression>(elements.size());
+        for (var el : elements) e.add(el.mono(gm));
+        var t = type.map(gm::mapIf);
+        return monoCopy(new ArrayExpression(pos(), e, t), gm);
     }
 
     //

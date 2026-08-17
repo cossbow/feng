@@ -1,12 +1,12 @@
 package org.cossbow.feng.mod;
 
 import org.antlr.v4.runtime.CharStreams;
-import org.cossbow.feng.analysis.AnalyseSymbolTable;
-import org.cossbow.feng.analysis.GlobalSymbolContext;
-import org.cossbow.feng.analysis.AnonFuncNormalizer;
-import org.cossbow.feng.analysis.Monomorphization;
-import org.cossbow.feng.analysis.RelayLowering;
-import org.cossbow.feng.analysis.SemanticAnalyzer;
+import org.cossbow.feng.analysis.*;
+import org.cossbow.feng.analysis.meta.ClassMetadata;
+import org.cossbow.feng.analysis.meta.CopyBuilder;
+import org.cossbow.feng.analysis.meta.VTableBuilder;
+import org.cossbow.feng.analysis.mono.Monomorphization;
+import org.cossbow.feng.analysis.meta.ReleaserBuilder;
 import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.dag.DAGGraph;
@@ -19,9 +19,8 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -73,15 +72,15 @@ public class ModuleAnalysis {
 
     public void analyse(DAGGraph<FModule> modules) {
         var tabMap = modules.stream().collect(
-                Collectors.toMap(FModule::path, FModule::table));
-        // Collect analyzed module tables for cross-module monomorphization
-        var analyzedTables = new HashMap<ModulePath, AnalyseSymbolTable>();
+                Collectors.toMap(FModule::path, Function.identity()));
+
         for (var m : modules) {
             var imports = new HashMap<ModulePath, ParseSymbolTable>(
                     m.imports().size() + 1);
             for (var i : m.imports()) {
-                var im = tabMap.get(i);
-                if (im == null) continue;
+                var dm = tabMap.get(i);
+                if (dm == null) continue;
+                var im = dm.table();
                 if (im.main.has()) {
                     ErrorUtil.semantic("can't import main-module: %s", i, i.pos());
                     return;
@@ -93,52 +92,98 @@ public class ModuleAnalysis {
             var ast = analyse(m.table(), context);
             ast.module.set(m);
 
-            // AST lowering: insert temporary variables for
-            // lifetime safety before code generation
-            new RelayLowering(ast).lower();
-
-            // Normalize anonymous function types to named prototypes
-            // so backends don't need to discover them at code-gen time
-            new AnonFuncNormalizer(ast).normalize();
-
-            // Monomorphization: discover all concrete generic instantiations
-            // and record them in the symbol table.
-            // Pass already-analyzed module tables so cross-module generic
-            // function definitions can be found.
-            var monoImports = new HashMap<ModulePath, AnalyseSymbolTable>();
-            for (var i : m.imports()) {
-                var analyzed = analyzedTables.get(i);
-                if (analyzed != null) monoImports.put(i, analyzed);
-            }
-            new Monomorphization(ast, monoImports.isEmpty() ? null : monoImports).run();
 
             m.result.set(ast);
-            analyzedTables.put(m.path(), ast);
 
             // TODO：暂时不导入元数据
             // TODO：暂时使用源码做元数据
 //            var pst = buildMetadata(m);
         }
-        ;
+
+        normalize(modules);
+
+        mono(modules, tabMap);
+
+        lowering(modules);
+
+        classFlat(modules);
+
+        classVtable(modules);
+
+        releaser(modules);
     }
 
-    public AnalyseSymbolTable analyse(FModule module) {
-        var context = new GlobalSymbolContext(module.table());
-        var ast = analyse(module.table(), context);
-        ast.module.set(module);
+    private void normalize(DAGGraph<FModule> modules) {
+        // Normalize anonymous function types to named prototypes
+        // so backends don't need to discover them at code-gen time
+        for (FModule fm : modules) {
+            new AnonFuncNormalizer(fm.result.must()).normalize();
+        }
+    }
 
+    private void mono(DAGGraph<FModule> modules,
+                      Map<ModulePath, FModule> map) {
+        // Cross-module mono instances (definition-site ownership) keyed by path.
+        var monoMap = new LinkedHashMap<ModulePath, Monomorphization>();
+        for (var fm : modules) {
+            // Monomorphization: discover all concrete generic instantiations
+            // and record them in the symbol table.
+            // Pass already-analyzed module tables so cross-module generic
+            // function definitions can be found.
+            var mono = new Monomorphization(fm.result.must(), monoMap);
+            monoMap.put(fm.path(), mono);
+        }
+        // Phase 1: run monomorphization on every module. Each run() concretizes
+        // types and writes cross-module instances into their *owner* module's
+        // concretized set (definition-site ownership). Phase 1 must complete for
+        // ALL modules before any buildDeps() runs, otherwise an instance written
+        // by a later module (e.g. main's IntPair`bool` owned by aad) is missed by
+        // the owner's already-completed bucketing.
+        for (var mono : monoMap.values()) {
+            mono.run();
+        }
+        // Phase 2: build dependency graphs after all modules' concretization
+        // (including cross-module instances) has been written.
+        for (var mono : monoMap.values()) {
+            mono.buildDeps();
+        }
+    }
+
+    private void lowering(DAGGraph<FModule> modules) {
         // AST lowering: insert temporary variables for
         // lifetime safety before code generation
-        new RelayLowering(ast).lower();
+        for (var fm : modules) {
+            new RelayLowering(fm.result.must()).lower();
+        }
+    }
 
-        // Normalize anonymous function types to named prototypes
-        new AnonFuncNormalizer(ast).normalize();
+    private void classFlat(DAGGraph<FModule> modules) {
+        // Phase 3: assemble class metadata (method → function symbol) after
+        // monomorphization, so concrete instances and method-level generic
+        // instantiations are all present.
+        for (var m : modules) {
+            var ast = m.result.must();
+            new ClassMetadata(ast).build();
+        }
+    }
 
-        // Monomorphization: discover all concrete generic instantiations
-        // and record them in the symbol table
-        new Monomorphization(ast).run();
+    private void classVtable(DAGGraph<FModule> modules) {
+        var tableMap = new LinkedHashMap<ModulePath, AnalyseSymbolTable>();
+        for (var fm : modules) {
+            tableMap.put(fm.path(), fm.result.must());
+        }
+        for (var m : modules) {
+            var ast = m.result.must();
+            new VTableBuilder(ast, tableMap).build();
+        }
+    }
 
-        module.result.set(ast);
-        return ast;
+    private void releaser(DAGGraph<FModule> modules) {
+        for (var m : modules) {
+            var ast = m.result.must();
+            ReleaserBuilder.build(ast);
+            // copy 复用 cleanups 已收集的类型键集，须在 releaser 之后执行
+            CopyBuilder.build(ast);
+        }
     }
 }

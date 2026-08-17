@@ -2,18 +2,20 @@ package org.cossbow.feng;
 
 import org.cossbow.feng.analysis.AnalyseSymbolTable;
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.dcl.PrimitiveTypeDeclarer;
-import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.Mangle;
 import org.cossbow.feng.ast.mod.FModule;
-import org.cossbow.feng.ast.proc.FixedParameter;
-import org.cossbow.feng.coder.CGenerator;
 import org.cossbow.feng.coder.Generator;
 import org.cossbow.feng.dag.DAGGraph;
+import org.cossbow.feng.dag.DAGUtil;
 import org.cossbow.feng.mod.ModuleAnalysis;
 import org.cossbow.feng.mod.ModuleParser;
+import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.Command;
 import org.cossbow.feng.util.CommonUtil;
+import org.cossbow.feng.util.DedupCache;
 import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.Groups;
+import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.TargetOS;
 
 import java.io.IOException;
@@ -207,6 +209,22 @@ public class Compiler {
 
     // ---- core pipeline ----
 
+    /**
+     * 注入内置合成模块 {@link Mangle#FENG}：一个无源文件的空模块，作为所有真实
+     * 模块的依赖（head），用来承载 primitive/内置类元素的数组/元组物化定义，
+     * 并生成共享头 {@code Feng.h}（避免 {@code [*]int} 等 typedef 在各模块重复）。
+     */
+    private DAGGraph<FModule> withBuiltinModule(DAGGraph<FModule> dag) {
+        var feng = new FModule(Mangle.FENG, List.of(),
+                new ParseSymbolTable(Optional.of(Mangle.FENG), new DedupCache<>()));
+        var nodes = new ArrayList<FModule>(dag.size() + 1);
+        nodes.add(feng);
+        for (var fm : dag) nodes.add(fm);
+        var edges = new ArrayList<Groups.G2<FModule, FModule>>(dag.edges());
+        for (var fm : dag) edges.add(Groups.g2(feng, fm));
+        return DAGUtil.make(nodes, edges);
+    }
+
     public void compile(DAGGraph<FModule> dag, Path dir)
             throws IOException {
         // Clean stale generated files from previous compilations to prevent
@@ -214,7 +232,10 @@ public class Compiler {
         // different IDs across runs).
         cleanBuildDir(dir);
 
-        var moduleNames = new ArrayList<String>();
+        // 注入内置合成模块 FENG：存放 primitive/内置类元素的数组/元组物化定义，
+        // 生成共享头 Feng.h，被所有模块 include（避免 [*]int 等 typedef 重复）。
+        dag = withBuiltinModule(dag);
+
         var ma = new ModuleAnalysis(test);
         ma.analyse(dag);
         ErrorUtil.reportError(ma.errors());
@@ -231,19 +252,8 @@ public class Compiler {
             if (!hasMain) {
                 hasMain = ast.main.has();
             }
-            if (!fm.cSources().isEmpty()) {
-                // Pure C module — generate bridge header, copy sources, skip generation
-                genBridgeHeader(fm, dir);
-                copyCSources(fm, dir);
-                allCSources.addAll(fm.cSources());
-            } else if (!fm.headerFiles().isEmpty()) {
-                // C header-only module
-                generate(ast, dir, mp.filename(), moduleNames);
-                copyCSources(fm, dir);
-                genBridgeHeader(fm, dir);
-            } else {
-                generate(ast, dir, mp.filename(), moduleNames);
-            }
+            generate(ast, dir, mp.filename());
+            copyCSources(fm, dir);
         }
 
         // Collect link libraries from all modules, deduplicate keeping order
@@ -254,10 +264,10 @@ public class Compiler {
         allLinkLibs.add("m");
 
         if (build == Build.MAKE) {
-            generateMakefile(dir, moduleNames, allCSources, hasMain,
+            generateMakefile(dir, allCSources, hasMain,
                     List.copyOf(allLinkLibs));
         } else {
-            generateCMakeLists(dir, moduleNames, allCSources, hasMain,
+            generateCMakeLists(dir, allCSources, hasMain,
                     List.copyOf(allLinkLibs));
         }
         runBuild(dir);
@@ -265,8 +275,8 @@ public class Compiler {
 
     // ---- single-module code generation ----
 
-    void generate(AnalyseSymbolTable ast, Path dir, String name,
-                  List<String> moduleNames) throws IOException {
+    void generate(AnalyseSymbolTable ast, Path dir, String name)
+            throws IOException {
         var ext = factory.extension();
         var src = dir.resolve(name + ext);
         try (var w = Files.newBufferedWriter(src, UTF_8)) {
@@ -277,119 +287,6 @@ public class Compiler {
         try (var w = Files.newBufferedWriter(header, UTF_8)) {
             var gen = factory.create(ast, w, true, debug);
             gen.write();
-        }
-        moduleNames.add(name);
-    }
-
-    // ---- bridge header for C modules ----
-
-    void genBridgeHeader(FModule fm, Path dir) throws IOException {
-        var name = fm.path().filename();
-        var isC = factory.extension().equals(".c");
-        var pureC = !fm.cSources().isEmpty();
-        // Pure-C module: write bridge content directly as the module header
-        // Header-only module: write bridge as _bridge.h, append include to .h
-        var outPath = dir.resolve(name + (pureC ? ".h" : "_bridge.h"));
-
-        var guard = "__HEADER_BRIDGE_" + name.toUpperCase();
-        try (var w = Files.newBufferedWriter(outPath, UTF_8)) {
-            w.append("#ifndef ").append(guard).write('\n');
-            w.append("#define ").append(guard).append('\n');
-            w.write("// auto-generated bridge for " + (isC ? "C" : "C++") + " functions: " + name + "\n\n");
-            // Include the original C headers so function declarations are visible
-            if (!isC && !fm.headerFiles().isEmpty()) w.write("extern \"C\" {\n");
-            for (var h : fm.headerFiles()) {
-                w.append("#include ").append('"')
-                        .append(name).append("_")
-                        .append(h.getFileName().toString());
-                w.append('"').write("\n");
-            }
-            if (!isC && !fm.headerFiles().isEmpty()) w.write("}\n");
-            if (!fm.headerFiles().isEmpty()) w.write("\n");
-            // Typedef for struct/union types
-            var ast = fm.result.must();
-            for (var sd : ast.dagStructures) {
-                if (!sd.cType() || sd.anonymous()) continue; // only named C-imported structs
-                w.write("typedef ");
-                w.append(sd.domain().name).append(' ');
-                w.append(sd.symbol().name().value()).append(' ');
-                w.append(fm.path().toString()).append('$');
-                w.write(sd.symbol().name().value());
-                w.write(";\n");
-            }
-            for (var fd : ast.functionList) {
-                if (fd.builtin() || fd.procedure().has()) continue;
-                var cName = fd.symbol().name().value();
-                // Skip C implementation-reserved identifiers (names starting
-                // with '_') that pollute system headers, except for explicitly
-                // needed functions like __acrt_iob_func.
-                if (cName.startsWith("_") && !"__acrt_iob_func".equals(cName)) continue;
-                var prefix = fm.path().toString() + "$";
-                var retType = cTypeOf(fd.prototype().returnType());
-                var inlineKw = isC ? "static inline " : "inline ";
-                w.write(inlineKw + retType + " ");
-                w.write(prefix);
-                w.write(fd.symbol().name().value());
-                w.write("(");
-                boolean first = true;
-                int paramIdx = 0;
-                for (var p : fd.prototype().parameterSet()) {
-                    if (!first) w.write(", ");
-                    first = false;
-                    var fp = (FixedParameter) p;
-                    w.write(cTypeOf(fp.type()));
-                    w.write(' ');
-                    var pName = fp.name().get().value();
-                    if (pName.isEmpty()) pName = "_" + paramIdx;
-                    w.write(pName);
-                    paramIdx++;
-                }
-                if (isC) {
-                    // C: cast function pointer directly
-                    w.write(") {\n\treturn ((");
-                } else {
-                    // C++: using + reinterpret_cast
-                    w.write(") {\n\tusing F = ");
-                }
-                w.write(retType);
-                w.write("(*)(");
-                first = true;
-                for (var p : fd.prototype().parameterSet()) {
-                    if (!first) w.write(", ");
-                    first = false;
-                    var fp = (FixedParameter) p;
-                    w.write(cTypeOf(fp.type()));
-                }
-                if (isC) {
-                    w.write("))");
-                } else {
-                    w.write(");\n\treturn reinterpret_cast<F>(");
-                }
-                w.write(fd.symbol().name().value());
-                w.write(")(");
-                first = true;
-                paramIdx = 0;
-                for (var p : fd.prototype().parameterSet()) {
-                    if (!first) w.write(", ");
-                    first = false;
-                    var fp = (FixedParameter) p;
-                    var pName = fp.name().get().value();
-                    if (pName.isEmpty()) pName = "_" + paramIdx;
-                    w.write(pName);
-                    paramIdx++;
-                }
-                w.write(");\n}\n");
-            }
-            w.write("#endif\n");
-        }
-
-        // For header-only modules, append bridge include to the module's .h
-        if (!pureC) {
-            var hPath = dir.resolve(name + ".h");
-            try (var w = Files.newBufferedWriter(hPath, UTF_8,
-                    java.nio.file.StandardOpenOption.APPEND)) {
-                w.write("\n#include \"" + name + "_bridge.h\"\n");
-            }
         }
     }
 
@@ -448,7 +345,7 @@ public class Compiler {
 
     // ---- build system generation ----
 
-    void generateCMakeLists(Path dir, List<String> moduleNames,
+    void generateCMakeLists(Path dir,
                             List<Path> cSources, boolean hasMain,
                             List<String> allLinkLibs) throws IOException {
         var isC = factory.extension().equals(".c");
@@ -472,6 +369,9 @@ public class Compiler {
             if (!isC && !cSources.isEmpty()) w.write(" ${C_SOURCES}");
             w.write(")\n");
 
+            w.write("\ntarget_compile_options(${PROJECT_NAME} PRIVATE " +
+                    (debug ? "-g -Og" : "-O2") +
+                    " -Wno-incompatible-pointer-types)");
             if (sanitizer != null && !sanitizer.isEmpty()) {
                 w.write("\ntarget_compile_options(${PROJECT_NAME} PRIVATE"
                         + " -fsanitize=" + sanitizer + " -fno-omit-frame-pointer)\n");
@@ -497,7 +397,7 @@ public class Compiler {
         }
     }
 
-    void generateMakefile(Path dir, List<String> moduleNames,
+    void generateMakefile(Path dir,
                           List<Path> cSources, boolean hasMain,
                           List<String> allLinkLibs) throws IOException {
         var isC = factory.extension().equals(".c");
@@ -515,8 +415,9 @@ public class Compiler {
 
         var moreFlags = (sanitizer == null || sanitizer.isEmpty())
                 ? "" : " -fsanitize=" + sanitizer + " -fno-omit-frame-pointer";
-        if (debug) moreFlags += " -g";
-        if (!debug) moreFlags += " -O2";
+        if (debug) moreFlags += " -g -Og";
+        else moreFlags += " -O2";
+        moreFlags += " -Wno-incompatible-pointer-types";
 
         // cross-compilation: add target triple + OS define so C #ifdef matches
         if (os.isCross()) {
@@ -598,17 +499,9 @@ public class Compiler {
             var target = dir.resolve(src.getFileName());
             Files.copy(src, target, REPLACE_EXISTING);
         }
-        var modName = fm.path().filename();
         for (var hdr : fm.headerFiles()) {
-            var target = dir.resolve(modName + "_" + hdr.getFileName().toString());
+            var target = dir.resolve(hdr.getFileName().toString());
             Files.copy(hdr, target, REPLACE_EXISTING);
         }
-    }
-
-    static String cTypeOf(TypeDeclarer td) {
-        if (td instanceof PrimitiveTypeDeclarer ptd) {
-            return CGenerator.PrimitiveName.get(ptd.primitive());
-        }
-        return "Uint64";
     }
 }

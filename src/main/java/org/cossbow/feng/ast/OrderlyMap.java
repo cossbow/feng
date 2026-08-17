@@ -44,9 +44,21 @@ public class OrderlyMap<K extends Entity, V> implements Iterable<V> {
     }
 
     public void addAll(OrderlyMap<K, V> other) {
-        nodes.addAll(other.nodes);
         for (var n : other.nodes) {
-            addIndex(n);
+            add(n.key, n.value);
+        }
+    }
+
+    public void addAll(Map<K, V> map) {
+        map.forEach(this::add);
+    }
+
+    public void set(K key, V value) {
+        var node = index.get(key);
+        if (node != null) {
+            node.value = value;
+        } else {
+            add(key, value);
         }
     }
 
@@ -136,7 +148,23 @@ public class OrderlyMap<K extends Entity, V> implements Iterable<V> {
 
     //
 
-    public record Node<K, V>(K key, V value) {
+    public static class Node<K, V> {
+        final K key;
+        V value;
+
+        public Node(K key, V value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public K key() {
+            return key;
+        }
+
+        public V value() {
+            return value;
+        }
+
         @Override
         public String toString() {
             return value.toString();

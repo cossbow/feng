@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.var.Assignment;
 import org.cossbow.feng.ast.var.Operand;
 
@@ -41,6 +42,15 @@ public class AssignmentsStatement extends Statement {
     public AssignmentsStatement mirror() {
         var l = new ArrayList<Assignment>(list.size());
         for (var a : list) l.add(a.mirror());
+        return new AssignmentsStatement(pos(), l);
+    }
+
+    @Override
+    public AssignmentsStatement mono(GenericMap gm) {
+        var l = new ArrayList<Assignment>(list.size());
+        for (var a : list) {
+            l.add(new Assignment(a.pos(), a.operand().mono(gm), a.value().mono(gm)));
+        }
         return new AssignmentsStatement(pos(), l);
     }
 

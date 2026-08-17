@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Scope;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.lit.BoolLiteral;
@@ -30,6 +31,10 @@ public class IfStatement extends Statement implements Scope {
 
     public Optional<Statement> init() {
         return init;
+    }
+
+    public void init(Optional<Statement> init) {
+        this.init = init;
     }
 
     public Expression condition() {
@@ -73,6 +78,15 @@ public class IfStatement extends Statement implements Scope {
         var cond = this.condition.mirror();
         var yes = this.yes.mirror();
         var not = this.not.map(Statement::mirror);
+        return new IfStatement(pos(), init, cond, yes, not);
+    }
+
+    @Override
+    public IfStatement mono(GenericMap gm) {
+        var init = this.init.map(s -> s.mono(gm));
+        var cond = this.condition.mono(gm);
+        var yes = this.yes.mono(gm);
+        var not = this.not.map(s -> s.mono(gm));
         return new IfStatement(pos(), init, cond, yes, not);
     }
 

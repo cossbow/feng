@@ -23,7 +23,8 @@ public class ClassParseTest extends BaseParseTest {
         var def = (ClassDefinition) doParseType("class " + name + " {}", name);
         Assertions.assertFalse(def.isFinal());
         Assertions.assertEquals(name, def.symbol());
-        Assertions.assertEquals(ClassDefinition.ObjectType, def.inherit().get());
+        Assertions.assertEquals(ClassDefinition.ObjectClass.link(),
+                def.inherit().get());
         Assertions.assertTrue(def.impl().isEmpty());
         Assertions.assertTrue(def.generic().isEmpty());
         Assertions.assertTrue(def.fields().isEmpty());

@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.stmt;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Scope;
+import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.dcl.Variable;
 
 import java.util.ArrayList;
@@ -71,5 +72,12 @@ public class BlockStatement extends Statement implements Scope {
         var n = new BlockStatement(pos(), list, newScope);
         n.stack = List.of();
         return n;
+    }
+
+    @Override
+    public BlockStatement mono(GenericMap gm) {
+        var list = new ArrayList<Statement>(this.list.size());
+        for (var s : this.list) list.add(s.mono(gm));
+        return new BlockStatement(pos(), list, newScope);
     }
 }
