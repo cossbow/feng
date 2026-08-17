@@ -139,6 +139,7 @@ public class ClassDefinition extends ObjectDefinition {
     private final Set<InterfaceDefinition> allImpls = new HashSet<>();
     /**
      * All field sets: including {@link #fields} and {@link #inheritFields}
+     * It's order is same to inherited order
      */
     private IdentifierMap<ClassField> allFields = new IdentifierMap<>();
     /**

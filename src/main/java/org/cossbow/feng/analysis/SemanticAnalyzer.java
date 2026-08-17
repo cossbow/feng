@@ -850,24 +850,23 @@ public class SemanticAnalyzer {
 
     // class define
 
-    private void checkInherit(ClassDefinition cd) {
-        cd.allFields().addAll(cd.fields());
-        cd.allMethods().addAll(cd.methods());
-        if (cd.inherit().none()) return;
+    private Void checkInherit(ClassDefinition cd) {
+        if (cd.inherit().none()) {
+            cd.allFields().addAll(cd.fields());
+            cd.allMethods().addAll(cd.methods());
+            return null;
+        }
         var pt = cd.inherit().must();
         var pd = cd.parent().must();
         if (cd.isFinal() != pd.isFinal()) {
-            semantic("final-class and non-final-class can't " +
+            return semantic("final-class and non-final-class can't " +
                             "have inheritance relationship: '%s' -> '%s'",
                     pd, cd);
-            return;
         }
 
         // 填充 ancestors：沿 parent 链收集所有祖先类
         cd.ancestors().add(pd);
         cd.ancestors().addAll(pd.ancestors());
-
-        if (pd == ClassDefinition.ObjectClass) return;
 
         // check fields: unsupport shadow parent's fields
         for (var pf : pd.allFields()) {
@@ -879,10 +878,10 @@ public class SemanticAnalyzer {
                 cd.allFields().add(nf.name(), nf);
                 continue;
             }
-            semantic("can't shadowing parent field: %s%s",
+            return semantic("can't shadowing parent field: %s%s",
                     pf.name(), cf.get().pos());
-            return;
         }
+        cd.allFields().addAll(cd.fields());
 
         // Check if the method override is compatible
         // and create a declaration cache that replaces
@@ -901,15 +900,13 @@ public class SemanticAnalyzer {
             }
             var cm = o.must();
             if (!pm.generic().isEmpty() || !cm.generic().isEmpty()) {
-                semantic("override method not support generic: '%s' -> '%s' %s",
+                return semantic("override method not support generic: '%s' -> '%s' %s",
                         pm, cm, cm.pos());
-                return;
             }
             checkMethodFlags(pm, cm);
             if (pm.export() != cm.export()) {
-                semantic("override require same export: ",
+                return semantic("override require same export: ",
                         cm.pos());
-                return;
             }
             var pp = pt.gm().instantiate(pm.prototype());
             if (!compatible(pp, cm.prototype(), pm).ok) {
@@ -919,7 +916,9 @@ public class SemanticAnalyzer {
             compatible(pp, cm.prototype(), pm).valid();
             pm.override().add(cm);
         }
+        cd.allMethods().addAll(cd.methods());
 
+        return null;
     }
 
     private ClassDefinition findParentClass(DerivedType t) {
