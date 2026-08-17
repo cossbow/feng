@@ -972,25 +972,30 @@ public class SemanticAnalyzer {
         }
     }
 
-    private Optional<ClassDefinition>
+    private Stream<ClassDefinition>
     getClassTypeField(TypeDeclarer t) {
         if (t instanceof DerivedTypeDeclarer ctd) {
             if (ctd.refer().has())
-                return Optional.empty();
+                return Stream.empty();
 
             var dt = findDef(ctd);
             if (dt instanceof ClassDefinition cd)
-                return Optional.of(cd);
-            return Optional.empty();
+                return Stream.of(cd);
+            return Stream.empty();
         }
 
         if (t instanceof ArrayTypeDeclarer atd) {
             if (atd.refer().has())
-                return Optional.empty();
+                return Stream.empty();
             return getClassTypeField(atd.element());
         }
 
-        return Optional.empty();
+        if (t instanceof TupleTypeDeclarer ttd) {
+            return ttd.elements().stream()
+                    .flatMap(this::getClassTypeField);
+        }
+
+        return Stream.empty();
     }
 
     private List<ClassDefinition> findInitDeps(ClassDefinition cd) {
@@ -1000,7 +1005,7 @@ public class SemanticAnalyzer {
                     p.markInherited();
                 });
         var fields = cd.fields().stream().map(ClassField::type)
-                .map(this::getClassTypeField).flatMap(Optional::stream);
+                .flatMap(this::getClassTypeField);
         return Stream.concat(inherit, fields)
                 .filter(d -> !d.builtin()).toList();
     }
