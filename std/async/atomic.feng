@@ -6,6 +6,7 @@ import std$async$c;
 
 // ===== AtomicInt32 =====
 
+@Sync
 export
 class AtomicInt32 final {
     var value int32;
@@ -50,6 +51,7 @@ func newAtomicInt32(v int32) *AtomicInt32 {
 // ===== AtomicBool =====
 // int32-backed; 0=false, 1=true.
 
+@Sync
 export
 class AtomicBool final {
     var value int32;

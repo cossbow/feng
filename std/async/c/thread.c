@@ -14,7 +14,6 @@ static void* threadEntry(void* p) {
     ThreadTask* task = (ThreadTask*)p;
     void *arg = task->arg;
     task->run(arg);
-    Feng$cleanup_sref(&arg);
     free(task);
     return NULL;
 }

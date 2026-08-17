@@ -4,7 +4,9 @@ import std$async$c;
 import std$error;
 
 // ===== Mutex =====
+// 锁本身用于解决并发，类级 @Sync 声明其实例并发安全（编译器无需再做字段并发处理）。
 
+@Sync
 export
 class Mutex {
     var _h uint64;
@@ -31,6 +33,13 @@ class Mutex {
     export func unlock() {
         c$mutexUnlock(_h);
     }
+
+    // 关联一个条件变量到本互斥量：wait() 无需再传 mutex
+    export func cond() *Cond {
+        var h = c$condCreate();
+        if (h == uint64(0)) { throw new(error$IllegalStateException); }
+        return new(Cond, {_mu = _h, _h = h});
+    }
 }
 
 export
@@ -41,10 +50,13 @@ func newMutex() *Mutex {
 }
 
 // ===== Cond =====
+// 由 Mutex.cond() 创建并与之关联；_mu 是 mutex 句柄的值副本（不拥有，随 mutex 生命周期）。
 
+@Sync
 export
 class Cond {
-    var _h uint64;
+    var _h uint64;    // cond 句柄
+    var _mu uint64;   // 关联的 mutex 句柄
 
     macro resource free() {
         _destroy();
@@ -57,8 +69,8 @@ class Cond {
         }
     }
 
-    export func wait(m *Mutex) {
-        c$condWait(_h, m._h);
+    export func wait() {
+        c$condWait(_h, _mu);
     }
 
     export func signal() {
@@ -70,9 +82,45 @@ class Cond {
     }
 }
 
+// ===== WaitGroup =====
+// 线程完成等待（join 的锁化等价物），由 Mutex + 关联的 Cond 组合实现。
+// add(delta) 累加计数，done() 减一，wait() 阻塞直到计数归零。
+// 类级 @Sync：内部用 mu 保护 count，实例并发安全；mu/cv 字段创建后只读。
+
+@Sync
 export
-func newCond() *Cond {
-    var h = c$condCreate();
-    if (h == uint64(0)) { throw new(error$IllegalStateException); }
-    return new(Cond, {_h = h});
+class WaitGroup {
+    var mu *Mutex;
+    var cv *Cond;
+    var count int;   // 受 mu 保护
+
+    export func add(delta int) {
+        mu.lock();
+        count += delta;
+        mu.unlock();
+    }
+
+    export func done() {
+        mu.lock();
+        count -= 1;
+        if (count == 0) {
+            cv.broadcast();
+        }
+        mu.unlock();
+    }
+
+    export func wait() {
+        mu.lock();
+        for (count > 0) {
+            cv.wait();
+        }
+        mu.unlock();
+    }
+}
+
+export
+func newWaitGroup() *WaitGroup {
+    var mu = newMutex();
+    var cv = mu.cond();
+    return new(WaitGroup, {mu = mu, cv = cv, count = 0});
 }

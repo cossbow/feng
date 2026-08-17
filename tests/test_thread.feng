@@ -1,7 +1,140 @@
 import std$testing;
 import std$async;
 
-// ===== Mutex =====
+// ===== std$async 并发原语测试 =====
+// 覆盖：AtomicInt32 / AtomicBool（单线程操作语义 + 并发原子性）、
+//       Mutex（lock/tryLock/unlock + 多线程互斥）、
+//       Cond（wait/signal/broadcast：生产者-消费者、广播唤醒）、
+//       WaitGroup（add/done/wait，join 的锁化等价物）、Task/start（线程派生）。
+// 线程没有 join，完成等待统一用 WaitGroup（mutex+cond 实现，不忙等自旋）。
+
+// ============================================================
+// AtomicInt32 单线程语义
+// ============================================================
+
+@Test
+func testInt32Load() {
+    var a = async$newAtomicInt32(int32(42));
+    testing$assertTrue(a.load() == int32(42));
+}
+
+@Test
+func testInt32Store() {
+    var a = async$newAtomicInt32(int32(0));
+    a.store(int32(99));
+    testing$assertTrue(a.load() == int32(99));
+}
+
+@Test
+func testInt32Swap() {
+    var a = async$newAtomicInt32(int32(10));
+    var old = a.swap(int32(20));
+    testing$assertTrue(old == int32(10));
+    testing$assertTrue(a.load() == int32(20));
+}
+
+@Test
+func testInt32CompareSwapSuccess() {
+    var a = async$newAtomicInt32(int32(100));
+    var ok = a.compareSwap(int32(100), int32(200));
+    testing$assertTrue(ok);
+    testing$assertTrue(a.load() == int32(200));
+}
+
+@Test
+func testInt32CompareSwapFail() {
+    var a = async$newAtomicInt32(int32(100));
+    var ok = a.compareSwap(int32(999), int32(200));
+    testing$assertFalse(ok);
+    testing$assertTrue(a.load() == int32(100));
+}
+
+@Test
+func testInt32FetchAdd() {
+    var a = async$newAtomicInt32(int32(5));
+    var old = a.fetchAdd(int32(3));
+    testing$assertTrue(old == int32(5));
+    testing$assertTrue(a.load() == int32(8));
+}
+
+@Test
+func testInt32FetchSub() {
+    var a = async$newAtomicInt32(int32(10));
+    var old = a.fetchSub(int32(4));
+    testing$assertTrue(old == int32(10));
+    testing$assertTrue(a.load() == int32(6));
+}
+
+@Test
+func testInt32Negative() {
+    var a = async$newAtomicInt32(int32(-1));
+    var old = a.fetchAdd(int32(-1));
+    testing$assertTrue(old == int32(-1));
+    testing$assertTrue(a.load() == int32(-2));
+}
+
+// ============================================================
+// AtomicBool 单线程语义
+// ============================================================
+
+@Test
+func testBoolLoad() {
+    var a = async$newAtomicBool(true);
+    testing$assertTrue(a.load());
+}
+
+@Test
+func testBoolStore() {
+    var a = async$newAtomicBool(false);
+    a.store(true);
+    testing$assertTrue(a.load());
+    a.store(false);
+    testing$assertFalse(a.load());
+}
+
+@Test
+func testBoolSwap() {
+    var a = async$newAtomicBool(false);
+    var old = a.swap(true);
+    testing$assertFalse(old);
+    testing$assertTrue(a.load());
+}
+
+@Test
+func testBoolCompareSwapSuccess() {
+    var a = async$newAtomicBool(true);
+    var ok = a.compareSwap(true, false);
+    testing$assertTrue(ok);
+    testing$assertFalse(a.load());
+}
+
+@Test
+func testBoolCompareSwapFail() {
+    var a = async$newAtomicBool(false);
+    var ok = a.compareSwap(true, false);
+    testing$assertFalse(ok);
+    testing$assertFalse(a.load());
+}
+
+@Test
+func testBoolSetTrue() {
+    var a = async$newAtomicBool(false);
+    var old = a.setTrue();
+    testing$assertFalse(old);
+    testing$assertTrue(a.load());
+}
+
+@Test
+func testBoolSetFalse() {
+    var a = async$newAtomicBool(true);
+    var old = a.setFalse();
+    testing$assertTrue(old);
+    testing$assertFalse(a.load());
+}
+
+// ============================================================
+// Mutex 单线程语义
+// ============================================================
 
 @Test
 func testMutexLockUnlock() {
@@ -25,64 +158,269 @@ func testMutexTryLock() {
     m.unlock();
 }
 
-// ===== Cond: signal / broadcast (local vars only) =====
+// ============================================================
+// WaitGroup 单线程语义
+// ============================================================
 
 @Test
-func testCondSignal() {
-    var mu = async$newMutex();
-    var cv = async$newCond();
-
-    mu.lock();
-    cv.signal();
-    mu.unlock();
+func testWaitGroupBasic() {
+    var wg = async$newWaitGroup();
+    wg.add(2);
+    wg.done();
+    wg.done();
+    wg.wait();   // 计数已归零，立即返回
 }
 
-@Test
-func testCondBroadcast() {
-    var mu = async$newMutex();
-    var cv = async$newCond();
+// ============================================================
+// 多线程场景
+// ============================================================
 
-    mu.lock();
-    cv.broadcast();
-    mu.unlock();
-}
-
-// ===== Cond: wait pattern (single-thread, no actual waiter) =====
-
-@Test
-func testCondWaitSetup() {
-    var mu = async$newMutex();
-    var cv = async$newCond();
-
-    // Just verify calling wait doesn't crash (will wait forever without signaler)
-    // Skip actual wait — instead just test lock/unlock around cond
-    mu.lock();
-    mu.unlock();
-}
-
-// ===== Mutex RAII via resource free =====
-
-@Test
-func testMutexRAII() {
-    {
-        var m = async$newMutex();
-        m.lock();
-        testing$assertTrue(!m.tryLock());
-        m.unlock();
-        m.lock();
-        m.unlock();
+// 原子自增：每线程 fetchAdd +1
+class IncAtomicTask (async$Task) {
+    @Sync
+    var counter *async$AtomicInt32;
+    @Sync
+    var wg *async$WaitGroup;
+    @Async func run() {
+        counter.fetchAdd(int32(1));
+        wg.done();
     }
 }
 
-// ===== Multiple mutexes =====
+// CAS 自旋自增：用 compareSwap 循环，覆盖无锁 CAS 在竞争下的正确性
+class IncCasTask (async$Task) {
+    @Sync
+    var counter *async$AtomicInt32;
+    @Sync
+    var wg *async$WaitGroup;
+    @Async func run() {
+        var ok = false;
+        for (!ok) {
+            var cur = counter.load();
+            ok = counter.compareSwap(cur, cur + int32(1));
+        }
+        wg.done();
+    }
+}
+
+// 互斥自增：非原子计数器靠 mutex 保护，times 为每线程自增次数
+class SharedCounter {
+    var value int;
+    @Sync
+    var mu *async$Mutex;
+}
+
+class IncMutexTask (async$Task) {
+    @Sync
+    var shared *SharedCounter;
+    @Sync
+    var wg *async$WaitGroup;
+    var times int;
+    @Async func run() {
+        for (var i = 0; i < times; i += 1) {
+            shared.mu.lock();
+            shared.value = shared.value + 1;
+            shared.mu.unlock();
+        }
+        wg.done();
+    }
+}
+
+// tryLock：锁被其它线程占有时 tryLock 必须失败
+class TryLockTask (async$Task) {
+    @Sync
+    var mu *async$Mutex;
+    @Sync
+    var acquired *async$AtomicInt32;
+    @Sync
+    var wg *async$WaitGroup;
+    @Async func run() {
+        if (mu.tryLock()) {
+            acquired.fetchAdd(int32(1));
+            mu.unlock();
+        }
+        wg.done();
+    }
+}
+
+// 条件变量共享状态：cv 由 mu.cond() 关联，ready/value 受 mu 保护
+class CondBox {
+    @Sync
+    var mu *async$Mutex;
+    @Sync
+    var cv *async$Cond;
+    @Sync
+    var arrived *async$AtomicInt32;   // 已进入临界区（即将 wait）的线程数
+    @Sync
+    var got *async$AtomicInt32;       // 消费者读到的值
+    var ready bool;   // 受 mu 保护
+    var value int32;  // 受 mu 保护
+}
+
+// 消费者：等待 ready 后读取 value 并记录
+class CondConsumer (async$Task) {
+    @Sync
+    var box *CondBox;
+    @Sync
+    var wg *async$WaitGroup;
+    @Async func run() {
+        box.mu.lock();
+        box.arrived.fetchAdd(int32(1));
+        for (!box.ready) {
+            box.cv.wait();
+        }
+        box.got.store(box.value);
+        box.mu.unlock();
+        wg.done();
+    }
+}
+
+// 等待者：等待 ready 后退出（用于 broadcast 测试）
+class CondWaiter (async$Task) {
+    @Sync
+    var box *CondBox;
+    @Sync
+    var wg *async$WaitGroup;
+    @Async func run() {
+        box.mu.lock();
+        box.arrived.fetchAdd(int32(1));
+        for (!box.ready) {
+            box.cv.wait();
+        }
+        box.mu.unlock();
+        wg.done();
+    }
+}
+
+// ===== 线程启动 + WaitGroup 完成等待 =====
 
 @Test
-func testMultipleMutexes() {
-    var m1 = async$newMutex();
-    var m2 = async$newMutex();
-
-    m1.lock();
-    m2.lock();
-    m2.unlock();
-    m1.unlock();
+func testThreadStart() {
+    @Sync var counter = async$newAtomicInt32(int32(0));
+    @Sync var wg = async$newWaitGroup();
+    wg.add(1);
+    @Sync var t = new(IncAtomicTask, {counter = counter, wg = wg});
+    async$start(t);
+    wg.wait();
+    testing$assertTrue(counter.load() == int32(1));
 }
+
+// ===== 并发原子自增（无锁） =====
+
+@Test
+func testConcurrentAtomicIncrement() {
+    @Sync var counter = async$newAtomicInt32(int32(0));
+    @Sync var wg = async$newWaitGroup();
+    var n = 8;
+    wg.add(n);
+    for (var i = 0; i < n; i += 1) {
+        @Sync var t = new(IncAtomicTask, {counter = counter, wg = wg});
+        async$start(t);
+    }
+    wg.wait();
+    testing$assertTrue(counter.load() == int32(n));
+}
+
+// ===== 并发 CAS 自旋自增 =====
+
+@Test
+func testConcurrentCasIncrement() {
+    @Sync var counter = async$newAtomicInt32(int32(0));
+    @Sync var wg = async$newWaitGroup();
+    var n = 8;
+    wg.add(n);
+    for (var i = 0; i < n; i += 1) {
+        @Sync var t = new(IncCasTask, {counter = counter, wg = wg});
+        async$start(t);
+    }
+    wg.wait();
+    testing$assertTrue(counter.load() == int32(n));
+}
+
+// ===== 互斥保护非原子计数器 =====
+
+@Test
+func testMutexMutualExclusion() {
+    @Sync var mu = async$newMutex();
+    @Sync var shared = new(SharedCounter, {mu = mu});
+    @Sync var wg = async$newWaitGroup();
+    var threads = 8;
+    var per = 200;
+    wg.add(threads);
+    for (var i = 0; i < threads; i += 1) {
+        @Sync var t = new(IncMutexTask, {shared = shared, wg = wg, times = per});
+        async$start(t);
+    }
+    wg.wait();
+    testing$assertTrue(shared.value == threads * per);
+}
+
+// ===== tryLock 在锁被占时必须失败 =====
+
+@Test
+func testTryLockContention() {
+    @Sync var mu = async$newMutex();
+    @Sync var acquired = async$newAtomicInt32(int32(0));
+    @Sync var wg = async$newWaitGroup();
+    var n = 8;
+    mu.lock();   // 主线程先占锁
+    wg.add(n);
+    for (var i = 0; i < n; i += 1) {
+        @Sync var t = new(TryLockTask, {mu = mu, acquired = acquired, wg = wg});
+        async$start(t);
+    }
+    wg.wait();
+    testing$assertTrue(acquired.load() == int32(0));
+    mu.unlock();
+}
+
+// ===== Cond signal 唤醒单个等待者（生产者-消费者） =====
+
+@Test
+func testCondSignal() {
+    @Sync var mu = async$newMutex();
+    @Sync var cv = mu.cond();
+    @Sync var arrived = async$newAtomicInt32(int32(0));
+    @Sync var got = async$newAtomicInt32(int32(0));
+    @Sync var box = new(CondBox, {mu = mu, cv = cv, arrived = arrived, got = got});
+    @Sync var wg = async$newWaitGroup();
+    wg.add(1);
+    @Sync var c = new(CondConsumer, {box = box, wg = wg});
+    async$start(c);
+    // 等消费者进入 wait 后再 signal，确保真的走「阻塞→唤醒」路径
+    for (box.arrived.load() == int32(0)) { }
+    box.mu.lock();
+    box.ready = true;
+    box.value = int32(42);
+    box.cv.signal();
+    box.mu.unlock();
+    wg.wait();
+    testing$assertTrue(box.got.load() == int32(42));
+}
+
+// ===== Cond broadcast 唤醒全部等待者 =====
+
+@Test
+func testCondBroadcast() {
+    @Sync var mu = async$newMutex();
+    @Sync var cv = mu.cond();
+    @Sync var arrived = async$newAtomicInt32(int32(0));
+    @Sync var got = async$newAtomicInt32(int32(0));
+    @Sync var box = new(CondBox, {mu = mu, cv = cv, arrived = arrived, got = got});
+    @Sync var wg = async$newWaitGroup();
+    var n = 8;
+    wg.add(n);
+    for (var i = 0; i < n; i += 1) {
+        @Sync var t = new(CondWaiter, {box = box, wg = wg});
+        async$start(t);
+    }
+    // 等全部等待者都进入 wait 后再 broadcast
+    for (box.arrived.load() < int32(n)) { }
+    box.mu.lock();
+    box.ready = true;
+    box.cv.broadcast();
+    box.mu.unlock();
+    wg.wait();   // 只有全部被唤醒并 done 后才会返回
+    testing$assertTrue(box.arrived.load() == int32(n));
+}
+

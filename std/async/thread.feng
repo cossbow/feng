@@ -18,13 +18,13 @@ class Thread {
     const task *Task;
 }
 
-func threadEntry(thread *Thread) {
+func threadEntry(@Sync thread *Thread) {
     thread.task.run();
 }
 
 @Async
 export
 func start(task *Task) {
-    var th = new(Thread, {task=task});
+    @Sync var th = new(Thread, {task=task});
     c$threadCreate(uint64(threadEntry), uint64(th));
 }
