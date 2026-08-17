@@ -1,0 +1,121 @@
+// ===== std$net — Proactor（IOCP / io_uring）异步 I/O 统一接口 =====
+//
+// 无泛型、无回调，只封装「完成通知」模型（docs/net-event-plan.md）。
+// 本文件与 net.feng 同属 std$net 模块，可直接访问未 export 的 Socket.fd（F2）。
+// Windows 走 IOCP，Linux 走 io_uring（推迟），统一由 platform 层分发。
+
+import std$net$platform;
+import std$error;
+
+// op 常量（值与 net_proactor.h 的 #define 一致；宏不导出成 Feng 符号，须此处定义）
+export const PRO_READ    int32 = 1;
+export const PRO_WRITE   int32 = 2;
+export const PRO_ACCEPT  int32 = 3;
+export const PRO_CONNECT int32 = 4;
+export const PRO_TIMEOUT int32 = 5;
+
+// I/O 缓冲区：struct 与 C 布局一致、自动可同步（无引用字段），对 C 透明（F9/F10）。
+// 一期定长 4KB；池化/可变长留后期。
+export
+struct Buf {
+    data [4096]byte;
+}
+
+// 完成事件：与 C 层 ProactorEvent 布局一致（token uint64 / result int32 / op int32 / fd int32）。
+export
+struct Completion {
+    token uint64;
+    result int32;
+    op int32;
+    fd int32;
+}
+
+export
+class Proactor final {
+    var _h uint64;     // opaque C handle（无引用字段 → 自动可同步，§3.3）
+    var _next uint64;  // token 计数器（单线程事件循环内递增，无需原子）
+
+    macro resource free() {
+        _destroy();
+    }
+
+    func _destroy() {
+        if (_h != uint64(0)) {
+            platform$proactorDestroy(_h);
+            _h = uint64(0);
+        }
+    }
+
+    // 同步注册（非 @Async）：IOCP 关联 socket，io_uring 记映射（幂等）。
+    export func associate(sock *Socket) bool {
+        return platform$proactorAssociate(_h, int32(sock.fd)) != 0;
+    }
+
+    // —— 对外（非 @Async）：生成 token，委托内部 @Async，返回 token ——
+    // buf 须 @Sync：它要穿过 innerSubmit 的 @Async 边界交给内核（§3.2）。
+
+    export func submitRead(sock *Socket, @Sync buf *Buf) uint64 {
+        var token = _next; _next += 1;
+        innerSubmit(_h, int32(sock.fd), buf, int32(4096),
+                    uint32(0), uint16(0), PRO_READ, token);
+        return token;
+    }
+
+    // len 为本次要写出的字节数（通常取自上次读完成的 result），避免把整块 4KB 缓冲写回。
+    export func submitWrite(sock *Socket, @Sync buf *Buf, len int32) uint64 {
+        var token = _next; _next += 1;
+        innerSubmit(_h, int32(sock.fd), buf, len,
+                    uint32(0), uint16(0), PRO_WRITE, token);
+        return token;
+    }
+
+    export func submitAccept(sock *Socket) uint64 {
+        var token = _next; _next += 1;
+        innerSubmit(_h, int32(sock.fd), nil, int32(0),
+                    uint32(0), uint16(0), PRO_ACCEPT, token);
+        return token;
+    }
+
+    export func submitConnect(sock *Socket, addr Addr) uint64 {
+        var token = _next; _next += 1;
+        // addr.packed 高 32 位为 ip（host 字节序），低 16 位为 port（与 net.feng 约定一致）
+        innerSubmit(_h, int32(sock.fd), nil, int32(0),
+                    uint32(addr.packed >> 16), uint16(addr.packed & 0xFFFF),
+                    PRO_CONNECT, token);
+        return token;
+    }
+
+    export func submitTimeout(ms int32) uint64 {
+        var token = _next; _next += 1;
+        innerSubmit(_h, int32(-1), nil, int32(ms),
+                    uint32(0), uint16(0), PRO_TIMEOUT, token);
+        return token;
+    }
+
+    // 同步取回完成（阻塞等待），非 @Async：out 为 struct 数组，C 直接填充。
+    export func poll(out [&]Completion, timeoutMs int32) int32 {
+        return platform$proactorPoll(_h, out.values,
+                                     int32(out.length), timeoutMs);
+    }
+
+    export func close() {
+        _destroy();
+    }
+}
+
+// —— 模块私有：真正发起异步（标 @Async，参数隐式 @Sync、无返回值）——
+// buf 为可空：read/write 传真实 buffer，accept/connect/timeout 传 nil。
+@Async
+func innerSubmit(h uint64, fd int32, buf *?Buf, len int32,
+                 ip uint32, port uint16, op int32, token uint64) {
+    var p uint64 = uint64(0);
+    if (buf != nil) { p = buf.data.values; }
+    platform$proactorSubmit(h, fd, p, len, ip, port, op, token);
+}
+
+export
+func newProactor() *Proactor {
+    var h = platform$proactorCreate();
+    if (h == uint64(0)) { throw new(error$IllegalStateException); }
+    return new(Proactor, {_h = h});
+}

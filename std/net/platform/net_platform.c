@@ -2,6 +2,7 @@
   #include <winsock2.h>
 #else
   #include <unistd.h>
+  #include <fcntl.h>
 #endif
 
 int netInit(void) {
@@ -18,5 +19,14 @@ int netCloseSock(int fd) {
     return closesocket(fd);
 #else
     return close(fd);
+#endif
+}
+
+int netSetNonBlock(int fd) {
+#ifdef _WIN32
+    u_long mode = 1;
+    return ioctlsocket(fd, FIONBIO, &mode);
+#else
+    return fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
 #endif
 }

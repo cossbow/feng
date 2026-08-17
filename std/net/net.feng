@@ -198,6 +198,12 @@ class Socket (Writer, Reader) {
         return (n, new(Addr, {packed=(uint64(ip) << 16) | uint64(uint16(pt))}));
     }
 
+    // ---- non-blocking ----
+
+    export func setNonBlocking() {
+        platform$netSetNonBlock(int32(fd));
+    }
+
     // ---- close ----
 
     export func close() {
@@ -240,6 +246,13 @@ func dial(addr Addr) *Socket {
         _closeFd(fd); throw new(error$IllegalStateException);
     }
     return new(Socket, {fd=fd});
+}
+
+// 由已接受的原始 fd 包装成 Socket（供 Proactor 的 submitAccept 完成事件使用，
+// 因 const fd 未 export，跨模块无法 new(Socket, {fd=…})，故提供此工厂）。
+export
+func socketFromFd(fd int) *Socket {
+    return new(Socket, {fd = fd});
 }
 
 export
