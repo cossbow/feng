@@ -121,6 +121,7 @@ public class FengAnalyzer {
     // ---- Diagnostic publishing ----
 
     private void publishDiagnostics(LanguageClient client, String uri, AnalyzeResult result) {
+        if (client == null) return; // MCP mode: no LSP client attached
         var diagnostics = new ArrayList<Diagnostic>();
         for (var err : result.syntaxErrors()) {
             diagnostics.add(new Diagnostic(
