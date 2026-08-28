@@ -84,14 +84,13 @@ mvn clean package -Dmaven.test.skip=true
 ```
 
 打包好的jar包在target目录下：feng-${version}.jar
-比如当前version为“0.0.1-dev”，构建的包为“feng-0.0.1-dev.jar”。
 
 运行编译器需要java运行环境及clang工具，clang的安装也可以咨询deepseek。
 
 编译器使用方式为：
 
 ```shell
-java -jar feng-0.0.1-dev.jar -t [类型] -i [源] -o [输出目录]
+java -jar feng-${version}.jar -t [类型] -i [源] -o [输出目录]
 ```
 
 参数说明（【选项】是指该参数是开关，无跟随参数）：
@@ -108,7 +107,7 @@ java -jar feng-0.0.1-dev.jar -t [类型] -i [源] -o [输出目录]
 例如，编译单个源文件：
 
 ```shell
-java -jar feng-0.0.1-dev.jar -t f -i jjj.feng -o /var/build
+java -jar feng-${version}.jar -t f -i jjj.feng -o /var/build
 ```
 
 然后在/var/build下会生成编译结果：
@@ -121,7 +120,7 @@ java -jar feng-0.0.1-dev.jar -t f -i jjj.feng -o /var/build
 项目内置了LSP Server提供语法高亮和语言服务，与编译器打包在同一个jar中，启动命令：
 
 ```shell
-java -cp feng-0.0.1-dev.jar org.cossbow.feng.lsp.FengLspMain
+java -cp feng-${version}.jar org.cossbow.feng.lsp.FengLspMain
 ```
 
 已支持的LSP功能：诊断、文档符号、悬停提示、跳转定义、补全。

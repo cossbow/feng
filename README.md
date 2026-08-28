@@ -92,14 +92,13 @@ mvn clean package -Dmaven.test.skip=true
 ```
 
 The packaged JAR will be in the target directory: `feng-${version}.jar`
-For example, with the current version "0.0.1-dev", the built package is `feng-0.0.1-dev.jar`.
 
 To run the compiler, Java and Clang are required. Clang installation can also be consulted with deepseek.
 
 Compiler usage:
 
 ```shell
-java -jar feng-0.0.1-dev.jar -t [type] -i [source] -o [output directory]
+java -jar feng-${version}.jar -t [type] -i [source] -o [output directory]
 ```
 
 Parameter descriptions:
@@ -120,7 +119,7 @@ Parameter descriptions:
 For example, compiling a single source file:
 
 ```shell
-java -jar feng-0.0.1-dev.jar -t f -i jjj.feng -o /var/build
+java -jar feng-${version}.jar -t f -i jjj.feng -o /var/build
 ```
 
 The build results under `/var/build` are:
@@ -133,7 +132,7 @@ The build results under `/var/build` are:
 The project includes a built-in LSP Server for syntax highlighting and language services, packaged in the same JAR as the compiler. Launch command:
 
 ```shell
-java -cp feng-0.0.1-dev.jar org.cossbow.feng.lsp.FengLspMain
+java -cp feng-${version}.jar org.cossbow.feng.lsp.FengLspMain
 ```
 
 Supported LSP features: diagnostics, document symbol, hover, go-to-definition, completion.

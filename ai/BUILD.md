@@ -17,7 +17,7 @@ cd feng/
 mvn clean package -Dmaven.test.skip=true
 ```
 
-Output: `target/feng-<version>.jar` (e.g., `feng-0.0.1-dev.jar`)
+Output: `target/feng-${version}.jar`
 
 ## Usage
 
@@ -42,16 +42,16 @@ java -jar feng-<version>.jar [options]
 
 ```bash
 # Single file
-java -jar feng-0.0.1-dev.jar -t f -i hello.feng -o /var/build
+java -jar feng-${version}.jar -t f -i hello.feng -o /var/build
 
 # Single file (test mode)
-java -jar feng-0.0.1-dev.jar -T -t f -i test_math.feng -o /var/build
+java -jar feng-${version}.jar -T -t f -i test_math.feng -o /var/build
 
 # Module
-java -jar feng-0.0.1-dev.jar -t m -i ./my_module -o ./out
+java -jar feng-${version}.jar -t m -i ./my_module -o ./out
 
 # Project with dependency
-java -jar feng-0.0.1-dev.jar -t p -i ./my_project -L foo=/path/to/foo -o ./out
+java -jar feng-${version}.jar -t p -i ./my_project -L foo=/path/to/foo -o ./out
 ```
 
 ## Generated Output
@@ -63,7 +63,7 @@ contains a `main` function, the build tool also produces an executable.
 ## LSP Server
 
 ```bash
-java -cp feng-0.0.1-dev.jar org.cossbow.feng.lsp.FengLspMain
+java -cp feng-${version}.jar org.cossbow.feng.lsp.FengLspMain
 ```
 
 Supports: diagnostics, document symbols, hover, go-to-definition, completion.

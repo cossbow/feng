@@ -6,7 +6,7 @@
 
     <groupId>org.cossbow</groupId>
     <artifactId>feng</artifactId>
-    <version>0.0.1-dev</version>
+    <version>0.0.2.a</version>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>

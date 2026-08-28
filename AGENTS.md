@@ -46,8 +46,8 @@ feng/
 mvn clean package -Dmaven.test.skip=true
 
 # Compile a single Fēng source file (output goes to build directory)
-java -jar target/feng-0.0.1-dev.jar -t f -i example.feng -o /var/build
+java -jar target/feng-${version}.jar -t f -i example.feng -o /var/build
 
 # Compile in test mode
-java -jar target/feng-0.0.1-dev.jar -T -t f -i test.feng -o /var/build
+java -jar target/feng-${version}.jar -T -t f -i test.feng -o /var/build
 ```
