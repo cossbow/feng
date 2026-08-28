@@ -27,6 +27,15 @@ func foo(a,b v$Vector) v$Vector {
     return a.sub(b);
 }
 
+// ==== 跨模块元组覆盖 ====
+// 值类型元素来自不同模块：Complex（aaa）与 Vector（aab）
+func crossValueTuple() (a$Complex, v$Vector) {
+    return (
+        {real=1.0, imag=2.0},
+        {x1=1.0, x2=2.0, x3=3.0}
+    );
+}
+
 func test(n int) {
     r$use2(foo);
 
@@ -34,6 +43,10 @@ func test(n int) {
     a$make(n);
 
     var p d$IntPair`bool` = {a=true,b=n};
+
+    var t (a$Complex, v$Vector) = crossValueTuple();
+    var c a$Complex = t.0;
+    var vv v$Vector = t.1;
 }
 
 func main(args [&#][*?#]byte) {

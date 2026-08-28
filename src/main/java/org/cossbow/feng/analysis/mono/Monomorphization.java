@@ -9,7 +9,7 @@ import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.ast.mod.ModulePath;
+import org.cossbow.feng.mod.ModuleManager;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.FixedParameter;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
@@ -33,11 +33,12 @@ public class Monomorphization {
 
     private final AnalyseSymbolTable table;
     /**
-     * Cross-module mono instances keyed by module path. When non-null, a
-     * concrete instance owned by another module is written into that module's
-     * table (definition-site ownership). Null in single-file mode.
+     * Cross-module mono instance lookup via {@link ModuleManager} (lazy create
+     * on first access). A concrete instance owned by another module is written
+     * into that module's table (definition-site ownership). Null in single-file
+     * mode.
      */
-    private final Map<ModulePath, Monomorphization> modules;
+    private final ModuleManager manager;
 
     /**
      * Worklist of concrete type declarers to concretize into mono definitions.
@@ -74,9 +75,9 @@ public class Monomorphization {
     }
 
     public Monomorphization(AnalyseSymbolTable ast,
-                            Map<ModulePath, Monomorphization> modules) {
+                            ModuleManager manager) {
         this.table = ast;
-        this.modules = modules;
+        this.manager = manager;
     }
 
     /**
@@ -84,8 +85,8 @@ public class Monomorphization {
      * back to {@code this} for the current module or single-file mode.
      */
     private Monomorphization owner(Symbol symbol) {
-        if (modules == null || symbol.module().none()) return this;
-        var m = modules.get(symbol.module().get());
+        if (manager == null || symbol.module().none()) return this;
+        var m = manager.mono(symbol.module().get());
         return m != null ? m : this;
     }
 
@@ -350,6 +351,9 @@ public class Monomorphization {
                 if (!concretized(Mangle.symbol(atd))) pending.add(atd);
             }
             case TupleTypeDeclarer ttd -> {
+                // 跨模块元组：先登记公共合成模块（懒创建 + 重建模块 DAG），
+                // 否则 concretizeTuple 时 owner() 找不到归属模块。
+                ensureTupleModule(ttd);
                 if (!concretized(Mangle.symbol(ttd))) pending.add(ttd);
             }
             case NamedFuncTypeDeclarer nftd -> {
@@ -370,6 +374,19 @@ public class Monomorphization {
             default -> {
             }
         }
+    }
+
+    /**
+     * 元组元素跨多个模块时，先向 {@link ModuleManager} 登记公共合成模块：
+     * 懒创建空合成模块、登记使用模块对它的依赖，并重建模块 DAG。这样
+     * {@code concretizeTuple} 时 {@code owner(symbol)} 能按定义站点归属找到它。
+     */
+    private void ensureTupleModule(TupleTypeDeclarer ttd) {
+        if (manager == null) return; // 单文件模式：无跨模块元组
+        var mods = Mangle.elementModules(ttd);
+        if (mods.size() <= 1) return; // 单模块或全内置：无需合成模块
+        var user = table.module.has() ? table.module.must().path() : null;
+        manager.ensureSynthetic(mods, user);
     }
 
     // ---- M2: concretization ----

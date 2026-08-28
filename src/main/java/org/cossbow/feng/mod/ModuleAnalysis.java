@@ -5,7 +5,6 @@ import org.cossbow.feng.analysis.*;
 import org.cossbow.feng.analysis.meta.ClassMetadata;
 import org.cossbow.feng.analysis.meta.CopyBuilder;
 import org.cossbow.feng.analysis.meta.VTableBuilder;
-import org.cossbow.feng.analysis.mono.Monomorphization;
 import org.cossbow.feng.analysis.meta.ReleaserBuilder;
 import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.ast.mod.ModulePath;
@@ -70,7 +69,8 @@ public class ModuleAnalysis {
         return ast;
     }
 
-    public void analyse(DAGGraph<FModule> modules) {
+    public void analyse(ModuleManager manager) {
+        var modules = manager.dag();
         var tabMap = modules.stream().collect(
                 Collectors.toMap(FModule::path, Function.identity()));
 
@@ -102,7 +102,7 @@ public class ModuleAnalysis {
 
         normalize(modules);
 
-        mono(modules, tabMap);
+        mono(manager);
 
         lowering(modules);
 
@@ -121,31 +121,21 @@ public class ModuleAnalysis {
         }
     }
 
-    private void mono(DAGGraph<FModule> modules,
-                      Map<ModulePath, FModule> map) {
-        // Cross-module mono instances (definition-site ownership) keyed by path.
-        var monoMap = new LinkedHashMap<ModulePath, Monomorphization>();
-        for (var fm : modules) {
-            // Monomorphization: discover all concrete generic instantiations
-            // and record them in the symbol table.
-            // Pass already-analyzed module tables so cross-module generic
-            // function definitions can be found.
-            var mono = new Monomorphization(fm.result.must(), monoMap);
-            monoMap.put(fm.path(), mono);
-        }
+    private void mono(ModuleManager manager) {
         // Phase 1: run monomorphization on every module. Each run() concretizes
         // types and writes cross-module instances into their *owner* module's
         // concretized set (definition-site ownership). Phase 1 must complete for
         // ALL modules before any buildDeps() runs, otherwise an instance written
         // by a later module (e.g. main's IntPair`bool` owned by aad) is missed by
-        // the owner's already-completed bucketing.
-        for (var mono : monoMap.values()) {
-            mono.run();
+        // the owner's already-completed bucketing. Instances are created lazily
+        // via ModuleManager.mono on first access.
+        for (var fm : manager.dag()) {
+            manager.mono(fm.path()).run();
         }
         // Phase 2: build dependency graphs after all modules' concretization
         // (including cross-module instances) has been written.
-        for (var mono : monoMap.values()) {
-            mono.buildDeps();
+        for (var fm : manager.dag()) {
+            manager.mono(fm.path()).buildDeps();
         }
     }
 

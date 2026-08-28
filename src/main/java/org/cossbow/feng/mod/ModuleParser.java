@@ -83,7 +83,7 @@ public class ModuleParser {
         return ErrorUtil.modFail("can't find module '%s'", mp);
     }
 
-    public DAGGraph<FModule> parseFile(Path file) throws IOException {
+    public ModuleManager parseFile(Path file) throws IOException {
         var mp = new ModulePath(pkg, Path.of(""));
         var src = new SourceParser(mp, charset)
                 .parse(absPath(file));
@@ -202,7 +202,7 @@ public class ModuleParser {
     /**
      * parse one module
      */
-    public DAGGraph<FModule> parseModule(Path module)
+    public ModuleManager parseModule(Path module)
             throws IOException {
         var fm = parseOneModule(module);
         return makeGraph(List.of(fm));
@@ -211,7 +211,7 @@ public class ModuleParser {
     /**
      * parse all modules of whole package
      */
-    public DAGGraph<FModule> parsePackage() throws IOException {
+    public ModuleManager parsePackage() throws IOException {
         var list = scanModule();
         var modules = new ArrayList<FModule>(list.size());
         for (var g : list) {
@@ -221,7 +221,7 @@ public class ModuleParser {
         return makeGraph(modules);
     }
 
-    private DAGGraph<FModule> makeGraph(List<FModule> list)
+    private ModuleManager makeGraph(List<FModule> list)
             throws IOException {
         var modules = CommonUtil.toMap(list, FModule::path);
         for (var fm : list) {
@@ -240,7 +240,7 @@ public class ModuleParser {
             }
             fm.imports(imports);
         }
-        return DAGUtil.make(modules.values(), edges);
+        return new ModuleManager(DAGUtil.make(modules.values(), edges));
     }
 
     private void collectLibs(Map<ModulePath, FModule> modules,

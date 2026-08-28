@@ -174,4 +174,24 @@ public class AnalyseSymbolTable {
      */
     public DAGGraph<TypeDefinition> monoTrailing = DAGGraph.empty();
 
+    /**
+     * 空的语义分析结果表（无任何源符号），用于承载「合成模块」这类无源文件的
+     * 虚拟模块。所有集合字段置空，仅 monoHead/monoAfter 等 mono 结果字段保留
+     * 默认空容器，供单态化 pass 写入物化类型。
+     */
+    public static AnalyseSymbolTable empty() {
+        var ast = new AnalyseSymbolTable();
+        ast.typeList = List.of();
+        ast.functionList = List.of();
+        ast.constVars = List.of();
+        ast.dagVars = DAGGraph.empty();
+        ast.enumList = List.of();
+        ast.dagPrototypes = DAGGraph.empty();
+        ast.dagStructures = DAGGraph.empty();
+        ast.dagInterfaces = DAGGraph.empty();
+        ast.dagClasses = DAGGraph.empty();
+        ast.stringCache = Map.of();
+        return ast;
+    }
+
 }

@@ -2,7 +2,6 @@ package org.cossbow.feng.mod;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.cossbow.feng.ast.mod.FModule;
-import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.parser.SourceParser;
 import org.cossbow.feng.util.BufferOutputStream;
@@ -36,7 +35,7 @@ public class ModuleAnalyseTest {
         return src.table();
     }
 
-    DAGGraph<FModule> analyseModule() {
+    ModuleManager analyseModule() {
         var m = ModuleParserTest.parseModule();
         var ma = new ModuleAnalysis();
         ma.analyse(m);
@@ -46,25 +45,25 @@ public class ModuleAnalyseTest {
 
     @Test
     public void testModule() throws IOException {
-        var dag = analyseModule();
-        for (var fm : dag) {
+        var m = analyseModule();
+        for (var fm : m.dag()) {
             if (ModuleParserTest.isTestPkg(fm.path()))
                 export(fm);
         }
     }
 
-    public static DAGGraph<FModule> analysePackage() throws IOException {
-        var dag = ModuleParserTest.parsePackage();
+    public static ModuleManager analysePackage() throws IOException {
+        var m = ModuleParserTest.parsePackage();
         var ma = new ModuleAnalysis();
-        ma.analyse(dag);
+        ma.analyse(m);
         ErrorUtil.reportError(ma.errors());
-        return dag;
+        return m;
     }
 
     @Test
     public void testPackage() throws IOException {
-        var dag = analysePackage();
-        for (var fm : dag) {
+        var m = analysePackage();
+        for (var fm : m.dag()) {
             if (ModuleParserTest.isTestPkg(fm.path()))
                 export(fm);
         }
@@ -72,9 +71,9 @@ public class ModuleAnalyseTest {
 
     @Test
     public void testLibrary() throws IOException {
-        var dag = ModuleParserTest.withLibrary();
+        var m = ModuleParserTest.withLibrary();
         var ma = new ModuleAnalysis();
-        ma.analyse(dag);
+        ma.analyse(m);
         ErrorUtil.reportError(ma.errors());
     }
 }

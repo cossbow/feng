@@ -2,20 +2,14 @@ package org.cossbow.feng;
 
 import org.cossbow.feng.analysis.AnalyseSymbolTable;
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.Mangle;
 import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.coder.Generator;
-import org.cossbow.feng.dag.DAGGraph;
-import org.cossbow.feng.dag.DAGUtil;
 import org.cossbow.feng.mod.ModuleAnalysis;
+import org.cossbow.feng.mod.ModuleManager;
 import org.cossbow.feng.mod.ModuleParser;
-import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.Command;
 import org.cossbow.feng.util.CommonUtil;
-import org.cossbow.feng.util.DedupCache;
 import org.cossbow.feng.util.ErrorUtil;
-import org.cossbow.feng.util.Groups;
-import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.TargetOS;
 
 import java.io.IOException;
@@ -209,39 +203,20 @@ public class Compiler {
 
     // ---- core pipeline ----
 
-    /**
-     * 注入内置合成模块 {@link Mangle#FENG}：一个无源文件的空模块，作为所有真实
-     * 模块的依赖（head），用来承载 primitive/内置类元素的数组/元组物化定义，
-     * 并生成共享头 {@code Feng.h}（避免 {@code [*]int} 等 typedef 在各模块重复）。
-     */
-    private DAGGraph<FModule> withBuiltinModule(DAGGraph<FModule> dag) {
-        var feng = new FModule(Mangle.FENG, List.of(),
-                new ParseSymbolTable(Optional.of(Mangle.FENG), new DedupCache<>()));
-        var nodes = new ArrayList<FModule>(dag.size() + 1);
-        nodes.add(feng);
-        for (var fm : dag) nodes.add(fm);
-        var edges = new ArrayList<Groups.G2<FModule, FModule>>(dag.edges());
-        for (var fm : dag) edges.add(Groups.g2(feng, fm));
-        return DAGUtil.make(nodes, edges);
-    }
-
-    public void compile(DAGGraph<FModule> dag, Path dir)
+    public void compile(ModuleManager manager, Path dir)
             throws IOException {
         // Clean stale generated files from previous compilations to prevent
         // symbol ID mismatches (the static IdGenerator in Variable assigns
         // different IDs across runs).
         cleanBuildDir(dir);
 
-        // 注入内置合成模块 FENG：存放 primitive/内置类元素的数组/元组物化定义，
-        // 生成共享头 Feng.h，被所有模块 include（避免 [*]int 等 typedef 重复）。
-        dag = withBuiltinModule(dag);
-
         var ma = new ModuleAnalysis(test);
-        ma.analyse(dag);
+        ma.analyse(manager);
         ErrorUtil.reportError(ma.errors());
         factory.copyBaseHeader(dir);
 
         // Collect all C source files from all modules
+        var dag = manager.dag();
         var allCSources = new ArrayList<Path>();
         boolean hasMain = test;  // test mode always produces executable
         for (var fm : dag) {

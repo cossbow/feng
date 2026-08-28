@@ -1,9 +1,7 @@
 package org.cossbow.feng.mod;
 
 import org.cossbow.feng.ast.Identifier;
-import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.ast.mod.ModulePath;
-import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.ResourceUtil;
 import org.junit.jupiter.api.Test;
@@ -36,7 +34,7 @@ public class ModuleParserTest {
         return pkgName.equals(mp.pkg().value());
     }
 
-    public static DAGGraph<FModule> parseModule() {
+    public static ModuleManager parseModule() {
         try {
             return testMod().parseModule(Path.of("aaa"));
         } catch (IOException e) {
@@ -46,22 +44,22 @@ public class ModuleParserTest {
 
     @Test
     public void testParseModule() {
-        var fm = parseModule();
-        System.out.println(fm);
+        var m = parseModule();
+        System.out.println(m.dag());
     }
 
-    public static DAGGraph<FModule> parsePackage() throws IOException {
+    public static ModuleManager parsePackage() throws IOException {
         return testMod().parsePackage();
     }
 
     @Test
     public void testParsePackage() throws IOException {
-        for (var fm : parsePackage()) {
+        for (var fm : parsePackage().dag()) {
             System.out.println(fm.path());
         }
     }
 
-    public static DAGGraph<FModule> withLibrary() throws IOException {
+    public static ModuleManager withLibrary() throws IOException {
         var test = testMod();
         var lib = new ModuleParser("lib",
                 ResourceUtil.getDir("lib"),
@@ -71,8 +69,8 @@ public class ModuleParserTest {
 
     @Test
     public void testLibrary() throws IOException {
-        var dag = withLibrary();
-        for (var fm : dag) {
+        var m = withLibrary();
+        for (var fm : m.dag()) {
             System.out.println(fm);
         }
     }

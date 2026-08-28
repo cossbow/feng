@@ -8,6 +8,9 @@ import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
 
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -76,10 +79,49 @@ public class Mangle {
                     new Symbol(atd.pos(), moduleOf(atd.element()).orElse(Optional.of(FENG)),
                             new Identifier(typeKey(atd)));
             case TupleTypeDeclarer ttd ->
-                    new Symbol(ttd.pos(), moduleOf(ttd).orElse(Optional.of(FENG)),
+                    new Symbol(ttd.pos(), tupleModule(ttd).orElse(Optional.of(FENG)),
                             new Identifier(typeKey(ttd)));
             default -> throw new IllegalArgumentException("not a concrete mono type: " + td);
         };
+    }
+
+    /**
+     * 元组的归属模块：元素跨多个模块时归确定性合成模块（见
+     * {@link #syntheticModule}）；否则沿用 {@link #moduleOf}（单模块或空）。
+     */
+    private static Optional<ModulePath> tupleModule(TupleTypeDeclarer ttd) {
+        var mods = elementModules(ttd);
+        if (mods.size() > 1) return Optional.of(syntheticModule(mods));
+        return moduleOf(ttd);
+    }
+
+    /**
+     * 元组所有元素的归属模块集合（去重，保持首次出现序）。
+     * 引用元素（{@code *a$A}）与值元素（{@code a$A}）同归属：refer 不影响模块。
+     */
+    public static Set<ModulePath> elementModules(TupleTypeDeclarer ttd) {
+        var set = new LinkedHashSet<ModulePath>();
+        for (var e : ttd.elements()) {
+            moduleOf(e).use(set::add);
+        }
+        return set;
+    }
+
+    /**
+     * 由元素模块集合确定的合成模块路径（确定性命名：按模块 {@code filename}
+     * 排序拼接）。同一组元素模块永远映射到同一合成模块。
+     */
+    public static ModulePath syntheticModule(Collection<ModulePath> elementModules) {
+        var names = elementModules.stream()
+                .map(ModulePath::filename)
+                .distinct()
+                .sorted()
+                .toArray(String[]::new);
+        var values = new Identifier[names.length];
+        for (int i = 0; i < names.length; i++) {
+            values[i] = new Identifier(names[i]);
+        }
+        return new ModulePath(Position.ZERO, FENG.pkg(), values);
     }
 
     /**
