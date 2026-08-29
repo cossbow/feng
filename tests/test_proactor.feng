@@ -138,3 +138,55 @@ func testAsyncEchoMultiConn() {
     pro.close();
     listener.close();
 }
+
+// 超时操作：提交 submitTimeout 后 poll 应取回 PRO_TIMEOUT 完成事件（token 匹配）。
+@Test
+func testProactorTimeout() {
+    @Sync var pro = n$newProactor();
+    testing$assertTrue(pro != nil);
+
+    var token = pro.submitTimeout(int32(100));   // 100ms 后触发
+
+    var events [1]n$Completion;
+    var nReady = pro.poll(events, int32(2000));  // 至多等 2s
+    testing$assertTrue(nReady == 1);
+    testing$assertTrue(events[0].op == n$PRO_TIMEOUT);
+    testing$assertTrue(events[0].token == token);
+
+    pro.close();
+}
+
+// 异步 connect：未连接 socket 经 submitConnect 后 poll 取回 PRO_CONNECT（result==0），
+// 并验证监听端确实 accept 到该连接（覆盖 ip/port 打包透传）。
+@Test
+func testProactorConnect() {
+    var addr = n$ip4(127, 0, 0, 1, 20101);
+    var listener = n$listenTCP(addr);
+    testing$assertTrue(listener != nil);
+
+    @Sync var pro = n$newProactor();
+    testing$assertTrue(pro != nil);
+
+    // 未连接 socket：先关联 IOCP，再提交异步 connect（fd 以值传入，无需 @Sync）。
+    var client = n$newSocket();
+    testing$assertTrue(client != nil);
+    testing$assertTrue(pro.associate(client));
+
+    var token = pro.submitConnect(client, addr);
+
+    var events [1]n$Completion;
+    var nReady = pro.poll(events, int32(2000));
+    testing$assertTrue(nReady == 1);
+    testing$assertTrue(events[0].op == n$PRO_CONNECT);
+    testing$assertTrue(events[0].token == token);
+    testing$assertTrue(events[0].result == int32(0));   // 0 = 成功
+
+    // 连接已建立：监听端 accept 应立即返回（不阻塞）。
+    var acc = listener.accept();
+    testing$assertTrue(acc.0 != nil);
+
+    client.close();
+    acc.0.close();
+    listener.close();
+    pro.close();
+}

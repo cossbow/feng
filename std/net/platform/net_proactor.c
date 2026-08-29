@@ -193,7 +193,7 @@ int proactorSubmit(void* h, int fd, void* buf, int len,
         SOCKADDR_IN dst;
         memset(&dst, 0, sizeof(dst));
         dst.sin_family = AF_INET;
-        dst.sin_addr.s_addr = ip;           // 传入 host 字节序，sin_addr 按网络序存储
+        dst.sin_addr.s_addr = htonl(ip);    // ip 传入为 host 字节序，须转网络序存储
         dst.sin_port = htons(port);
         DWORD sent = 0;
         int rc = p->pConnectEx(s, (SOCKADDR*)&dst, sizeof(dst),

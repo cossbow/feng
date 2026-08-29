@@ -255,6 +255,16 @@ func socketFromFd(fd int) *Socket {
     return new(Socket, {fd = fd});
 }
 
+// 创建未连接的 TCP socket（供 Proactor 的 submitConnect 使用；dial 会同步 connect，
+// 无法用于异步 connect 测试）。
+export
+func newSocket() *Socket {
+    ensureStartup();
+    var fd = int(socket(2, 1, 0));  // AF_INET, SOCK_STREAM
+    if (fd < 0) { throw new(error$IllegalStateException); }
+    return new(Socket, {fd = fd});
+}
+
 export
 func listenUDP(addr Addr) *Socket {
     ensureStartup();
