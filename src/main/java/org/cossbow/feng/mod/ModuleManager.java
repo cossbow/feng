@@ -12,12 +12,7 @@ import org.cossbow.feng.util.DedupCache;
 import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Optional;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 模块图管理器：封装模块 DAG，并 lazy 创建/查找每个模块的
@@ -36,15 +31,23 @@ import java.util.Map;
  */
 public class ModuleManager {
 
-    /** 内置合成模块 FENG：承载 primitive/内置元素的数组/元组 typedef。 */
+    /**
+     * 内置合成模块 FENG：承载 primitive/内置元素的数组/元组 typedef。
+     */
     private final FModule feng;
-    /** 原始模块 DAG（不含 FENG、不含合成模块）。 */
+    /**
+     * 原始模块 DAG（不含 FENG、不含合成模块）。
+     */
     private final DAGGraph<FModule> base;
     private final Map<ModulePath, FModule> byPath = new HashMap<>();
     private final Map<ModulePath, Monomorphization> monos = new LinkedHashMap<>();
-    /** 公共合成模块：path → 空 FModule（import 各元素模块）。 */
+    /**
+     * 公共合成模块：path → 空 FModule（import 各元素模块）。
+     */
     private final Map<ModulePath, FModule> synthetics = new LinkedHashMap<>();
-    /** 当前模块 DAG（FENG + 原始模块 + 合成模块）。 */
+    /**
+     * 当前模块 DAG（FENG + 原始模块 + 合成模块）。
+     */
     private DAGGraph<FModule> dag;
 
     public ModuleManager(DAGGraph<FModule> raw) {
@@ -110,14 +113,16 @@ public class ModuleManager {
         return path;
     }
 
-    /** 由基础 DAG + 合成模块 + imports 派生边重建模块 DAG。 */
+    /**
+     * 由基础 DAG + 合成模块 + imports 派生边重建模块 DAG。
+     */
     private void rebuild() {
-        var nodes = new ArrayList<FModule>(base.size() + synthetics.size() + 1);
+        var nodes = new HashSet<FModule>(base.size() + synthetics.size() + 1);
         nodes.add(feng);
-        for (var fm : base) nodes.add(fm);
-        for (var fm : synthetics.values()) nodes.add(fm);
+        nodes.addAll(base.all());
+        nodes.addAll(synthetics.values());
 
-        var edges = new ArrayList<Groups.G2<FModule, FModule>>();
+        var edges = new HashSet<Groups.G2<FModule, FModule>>();
         // FENG 是所有模块的依赖（head）。
         for (var fm : base) edges.add(Groups.g2(feng, fm));
         for (var fm : synthetics.values()) edges.add(Groups.g2(feng, fm));

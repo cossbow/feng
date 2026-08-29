@@ -37,7 +37,8 @@ public class Mangle {
      */
     public static String name(DerivedType dt) {
         var sb = new StringBuilder();
-        dt.symbol().module().use(m -> sb.append(m).append('$'));
+        genericModule(dt.symbol(), dt.generic())
+                .use(m -> sb.append(m).append('$'));
         sb.append(dt.name().value()).append('_');
         sb.append(dt.generic().stream()
                 .map(Mangle::typeKey)
@@ -50,7 +51,10 @@ public class Mangle {
      * instantiation. {@code toString()} yields {@link #name(DerivedType)}.
      */
     public static Symbol symbol(DerivedType dt) {
-        return symbol(dt.symbol(), dt.generic());
+        var suffix = dt.name().value() + '_' + dt.generic().stream()
+                .map(Mangle::typeKey).collect(Collectors.joining("_"));
+        return new Symbol(dt.pos(), genericModule(dt.symbol(), dt.generic()),
+                new Identifier(dt.pos(), suffix));
     }
 
     /**
@@ -105,6 +109,46 @@ public class Mangle {
             moduleOf(e).use(set::add);
         }
         return set;
+    }
+
+    /**
+     * 泛型类型（类/接口/结构）具体化的归属模块：定义站点 + 各类型实参的归属
+     * 模块，跨多个模块时归确定性合成模块；否则沿用定义站点模块。
+     */
+    private static Optional<ModulePath> genericModule(Symbol base, TypeArguments args) {
+        var mods = genericModules(base, args);
+        if (mods.size() > 1) return Optional.of(syntheticModule(mods));
+        return base.module();
+    }
+
+    /**
+     * 泛型类型具体化的归属模块集合：定义站点模块 + 各类型实参的归属模块
+     * （去重，保持首次出现序）。
+     */
+    public static Set<ModulePath> genericModules(Symbol base, TypeArguments args) {
+        var set = new LinkedHashSet<ModulePath>();
+        base.module().use(set::add);
+        for (var a : args) {
+            argModule(a).use(set::add);
+        }
+        return set;
+    }
+
+    /**
+     * 类型实参的归属模块（递归）：泛型类型用其 {@link #genericModule}（可能是
+     * 合成模块），元组用 {@link #tupleModule}；其余（数组/函数/primitive）沿用
+     * {@link #moduleOf} 递归取第一个带模块的类型。
+     */
+    private static Optional<ModulePath> argModule(TypeDeclarer td) {
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            var dt = dtd.derivedType();
+            if (dt.generic().isEmpty()) return dt.symbol().module();
+            return genericModule(dt.symbol(), dt.generic());
+        }
+        if (td instanceof TupleTypeDeclarer ttd) {
+            return tupleModule(ttd);
+        }
+        return moduleOf(td);
     }
 
     /**

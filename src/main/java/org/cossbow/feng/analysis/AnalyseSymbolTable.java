@@ -2,9 +2,6 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.analysis.meta.ClassMeta;
 import org.cossbow.feng.analysis.meta.VTable;
-import org.cossbow.feng.analysis.mono.ConcreteTypeInst;
-import org.cossbow.feng.analysis.mono.FuncInstantiation;
-import org.cossbow.feng.analysis.mono.MethodInstantiation;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.EnumDefinition;
 import org.cossbow.feng.ast.GlobalVariable;
@@ -12,7 +9,6 @@ import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.SymbolMap;
 import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
-import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.mod.FModule;
 import org.cossbow.feng.ast.oop.ClassDefinition;
@@ -65,60 +61,10 @@ public class AnalyseSymbolTable {
     // ---- (CGenerator) Monomorphization results (populated by Monomorphization pass) ----
 
     /**
-     * Concrete generic type instantiations (class/interface).
-     * Deduplicated by DerivedType.equals/hashCode.
-     *
-     * @deprecated Use {@link #concreteTypeInsts} instead; will be removed after CGenerator refactor.
-     */
-    @Deprecated
-    public Set<DerivedType> concreteInstantiations = new LinkedHashSet<>();
-
-    /**
-     * All concrete type instantiations in DAG topological order.
-     * Populated by the Monomorphization pass.
-     */
-    public DAGGraph<ConcreteTypeInst> concreteTypeInsts = DAGGraph.empty();
-
-    /**
-     * Mapping from resolved TypeDeclarer → ConcreteTypeInst.
-     * Used by CGenerator to look up type definitions and type parameter mappings.
-     * Populated by the Monomorphization pass.
-     */
-    public Map<String, ConcreteTypeInst> typeToInst = new LinkedHashMap<>();
-
-    /**
-     * Concrete generic function instantiations: (FunctionDefinition, TypeArguments).
-     * Deduplicated by FuncInstantiation.equals/hashCode.
-     */
-    public Set<FuncInstantiation> concreteFuncInsts = new LinkedHashSet<>();
-
-    /**
-     * Concrete method-level generic instantiations: (classOwner, method, methodArgs).
-     * Deduplicated by MethodInstantiation.equals/hashCode.
-     */
-    public Set<MethodInstantiation> concreteMethodInsts = new LinkedHashSet<>();
-
-    /**
-     * Imported (cross-module) generic function instantiations:
-     * mangled name → FuncInstantiation (fd + concrete type arguments).
-     * Used by CGenerator to emit correct extern declarations with
-     * resolved types (not raw generic type variables like $T).
-     */
-    public Map<String, FuncInstantiation> externFuncInsts = new LinkedHashMap<>();
-
-    /**
-     * Pending anonymous prototype typedefs registered by emitProtoType
-     * during code generation. Flushed once by {@code declareProtoTypedefs()}.
-     */
-    public final Set<org.cossbow.feng.ast.proc.Prototype> pendingProtoTypedefs =
-            new LinkedHashSet<>();
-
-    // ---- (NCGenerator) mono2 (new Monomorphization pass) results ----
-
-    /**
      * Dependency sub-DAGs bucketed by analysis-order unit (deduplicated):
      * key = type / global variable, value = the mono types it needs.
      */
+    @Deprecated
     public Map<Entity, DAGGraph<TypeDefinition>> monoDeps = new LinkedHashMap<>();
 
     /**
@@ -172,6 +118,7 @@ public class AnalyseSymbolTable {
      * 由 mono2 {@code buildUnitDeps} 末尾收集（trailing group），依赖拓扑序。
      * 后端在 {@link #monoDeps} 之后补发这些类型的 typedef/struct。
      */
+    @Deprecated
     public DAGGraph<TypeDefinition> monoTrailing = DAGGraph.empty();
 
     /**

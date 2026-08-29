@@ -104,6 +104,11 @@ public class ModuleAnalysis {
 
         mono(manager);
 
+        // mono 阶段跨模块泛型/元组会懒创建「合成模块」并重建 DAG，后续 pass
+        // 必须用最新 DAG，否则合成模块里的具体化类不进 classFlat/classVtable/
+        // releaser → 缺失 classMetas 与 destroy 声明（module-2 泛型跨模块报错）。
+        modules = manager.dag();
+
         lowering(modules);
 
         classFlat(modules);

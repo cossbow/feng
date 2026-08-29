@@ -337,14 +337,18 @@ public class Monomorphization {
         if (td.hasTypeVar()) return;
         switch (td) {
             case DerivedTypeDeclarer dtd -> {
-                if (!dtd.derivedType().generic().isEmpty()
-                        // 已具体化不再入队：concretizeClass 的 collect 会反复遇到
-                        // 同一具体化类型（如 Pair`int, *?int`），否则 pending 永不
-                        // 排空（generic-1 死循环 guard 到 20 万）。
-                        // 注意用 concretized()（owner 感知）：跨模块泛型实例写入
-                        // 定义所属模块的 map，this 的 map 会永远 miss → 死循环。
-                        && !concretized(Mangle.symbol(dtd.derivedType()))) {
-                    pending.add(dtd);
+                if (!dtd.derivedType().generic().isEmpty()) {
+                    // 跨模块泛型类型：先登记公共合成模块（懒创建 + 重建模块 DAG），
+                    // 否则 concretizeClass 时 owner() 找不到归属模块。
+                    ensureGenericModule(dtd);
+                    // 已具体化不再入队：concretizeClass 的 collect 会反复遇到
+                    // 同一具体化类型（如 Pair`int, *?int`），否则 pending 永不
+                    // 排空（generic-1 死循环 guard 到 20 万）。
+                    // 注意用 concretized()（owner 感知）：跨模块泛型实例写入
+                    // 定义所属模块的 map，this 的 map 会永远 miss → 死循环。
+                    if (!concretized(Mangle.symbol(dtd.derivedType()))) {
+                        pending.add(dtd);
+                    }
                 }
             }
             case ArrayTypeDeclarer atd -> {
@@ -387,6 +391,38 @@ public class Monomorphization {
         if (mods.size() <= 1) return; // 单模块或全内置：无需合成模块
         var user = table.module.has() ? table.module.must().path() : null;
         manager.ensureSynthetic(mods, user);
+    }
+
+    /**
+     * 泛型类型（类/接口/结构）跨多个模块时，先向 {@link ModuleManager} 登记
+     * 公共合成模块，与 {@link #ensureTupleModule} 同机制。类型实参若自身也是
+     * 跨模块泛型/元组，先递归登记其合成模块，保证合成模块之间的依赖边正确。
+     */
+    private void ensureGenericModule(DerivedTypeDeclarer dtd) {
+        if (manager == null) return; // 单文件模式：无跨模块
+        var dt = dtd.derivedType();
+        // 先递归登记实参里的跨模块泛型/元组，让内层合成模块先建、可被 import。
+        for (var a : dt.generic()) {
+            ensureArgModule(a);
+        }
+        var mods = Mangle.genericModules(dt.symbol(), dt.generic());
+        if (mods.size() <= 1) return; // 单模块或全内置：无需合成模块
+        var user = table.module.has() ? table.module.must().path() : null;
+        manager.ensureSynthetic(mods, user);
+    }
+
+    /** 递归登记类型实参里涉及的跨模块泛型/元组合成模块。 */
+    private void ensureArgModule(TypeDeclarer td) {
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            if (!dtd.derivedType().generic().isEmpty()) {
+                ensureGenericModule(dtd);
+            }
+        } else if (td instanceof TupleTypeDeclarer ttd) {
+            ensureTupleModule(ttd);
+            for (var e : ttd.elements()) ensureArgModule(e);
+        } else if (td instanceof ArrayTypeDeclarer atd) {
+            ensureArgModule(atd.element());
+        }
     }
 
     // ---- M2: concretization ----

@@ -440,7 +440,7 @@ public class TypeWriter extends CWriter<TypeWriter> {
             case ClassDefinition cd -> declareClass(cd);
             case StructureDefinition sd -> declareType(sd);
             case EnumDefinition ed -> declareEnum(ed);
-            case InterfaceDefinition id -> declareType(id);
+            case InterfaceDefinition id -> declareInterface(id);
             case TupleDefinition td -> declareTuple(td);
             case FixedArrayDefinition ad -> declareFixedArray(ad);
             case ArrayRefDefinition ad -> declareArrayRef(ad);
