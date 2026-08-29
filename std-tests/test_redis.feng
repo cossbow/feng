@@ -1,0 +1,196 @@
+import std$testing;
+import std$redis;
+import std$util;
+import std$error;
+
+// 从字符串字面量复制出一个可变的 [*]byte。
+func toBytes(s [&#]byte) [*]byte {
+    var n = s.length;
+    var b = new([n]byte);
+    for (var i = 0; i < n; i += 1) {
+        b[i] = s[i];
+    }
+    return b;
+}
+
+// ---- 编码 ----
+
+@Test
+func testEncodeSimpleString() {
+    testing$assertTrue(util$equal`byte`(redis$encode(redis$simpleString("OK")), "+OK\r\n"));
+}
+
+@Test
+func testEncodeError() {
+    testing$assertTrue(util$equal`byte`(redis$encode(redis$error("ERR unknown command")),
+        "-ERR unknown command\r\n"));
+}
+
+@Test
+func testEncodeInteger() {
+    testing$assertTrue(util$equal`byte`(redis$encode(redis$integer(int64(0))), ":0\r\n"));
+    testing$assertTrue(util$equal`byte`(redis$encode(redis$integer(int64(-42))), ":-42\r\n"));
+    testing$assertTrue(util$equal`byte`(
+        redis$encode(redis$integer(int64(9223372036854775807))),
+        ":9223372036854775807\r\n"));
+}
+
+@Test
+func testEncodeBulk() {
+    testing$assertTrue(util$equal`byte`(redis$encode(redis$nullBulk()), "$-1\r\n"));
+    testing$assertTrue(util$equal`byte`(redis$encode(redis$bulk(nil)), "$-1\r\n"));
+    testing$assertTrue(util$equal`byte`(redis$encode(redis$bulk(toBytes(""))), "$0\r\n\r\n"));
+    testing$assertTrue(util$equal`byte`(redis$encode(redis$bulk(toBytes("hello"))),
+        "$5\r\nhello\r\n"));
+}
+
+@Test
+func testEncodeArray() {
+    testing$assertTrue(util$equal`byte`(redis$encode(redis$nullArray()), "*-1\r\n"));
+
+    // 空数组
+    var empty = new([0]redis$RespValue);
+    testing$assertTrue(util$equal`byte`(redis$encode(redis$array(empty)), "*0\r\n"));
+
+    // *2: 批量字符串 + 整数
+    var elems = new([2]redis$RespValue);
+    elems[0] = redis$bulk(toBytes("foo"));
+    elems[1] = redis$integer(int64(42));
+    testing$assertTrue(util$equal`byte`(redis$encode(redis$array(elems)),
+        "*2\r\n$3\r\nfoo\r\n:42\r\n"));
+}
+
+@Test
+func testEncodeNested() {
+    // *1\r\n*2\r\n$3\r\nfoo\r\n:42\r\n
+    var inner = new([2]redis$RespValue);
+    inner[0] = redis$bulk(toBytes("foo"));
+    inner[1] = redis$integer(int64(42));
+    var outer = new([1]redis$RespValue);
+    outer[0] = redis$array(inner);
+    testing$assertTrue(util$equal`byte`(redis$encode(redis$array(outer)),
+        "*1\r\n*2\r\n$3\r\nfoo\r\n:42\r\n"));
+}
+
+// ---- 解码 ----
+
+@Test
+func testDecodeSimpleString() {
+    var r = redis$parse("+OK\r\n");
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.0.isKind(redis$RespType.SimpleString));
+    testing$assertTrue(util$equal`byte`(r.0.text(), "OK"));
+    testing$assertTrue(r.1 == 5);
+}
+
+@Test
+func testDecodeError() {
+    var r = redis$parse("-ERR nope\r\n");
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.0.isKind(redis$RespType.Error));
+    testing$assertTrue(util$equal`byte`(r.0.text(), "ERR nope"));
+}
+
+@Test
+func testDecodeInteger() {
+    var r = redis$parse(":1000\r\n");
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.0.isKind(redis$RespType.Integer));
+    testing$assertTrue(r.0.intVal == int64(1000));
+}
+
+@Test
+func testDecodeBulk() {
+    var r1 = redis$parse("$-1\r\n");
+    testing$assertTrue(r1.2);
+    testing$assertTrue(r1.0.isKind(redis$RespType.BulkString));
+    testing$assertTrue(r1.0.isNull());
+
+    var r2 = redis$parse("$0\r\n\r\n");
+    testing$assertTrue(r2.2);
+    testing$assertTrue(r2.0.isKind(redis$RespType.BulkString));
+    testing$assertFalse(r2.0.isNull());
+    testing$assertTrue(r2.0.text().length == 0);
+
+    var r3 = redis$parse("$5\r\nhello\r\n");
+    testing$assertTrue(r3.2);
+    testing$assertTrue(util$equal`byte`(r3.0.text(), "hello"));
+}
+
+@Test
+func testDecodeArray() {
+    var r1 = redis$parse("*-1\r\n");
+    testing$assertTrue(r1.2);
+    testing$assertTrue(r1.0.isKind(redis$RespType.Array));
+    testing$assertTrue(r1.0.isNull());
+
+    var r2 = redis$parse("*0\r\n");
+    testing$assertTrue(r2.2);
+    testing$assertTrue(r2.0.isKind(redis$RespType.Array));
+    testing$assertFalse(r2.0.isNull());
+    testing$assertTrue(r2.0.len() == 0);
+
+    var r3 = redis$parse("*2\r\n$3\r\nfoo\r\n:42\r\n");
+    testing$assertTrue(r3.2);
+    testing$assertTrue(r3.0.isKind(redis$RespType.Array));
+    testing$assertTrue(r3.0.len() == 2);
+    var e = r3.0.elems;
+    if (e == nil) { return; }
+    testing$assertTrue(util$equal`byte`(e[0].text(), "foo"));
+    testing$assertTrue(e[1].intVal == int64(42));
+}
+
+@Test
+func testDecodeNested() {
+    var r = redis$parse("*1\r\n*2\r\n$3\r\nfoo\r\n:42\r\n");
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.0.isKind(redis$RespType.Array));
+    testing$assertTrue(r.0.len() == 1);
+    var e = r.0.elems;
+    if (e == nil) { return; }
+    testing$assertTrue(e[0].isKind(redis$RespType.Array));
+    testing$assertTrue(e[0].len() == 2);
+}
+
+// ---- 往返与错误 ----
+
+@Test
+func testRoundTrip() {
+    var elems = new([3]redis$RespValue);
+    elems[0] = redis$bulk(toBytes("SET"));
+    elems[1] = redis$bulk(toBytes("key"));
+    elems[2] = redis$bulk(toBytes("value"));
+    var cmd = redis$array(elems);
+
+    var enc = redis$encode(cmd);
+    var r = redis$parse(enc);
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.1 == enc.length);
+
+    // 再次编码，结果应与第一次一致
+    var enc2 = redis$encode(r.0);
+    testing$assertTrue(util$equal`byte`(enc, enc2));
+}
+
+@Test
+func testDecodeErrors() {
+    testing$assertFalse(redis$parse("").2);               // 空输入
+    testing$assertFalse(redis$parse("+OK").2);            // 缺少 CRLF
+    testing$assertFalse(redis$parse(":12x\r\n").2);       // 非法整数
+    testing$assertFalse(redis$parse("$5\r\nabc").2);      // 批量字符串截断
+    testing$assertFalse(redis$parse("$5\r\nabcd\r\n").2); // 长度不匹配
+    testing$assertFalse(redis$parse("*2\r\n$3\r\nfoo\r\n").2); // 数组截断
+    testing$assertFalse(redis$parse("?1\r\n").2);         // 未知类型
+}
+
+@Test
+func testMustParse() {
+    var ok = true;
+    try {
+        redis$mustParse("+OK");
+        ok = false;
+    } catch (e *#error$ParseException) {
+        // 预期抛出的异常
+    }
+    testing$assertTrue(ok);
+}

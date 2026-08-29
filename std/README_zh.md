@@ -775,6 +775,43 @@ import std$regex;
 
 ---
 
+## 16. Redis 协议（RESP）
+
+### `std$redis` — RESP2 编解码
+
+```feng
+import std$redis;
+```
+
+线协议框架（类型字节、长度、CRLF）为 ASCII 文本，批量字符串载荷为原始字节。
+当前实现 RESP2；RESP3 类型（Map/Set/Push 等）暂未包含。
+
+| 符号 | 类型 | 签名 / 说明 |
+|------|------|------------|
+| `RespType` | enum | `SimpleString`, `Error`, `Integer`, `BulkString`, `Array` |
+| `RespValue` | class | RESP 值（值类型），编码与解码共用 |
+| `RespValue.kind` | field | `RespType` 值的种类 |
+| `RespValue.intVal` | field | `int64` 整数值（Integer 用） |
+| `RespValue.str` | field | `[*?]byte` 载荷（SimpleString/Error/BulkString 用；nil 表示空批量字符串） |
+| `RespValue.elems` | field | `[*?]RespValue` 元素（Array 用；nil 表示空数组） |
+| `RespValue.isKind#(k RespType)` | method | `bool` 判断 kind |
+| `RespValue.isNull#()` | method | `bool` 是否为空批量字符串或空数组 |
+| `RespValue.text#()` | method | `[*#]byte` 载荷字节（其余返回空串） |
+| `RespValue.len#()` | method | `int` 数组元素个数 |
+| `simpleString(s [&#]byte)` | func | `RespValue` 简单字符串 `+` |
+| `error(s [&#]byte)` | func | `RespValue` 错误 `-` |
+| `integer(v int64)` | func | `RespValue` 整数 `:` |
+| `bulk(data [*?]byte)` | func | `RespValue` 批量字符串 `$`，nil=空批量 |
+| `array(elems [*?]RespValue)` | func | `RespValue` 数组 `*`，nil=空数组 |
+| `nullBulk()` | func | `RespValue` 空批量字符串 `$-1` |
+| `nullArray()` | func | `RespValue` 空数组 `*-1` |
+| `encode(v RespValue)` | func | `[*#]byte` 编码为 RESP 字节 |
+| `writeTo(v RespValue, w &Writer)` | func | `int` 编码并写入 Writer |
+| `parse(data [&#]byte)` | func | `(RespValue, int, bool)` 解码一个值：`(值, 已消费字节数, ok)` |
+| `mustParse(data [&#]byte)` | func | `RespValue` 解码，失败抛 `ParseException` |
+
+---
+
 ## 模块依赖关系
 
 ```
@@ -802,6 +839,7 @@ std$os             ← 文件 I/O（依赖 std$string）
 std$path           ← 路径（依赖 std$string）
 std$net            ← 网络（依赖 std$string, std$error, std$net$platform）
 std$regex          ← 正则表达式（依赖 std$string）
+std$redis          ← Redis 协议（依赖 std$bytes, std$strconv, std$error）
 std$testing        ← 测试（依赖 std$string）
 ```
 
@@ -834,5 +872,6 @@ std$testing        ← 测试（依赖 std$string）
 | 路径 | `import std$path;` |
 | 网络 | `import std$net;` |
 | 正则表达式 | `import std$regex;` |
+| Redis 协议 | `import std$redis;` |
 | 测试 | `import std$testing;` |
 | 数组工具 | `import std$util;` |

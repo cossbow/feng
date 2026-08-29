@@ -1,0 +1,301 @@
+// RESP (REdis Serialization Protocol) — 编码与解码。
+//
+// 实现 RESP2 线协议：
+//   +  简单字符串  simple string
+//   -  错误        error
+//   :  整数        integer
+//   $  批量字符串  bulk string（含空批量字符串 "$-1"）
+//   *  数组        array（含空数组 "*-1"）
+//
+// 线协议框架（类型字节、长度、CRLF）均为 ASCII 文本，批量字符串的载荷
+// 则是原始字节（[*]byte）。RespValue 是普通值类型，解码产出与编码消费
+// 使用同一类型。
+
+import std$bytes;
+import std$strconv;
+import std$error;
+
+// RESP 值的种类，与线格式的首字节一一对应。
+export
+enum RespType {
+    SimpleString,   // +
+    Error,          // -
+    Integer,        // :
+    BulkString,     // $
+    Array,          // *
+}
+
+// 一个 RESP 值。
+//
+// 依据 kind 决定哪些字段承载数据：
+//   SimpleString / Error : str 存放载荷（永远非空）。
+//   Integer              : intVal 存放数值。
+//   BulkString           : str 存放载荷；nil 表示空批量字符串（"$-1"）。
+//   Array                : elems 存放元素；nil 表示空数组（"*-1"）。
+export
+class RespValue {
+    export var kind RespType;
+    export var intVal int64;
+    export var str [*?]byte;
+    export var elems [*?]RespValue;
+
+    // 判断 kind 是否为指定类型。
+    export
+    func isKind#(k RespType) bool {
+        return kind.id == k.id;
+    }
+
+    // 是否为空批量字符串或空数组。
+    export
+    func isNull#() bool {
+        if (isKind(RespType.BulkString)) { return str == nil; }
+        if (isKind(RespType.Array)) { return elems == nil; }
+        return false;
+    }
+
+    // 简单字符串 / 错误 / 批量字符串的载荷；其余情况返回空串。
+    export
+    func text#() [*#]byte {
+        var s = str;
+        if (s == nil) { return ""; }
+        return s;
+    }
+
+    // 数组元素个数；非数组或空数组返回 0。
+    export
+    func len#() int {
+        var e = elems;
+        if (e == nil) { return 0; }
+        return e.length;
+    }
+}
+
+// ---- 构造器 ----
+
+// 简单字符串值（+OK）。
+export
+func simpleString(s [&#]byte) RespValue {
+    return {kind = RespType.SimpleString, str = copyBytes(s)};
+}
+
+// 错误值（-ERR ...）。
+export
+func error(s [&#]byte) RespValue {
+    return {kind = RespType.Error, str = copyBytes(s)};
+}
+
+// 整数值（:42）。
+export
+func integer(v int64) RespValue {
+    return {kind = RespType.Integer, intVal = v};
+}
+
+// 批量字符串值（$...）。传入 nil 表示空批量字符串。
+export
+func bulk(data [*?]byte) RespValue {
+    return {kind = RespType.BulkString, str = data};
+}
+
+// 数组值（*...）。传入 nil 表示空数组。
+export
+func array(elems [*?]RespValue) RespValue {
+    return {kind = RespType.Array, elems = elems};
+}
+
+// 空批量字符串（$-1）。
+export
+func nullBulk() RespValue {
+    return {kind = RespType.BulkString};
+}
+
+// 空数组（*-1）。
+export
+func nullArray() RespValue {
+    return {kind = RespType.Array};
+}
+
+// ---- 编码 ----
+
+// 将 v 编码为 RESP 字节，返回新分配的字节数组。
+export
+func encode(v RespValue) [*#]byte {
+    var w = bytes$newWriter();
+    encodeTo(v, w);
+    return w.copy();
+}
+
+// 将 v 编码并写入 w，返回写入的字节数。
+export
+func writeTo(v RespValue, w &Writer) int {
+    var b = encode(v);
+    return w.write(b, 0, b.length);
+}
+
+// 将 v 的 RESP 编码追加到 w。
+func encodeTo(v RespValue, w &Writer) {
+    if (v.isKind(RespType.SimpleString)) {
+        w.write("+", 0, 1);
+        writeLine(w, v.str);
+    } else if (v.isKind(RespType.Error)) {
+        w.write("-", 0, 1);
+        writeLine(w, v.str);
+    } else if (v.isKind(RespType.Integer)) {
+        w.write(":", 0, 1);
+        var digits = strconv$formatInt64(v.intVal);
+        w.write(digits, 0, digits.length);
+        w.write("\r\n", 0, 2);
+    } else if (v.isKind(RespType.BulkString)) {
+        w.write("$", 0, 1);
+        var s = v.str;
+        if (s == nil) {
+            w.write("-1\r\n", 0, 4);
+        } else {
+            var len = strconv$formatInt(s.length);
+            w.write(len, 0, len.length);
+            w.write("\r\n", 0, 2);
+            w.write(s, 0, s.length);
+            w.write("\r\n", 0, 2);
+        }
+    } else if (v.isKind(RespType.Array)) {
+        w.write("*", 0, 1);
+        var e = v.elems;
+        if (e == nil) {
+            w.write("-1\r\n", 0, 4);
+        } else {
+            var len = strconv$formatInt(e.length);
+            w.write(len, 0, len.length);
+            w.write("\r\n", 0, 2);
+            for (var i = 0; i < e.length; i += 1) {
+                encodeTo(e[i], w);
+            }
+        }
+    }
+}
+
+// 写入字节序列，后跟 CRLF。
+func writeLine(w &Writer, s [*?]byte) {
+    if (s != nil) {
+        w.write(s, 0, s.length);
+    }
+    w.write("\r\n", 0, 2);
+}
+
+// ---- 解码 ----
+
+// 从 data 前端解码一个 RESP 值。
+// 返回 (值, 已消费字节数, ok)。数据截断或格式错误时 ok 为 false。
+// 解码命令流水线时，按已消费字节数前进并重复调用 parse 即可。
+export
+func parse(data [&#]byte) (RespValue, int, bool) {
+    return parseValue(data, 0);
+}
+
+// 同 parse，但失败时抛出 std$error$ParseException。
+export
+func mustParse(data [&#]byte) RespValue {
+    var r = parse(data);
+    if (!r.2) {
+        throw new(error$ParseException);
+    }
+    return r.0;
+}
+
+// 从字节偏移 pos 处解码一个 RESP 值。
+func parseValue(data [&#]byte, pos int) (RespValue, int, bool) {
+    if (pos >= data.length) {
+        return (RespValue{}, pos, false);
+    }
+    var c = data[pos];
+    if (c == 43) {       // '+'
+        return parseLineValue(data, pos + 1, RespType.SimpleString);
+    }
+    if (c == 45) {       // '-'
+        return parseLineValue(data, pos + 1, RespType.Error);
+    }
+    if (c == 58) {       // ':'
+        var r = readLine(data, pos + 1);
+        if (!r.2) { return (RespValue{}, pos, false); }
+        var p = strconv$parseInt64(r.0);
+        if (!p.1) { return (RespValue{}, pos, false); }
+        return ({kind = RespType.Integer, intVal = p.0}, r.1, true);
+    }
+    if (c == 36) {       // '$'
+        var r = readLine(data, pos + 1);
+        if (!r.2) { return (RespValue{}, pos, false); }
+        var p = strconv$parseInt(r.0);
+        if (!p.1) { return (RespValue{}, pos, false); }
+        var len = p.0;
+        if (len == -1) {
+            return ({kind = RespType.BulkString}, r.1, true);
+        }
+        if (len < 0 || r.1 + len + 2 > data.length) {
+            return (RespValue{}, pos, false);
+        }
+        if (data[r.1 + len] != 13 || data[r.1 + len + 1] != 10) {
+            return (RespValue{}, pos, false);
+        }
+        var b = new([len]byte);
+        for (var i = 0; i < len; i += 1) {
+            b[i] = data[r.1 + i];
+        }
+        return ({kind = RespType.BulkString, str = b}, r.1 + len + 2, true);
+    }
+    if (c == 42) {       // '*'
+        var r = readLine(data, pos + 1);
+        if (!r.2) { return (RespValue{}, pos, false); }
+        var p = strconv$parseInt(r.0);
+        if (!p.1) { return (RespValue{}, pos, false); }
+        var count = p.0;
+        if (count == -1) {
+            return ({kind = RespType.Array}, r.1, true);
+        }
+        if (count < 0) {
+            return (RespValue{}, pos, false);
+        }
+        var elems = new([count]RespValue);
+        var cur = r.1;
+        for (var i = 0; i < count; i += 1) {
+            var e = parseValue(data, cur);
+            if (!e.2) { return (RespValue{}, pos, false); }
+            elems[i] = e.0;
+            cur = e.1;
+        }
+        return ({kind = RespType.Array, elems = elems}, cur, true);
+    }
+    return (RespValue{}, pos, false);
+}
+
+// 解析简单字符串或错误行：读到 CRLF 为止。
+func parseLineValue(data [&#]byte, pos int, k RespType) (RespValue, int, bool) {
+    var r = readLine(data, pos);
+    if (!r.2) { return (RespValue{}, pos, false); }
+    return ({kind = k, str = r.0}, r.1, true);
+}
+
+// 读取到（不含）下一个 CRLF 为止的字节。
+// 返回 (行内容, CRLF 之后的偏移, ok)。
+func readLine(data [&#]byte, pos int) ([*]byte, int, bool) {
+    var i = pos;
+    for (i + 1 < data.length) {
+        if (data[i] == 13 && data[i + 1] == 10) {
+            var n = i - pos;
+            var b = new([n]byte);
+            for (var j = 0; j < n; j += 1) {
+                b[j] = data[pos + j];
+            }
+            return (b, i + 2, true);
+        }
+        i += 1;
+    }
+    return (new([0]byte), pos, false);
+}
+
+// 将字节序列复制到新分配的可变数组。
+func copyBytes(s [&#]byte) [*]byte {
+    var n = s.length;
+    var b = new([n]byte);
+    for (var i = 0; i < n; i += 1) {
+        b[i] = s[i];
+    }
+    return b;
+}
