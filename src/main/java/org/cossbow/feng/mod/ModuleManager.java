@@ -58,6 +58,8 @@ public class ModuleManager {
             byPath.put(fm.path(), fm);
         }
         byPath.put(Mangle.FENG, feng);
+        // 让 Mangle 在计算泛型具体化归属时，能按模块 import 图判定最小公共后代。
+        Mangle.bindOwnerResolver(this::commonDescendant);
         rebuild();
     }
 
@@ -80,6 +82,45 @@ public class ModuleManager {
             monos.put(path, m);
         }
         return m;
+    }
+
+    /**
+     * 模块集合 {@code mods} 的「最小公共后代」：唯一一个依赖（import 传递闭包
+     * 覆盖）其余所有成员的模块；不存在则返回 {@code null}。
+     *
+     * <p>用于跨模块泛型具体化的归属判定：存在公共后代（通常就是使用模块自己）
+     * 时把具体化类型归它，避免「合成模块 ↔ 使用模块」的镜像环。
+     */
+    public ModulePath commonDescendant(Collection<ModulePath> mods) {
+        for (var m : mods) {
+            if (dependsOnAll(m, mods)) return m;
+        }
+        return null;
+    }
+
+    /** {@code m} 是否（传递）import {@code mods} 中其余所有模块。 */
+    private boolean dependsOnAll(ModulePath m, Collection<ModulePath> mods) {
+        var deps = transitiveDeps(m);
+        for (var other : mods) {
+            if (other.equals(m)) continue;
+            if (!deps.contains(other)) return false;
+        }
+        return true;
+    }
+
+    /** {@code m} 的 import 传递闭包（含自身）。 */
+    private Set<ModulePath> transitiveDeps(ModulePath m) {
+        var seen = new HashSet<ModulePath>();
+        var queue = new ArrayDeque<ModulePath>();
+        queue.add(m);
+        while (!queue.isEmpty()) {
+            var cur = queue.poll();
+            if (!seen.add(cur)) continue;
+            var fm = byPath.get(cur);
+            if (fm == null) continue;
+            for (var imp : fm.imports()) queue.add(imp);
+        }
+        return seen;
     }
 
     /**

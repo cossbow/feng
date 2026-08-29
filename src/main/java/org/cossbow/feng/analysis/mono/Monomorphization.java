@@ -407,6 +407,9 @@ public class Monomorphization {
         }
         var mods = Mangle.genericModules(dt.symbol(), dt.generic());
         if (mods.size() <= 1) return; // 单模块或全内置：无需合成模块
+        // 存在最小公共后代（通常就是使用模块自己）：类型直接归它（真实模块），
+        // 不建合成模块，从而避免「合成模块 ↔ 使用模块」的镜像环。
+        if (manager.commonDescendant(mods) != null) return;
         var user = table.module.has() ? table.module.must().path() : null;
         manager.ensureSynthetic(mods, user);
     }

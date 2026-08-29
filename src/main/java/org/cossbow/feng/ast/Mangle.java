@@ -27,6 +27,28 @@ public class Mangle {
     protected Mangle() {
     }
 
+    /**
+     * 跨模块具体化类型的「最小公共后代」解析器：给定涉及模块集合
+     * {@code mods}（定义站点 + 各实参模块），返回其中唯一「依赖其余全部」的
+     * 模块（即 import 链覆盖 mods 其余所有成员的模块），否则返回 {@code null}。
+     *
+     * <p>由 {@code ModuleManager} 在构造时绑定（拥有模块 import 图）。存在公共
+     * 后代时具体化类型归它（通常就是使用模块自己），从而避免合成模块与使用
+     * 模块互为依赖的镜像环。
+     */
+    @FunctionalInterface
+    public interface OwnerResolver {
+        ModulePath commonDescendant(Collection<ModulePath> mods);
+    }
+
+    /** 模块 import 图的可达性解析器；单文件模式（无模块图）为 {@code null}。 */
+    private static OwnerResolver ownerResolver;
+
+    /** 绑定模块图解析器（编译期由 {@code ModuleManager} 调用一次）。 */
+    public static void bindOwnerResolver(OwnerResolver resolver) {
+        ownerResolver = resolver;
+    }
+
     /** 合成模块：运行时 C 函数（Feng$dec 等）与 release 函数的命名空间。 */
     public static final ModulePath FENG =
             new ModulePath(Position.ZERO, new Identifier("Feng"), new Identifier[0]);
@@ -113,12 +135,25 @@ public class Mangle {
 
     /**
      * 泛型类型（类/接口/结构）具体化的归属模块：定义站点 + 各类型实参的归属
-     * 模块，跨多个模块时归确定性合成模块；否则沿用定义站点模块。
+     * 模块，跨多个模块时优先归「最小公共后代」（避免合成模块镜像环），否则
+     * 归确定性合成模块；单模块则沿用定义站点模块。
      */
     private static Optional<ModulePath> genericModule(Symbol base, TypeArguments args) {
         var mods = genericModules(base, args);
-        if (mods.size() > 1) return Optional.of(syntheticModule(mods));
+        if (mods.size() > 1) {
+            var common = commonDescendant(mods);
+            if (common != null) return Optional.of(common);
+            return Optional.of(syntheticModule(mods));
+        }
         return base.module();
+    }
+
+    /**
+     * 模块集合 {@code mods} 的「最小公共后代」：依赖（import 链）覆盖其余所有
+     * 成员的唯一模块；无模块图（单文件模式）或无公共后代时返回 {@code null}。
+     */
+    private static ModulePath commonDescendant(Set<ModulePath> mods) {
+        return ownerResolver != null ? ownerResolver.commonDescendant(mods) : null;
     }
 
     /**
