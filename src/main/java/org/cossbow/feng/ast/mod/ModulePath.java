@@ -3,7 +3,6 @@ package org.cossbow.feng.ast.mod;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.util.CommonUtil;
 
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -32,7 +31,7 @@ public class ModulePath extends Entity {
         } else {
             values = new Identifier[path.getNameCount()];
             for (int i = 0; i < values.length; i++) {
-                var v = CommonUtil.letters(path.getName(i).toString());
+                var v = path.getName(i).toString();
                 values[i] = new Identifier(v);
             }
         }
