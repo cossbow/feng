@@ -80,13 +80,15 @@ public class Mangle {
     }
 
     /**
-     * Mangled symbol for a concrete generic function / type instantiation:
-     * {@code [module$]Name_Arg1_Arg2}.
+     * Mangled symbol for a concrete generic function instantiation:
+     * {@code [module$]Name_Arg1_Arg2}。归属模块与 {@link #symbol(DerivedType)}
+     * 一致（最小公共后代优先，否则合成模块），保证泛型函数返回跨模块具体化
+     * 类型时，函数与其返回类型落在同一模块，跨模块可见。
      */
     public static Symbol symbol(Symbol base, TypeArguments args) {
         var suffix = base.name().value() + '_' + args.stream()
                 .map(Mangle::typeKey).collect(Collectors.joining("_"));
-        return new Symbol(base.pos(), base.module(),
+        return new Symbol(base.pos(), genericModule(base, args),
                 new Identifier(base.pos(), suffix));
     }
 
