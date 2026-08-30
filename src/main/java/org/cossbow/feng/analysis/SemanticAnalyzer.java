@@ -2662,6 +2662,7 @@ public class SemanticAnalyzer {
             SwitchStatement s, EnumDefinition type) {
         var set = new OrderlyMap<Identifier, Identifier>();
         for (var b : s.branches()) {
+            var constants = new ArrayList<Expression>(b.constants().size());
             for (var c : b.constants()) {
                 if (c instanceof SymbolExpression le) {
                     if (!le.generic().isEmpty()) {
@@ -2673,6 +2674,8 @@ public class SemanticAnalyzer {
                         var v = type.values().tryGet(name);
                         if (v.has()) {
                             set.add(name, name);
+                            constants.add(new EnumValueExpression(c.pos(),
+                                    type, v.get()));
                             continue;
                         }
                     }
@@ -2681,6 +2684,7 @@ public class SemanticAnalyzer {
                         type.symbol(), c.pos());
                 return;
             }
+            b.constants(constants);
         }
 
         var except = subtract(type.values().keys(), set.keys());

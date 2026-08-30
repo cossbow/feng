@@ -7,6 +7,11 @@ func test(i int) {
     const id int = E.Stop.id;
     const v int = E.GO.value;
     const n [&#]byte= E.Stop.name;
+    switch(e2) {
+        case Stop {}
+        case GO {}
+        default {}
+    }
 }
 
 func main(args [&#][*?#]byte) {
