@@ -2,6 +2,10 @@ package org.cossbow.feng.ast.gen;
 
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.dcl.GenericTypeDeclarer;
+import org.cossbow.feng.ast.dcl.Refer;
+import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.util.Optional;
 
 /**
  * Type Variance: reference the type-paratemer in the generic-type
@@ -22,6 +26,14 @@ public class GenericType extends DefinedType {
 
     public Identifier name() {
         return param.name();
+    }
+
+    public TypeDeclarer declarer(Optional<Refer> r) {
+        if (r.none())
+            return new GenericTypeDeclarer(pos(), this);
+        return new GenericTypeDeclarer(pos(), this,
+                Optional.of(r.get().kind()),
+                r.get().required(), r.get().unmodifiable());
     }
 
     public boolean equals(Object o) {

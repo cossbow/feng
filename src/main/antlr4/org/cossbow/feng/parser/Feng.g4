@@ -365,16 +365,25 @@ typeParameters
     : BACKTICK typeParameter (COMMA typeParameter)* BACKTICK
     ;
 typeParameter
-    : name=Identifier typeConstraint?
+    : name=Identifier DEFAULT? typeConstraint?
     ;
 typeConstraint
-    : typeDomain                                    # DomainTypeConstraint
-    | definedType                                   # DefinedTypeConstraint
+    : primaryConstraint                             # PrimaryTypeConstraint
+    | '(' typeConstraint ')'                        # ParenTypeConstraint
+    | NOT typeConstraint                            # ExcludeTypeConstraint
     | l=typeConstraint op=BITAND r=typeConstraint   # BinaryTypeConstraint
     | l=typeConstraint op=BITOR r=typeConstraint    # BinaryTypeConstraint
     ;
+primaryConstraint
+    : typeDomain                                    # DomainTypeConstraint
+    | MUL                                           # ReferTypeConstraint
+    | QUESTION                                      # OptionalTypeConstraint
+    | HASH                                          # UnmodifiableTypeConstraint
+    | definedType                                   # DefinedTypeConstraint
+    | AT symbol                                     # AttributeTypeConstraint
+    ;
 typeDomain
-    : CLASS | INTERFACE | ENUM | STRUCT | UNION | ATTRIBUTE | FUNC
+    : CLASS | INTERFACE | ENUM | STRUCT | UNION | ATTRIBUTE | FUNC | PRIMITIVE
     ;
 
 
@@ -764,6 +773,7 @@ FENG3            : 'FENG' ;
 EXPORT          : 'export' ;
 IMPORT          : 'import' ;
 // Keywords: Type & Declare
+PRIMITIVE       : 'primitive' ;
 STRUCT          : 'struct' ;
 UNION           : 'union' ;
 ENUM            : 'enum' ;

@@ -5,8 +5,10 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.Optional;
 
-public class StructureDefinition extends TypeDefinition {
+public class StructureDefinition extends TypeDefinition
+        implements Aggregatable<StructureField> {
     private IdentifierMap<StructureField> fields;
     private boolean anonymous;
     private boolean cType;
@@ -57,6 +59,10 @@ public class StructureDefinition extends TypeDefinition {
 
     public boolean newable() {
         return true;
+    }
+
+    public Optional<StructureField> field(Identifier name) {
+        return fields.tryGet(name);
     }
 
     //

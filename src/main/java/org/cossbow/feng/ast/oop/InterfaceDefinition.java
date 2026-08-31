@@ -24,7 +24,8 @@ import static org.cossbow.feng.ast.Position.ZERO;
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
 
 final
-public class InterfaceDefinition extends ObjectDefinition {
+public class InterfaceDefinition extends ObjectDefinition
+        implements Abstractable<InterfaceMethod> {
     /**
      * Methods declaration
      */

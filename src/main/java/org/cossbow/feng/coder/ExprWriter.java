@@ -742,10 +742,10 @@ public class ExprWriter extends CWriter<ExprWriter> {
     }
 
     private ExprWriter enumMember(MemberOfExpression e, EnumDefinition ed) {
-        if (EnumDefinition.TokenFieldId.equals(e.member().value()))
+        // TokenFieldId 为 Identifier 常量，需取 value 与成员名比较
+        if (EnumDefinition.TokenFieldId.equals(e.member()))
             return write(e.subject());
-        var mid = e.member().value();
-        if ("name".equals(mid)) {
+        if (EnumDefinition.TokenFieldName.equals(e.member())) {
             // PRef → SRef：(Feng$ArraySRef_Byte){Feng$inc((void*)data), len}
             return write("(Feng$ArraySRef_Byte){Feng$inc((void*)")
                     .enumName(ed).write('[').write(e.subject()).write("].$name.$values), ")

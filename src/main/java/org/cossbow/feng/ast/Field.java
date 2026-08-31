@@ -1,5 +1,6 @@
 package org.cossbow.feng.ast;
 
+import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 /**
@@ -32,12 +33,15 @@ public class Field extends Entity
         this.type = type;
     }
 
+    abstract
+    public Modifier modifier();
+
     /**
      * Allow some types to set whether to export
      * when defining fields
      */
     public boolean export() {
-        return true;
+        return modifier().export();
     }
 
     public Identifier name() {
@@ -61,6 +65,10 @@ public class Field extends Entity
      */
     public boolean enablePhantom() {
         return true;
+    }
+
+    public Field clone() {
+        return (Field) super.clone();
     }
 
     //

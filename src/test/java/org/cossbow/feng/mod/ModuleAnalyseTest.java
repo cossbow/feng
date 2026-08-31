@@ -2,10 +2,13 @@ package org.cossbow.feng.mod;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.cossbow.feng.ast.mod.FModule;
+import org.cossbow.feng.err.SemanticException;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.parser.SourceParser;
 import org.cossbow.feng.util.BufferOutputStream;
 import org.cossbow.feng.util.ErrorUtil;
+import org.cossbow.feng.util.ResourceUtil;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.BufferedWriter;
@@ -79,4 +82,5 @@ public class ModuleAnalyseTest {
         ma.analyse(m);
         ErrorUtil.reportError(ma.errors());
     }
+
 }

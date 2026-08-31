@@ -17,7 +17,10 @@ import java.util.*;
 import java.util.stream.Stream;
 
 final
-public class ClassDefinition extends ObjectDefinition {
+public class ClassDefinition extends ObjectDefinition
+        implements
+        Aggregatable<ClassField>,
+        Abstractable<ClassMethod> {
     // The following are the properties defined in the syntax:
     /**
      * Final classes do not allow inheritance, being inherited,
@@ -210,6 +213,10 @@ public class ClassDefinition extends ObjectDefinition {
         return allFields;
     }
 
+    public Optional<ClassField> field(Identifier name) {
+        return allFields.tryGet(name);
+    }
+
     public IdentifierMap<ClassField> inheritFields() {
         return inheritFields;
     }
@@ -369,6 +376,10 @@ public class ClassDefinition extends ObjectDefinition {
                 OutOfBoundsExceptionClass, AssertExceptionClass)) {
             cd.allFields().addAll(cd.fields());
             cd.allMethods().addAll(cd.methods());
+            // built-in fields/methods carry their class as master
+            // (used by export checks)
+            cd.fields().each(f -> f.master(cd));
+            cd.methods().each(m -> m.master(cd));
             cd.parent().use(pd -> {
                 cd.ancestors().add(pd);
                 cd.ancestors().addAll(pd.ancestors());

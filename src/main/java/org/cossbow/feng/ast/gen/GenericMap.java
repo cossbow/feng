@@ -6,13 +6,13 @@ import org.cossbow.feng.ast.proc.FixedParameter;
 import org.cossbow.feng.ast.proc.Parameter;
 import org.cossbow.feng.ast.proc.ParameterSet;
 import org.cossbow.feng.ast.proc.Prototype;
+import org.cossbow.feng.ast.type.DefinedTypeConstraint;
+import org.cossbow.feng.ast.type.TypeConstraint;
 import org.cossbow.feng.util.CommonUtil;
 import org.cossbow.feng.util.ErrorUtil;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
@@ -155,6 +155,14 @@ public class GenericMap {
         return this::mapIf;
     }
 
+    public Set<Map.Entry<TypeParameter, TypeDeclarer>> set() {
+        return map.entrySet();
+    }
+
+    public void foreach(BiConsumer<TypeParameter, TypeDeclarer> c) {
+        map.forEach(c);
+    }
+
     //
 
     public static final GenericMap EMPTY = new GenericMap(
@@ -192,7 +200,7 @@ public class GenericMap {
         return make(e, true, GenericMap.EMPTY, params, args);
     }
 
-    public static GenericMap make(
+    private static GenericMap make(
             Entity e, boolean checkMiss,
             GenericMap parent,
             List<TypeParameter> params,
@@ -221,7 +229,6 @@ public class GenericMap {
 
         return new GenericMap(gm).merge(parent);
     }
-
 
     //
 

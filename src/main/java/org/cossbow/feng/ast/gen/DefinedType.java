@@ -4,6 +4,9 @@ import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.TypeDefinition;
+import org.cossbow.feng.ast.dcl.Refer;
+import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.util.Optional;
 
 /**
  * A symbol link to a {@link TypeDefinition} or a gengeric type paramster
@@ -17,6 +20,9 @@ public class DefinedType extends Entity
 
     abstract
     public Identifier name();
+
+    abstract
+    public TypeDeclarer declarer(Optional<Refer> r);
 
     @Override
     abstract

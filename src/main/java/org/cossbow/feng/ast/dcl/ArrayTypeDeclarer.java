@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.dcl;
 
 import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
@@ -165,10 +166,18 @@ public class ArrayTypeDeclarer extends TypeDeclarer
     }
 
     public static class ArrayField extends Field {
+        private Modifier modifier;
+
         private ArrayField(Position pos,
                            Identifier name,
                            TypeDeclarer type) {
             super(pos, name, type);
+            modifier = new Modifier(pos, true, new SymbolMap<>());
+        }
+
+        @Override
+        public Modifier modifier() {
+            return modifier;
         }
 
         public boolean immutable() {
@@ -196,6 +205,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         private final Identifier name;
         private final Prototype prototype;
         private final boolean unmodifiable;
+        private final Modifier modifier;
 
         public ArrayMethod(String name,
                            ParameterSet parameterSet,
@@ -205,6 +215,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
             this.name = new Identifier(name);
             this.prototype = new Prototype(ZERO, parameterSet, returnSet);
             this.unmodifiable = unmodifiable;
+            modifier = new Modifier(ZERO, true, new SymbolMap<>());
         }
 
         public ArrayMethod(String name,
@@ -214,6 +225,12 @@ public class ArrayTypeDeclarer extends TypeDeclarer
             this.name = new Identifier(name);
             this.prototype = new Prototype(ZERO, parameterSet);
             this.unmodifiable = unmodifiable;
+            modifier = new Modifier(ZERO, true, new SymbolMap<>());
+        }
+
+        @Override
+        public Modifier modifier() {
+            return modifier;
         }
 
         @Override

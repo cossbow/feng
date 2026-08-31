@@ -11,69 +11,104 @@ import org.cossbow.feng.util.Optional;
 public class GenericTypeDeclarer extends TypeDeclarer
         implements Referable {
     private final GenericType type;
+    private final Optional<ReferKind> kind;
+    private final boolean required;
+    private final boolean unmodifiable;
+
     private final Optional<Refer> refer;
 
     public GenericTypeDeclarer(Position pos,
                                GenericType type,
-                               Optional<Refer> refer) {
+                               Optional<ReferKind> kind,
+                               boolean required,
+                               boolean unmodifiable) {
         super(pos);
         this.type = type;
-        this.refer = refer;
-    }
-
-    public GenericTypeDeclarer(
-            Position pos, GenericType type,
-            Refer refer) {
-        this(pos, type, Optional.of(refer));
+        this.kind = kind;
+        this.required = required;
+        this.unmodifiable = unmodifiable;
+        refer = kind.map(k ->
+                new Refer(pos, k, required, unmodifiable));
     }
 
     public GenericTypeDeclarer(
             Position pos, GenericType type) {
-        this(pos, type, Optional.empty());
+        this(pos, type, Optional.empty(), true, false);
     }
 
     public GenericType type() {
         return type;
     }
 
-    public Optional<Refer> refer() {
-        return refer;
+    public Optional<ReferKind> kind() {
+        return kind;
+    }
+
+    public boolean required() {
+        return required;
+    }
+
+    public boolean unmodifiable() {
+        return unmodifiable;
     }
 
     public TypeParameter param() {
         return type.param();
     }
 
+    public Optional<Refer> refer() {
+        return refer;
+    }
+
     public boolean hasTypeVar() {
         return true;
+    }
+
+    public boolean requiredInit() {
+        if (kind.has()) return required;
+        var ov = type.param().view();
+        if (ov.none()) return false;
+        return ov.get().hasRequiredInit();
     }
 
     //
 
     @Override
     public Optional<TypeDeclarer> derefer() {
-        if (refer.none()) return Optional.of(this);
-        return Optional.of(new GenericTypeDeclarer(pos(), type));
+        if (kind.none()) return Optional.of(this);
+        return Optional.of(new GenericTypeDeclarer(pos(),
+                type, Optional.empty(), required, unmodifiable));
     }
 
 
     //
 
-    public boolean equals(Object o) {
-        return o instanceof GenericTypeDeclarer t
-                && type.equals(t.type);
+    @Override
+    public final boolean equals(Object o) {
+        if (!(o instanceof GenericTypeDeclarer t)) return false;
+
+        return type.equals(t.type) &&
+                kind.equals(t.kind) &&
+                required == t.required &&
+                unmodifiable == t.unmodifiable;
     }
 
+    @Override
     public int hashCode() {
-        return type.hashCode();
+        int result = type.hashCode();
+        result = 31 * result + kind.hashCode();
+        result = 31 * result + Boolean.hashCode(required);
+        result = 31 * result + Boolean.hashCode(unmodifiable);
+        return result;
     }
+
 
     //
 
     @Override
     public String toString() {
-        if (refer.none())
-            return type.toString();
-        return refer.get() + type.toString();
+        if (kind.none()) return (required ? "" : "?") + type;
+        return kind.get().symbol + (required ? "" : "?") +
+                (unmodifiable ? "#" : "") + type;
     }
 }

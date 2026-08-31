@@ -3,6 +3,9 @@ package org.cossbow.feng.ast.gen;
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.type.TypeConstraint;
+import org.cossbow.feng.ast.type.TypeView;
 import org.cossbow.feng.util.Optional;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -14,13 +17,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TypeParameter extends Entity {
     private Identifier name;
     private Optional<TypeConstraint> constraint;
+    private boolean initable;
 
     public TypeParameter(Position pos,
                          Identifier name,
-                         Optional<TypeConstraint> constraint) {
+                         Optional<TypeConstraint> constraint,
+                         boolean initable) {
         super(pos);
         this.name = name;
         this.constraint = constraint;
+        this.initable = initable;
     }
 
     public Identifier name() {
@@ -29,6 +35,27 @@ public class TypeParameter extends Entity {
 
     public Optional<TypeConstraint> constraint() {
         return constraint;
+    }
+
+    public boolean initable() {
+        return initable;
+    }
+
+    public boolean match(TypeDeclarer td) {
+        if (constraint.none()) return true;
+        return constraint.get().contains(td);
+    }
+
+    //
+
+    private TypeView view;
+
+    public Optional<TypeView> view() {
+        if (constraint.none()) return Optional.empty();
+        if (view == null) {
+            view = constraint.get().view();
+        }
+        return Optional.of(view);
     }
 
     //
