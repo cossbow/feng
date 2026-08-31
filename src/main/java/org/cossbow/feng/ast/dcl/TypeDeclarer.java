@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.dcl;
 
 import org.cossbow.feng.ast.Entity;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.util.Optional;
 
 /**
@@ -115,6 +116,33 @@ public class TypeDeclarer extends Entity {
         var r = maybeRefer();
         // value-type is required
         return r.none() || r.get().required();
+    }
+
+    /**
+     * Recursively check whether this type contains a non-null (required)
+     * reference. Used to determine if an array/tuple element or class field
+     * needs mandatory non-null initialization.
+     * <p>
+     * Recurse into array elements, tuple elements, and class fields.
+     */
+    public boolean requiredInit() {
+        var ref = maybeRefer();
+        if (ref.has()) return ref.get().required();
+
+        // Value type: check nested structure
+        return switch (this) {
+            case ArrayTypeDeclarer atd -> atd.element().requiredInit();
+            case TupleTypeDeclarer ttd -> ttd.elements().stream()
+                    .anyMatch(TypeDeclarer::requiredInit);
+            case DerivedTypeDeclarer dtd -> {
+                if (dtd.def() instanceof ClassDefinition cd) {
+                    yield cd.allFields().stream().anyMatch(f ->
+                            dtd.gm().mapIf(f.type()).requiredInit());
+                }
+                yield false;
+            }
+            default -> false;
+        };
     }
 
     /**

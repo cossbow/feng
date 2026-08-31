@@ -7,10 +7,6 @@ import java.util.Map;
  * Each type definition is associated with a unique TypeDomain value.
  */
 public enum TypeDomain {
-    /**
-     * Primitive types are built-in, so there is no need for
-     * customization or using primitive as a keyword
-     */
     PRIMITIVE("primitive", false),
     STRUCT("struct", true),
     UNION("union", true),
@@ -22,11 +18,11 @@ public enum TypeDomain {
     ;
 
     public final String name;
-    public final boolean keyword;
+    public final boolean using;
 
-    TypeDomain(String name, boolean keyword) {
+    TypeDomain(String name, boolean using) {
         this.name = name;
-        this.keyword = keyword;
+        this.using = using;
     }
 
     @Override

@@ -23,8 +23,4 @@ public class BuiltinTypeDefinition extends TypeDefinition {
         super(pos, Modifier.empty(), symbol, generic, TypeDomain.STRUCT);
     }
 
-    @Override
-    public boolean newable() {
-        return true;
-    }
 }

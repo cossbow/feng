@@ -4,7 +4,11 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDefinition;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.Refer;
+import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.util.CommonUtil;
+import org.cossbow.feng.util.Optional;
 
 /**
  * Symbol link to a custom derived-type.
@@ -51,6 +55,10 @@ public class DerivedType extends DefinedType {
         this.def = CommonUtil.required(def);
     }
 
+    public boolean analyzed() {
+        return def != null;
+    }
+
     public GenericMap gm() {
         return CommonUtil.required(gm);
     }
@@ -71,6 +79,10 @@ public class DerivedType extends DefinedType {
 
     public DerivedType clone() {
         return (DerivedType) super.clone();
+    }
+
+    public TypeDeclarer declarer(Optional<Refer> r) {
+        return new DerivedTypeDeclarer(pos(), this, r);
     }
 
     //

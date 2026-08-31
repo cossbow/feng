@@ -23,6 +23,10 @@ public class ObjectDefinition extends TypeDefinition
         super(pos, modifier, symbol, generic, domain);
     }
 
+    public boolean referable() {
+        return true;
+    }
+
     abstract
     public List<DerivedType> supers();
 

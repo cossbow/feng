@@ -39,6 +39,7 @@ global
     : def=typeDefinition            # GlobalTypeDefinition
     | def=functionDefinition        # GlobalFunctionDefinition
     | exportable declaration SEMI   # GlobalDeclaration
+    | concept                       # DefineConcept
     | macro                         # GlobalMacro
     ;
 
@@ -365,18 +366,30 @@ typeParameters
     : BACKTICK typeParameter (COMMA typeParameter)* BACKTICK
     ;
 typeParameter
-    : name=Identifier typeConstraint?
+    : name=Identifier DEFAULT? typeConstraint?
     ;
 typeConstraint
-    : typeDomain                                    # DomainTypeConstraint
-    | definedType                                   # DefinedTypeConstraint
+    : primaryConstraint                             # PrimaryTypeConstraint
+    | '(' typeConstraint ')'                        # ParenTypeConstraint
+    | NOT typeConstraint                            # ExcludeTypeConstraint
     | l=typeConstraint op=BITAND r=typeConstraint   # BinaryTypeConstraint
     | l=typeConstraint op=BITOR r=typeConstraint    # BinaryTypeConstraint
     ;
+primaryConstraint
+    : typeDomain                                    # DomainTypeConstraint
+    | MUL                                           # ReferTypeConstraint
+    | QUESTION                                      # OptionalTypeConstraint
+    | HASH                                          # UnmodifiableTypeConstraint
+    | definedType                                   # DefinedTypeConstraint
+    | AT symbol                                     # AttributeTypeConstraint
+    ;
 typeDomain
-    : CLASS | INTERFACE | ENUM | STRUCT | UNION | ATTRIBUTE | FUNC
+    : CLASS | INTERFACE | ENUM | STRUCT | UNION | ATTRIBUTE | FUNC | PRIMITIVE
     ;
 
+concept
+    : EXPORT? CONCEPT name=Identifier ASSIGN expr=typeConstraint SEMI
+    ;
 
 
 
@@ -768,6 +781,7 @@ FENG3            : 'FENG' ;
 EXPORT          : 'export' ;
 IMPORT          : 'import' ;
 // Keywords: Type & Declare
+PRIMITIVE       : 'primitive' ;
 STRUCT          : 'struct' ;
 UNION           : 'union' ;
 ENUM            : 'enum' ;
@@ -775,6 +789,7 @@ ATTRIBUTE       : 'attribute' ;
 INTERFACE       : 'interface' ;
 CLASS           : 'class' ;
 FUNC            : 'func' ;
+CONCEPT         : 'concept' ;
 MACRO           : 'macro' ;
 CONST           : 'const' ;
 VAR             : 'var' ;

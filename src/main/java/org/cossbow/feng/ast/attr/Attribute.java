@@ -20,6 +20,10 @@ public class Attribute extends Entity {
         this.init = init;
     }
 
+    public Attribute(Symbol type) {
+        this(Position.ZERO, type, Optional.empty());
+    }
+
     public Symbol type() {
         return type;
     }
@@ -29,6 +33,17 @@ public class Attribute extends Entity {
     }
 
     //
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof Attribute a)) return false;
+        return type.equals(a.type);
+    }
+
+    @Override
+    public int hashCode() {
+        return type.hashCode();
+    }
+
     @Override
     public String toString() {
         if (init.none()) return "@" + type;

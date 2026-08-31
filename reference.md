@@ -1986,7 +1986,7 @@ The built-in string formatting function is a variadic function:
 
 1. The first parameter is an `&Writer`, i.e., an object implementing the built-in `Writer` interface.
 2. Format string literal: `"This is for {}!"`, where `{}` is a placeholder for formatting subsequent parameters.
-3. Parameter instances to output; their count must match the number of placeholders. Types can be basic types, classes, and interfaces.
+3. Parameter instances to output; their count must match the number of placeholders. Types can be primitive types, classes, and interfaces.
 
 Usage:
 
@@ -3407,6 +3407,180 @@ func test() {
     var f func(int)int = filter;
 }
 ```
+
+### Generic Constraints
+
+A generic parameter can be followed by a constraint that restricts the type arguments that may be passed. A simple example:
+
+```feng
+class A {}
+class A2:A {}
+class B {}
+class Box`T A` {}           // ✔: T can only be A or its subclasses here
+func foo() {
+    var b1 Box`A`();        // ✔: A itself is allowed
+    var b1 Box`A2`();       // ✔: the subclass A2 is allowed
+    // var b1 Box`B`();     // ✖: a non-subclass is not allowed
+}
+```
+
+#### Constraint Expressions
+
+The example above uses a class `A` as the constraint. Because a class supports [inheritance](#inheritance), its subclasses can also be passed; from a set
+point of view this is because `A2` ⊆ `A`.
+Obviously, if the constraint is a struct, then only that struct itself may be passed.
+
+The essence of a generic constraint is a set, so the set operations can be combined into a constraint expression. There are three basic operations:
+
+| Operation | Symbol | Precedence |
+|----|----|-----|
+| Complement | !  | 1   |
+| Intersection | &  | 2   |
+| Union | \| | 3   |
+
+Parentheses are also supported and denote the highest precedence, used like parentheses in ordinary expressions.
+
+The following example uses interfaces, because interfaces allow many combinations and are the most common scenario for generic constraints:
+
+```feng
+interface A {}
+interface B {}
+interface C {}
+class Box`T !A` {}              // every type except A is accepted
+class Box`T A & B` {}           // must be both A and B; since both are interfaces, only classes implementing both are accepted
+class Box`T A | B` {}           // A or B, or classes implementing them
+class Box`T (A | B) & C` {}     // example with parentheses: the accepted class must implement C and also one of A or B
+```
+
+If the constraint is replaced by a type that cannot be inherited, such as a struct, the above usage no longer applies. For example:
+
+```feng
+struct S1 {id int;}
+struct S2 {id int;}
+class Box`T S1` {}
+var b Box`S1`;       // ✔
+// var b Box`S2`;    // ✖: no type other than S1 is accepted
+```
+
+[Function types](#function-prototype) are special: as long as the prototype is exactly the same it is accepted, but return-type covariance is not supported. For example:
+
+```feng
+class A {}
+class B:A {}
+func Call1 = () *A;
+func Call2 = () *A;
+func Call3 = () *B;
+class Box`T Call1` {}
+var b Box`Call1`;       // ✔: accepts Call1
+var b Box`Call2`;       // ✔: accepts Call2, whose prototype is exactly the same
+// var b Box`Call3`;    // ✖: does not accept Call3, whose prototype is not identical
+```
+
+#### Type Constraints
+
+There are 7 type constraints, corresponding to the respective kinds of types:
+
+| Marker        | Constrained type |
+|-----------|------|
+| primitive | primitive type |
+| struct    | struct  |
+| union     | union  |
+| enum      | enum   |
+| interface | interface   |
+| class     | class    |
+| func      | function class  |
+
+Their use is simple. For example:
+
+```feng
+class A`T primitive` {}    // only primitive types are accepted
+class B`T !primitive` {}   // primitive types are not accepted
+var a A`int`;              // ✔: accepts int
+// var b B`int`;           // ✖: does not accept int
+```
+
+#### Marker Constraints
+
+What marker constraints have in common is that they are all binary sets: without a marker everything is accepted, with a marker the matching "having" is
+accepted; to match "not having" you have to use the complement form.
+
+The markers are:
+
+| Marker   | Symbol           | Description                          |
+|------|--------------|-----------------------------|
+| Reference   | \*           | must be a reference; **virtual references are not supported**            |
+| Nullable   | ?            | must be nullable                       |
+| Unmodifiable | \#           | must be unmodifiable                    |
+| Attribute   | @+\[Symbol\] | must be marked with the attribute \[Symbol\], _ignores attribute fields_ |
+
+These markers are not the same concept as the various markers on types; the same symbols are only used for ease of memory.
+
+Reference example:
+
+```feng
+class A`T *` { var t T; }     // only reference types are accepted
+// var a1 A`int`;             // ✖: does not accept the non-reference type int
+var a1 A`*?int`;              // ✔: only accepts the reference type "*?int"
+```
+
+Nullable example:
+
+```feng
+func F=();
+class A`T ?`{}       // only nullable references or nullable function classes are accepted
+// var a1 A`*int`;   // ✖: does not accept a non-null reference
+var a2 A`*?int`;     // ✔: accepts a nullable reference
+// var a3 A`F`;      // ✖: does not accept a non-null function class
+var a4 A`F`;         // ✔: accepts a nullable function class
+```
+
+Unmodifiable example:
+
+```feng
+class A`T #`{}
+// var a1 A`*`;      // ✖: does not accept a modifiable one
+var a2 A`*#`;        // ✔: accepts an unmodifiable one
+```
+
+Attribute example:
+
+```feng
+attribute Beta {};
+class A`T @Beta` {}
+class E1 {}
+@Beta class E2 {}
+// var a1 A`E1`;     // ✖: does not accept a type without @Beta
+var a2 A`E2`;        // ✔: only accepts types with @Beta
+```
+
+No marker means everything is accepted; to not accept something, use the complement form. Here only the reference case is shown:
+
+```feng
+class A`T`{}      // accepts both references and values
+class B`T *`{}    // only accepts references
+class C`T !*`{}   // only accepts values
+```
+
+#### Constraints and concept
+
+A concept is essentially a named constraint expression, and it can participate in expressions. This simplifies the writing of expressions.
+
+For example:
+
+```feng
+concept objects = * & (class | interface);
+class A`T objects` {}            // used directly as the expression
+class B`T objects & @Beta` {}    // participates in another expression
+```
+
+A concept can be exported, so that public concepts can be defined:
+
+```feng
+export
+concept objects = * & (class | interface);
+```
+
+_Since it is named, it cannot have the same name as a defined type or a global variable._
 
 ## Exceptions
 
