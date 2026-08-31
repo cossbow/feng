@@ -52,11 +52,35 @@ public class RelayLowering {
         for (var fd : ast.functionList) {
             lowerFunction(fd);
         }
+        // 具体化函数（mono 产物，含丢弃强引用返回值的调用，须同样 lower）
+        for (var fd : ast.monoFuncs) {
+            lowerFunction(fd);
+        }
         ast.main.use(this::lowerFunction);
         for (var cd : ast.dagClasses.all()) {
-            for (var cm : cd.allMethods().values()) {
+            lowerClass(cd);
+        }
+        // 具体化类（mono 产物，不在 dagClasses）：monoHead / monoAfter，
+        // 其方法体已按 gm 具体化，但尚未 lower——丢弃强引用返回值会泄漏。
+        for (var def : ast.monoHead) {
+            if (def instanceof ClassDefinition cd) lowerClass(cd);
+        }
+        for (var list : ast.monoAfter.values()) {
+            for (var def : list) {
+                if (def instanceof ClassDefinition cd) lowerClass(cd);
+            }
+        }
+        // 方法级泛型实例化（monoMethods）：单独挂到具体类，同样须 lower。
+        for (var list : ast.monoMethods.values()) {
+            for (var cm : list) {
                 cm.procedure().use(this::lowerProcedure);
             }
+        }
+    }
+
+    private void lowerClass(ClassDefinition cd) {
+        for (var cm : cd.allMethods().values()) {
+            cm.procedure().use(this::lowerProcedure);
         }
     }
 
@@ -268,7 +292,7 @@ public class RelayLowering {
     }
 
     private boolean needDiscardResult(Expression e) {
-        return e.resultType.match(t -> t.checkRefer(ReferKind.STRONG));
+        return e.resultType.must().checkRefer(ReferKind.STRONG);
     }
 
     // ---- expression lowering ----

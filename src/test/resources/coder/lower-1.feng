@@ -1,0 +1,18 @@
+// RelayLowering 必须覆盖单态化类方法：具体化方法里以语句形式调用
+// 返回强引用数组的方法、丢弃其返回值时，须 pin 并释放（否则 refcnt +1 泄漏）。
+class Box`T` {
+    var buf [*]T;
+
+    func getBuf() [*]T {
+        return buf;
+    }
+
+    func touch() {
+        getBuf();   // 丢弃强引用返回值
+    }
+}
+
+func main() {
+    var b = new(Box`int`, {buf=new([4]int)});
+    b.touch();
+}
