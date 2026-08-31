@@ -1,0 +1,11 @@
+class String {
+    const value [*?#]byte;
+}
+func make(n int) [*]byte {
+    return new([n]byte);
+}
+func use(s String) {}
+func main() {
+    var s String = {value=make(12)};
+    use(s);
+}

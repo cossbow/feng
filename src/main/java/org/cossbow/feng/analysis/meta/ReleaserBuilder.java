@@ -366,6 +366,14 @@ public final class ReleaserBuilder {
         // main 原型参数（Main.c 拼接的 FENG_MAIN_HAS_ARGS 分支引用其 cleanup，
         // 如 Feng$cleanup_arr_ArraySRef_Byte 内部调用 Feng$cleanup_arr_Byte）
         ast.main.use(fd -> collectProto(types, fd.prototype()));
+        // 方法原型参数/返回值：值类型含强引用内容的参数（如 take(b Box) 的 Box）
+        // 也会生成 _own 影子变量并引用 cleanup 函数，须在此收集，否则函数体
+        // 未以局部变量/字段形式使用该类型时 cleanup 未生成 → 后端链接失败。
+        for (var meta : ast.classMetas) {
+            for (var mf : meta.methods().values()) {
+                collectProto(types, mf.prototype());
+            }
+        }
         // 函数/方法体局部变量与表达式：FENG$DEC 引用的强引用类型
         // （局部数组 `[*]T` 的 cleanup_arr、局部 final 类、值类型 cleanup_val）
         for (var fd : ast.functionList) {

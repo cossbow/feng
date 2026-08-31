@@ -3,7 +3,6 @@ package org.cossbow.feng.coder;
 import org.cossbow.feng.analysis.meta.ClassMeta;
 import org.cossbow.feng.analysis.meta.MethodFunc;
 import org.cossbow.feng.ast.GlobalVariable;
-import org.cossbow.feng.ast.dcl.ReferKind;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.Statement;
@@ -234,15 +233,11 @@ public class FuncWriter extends CWriter<FuncWriter> {
             var vo = fp.var();
             if (vo.none()) continue;
             var v = vo.get();
-            var t = v.type().must();
-            var ref = t.maybeRefer();
-            if (ref.none() || !ref.get().isKind(ReferKind.STRONG)) continue;
-            context.types.write(t).write(' ');
-            write('$').write(v.name().value()).write('_').write(v.id()).write("_own");
-            write(" FENG$DEC(").write(context.stmts.strongRefCleanupFn(t)).write(')');
-            write(" = ");
-            context.exprs.varName(v);
-            endStmt();
+            context.stmts.declareVar(v.type().must(), () -> {
+                write('$').write(v.name().value()).write('_').write(v.id()).write("_own");
+            }, () -> {
+                context.exprs.varName(v);
+            });
         }
     }
 

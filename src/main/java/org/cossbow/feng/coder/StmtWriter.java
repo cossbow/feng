@@ -88,29 +88,39 @@ public class StmtWriter extends CWriter<StmtWriter> {
         return this;
     }
 
-    /**
-     * 强引用局部变量声明：{@code <T> <name> FENG$DEC(<cleanupFn>) = <init>;}
-     * （旧 CGenerator 1663–1688；cleanups 已由 ReleaserBuilder 前置，本类只查表）。
-     */
-    private StmtWriter declareVar(Variable v) {
-        var t = v.type().must();
-        var ref = t.maybeRefer();
+    StmtWriter declareVar(TypeDeclarer t,
+                          Runnable namer,
+                          Runnable valuer) {
         context.exprs.writeType(t).write(' ');
-        context.exprs.varName(v);
+        namer.run();
         // 强引用 → FENG$DEC(cleanupFn)：cleanups 查表（SRef 数组 / final 类），
         // 查不到（非 final/接口/boxed）回退运行时函数。
+        var ref = t.maybeRefer();
         if (ref.has() && ref.get().isKind(ReferKind.STRONG)) {
             write(" FENG$DEC(").write(strongRefCleanupFn(t)).write(')');
         } else if (ref.none() && needsDestroy(t)) {
             write(" FENG$DEC(").write(valueCleanupFn(t)).write(')');
         }
         write(" = ");
-        v.value().use(e -> context.exprs.writeValue(e, t), () -> {
-            if (t instanceof ArrayTypeDeclarer) write("{}");
-            else if (t.maybeRefer().has()) write("NULL");
-            else write("{}");
-        });
+        valuer.run();
         return endStmt();
+    }
+
+    /**
+     * 强引用局部变量声明：{@code <T> <name> FENG$DEC(<cleanupFn>) = <init>;}
+     * （旧 CGenerator 1663–1688；cleanups 已由 ReleaserBuilder 前置，本类只查表）。
+     */
+    StmtWriter declareVar(Variable v) {
+        var t = v.type().must();
+        return declareVar(t, () -> {
+            context.exprs.varName(v);
+        }, () -> {
+            v.value().use(e -> context.exprs.writeValue(e, t), () -> {
+                if (t instanceof ArrayTypeDeclarer) write("{}");
+                else if (t.maybeRefer().has()) write("NULL");
+                else write("{}");
+            });
+        });
     }
 
     private StmtWriter write(AssignmentsStatement as) {
