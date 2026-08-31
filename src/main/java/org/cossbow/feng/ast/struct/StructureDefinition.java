@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.Optional;
 
 public class StructureDefinition extends TypeDefinition {
     private IdentifierMap<StructureField> fields;
@@ -57,6 +58,14 @@ public class StructureDefinition extends TypeDefinition {
 
     public boolean newable() {
         return true;
+    }
+
+    public boolean referable() {
+        return true;
+    }
+
+    public Optional<StructureField> field(Identifier name) {
+        return fields.tryGet(name);
     }
 
     //

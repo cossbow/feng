@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.dcl;
 
 import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.gen.TypeParameters;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
@@ -155,20 +156,30 @@ public class ArrayTypeDeclarer extends TypeDeclarer
             new Identifier("values"),
             Primitive.UINT64.declarer());
 
-    private static final Map<Identifier, ArrayField> Fields = Map.of(
-            FieldLength.name(), FieldLength,
-            FieldValues.name(), FieldValues
-    );
+    public static final IdentifierMap<ArrayField> Fields = new IdentifierMap<>();
+
+    static {
+        Fields.add(FieldValues.name(), FieldValues);
+        Fields.add(FieldLength.name(), FieldLength);
+    }
 
     public static Optional<ArrayField> fieldOf(Identifier name) {
         return Optional.of(Fields.get(name));
     }
 
     public static class ArrayField extends Field {
+        private Modifier modifier;
+
         private ArrayField(Position pos,
                            Identifier name,
                            TypeDeclarer type) {
             super(pos, name, type);
+            modifier = new Modifier(pos, true, new SymbolMap<>());
+        }
+
+        @Override
+        public Modifier modifier() {
+            return modifier;
         }
 
         public boolean immutable() {
@@ -196,6 +207,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         private final Identifier name;
         private final Prototype prototype;
         private final boolean unmodifiable;
+        private final Modifier modifier;
 
         public ArrayMethod(String name,
                            ParameterSet parameterSet,
@@ -205,6 +217,7 @@ public class ArrayTypeDeclarer extends TypeDeclarer
             this.name = new Identifier(name);
             this.prototype = new Prototype(ZERO, parameterSet, returnSet);
             this.unmodifiable = unmodifiable;
+            modifier = new Modifier(ZERO, true, new SymbolMap<>());
         }
 
         public ArrayMethod(String name,
@@ -214,6 +227,12 @@ public class ArrayTypeDeclarer extends TypeDeclarer
             this.name = new Identifier(name);
             this.prototype = new Prototype(ZERO, parameterSet);
             this.unmodifiable = unmodifiable;
+            modifier = new Modifier(ZERO, true, new SymbolMap<>());
+        }
+
+        @Override
+        public Modifier modifier() {
+            return modifier;
         }
 
         @Override
@@ -247,13 +266,15 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         }
     }
 
-    static final Map<Identifier, ArrayMethod> METHODS = Map.of(
-            MethodSwap.name, MethodSwap,
-            MethodMove.name, MethodMove
-    );
+    public static final IdentifierMap<ArrayMethod> Methods = new IdentifierMap<>();
+
+    static {
+        Methods.add(MethodSwap.name, MethodSwap);
+        Methods.add(MethodMove.name, MethodMove);
+    }
 
     public static Optional<ArrayMethod> methodOf(Identifier name) {
-        return Optional.of(METHODS.get(name));
+        return Optional.of(Methods.get(name));
     }
 
     //

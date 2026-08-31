@@ -11,7 +11,8 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-public class OrderlyMap<K extends Entity, V> implements Iterable<V> {
+public class OrderlyMap<K extends Entity, V>
+        implements Iterable<V>, ReadMap<K, V> {
     private final HashMap<K, Node<K, V>> index;
     private final List<Node<K, V>> nodes;
 
@@ -163,6 +164,19 @@ public class OrderlyMap<K extends Entity, V> implements Iterable<V> {
 
         public V value() {
             return value;
+        }
+
+        //
+
+        @Override
+        public final boolean equals(Object o) {
+            return o instanceof Node<?, ?> n &&
+                    Objects.equals(value, n.value);
+        }
+
+        @Override
+        public int hashCode() {
+            return value.hashCode();
         }
 
         @Override

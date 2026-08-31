@@ -21,6 +21,7 @@ import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
+import org.cossbow.feng.ast.type.*;
 import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.dag.DAGUtil;
@@ -384,6 +385,10 @@ public class SemanticAnalyzer {
         // on all types and functions. Therefore, we should
         // first analyze the declaration part
         result.dagClasses = visitClasses(table.types);
+        // check generic constraints
+        analyse(table.concepts);
+        checkConstraint(table.types.values());
+        checkConstraint(table.functions.values());
         // A function may also depend on all types, so its
         // prototype should also be analyzed first
         var functions = table.functions.stream()
@@ -441,27 +446,244 @@ public class SemanticAnalyzer {
         semantic("here can't use type arguments '%s': %s", ta, ta.pos());
     }
 
+    private void analyse(IdentifierMap<Concept> concepts) {
+        if (concepts.isEmpty()) return;
+        for (var c : concepts) {
+            checkMarker(c.expr());
+            c.expr(analyse(c.expr()));
+        }
+        var edges = new ArrayList<Groups.G2<Concept, Concept>>();
+        for (var c : concepts) {
+            var s = new HashSet<Concept>();
+            conceptDeps(c.expr(), s);
+            for (Concept d : s) {
+                edges.add(Groups.g2(d, c));
+            }
+        }
+        makeDAG(concepts.values(), edges);
+    }
+
+    private void conceptDeps(TypeConstraint c, Set<Concept> s) {
+        switch (c) {
+            case ConceptTypeConstraint dtc -> {
+                s.add(dtc.concept());
+            }
+            case BinaryTypeConstraint bc -> {
+                conceptDeps(bc.left(), s);
+                conceptDeps(bc.right(), s);
+            }
+            case ExcludeTypeConstraint ec -> conceptDeps(ec.operand(), s);
+            case ParenTypeConstraint pc -> conceptDeps(pc.child(), s);
+            default -> {
+            }
+        }
+        ;
+
+    }
+
+    private void analyse(TypeParameters tps) {
+        for (var tp : tps) {
+            if (tp.initable() && tp.constraint().none()) {
+                error("'default' requires a constraint: %s", tp.pos());
+            }
+            if (tp.constraint().none()) continue;
+            checkMarker(tp.constraint().get());
+            tp.constraint(analyse(tp.constraint().get()));
+        }
+    }
+
+    private TypeConstraint analyse(TypeConstraint c) {
+        return switch (c) {
+            case DefinedTypeConstraint dtc -> {
+                if (!(dtc.definedType() instanceof DerivedType dt)) {
+                    yield c;
+                }
+                var s = dt.symbol();
+                var oc = context.findConcept(s);
+                if (oc.has())
+                    yield new ConceptTypeConstraint(c.pos(), oc.get());
+
+                analyse(dt);
+                yield c;
+            }
+            case AttributeTypeConstraint atc -> {
+                analyse(atc.attribute());
+                yield atc;
+            }
+            case BinaryTypeConstraint bc -> {
+                var l = analyse(bc.left());
+                var r = analyse(bc.right());
+                if (bc.operator() == TypeOperator.AND) {
+                    checkEmpty(l, r);
+                }
+                yield new BinaryTypeConstraint(c.pos(), bc.operator(), l, r);
+            }
+            case ExcludeTypeConstraint ec -> new ExcludeTypeConstraint(
+                    c.pos(), analyse(ec.operand()));
+            case ParenTypeConstraint pc -> analyse(pc.child());
+            default -> c;
+        };
+    }
+
     private void invalid(TypeParameters tp) {
         if (tp.isEmpty()) return;
         semantic("here can't use type parameters '%s'", tp);
     }
 
-    private TypeDefinition findDef(DerivedType dt) {
+    /**
+     * 检查 AND 约束两侧是否矛盾（投影为 ∅，即无效约束）。
+     * <p>
+     * 采用结构化判据而非投影判据（见 §4.2 与 §2.4）：
+     * <ol>
+     *   <li>{@code C & !C}：约束与其补集相交，恒空；</li>
+     *   <li>两个确定域约束（域/具体类型）域不同：无类型同时属于两个域。</li>
+     * </ol>
+     */
+    private void checkEmpty(TypeConstraint l, TypeConstraint r) {
+        if (complementOf(l, r) || complementOf(r, l)) {
+            error("invalid constraint: '%s' and its complement can't both hold: %s",
+                    stripParen(l), l.pos());
+            return;
+        }
+        var ld = domainOf(l);
+        var rd = domainOf(r);
+        if (ld != null && rd != null && ld != rd) {
+            error("invalid constraint: no type has both domain '%s' and '%s': %s",
+                    ld, rd, l.pos());
+        }
+    }
+
+    private static boolean complementOf(TypeConstraint c, TypeConstraint operand) {
+        var x = stripParen(c);
+        return x instanceof ExcludeTypeConstraint ec
+                && ec.operand().equals(stripParen(operand));
+    }
+
+    private static TypeConstraint stripParen(TypeConstraint c) {
+        var x = c;
+        while (x instanceof ParenTypeConstraint pc) x = pc.child();
+        return x;
+    }
+
+    private static TypeDomain domainOf(TypeConstraint c) {
+        return switch (stripParen(c)) {
+            case DomainTypeConstraint d -> d.domain();
+            case DefinedTypeConstraint dt ->
+                    dt.definedType() instanceof DerivedType d ? d.def().domain() : null;
+            default -> null;
+        };
+    }
+
+    /**
+     * 形态标记（{@code *} / {@code ?} / {@code #} / {@code @Attr}）是修饰符而非类型，
+     * 不能作为约束单独出现，必须依附于能标识类型的符号（域或命名类型）。
+     */
+    private void checkMarker(TypeConstraint c) {
+        var x = stripParen(c);
+        if (x instanceof ReferTypeConstraint
+                || x instanceof OptionalTypeConstraint
+                || x instanceof UnmodifiableTypeConstraint
+                || x instanceof AttributeTypeConstraint) {
+            error("marker '%s' can't be a constraint alone: %s", x, x.pos());
+        }
+    }
+
+    private GenericMap checkConstraint(GenericMap gm) {
+        gm.foreach((c, t) -> {
+            if (!c.match(t)) {
+                error("type '%s' doesn't satisfy constraint of '%s': %s",
+                        t, c, t.pos());
+                return;
+            }
+            if (c.initable() && !literalSafe(c, t)) {
+                error("type '%s' can't support default-init: %s",
+                        t, t.pos());
+            }
+        });
+        return gm;
+    }
+
+    private void checkConstraint(TypeConstraint c) {
+        switch (c) {
+            case DefinedTypeConstraint dtc -> {
+                if (dtc.definedType() instanceof DerivedType dt)
+                    checkConstraint(dt.gm());
+            }
+            case BinaryTypeConstraint bc -> {
+                checkConstraint(bc.left());
+                checkConstraint(bc.right());
+            }
+            case ExcludeTypeConstraint ec -> checkConstraint(ec.operand());
+            case ParenTypeConstraint pc -> checkConstraint(pc.child());
+            default -> { /* cover branch */}
+        }
+    }
+
+    /**
+     * Whether a concrete type argument can be default-initialized as the
+     * generic parameter with 'default'.
+     * <p>
+     * The view only knows the constraint fields, so a required field
+     * outside the view would be missed by the inner literal check; a
+     * reference argument is unknown-shape (its literal is nil, not an
+     * object-literal), so it can't be default-initialized.
+     */
+    private boolean literalSafe(TypeParameter c, TypeDeclarer t) {
+        if (t.maybeRefer().has()) return false;
+
+        if (t instanceof GenericTypeDeclarer gtd) {
+            // Generic chain: the eventual concrete type is checked at U's
+            // own instantiation, which must have 'default' too; its required
+            // fields must be visible in T's view to be checked here.
+            if (!gtd.param().initable()) return false;
+            if (c.constraint().none() || gtd.param().constraint().none())
+                return false;
+            var om = c.members();
+            var um = gtd.param().members();
+            return um.fields().keys().stream()
+                    .allMatch(k -> om.fields().exists(k));
+        }
+
+        if (!(t instanceof DerivedTypeDeclarer dtd)) return true;
+
+        var ms = c.members();
+        var fields = switch (dtd.def()) {
+            case StructureDefinition sd -> sd.fields();
+            case ClassDefinition cd -> cd.allFields();
+            case null, default -> new IdentifierMap<Field>();
+        };
+        for (var f : fields) {
+            if (ms.fields().exists(f.name())) continue;
+            if (dtd.gm().mapIf(f.type()).requiredInit()) return false;
+        }
+        return true;
+    }
+
+    private DerivedType analyse(DerivedType dt) {
+        if (dt.analyzed()) return dt;
         var s = dt.symbol();
         var o = context.findType(s);
         if (o.has()) {
             dt.def(o.get());
             analyse(dt.generic());
-            if (dt.generic().isEmpty()) return o.get();
-            if (dt.def().generic().isEmpty()) return
-                    semantic("'%s' is not generic type: %s", dt.def(), dt.pos());
+            if (dt.generic().isEmpty()) return dt;
+            if (dt.def().generic().isEmpty()) {
+                return semantic("'%s' is not generic type: %s",
+                        dt.def(), dt.pos());
+            }
             var gm = GenericMap.make(dt, o.get().generic(), dt.generic());
             dt.gm(gm);
-            return o.get();
+            return dt;
         }
 
         return semantic("type %s not defined: %s",
                 s, dt.pos());
+    }
+
+    private TypeDefinition findDef(DerivedType dt) {
+        analyse(dt);
+        checkConstraint(dt.gm());
+        return dt.def();
     }
 
     private TypeDefinition findDef(DerivedTypeDeclarer dtd) {
@@ -536,7 +758,7 @@ public class SemanticAnalyzer {
         // Variable-length array cannot have non-null element type,
         // because runtime zero-initialization would produce nil elements.
         var et = td.element();
-        if (requiredInit(et)) {
+        if (et.requiredInit()) {
             semantic("variable-length array can't have " +
                             "non-null element '%s': %s",
                     et, et.pos());
@@ -584,16 +806,21 @@ public class SemanticAnalyzer {
     }
 
     private GenericTypeDeclarer analyse(GenericTypeDeclarer td) {
-        if (td.refer().has()) {
-            semantic("can't use type-parameter '%s' as value-type: '%s'",
-                    td.type(), td.pos());
+        if (td.kind().has()) {
+            // *T / *?T / *#T: 只有值类型约束可引用
+            if (td.type().param().referenced() != Tri.NO) {
+                return semantic("only value-type support refer: %s", td.pos());
+            }
+        } else if (!td.required()) {
+            // ?T: 仅 func 约束
+            var ds = td.type().param().domains();
+            if (ds.size() != 1 || !ds.contains(TypeDomain.FUNC)) {
+                return semantic("only func-constraint support optional: %s", td.pos());
+            }
         }
         return td;
     }
 
-    private void analyse(TypeParameters e) {
-        // TODO: check generic constants
-    }
 
     // structure define
 
@@ -639,10 +866,11 @@ public class SemanticAnalyzer {
         }
 
         if (td instanceof DerivedTypeDeclarer dtd) {
-            if (!dtd.derivedType().generic().isEmpty())
+            var dt = dtd.derivedType();
+            if (!dt.generic().isEmpty())
                 return unsupported("generic");
 
-            var def = findDef(dtd);
+            var def = analyse(dt).def();
             if (def instanceof StructureDefinition sd)
                 return Stream.of(sd);
 
@@ -692,6 +920,7 @@ public class SemanticAnalyzer {
 
     private void visitStructure(StructureDefinition sd) {
         analyse(sd.modifier());
+        invalid(sd.generic());
         var pack = extractAttrLayout(sd.modifier().attributes(),
                 AttributeDefinition.PackDef.symbol(),
                 AttributeDefinition.ValueField);
@@ -736,6 +965,7 @@ public class SemanticAnalyzer {
 
     private Entity analyse(EnumDefinition ed) {
         analyse(ed.modifier());
+        invalid(ed.generic());
 
         var i = 0;
         for (var v : ed.values()) {
@@ -931,7 +1161,7 @@ public class SemanticAnalyzer {
     }
 
     private ClassDefinition findParentClass(DerivedType t) {
-        var def = findDef(t);
+        var def = analyse(t).def();
         if (def instanceof ClassDefinition pcd) {
             return pcd;
         }
@@ -944,7 +1174,7 @@ public class SemanticAnalyzer {
         if (cd.impl().isEmpty()) return;
 
         for (var t : cd.impl()) {
-            var def = findDef(t);
+            var def = analyse(t).def();
             if (def instanceof InterfaceDefinition)
                 continue;
             semantic("require interface but actual '%s':  %s",
@@ -1014,8 +1244,17 @@ public class SemanticAnalyzer {
                 });
         var fields = cd.fields().stream().map(ClassField::type)
                 .flatMap(this::getClassTypeField);
+
         return Stream.concat(inherit, fields)
                 .filter(d -> !d.builtin()).toList();
+    }
+
+    private void checkConstraint(List<? extends Definition> ds) {
+        for (var d : ds) {
+            for (var tp : d.generic()) {
+                tp.constraint().use(this::checkConstraint);
+            }
+        }
     }
 
     private DAGGraph<ClassDefinition>
@@ -1130,6 +1369,8 @@ public class SemanticAnalyzer {
         assert enterClass == null;
         enterClass = cd;
 
+        analyse(cd.generic());
+
         for (var f : cd.fields()) analyse(f);
 
         macro(cd);
@@ -1164,6 +1405,7 @@ public class SemanticAnalyzer {
     private void declareMethod(ClassMethod m) {
         enterAsync = m.modifier().async().has();
         analyse(m.modifier());
+        analyse(m.generic());
         analyse(m.prototype(), false);
         enterAsync = false;
     }
@@ -1234,6 +1476,7 @@ public class SemanticAnalyzer {
                       BiConsumer<ObjectDefinition, GenericMap> walk,
                       Entity e) {
         for (var st : od.supers()) {
+            checkConstraint(st.gm());
             var gm = st.gm().overlay(next);
             var sd = (ObjectDefinition) st.def();
             var other = gm.mapAll(sd.generic());
@@ -1264,7 +1507,7 @@ public class SemanticAnalyzer {
     private List<InterfaceDefinition>
     findParts(InterfaceDefinition def) {
         return def.parts().stream().map(p -> {
-            var t = findDef(p);
+            var t = analyse(p).def();
             if (t instanceof InterfaceDefinition id) return id;
             return semantic("component must be interface: %s", p.pos());
         }).toList();
@@ -1295,6 +1538,7 @@ public class SemanticAnalyzer {
         if (id.builtin()) return id;
 
         analyse(id.modifier());
+        analyse(id.generic());
 
         for (var m : id.methods()) analyse(m);
 
@@ -1402,6 +1646,7 @@ public class SemanticAnalyzer {
     private FunctionDefinition declareFunc(FunctionDefinition fd) {
         enterAsync = fd.modifier().async().has();
         analyse(fd.modifier());
+        analyse(fd.generic());
         analyse(fd.prototype(), false);
         enterAsync = false;
         return fd;
@@ -1703,28 +1948,6 @@ public class SemanticAnalyzer {
         return assignable(lt, rd, rt.gm());
     }
 
-    private Optional<TypeArguments> checkInherited(
-            DerivedType lt,
-            ObjectDefinition rd, GenericMap next) {
-        for (var st : rd.supers()) {
-            var sd = (ObjectDefinition) st.def();
-            var gm = st.gm().overlay(next);
-            var tas = gm.mapAll(sd.generic());
-            if (lt.symbol().equals(sd.symbol()))
-                return Optional.of(tas);
-            var o = checkInherited(lt, sd, gm);
-            if (o.has())
-                return o;
-        }
-        return Optional.empty();
-    }
-
-    private Optional<TypeArguments> checkInherited(
-            DerivedType lt,
-            DerivedType rt, ObjectDefinition rd) {
-        return checkInherited(lt, rd, rt.gm());
-    }
-
     // 协变分析
     private TypeValid assignable(
             DerivedTypeDeclarer lt, ObjectDefinition ld,
@@ -1758,8 +1981,8 @@ public class SemanticAnalyzer {
                         rt, lt, e.pos());
             }
             if (rd instanceof ClassDefinition rc) {
-                var ok = checkInherited(lt.derivedType(),
-                        rt.derivedType(), rc)
+                var ok = TypeTool.checkInherited(lt.derivedType(),
+                                rt.derivedType())
                         .match(a -> lt.generic().equals(a));
                 if (ok) return TypeValid.ok();
                 return TypeValid.err("'%s' doesn't inherit '%s': %s",
@@ -1773,8 +1996,8 @@ public class SemanticAnalyzer {
         }
 
         var li = (InterfaceDefinition) ld;
-        var ok = checkInherited(lt.derivedType(),
-                rt.derivedType(), rd)
+        var ok = TypeTool.checkInherited(lt.derivedType(),
+                        rt.derivedType())
                 .match(a -> lt.generic().equals(a));
         if (ok) return TypeValid.ok();
         return TypeValid.err("'%s' doesn't implement '%s': %s",
@@ -1821,33 +2044,6 @@ public class SemanticAnalyzer {
         if (re.match(this::ifMarkNonNil)) return;
         error("must check-nil before assign optional '%s' to required '%s': %s",
                 r, l, e.pos());
-    }
-
-    /**
-     * Recursively check whether a type contains a non-null (required) reference.
-     * Used to determine if an array/tuple element or class field needs mandatory
-     * non-null initialization.
-     * <p>
-     * Recurse into array elements, tuple elements, and class/struct fields.
-     */
-    private boolean requiredInit(TypeDeclarer td) {
-        var ref = td.maybeRefer();
-        if (ref.has()) return ref.get().required();
-
-        // Value type: check nested structure
-        return switch (td) {
-            case ArrayTypeDeclarer atd -> requiredInit(atd.element());
-            case TupleTypeDeclarer ttd -> ttd.elements().stream()
-                    .anyMatch(this::requiredInit);
-            case DerivedTypeDeclarer dtd -> {
-                if (dtd.def() instanceof ClassDefinition cd) {
-                    yield cd.allFields().stream().anyMatch(f ->
-                            requiredInit(dtd.gm().mapIf(f.type())));
-                }
-                yield false;
-            }
-            default -> false;
-        };
     }
 
     private boolean isByteArray(ArrayTypeDeclarer la) {
@@ -2337,7 +2533,7 @@ public class SemanticAnalyzer {
                 semantic("const must init: %s", v.pos());
             }
             var t = v.type().must();
-            if (requiredInit(t)) {
+            if (t.requiredInit()) {
                 semantic("required initialize: %s", v.pos());
             }
         } else {
@@ -3409,29 +3605,36 @@ public class SemanticAnalyzer {
         return Groups.g2(n, atd.element());
     }
 
+    /**
+     * Whether a generic type can be initialized by an object literal
+     * regardless of the 'default' flag.
+     * <p>
+     * With view fields the literal is validated per-field; an empty view
+     * carries no field info, so the literal is writable only when no
+     * member carries a mandatory init and the domain is a class/struct.
+     */
+    private boolean literalInitable(GenericTypeDeclarer gtd) {
+        var ms = gtd.param().members();
+        if (!ms.fields().isEmpty()) return true;
+        if (ms.hasRequiredInit()) return false;
+        var ds = gtd.param().domains();
+        return ds.size() == 1 &&
+                (ds.contains(TypeDomain.CLASS) ||
+                        ds.contains(TypeDomain.STRUCT));
+    }
+
     private Groups.G2<Operand, TypeDeclarer> optimize(FieldOperand op) {
         var name = op.field();
 
         var sg = optimize(op.subject());
-        var td = sg.b();
-        if (td instanceof VoidTypeDeclarer) return unreachable();
 
-        if (!(td instanceof DerivedTypeDeclarer dtd))
-            return semantic("illegal operand %s: %s", name, op.pos());
-
-        var def = dtd.def();
-        Optional<? extends Field> of = switch (def) {
-            case StructureDefinition sd -> sd.fields().tryGet(name);
-            case ClassDefinition cd -> cd.allFields().tryGet(name);
-            case null, default -> semantic("%s have no any field: %s",
-                    def, op.pos());
-        };
+        var of = TypeTool.fieldOf(sg.b(), name);
 
         if (of.none())
             return semantic("field %s not defined: %s", name, name.pos());
         var f = of.get();
         if (f instanceof ClassField cf) {
-            checkExport(cf, cf.master(), name);
+            checkExport(cf, name);
             if (cf.immutable())
                 return semantic("unmodifiable field: %s", name.pos());
         }
@@ -3439,9 +3642,12 @@ public class SemanticAnalyzer {
         if (unmodifiable(sg.a(), true))
             return semantic("unmodifiable operand '%s': %s", op, op.pos());
 
+        var gm = sg.b() instanceof DerivedTypeDeclarer dtd ?
+                dtd.gm() : GenericMap.EMPTY;
+
         var s = (PrimaryExpression) sg.a();
         var n = new FieldOperand(op.pos(), s, name);
-        var t = dtd.gm().mapIf(f.type());
+        var t = gm.mapIf(f.type());
         return Groups.g2(n, t);
     }
 
@@ -3684,8 +3890,11 @@ public class SemanticAnalyzer {
         var t = new PrimitiveTypeDeclarer(e.pos(),
                 Primitive.BOOL, Optional.empty());
 
-        if (!(g.b() instanceof FuncTypeDeclarer)
-                && g.b().maybeRefer().none())
+        var funcable = g.b() instanceof FuncTypeDeclarer
+                || g.b() instanceof GenericTypeDeclarer gtd
+                && gtd.refer().none()
+                && funcPrototype(gtd.type().param()).has();
+        if (!funcable && g.b().maybeRefer().none())
             return semantic("'%s' can't check-nil: %s", g.a(), e.pos());
 
         if (g.b().required()) {
@@ -4061,7 +4270,7 @@ public class SemanticAnalyzer {
 
         if (tParams.isEmpty()) return GenericMap.EMPTY;
 
-        return GenericMap.make(e, tParams, tArgs);
+        return checkConstraint(GenericMap.make(e, tParams, tArgs));
     }
 
     private GenericMap genericInfer(
@@ -4437,56 +4646,25 @@ public class SemanticAnalyzer {
         return Groups.g2(n, td);
     }
 
-    private Groups.G2<Expression, TypeDeclarer>
-    optimizeArray(PrimaryExpression s, ArrayTypeDeclarer atd,
-                  Identifier name) {
-        if (s.expectCallable()) {
-            var o = ArrayTypeDeclarer.methodOf(name);
-            if (o.none()) {
-                return semantic("array has no method %s: %s",
-                        name, name.pos());
-            }
-            var am = o.get();
-            var t = new AnonFuncTypeDeclarer(s.pos(), true, am.prototype());
-            var n = new MethodExpression(s.pos(), s, am);
-            return Groups.g2(n, t);
+    private <T> T checkExport(T e, Identifier name) {
+        if (e instanceof ClassField cf) {
+            if (context.isLocal(cf.master().symbol()))
+                return e;
         }
-
-        var o = ArrayTypeDeclarer.fieldOf(name);
-        if (o.none()) {
-            return semantic("array has no field %s: %s",
-                    name, name.pos());
+        if (e instanceof ClassMethod cm) {
+            if (context.isLocal(cm.master().symbol()))
+                return e;
         }
-        if (ArrayTypeDeclarer.FieldLength.name().equals(name)) {
-            if (atd.refer().none()) {
-                var td = Primitive.INT.declarer(s.pos());
-                var n = new IntegerLiteral(s.pos(), atd.len()).expr();
-                return Groups.g2(n, td);
-            }
-        }
+        if (!(e instanceof Exportable ex))
+            return e;
+        if (ex.export()) return e;
 
-        var f = o.get();
-        var t = f.type();
-
-        var n = new MemberOfExpression(s.pos(),
-                (PrimaryExpression) s, f.name(), f);
-        n.resultType.set(t);
-        return Groups.g2(n, t);
-
+        return semantic("Can‘t use unexported member '%s' here: %s",
+                name, name.pos());
     }
 
-    private <T extends Exportable, D extends Definition> T
-    checkExport(T cf, D cd, Identifier name) {
-        if (context.isLocal(cd.symbol()))
-            return cf;
-        if (cf.export()) return cf;
-
-        return semantic("Can‘t use unexported member '%s.%s' here: %s",
-                cd.symbol(), name, name.pos());
-    }
-
-    void checkEscaped(DerivedTypeDeclarer st, Method m, Entity e) {
-        if (!m.escaped() || st.isKind(STRONG))
+    void checkEscaped(TypeDeclarer st, Method m, Entity e) {
+        if (!m.escaped() || st.checkRefer(STRONG))
             return;
         semantic("only Strong-Refer can call escaped-method '%s': %s", m, e.pos());
     }
@@ -4508,116 +4686,62 @@ public class SemanticAnalyzer {
                     t, m, e.pos());
     }
 
-    private Groups.G2<Expression, TypeDeclarer>
-    optimizeMember(PrimaryExpression s, ClassDefinition cd,
-                   Identifier name, DerivedTypeDeclarer st,
-                   TypeArguments generic) {
-        if (!s.expectCallable()) {
-            invalid(generic);
-            var o = cd.allFields().tryGet(name);
-            if (o.has()) {
-                var f = checkExport(o.get(), cd, name);
-                var gm = st.gm();
-                var t = gm.mapIf(f.type());
-                var n = new MemberOfExpression(s.pos(),
-                        (PrimaryExpression) s,
-                        name, f);
-                n.resultType.set(t);
-                return Groups.g2(n, t);
-            }
-            return semantic("class '%s' not defined member '%s': %s",
-                    cd, name, s.pos());
-        }
+    private Groups.G2<Expression, TypeDeclarer> optimizeField(
+            PrimaryExpression s, TypeDeclarer td,
+            Identifier name, boolean expectCallable) {
+        var o = TypeTool.fieldOf(td, name);
+        if (o.none()) return semantic("'%s' not defined field '%s': %s",
+                td, name, s.pos());
 
-        var om = cd.method(name);
-        if (om.has()) {
-            var m = checkExport(om.get(), cd, name);
-            checkEscaped(st, m, name);
-            checkUnmodifiable(s, m, name);
-            checkEnterAsync(st, m, s);
-            var gm = GenericMap.make(name, false, st.gm(),
-                    m.generic(), generic);
-            var prot = gm.instantiate(m.prototype());
-            var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
-            var n = new MethodExpression(s.pos(),
-                    (PrimaryExpression) s, m, generic);
+        var f = checkExport(o.get(), name);
+        var t = analyse(f.type());
+        if (!expectCallable || t instanceof FuncTypeDeclarer) {
+            var n = new MemberOfExpression(s.pos(), s, name, f);
             n.resultType.set(t);
             return Groups.g2(n, t);
         }
-        var of = cd.allFields().tryGet(name);
-        if (of.has()) {
-            invalid(generic);
-            var f = checkExport(of.get(), cd, name);
-            if (f.type() instanceof FuncTypeDeclarer) {
-                var t = st.gm().mapIf(f.type());
-                var n = new MemberOfExpression(s.pos(),
-                        (PrimaryExpression) s, name,
-                        of.get());
-                n.resultType.set(t);
-                return Groups.g2(n, t);
-            }
-        }
-        return semantic("class '%s' not defined callable '%s': %s",
-                cd, name, s.pos());
-    }
 
-    private Groups.G2<Expression, TypeDeclarer>
-    optimizeMember(PrimaryExpression s, DerivedTypeDeclarer st,
-                   Identifier name, TypeArguments generic) {
-        var def = st.def();
-
-        if (def instanceof StructureDefinition sd) {
-            invalid(generic);
-            var o = sd.fields().tryGet(name);
-            if (o.has()) {
-                var f = o.get();
-                var n = new MemberOfExpression(s.pos(),
-                        (PrimaryExpression) s, name, f);
-                n.resultType.set(f.type());
-                return Groups.g2(n, f.type());
-            }
-        } else if (def instanceof ClassDefinition cd) {
-            return optimizeMember(s, cd, name, st, generic);
-        } else if (def instanceof InterfaceDefinition id) {
-            if (!s.expectCallable())
-                return semantic("interface has no field '%s': %s",
-                        name, s.pos());
-            var om = id.method(name);
-            if (om.has()) {
-                invalid(generic);
-                var m = om.get();
-                checkEscaped(st, m, name);
-                checkUnmodifiable(s, m, name);
-                checkEnterAsync(st, m, s);
-                var prot = st.gm().instantiate(m.prototype());
-                var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
-                var n = new MethodExpression(s.pos(),
-                        (PrimaryExpression) s, m, generic);
-                n.resultType.set(t);
-                return Groups.g2(n, t);
-            }
-        } else if (def instanceof EnumDefinition ed) {
-            invalid(generic);
-            var f = ed.getField(name);
-            if (f.has()) {
-                var n = new MemberOfExpression(s.pos(), s, name, f.get());
-                return Groups.g2(n, f.get().type());
+        if (t instanceof GenericTypeDeclarer gtd
+                && gtd.kind().none()) {
+            var op = funcPrototype(gtd.type().param());
+            if (op.has()) {
+                var nt = new AnonFuncTypeDeclarer(
+                        s.pos(), gtd.required(), op.get());
+                var n = new MemberOfExpression(s.pos(), s, name, f);
+                n.resultType.set(nt);
+                return Groups.g2(n, nt);
             }
         }
 
-        return semantic("member '%s'.'%s' not defined: %s", def, name, s.pos());
+        return semantic("'%s' not defined callable field '%s': %s",
+                td, name, s.pos());
     }
 
-    private Groups.G2<Expression, TypeDeclarer>
-    optimizeEnumValue(PrimaryExpression eve,
-                      EnumTypeDeclarer etd, Identifier name) {
-        var o = etd.def().getField(name);
-        if (o.none()) return semantic("%s has no field %s: %s",
-                etd.def(), name, name.pos());
-
-        var f = o.get();
-        var n = new MemberOfExpression(eve.pos(), eve, name, f);
-        return Groups.g2(n, f.type());
+    private Groups.G3<Expression, TypeDeclarer, Boolean>
+    optimizeMethod(
+            PrimaryExpression s, TypeDeclarer td,
+            Identifier name, TypeArguments tas) {
+        var o = TypeTool.methodOf(td, name);
+        if (o.none()) {
+            return Groups.g3(null, null, false);
+        }
+        var st = s.resultType.must();
+        var m = o.get();
+        if (m.generic().isEmpty() && !tas.isEmpty()) {
+            return semantic("'%s' is not generic method: %s",
+                    m, name.pos());
+        }
+        checkExport(m, name);
+        checkEscaped(st, m, name);
+        checkUnmodifiable(s, m, name);
+        checkEnterAsync(st, m, s);
+        var gm = checkConstraint(GenericMap.make(name, false,
+                GenericMap.EMPTY, m.generic(), tas));
+        var prot = gm.instantiate(m.prototype());
+        var t = new AnonFuncTypeDeclarer(s.pos(), true, prot);
+        var n = new MethodExpression(s.pos(), s, m, tas);
+        n.resultType.set(t);
+        return Groups.g3(n, t, true);
     }
 
     private void checkOptional(Expression e) {
@@ -4637,27 +4761,25 @@ public class SemanticAnalyzer {
             }
             return semantic("%s not support use member: %s", dtd, e.pos());
         }
+        if (sg.b() instanceof ArrayTypeDeclarer atd && atd.refer().none()
+                && ArrayTypeDeclarer.FieldLength.name().equals(e.member())) {
+            // fixed array has const length
+            var td = Primitive.INT.declarer(e.pos());
+            var n = new IntegerLiteral(e.pos(), atd.len()).expr();
+            return Groups.g2(n, td);
+        }
 
         var s = (PrimaryExpression) sg.a();
         checkOptional(s);
-        s.expectCallable(e.expectCallable());
 
-        if (sg.b() instanceof ArrayTypeDeclarer atd) {
-            invalid(e.generic());
-            return optimizeArray(s, atd, e.member());
+        if (e.expectCallable()) {
+            var g = optimizeMethod(s, sg.b(), e.member(), e.generic());
+            if (g.c()) return g.reduce();
         }
 
-        if (sg.b() instanceof DerivedTypeDeclarer dtd) {
-            return optimizeMember(s, dtd, e.member(), e.generic());
-        }
-
-        if (sg.b() instanceof EnumTypeDeclarer etd) {
-            invalid(e.generic());
-            return optimizeEnumValue((PrimaryExpression) sg.a(), etd, e.member());
-        }
-
-        return semantic("member '%s' not defined: %s",
-                e.member(), e.pos());
+        invalid(e.generic());
+        return optimizeField(s, sg.b(), e.member(),
+                e.expectCallable());
     }
 
     private Groups.G2<Expression, TypeDeclarer>
@@ -4694,7 +4816,7 @@ public class SemanticAnalyzer {
 
         if (od.generic().isEmpty()) return null;
 
-        var o = checkInherited(etd.derivedType(), dt, od);
+        var o = TypeTool.checkInherited(etd.derivedType(), dt);
         if (o.none()) return semantic("'%s' don't inherit '%s': %s",
                 def, etd.def(), dt.pos());
         var gm = genericInfer(e, o.get(), etd.generic());
@@ -4711,7 +4833,7 @@ public class SemanticAnalyzer {
                 e.pos(), STRONG, true, false));
         var dtd = new DerivedTypeDeclarer(e.pos(), dt, ref);
         if (e.arg().none()) {
-            if (requiredInit(new DerivedTypeDeclarer(e.pos(), dt))) {
+            if (new DerivedTypeDeclarer(e.pos(), dt).requiredInit()) {
                 error("new type '%s' required init: %s",
                         dt, e.pos());
             }
@@ -4733,8 +4855,44 @@ public class SemanticAnalyzer {
      * not support multi-level references.
      */
     private Groups.G2<Expression, TypeDeclarer>
-    analyseNewType(NewExpression e, GenericType dt) {
-        return unsupported("new generic type");
+    analyseNewType(NewExpression e, GenericType gt) {
+        if (gt.param().constraint().none()) {
+            return semantic("'%s' can't support new instance: %s", gt, gt.pos());
+        }
+        // 引用性投影：仅值类型可 new 实例
+        if (gt.param().referenced() != Tri.NO) {
+            return semantic("only value-type support new instance: %s", gt.pos());
+        }
+        var ms = gt.param().members();
+        var ref = Optional.of(new Refer(
+                e.pos(), STRONG, true, false));
+        var td = gt.declarer(ref);
+
+        if (e.arg().none()) {
+            if (gt.param().newable() != Tri.YES) {
+                return semantic("can't new type '%s': %s", gt, gt.pos());
+            }
+            if (ms.hasRequiredInit()) {
+                return semantic("new type '%s' required init: %s",
+                        gt, e.pos());
+            }
+            var n = new NewExpression(e.pos(), e.type(), Optional.empty());
+            return Groups.g2(n, td);
+        }
+        var arg = e.arg().get();
+        // The argument is an instance of T, not the new-expression type.
+        var it = gt.declarer(Optional.empty());
+        arg.expectType.set(it);
+        var g = optimize(arg);
+        // Covariance is applicable exclusively to reference types.
+        // In contrast, instance types must be identical and are subject
+        // to direct comparison
+        if (!it.equals(g.b())) {
+            return semantic("can't init generic type '%s' from '%s': %s",
+                    gt, g.b(), e.pos());
+        }
+        var n = new NewExpression(e.pos(), e.type(), Optional.of(g.a()));
+        return Groups.g2(n, td);
     }
 
     private Groups.G2<Expression, TypeDeclarer>
@@ -4790,6 +4948,27 @@ public class SemanticAnalyzer {
     }
 
 
+    /**
+     * Resolve the function prototype of a generic-typed callable from its
+     * constraint. Only a single prototype constraint is resolvable:
+     * composite constraints and non-prototype constraints have none.
+     */
+    private Optional<Prototype>
+    funcPrototype(TypeParameter param) {
+        var oc = param.constraint();
+        if (oc.none()) return Optional.empty();
+        var c = oc.get();
+        while (c instanceof ParenTypeConstraint pc) c = pc.child();
+        if (!(c instanceof DefinedTypeConstraint dtc))
+            return Optional.empty();
+        if (dtc.definedType() instanceof DerivedType d
+                && d.def() instanceof PrototypeDefinition pd)
+            return Optional.of(d.gm().instantiate(pd.prototype()));
+        if (dtc.definedType() instanceof GenericType gt)
+            return funcPrototype(gt.param());
+        return Optional.empty();
+    }
+
     private Groups.G2<Expression, TypeDeclarer>
     findCallable(SymbolExpression re) {
         var s = re.symbol();
@@ -4803,6 +4982,18 @@ public class SemanticAnalyzer {
                         re.pos(), ov.get(), s);
                 return Groups.g2(n, ftd);
             }
+            if (v.type().must() instanceof GenericTypeDeclarer gtd
+                    && gtd.kind().none()) {
+                var op = funcPrototype(gtd.type().param());
+                if (op.has()) {
+                    invalid(re.generic());
+                    var n = new VariableExpression(
+                            re.pos(), ov.get(), s);
+                    var td = new AnonFuncTypeDeclarer(
+                            re.pos(), gtd.required(), op.get());
+                    return Groups.g2(n, td);
+                }
+            }
         }
 
         var od = context.findFunc(s);
@@ -4810,8 +5001,8 @@ public class SemanticAnalyzer {
             var f = od.get();
             if (f.testcase()) return semantic(
                     "can't call testcase '%s': %s", re, re.pos());
-            var gm = GenericMap.make(re, false,
-                    f.generic(), re.generic());
+            var gm = checkConstraint(GenericMap.make(re, false,
+                    f.generic(), re.generic()));
             var prot = gm.instantiate(f.prototype());
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
             var n = new FunctionExpression(re.pos(), f, re.generic());
@@ -4837,10 +5028,8 @@ public class SemanticAnalyzer {
                             m, enterMethod, re.pos());
                 }
                 // 叠加上继承的泛型替换
-                var gm = enterClass.inherit().map(DerivedType::gm)
-                        .getOrElse(GenericMap.EMPTY);
-                gm = GenericMap.make(re, false, gm,
-                        m.generic(), re.generic());
+                var gm = checkConstraint(GenericMap.make(re, false,
+                        GenericMap.EMPTY, m.generic(), re.generic()));
                 var prot = gm.instantiate(m.prototype());
                 // 函数调用加上`this.`前缀，方便后续处理
                 var n = wrapThis(re, m);
@@ -4854,6 +5043,17 @@ public class SemanticAnalyzer {
                     invalid(re.generic());
                     var n = wrapThis(s, f);
                     return Groups.g2(n, ftd);
+                }
+                if (f.type() instanceof GenericTypeDeclarer gtd
+                        && gtd.kind().none()) {
+                    var op = funcPrototype(gtd.type().param());
+                    if (op.has()) {
+                        invalid(re.generic());
+                        var n = wrapThis(s, f);
+                        var td = new AnonFuncTypeDeclarer(
+                                re.pos(), gtd.required(), op.get());
+                        return Groups.g2(n, td);
+                    }
                 }
             }
         }
@@ -4902,8 +5102,8 @@ public class SemanticAnalyzer {
                     gm = genericInfer(re, List.of(tt), List.of(ftd));
                 } else {
                     // Directly make type-map
-                    gm = GenericMap.make(re, false,
-                            fd.generic(), re.generic());
+                    gm = checkConstraint(GenericMap.make(re, false,
+                            fd.generic(), re.generic()));
                 }
                 prot = gm.instantiate(prot);
             }
@@ -4983,7 +5183,7 @@ public class SemanticAnalyzer {
         }
 
         // Check non-null element initialization requirements
-        if (requiredInit(td.element()) && e.size() < td.len()) {
+        if (td.element().requiredInit() && e.size() < td.len()) {
             return semantic("non-null element array requires full initialization (expected %d, got %d): %s",
                     td.len(), e.size(), e.pos());
         }
@@ -5014,26 +5214,35 @@ public class SemanticAnalyzer {
             if (o.none()) return semantic("missing type-declarer: %s", oe.pos());
             t = o.get();
         }
-        if (!(t instanceof DerivedTypeDeclarer dtd))
-            return semantic("type '%s' can't init by '%s': %s", t, oe, oe.pos());
-        var def = dtd.def();
-        if (dtd.refer().has())
-            return semantic("can't init %s-reference: %s",
-                    dtd.derivedType(), oe.pos());
 
-        IdentifierMap<? extends Field> fields = switch (def) {
-            case StructureDefinition sd -> sd.fields();
-            case ClassDefinition cd -> cd.allFields();
-            case null, default -> semantic("type '%s' can't define fields: %s", def, oe.pos());
-        };
-        if (def.domain() == TypeDomain.UNION && oe.entries().size() > 1) {
-            return semantic("union only can init one field: %s",
-                    oe.entries().getKey(1).pos());
+        if (t.maybeRefer().has())
+            return semantic("can't init reference: %s", t, oe.pos());
+
+        if (t instanceof DerivedTypeDeclarer dtd) {
+            if (dtd.def().domain() == TypeDomain.UNION &&
+                    oe.entries().size() > 1)
+                return semantic("union only can init one field: %s",
+                        oe.entries().getKey(1).pos());
+        } else if (t instanceof GenericTypeDeclarer gtd) {
+            if (!gtd.param().initable()) return semantic(
+                    "type '%s' can't init default: %s",
+                    gtd, oe.pos());
+            if (!literalInitable(gtd)) return semantic(
+                    "type '%s' can't init by '%s': %s",
+                    gtd, oe, oe.pos());
+        } else {
+            return semantic("type '%s' can't init by '%s': %s",
+                    t, oe, oe.pos());
         }
+
+        var fields = TypeTool.fieldsOf(t, oe);
+        var gm = (t instanceof DerivedTypeDeclarer dtd) ?
+                dtd.gm() : GenericMap.EMPTY;
+
         for (var f : fields) {
             if (oe.entries().exists(f.name())) continue;
-            var ft = dtd.gm().mapIf(f.type());
-            if (requiredInit(ft)) {
+            var ft = gm.mapIf(f.type());
+            if (ft.requiredInit()) {
                 error("non-null field '%s' must be init: %s",
                         f.name(), oe.pos());
             }
@@ -5043,11 +5252,11 @@ public class SemanticAnalyzer {
             var o = fields.tryGet(n.key());
             if (o.none()) {
                 return semantic("type '%s' had no field '%s': %s",
-                        def, n.key(), n.key().pos());
+                        t, n.key(), n.key().pos());
             }
-            var f = checkExport(o.get(), def, n.key());
+            var f = checkExport(o.get(), n.key());
             var v = n.value();
-            var ft = dtd.gm().mapIf(f.type());
+            var ft = gm.mapIf(f.type());
             v.expectType.set(ft);
             var g = optimize(v);
             if (!isCompoundLiteral(v))
@@ -5056,7 +5265,7 @@ public class SemanticAnalyzer {
         }
 
         var n = new ObjectExpression(oe.pos(), entries, oe.type());
-        return Groups.g2(n, dtd);
+        return Groups.g2(n, t);
     }
 
     private Groups.G2<Expression, TypeDeclarer>

@@ -26,6 +26,14 @@ public class PrimitiveDefinition extends TypeDefinition {
         return primitive;
     }
 
+    public boolean newable() {
+        return true;
+    }
+
+    public boolean referable() {
+        return true;
+    }
+
     //
 
     public static final Map<Primitive, PrimitiveDefinition> types;

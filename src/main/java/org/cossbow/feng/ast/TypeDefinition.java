@@ -24,6 +24,10 @@ public class TypeDefinition extends Definition {
         return false;
     }
 
+    public boolean referable() {
+        return false;
+    }
+
     //
 
     public boolean syncable() {

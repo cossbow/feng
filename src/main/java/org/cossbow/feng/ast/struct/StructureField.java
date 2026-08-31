@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.SymbolMap;
 import org.cossbow.feng.ast.attr.Attribute;
+import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.util.Lazy;
@@ -12,7 +13,7 @@ import org.cossbow.feng.util.Optional;
 
 public class StructureField extends Field {
     private Optional<Expression> bitfield;
-    private final SymbolMap<Attribute> attributes;
+    private Modifier modifier;
 
     public StructureField(Position pos,
                           Identifier name,
@@ -28,15 +29,20 @@ public class StructureField extends Field {
                           SymbolMap<Attribute> attributes) {
         super(pos, name, type);
         this.bitfield = bitfield;
-        this.attributes = attributes;
+        modifier = new Modifier(pos, true, attributes);
     }
 
     public Optional<Expression> bitfield() {
         return bitfield;
     }
 
+    @Override
+    public Modifier modifier() {
+        return modifier;
+    }
+
     public SymbolMap<Attribute> attributes() {
-        return attributes;
+        return modifier.attributes();
     }
 
     private volatile int bits;

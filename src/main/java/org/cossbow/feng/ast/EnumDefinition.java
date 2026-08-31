@@ -8,7 +8,7 @@ import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
-import static org.cossbow.feng.ast.Position.*;
+import static org.cossbow.feng.ast.Position.ZERO;
 
 /**
  * An enum is defined such that its domain is strictly limited
@@ -46,6 +46,9 @@ public class EnumDefinition extends TypeDefinition {
         return true;
     }
 
+    public boolean referable() {
+        return true;
+    }
 
     public static final class Value extends Entity {
         /**
@@ -133,47 +136,55 @@ public class EnumDefinition extends TypeDefinition {
 
     //
 
-    public static final String TokenFieldId = "id";
-    public static final String TokenFieldValue = "value";
-    public static final String TokenFieldName = "name";
+    public static final Identifier TokenFieldId = new Identifier("id");
+    public static final Identifier TokenFieldValue = new Identifier("value");
+    public static final Identifier TokenFieldName = new Identifier("name");
 
-    public Optional<EnumField> getField(Identifier name) {
-        var f = switch (name.value()) {
-            case TokenFieldId -> IdField;
-            case TokenFieldValue -> ValueField;
-            case TokenFieldName -> NameField;
-            case null, default -> null;
-        };
-        return Optional.of(f);
+    public Optional<EnumField> field(Identifier name) {
+        return fields.tryGet(name);
     }
 
-    public final EnumField IdField = makeField(TokenFieldId,
-            Primitive.INT.declarer(pos()), false);
-    public final EnumField ValueField = makeField(TokenFieldValue,
-            Primitive.INT.declarer(pos()), false);
-    public final EnumField NameField = makeField(TokenFieldName,
-            ArrayTypeDeclarer.make(Primitive.BYTE.declarer(pos()),
-                    Optional.of(new Refer(pos(), ReferKind.STRONG,
-                            true, true)),
-                    pos()), true);
+    public IdentifierMap<EnumField> fields() {
+        return fields;
+    }
 
-    private EnumField makeField(String name, TypeDeclarer td,
+    private final IdentifierMap<EnumField> fields = new IdentifierMap<>();
+
+    {
+        fields.add(TokenFieldId, makeField(TokenFieldId,
+                Primitive.INT.declarer(pos()), false));
+        fields.add(TokenFieldValue, makeField(TokenFieldValue,
+                Primitive.INT.declarer(pos()), false));
+        fields.add(TokenFieldName, makeField(TokenFieldName,
+                ArrayTypeDeclarer.make(Primitive.BYTE.declarer(pos()),
+                        Optional.of(new Refer(pos(), ReferKind.STRONG,
+                                true, true)),
+                        pos()), true));
+    }
+
+    private EnumField makeField(Identifier name, TypeDeclarer td,
                                 boolean enablePhantom) {
-        return new EnumField(new Identifier(pos(), name), td,
-                enablePhantom);
+        return new EnumField(name, td, enablePhantom);
     }
 
     /**
      * Builtin fields of enum.
      */
     public class EnumField extends Field {
+        private final Modifier modifier;
         private final boolean enablePhantom;
 
         public EnumField(Identifier name,
                          TypeDeclarer type,
                          boolean enablePhantom) {
             super(EnumDefinition.this.pos(), name, type);
+            modifier = new Modifier(ZERO, true, new SymbolMap<>());
             this.enablePhantom = enablePhantom;
+        }
+
+        @Override
+        public Modifier modifier() {
+            return modifier;
         }
 
         public boolean immutable() {

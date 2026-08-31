@@ -3,6 +3,10 @@ package org.cossbow.feng.ast.gen;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.dcl.Primitive;
+import org.cossbow.feng.ast.dcl.PrimitiveTypeDeclarer;
+import org.cossbow.feng.ast.dcl.Refer;
+import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.util.Optional;
 
 final
 public class PrimitiveType extends DefinedType {
@@ -23,6 +27,11 @@ public class PrimitiveType extends DefinedType {
 
     public Identifier name() {
         return name;
+    }
+
+    @Override
+    public TypeDeclarer declarer(Optional<Refer> r) {
+        return new PrimitiveTypeDeclarer(pos(), primitive, r);
     }
 
     //

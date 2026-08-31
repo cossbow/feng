@@ -17,6 +17,9 @@ public class Groups {
     //
 
     public record G3<A, B, C>(A a, B b, C c) {
+        public G2<A, B> reduce() {
+            return g2(a, b);
+        }
     }
 
     public static <A, B, C> G3<A, B, C> g3(A a, B b, C c) {

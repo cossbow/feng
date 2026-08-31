@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.VariadicArgument;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.ast.type.Concept;
 import org.cossbow.feng.util.Optional;
 
 import java.util.List;
@@ -13,6 +14,8 @@ import java.util.stream.Stream;
 public interface SymbolContext {
 
     boolean isLocal(Symbol s);
+
+    Optional<Concept> findConcept(Symbol symbol);
 
     Optional<TypeDefinition> findType(Symbol symbol);
 

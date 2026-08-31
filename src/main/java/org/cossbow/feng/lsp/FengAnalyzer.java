@@ -5,6 +5,7 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Token;
 import org.cossbow.feng.analysis.SemanticAnalyzer;
 import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.dcl.Primitive;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.parser.FengLexer;
@@ -56,13 +57,14 @@ public class FengAnalyzer {
             FengLexer.EXPORT, FengLexer.IMPORT,
             FengLexer.STRUCT, FengLexer.UNION, FengLexer.ENUM,
             FengLexer.ATTRIBUTE, FengLexer.INTERFACE, FengLexer.CLASS,
+            FengLexer.PRIMITIVE,
             FengLexer.FUNC, FengLexer.MACRO, FengLexer.CONST,
             FengLexer.VAR, FengLexer.LET, FengLexer.NEW, FengLexer.SIZEOF,
             FengLexer.RETURN, FengLexer.IF, FengLexer.ELSE, FengLexer.FOR,
             FengLexer.CONTINUE, FengLexer.BREAK, FengLexer.SWITCH, FengLexer.CASE,
             FengLexer.DEFAULT, FengLexer.THROW, FengLexer.TRY, FengLexer.CATCH,
             FengLexer.FINAL, FengLexer.STATIC, FengLexer.ASSERT,
-            FengLexer.THIS, FengLexer.SUPER,
+            FengLexer.THIS, FengLexer.SUPER, FengLexer.CONCEPT,
             FengLexer.BoolLiteral, FengLexer.NilLiteral);
 
     private static final Set<Integer> NUMBER_TOKENS = Set.of(
@@ -293,16 +295,14 @@ public class FengAnalyzer {
     // ---- Phase 2: completion ----
 
     private static final List<String> KEYWORDS = List.of(
-            "import", "export", "struct", "union", "enum", "attribute",
-            "interface", "class", "func", "macro", "const", "var", "let",
+            "import", "export",
+            "struct", "union", "enum", "attribute", "primitive",
+            "interface", "class", "func", "concept", "macro",
+            "const", "var", "let",
             "new", "sizeof", "return", "if", "else", "for", "continue",
             "break", "switch", "case", "default", "throw", "try",
             "catch", "final", "static", "assert", "this", "super", "nil",
             "true", "false");
-
-    private static final List<String> BUILTIN_TYPES = List.of(
-            "int", "uint", "long", "ulong", "float", "double", "byte",
-            "bool", "size");
 
     public CompletionList completion(String uri, org.eclipse.lsp4j.Position position) {
         var items = new ArrayList<CompletionItem>();
@@ -313,8 +313,8 @@ public class FengAnalyzer {
         }
 
         // Builtin types
-        for (var bt : BUILTIN_TYPES) {
-            items.add(typeItem(bt));
+        for (var bt : Primitive.values()) {
+            items.add(typeItem(bt.code));
         }
 
         // Scope symbols from current file

@@ -4274,4 +4274,1165 @@ public class SemanticAnalyzerTest {
         checkSucc("func f(@Sync a *int) { @Sync var i *int = a; }");
     }
 
+    // TypeConstraint
+
+    @Test
+    public void testGenericConstraint1() {
+        checkSucc("interface Comparable {} class Int (Comparable) {} " +
+                "class Box`T Comparable` { var v T; } " +
+                "func f() { var b Box`Int`; }");
+        checkFail("interface Comparable {} class Int (Comparable) {} class Foo {} " +
+                "class Box`T Comparable` { var v T; } " +
+                "func f() { var b Box`Foo`; }");
+    }
+
+    @Test
+    public void testGenericConstraint2() {
+        // 接口约束：满足/不满足
+        checkSucc("interface I {} " +
+                "class A (I) {} " +
+                "class Holder`T I` { var v T; } " +
+                "func f() { var h Holder`A`; }");
+        checkFail("interface I {} " +
+                "class A {} " +
+                "class Holder`T I` { var v T; } " +
+                "func f() { var h Holder`A`; }");
+    }
+
+    @Test
+    public void testGenericConstraint3() {
+        // 类继承约束：直系满足；无关类不满足
+        checkSucc("class Base {} " +
+                "class Derived : Base {} " +
+                "class Holder`T Base` { var v T; } " +
+                "func f() { var h Holder`Derived`; }");
+        checkFail("class Base {} " +
+                "class Unrelated {} " +
+                "class Holder`T Base` { var v T; } " +
+                "func f() { var h Holder`Unrelated`; }");
+    }
+
+    @Test
+    public void testGenericConstraint4() {
+        // 深层继承 BFS：链内满足；链外不满足
+        checkSucc("class GrandParent {} " +
+                "class Parent : GrandParent {} " +
+                "class Child : Parent {} " +
+                "class Holder`T GrandParent` { var v T; } " +
+                "func f() { var h Holder`Child`; }");
+        checkFail("class GrandParent {} " +
+                "class Parent : GrandParent {} " +
+                "class Child : Parent {} class Other {} " +
+                "class Holder`T GrandParent` { var v T; } " +
+                "func f() { var h Holder`Other`; }");
+    }
+
+    @Test
+    public void testGenericConstraint5() {
+        // 并集约束 T:A|B：满足其一即可；都不满足报错
+        checkSucc("interface A {} interface B {} class X (A) {} " +
+                "class Holder`T A|B` { var v T; } " +
+                "func f() { var h Holder`X`; }");
+        checkFail("interface A {} interface B {} class Y {} " +
+                "class Holder`T A|B` { var v T; } " +
+                "func f() { var h Holder`Y`; }");
+    }
+
+    @Test
+    public void testGenericConstraint6() {
+        // 交集约束 T:A&B：两者都满足；只满足一个报错
+        checkSucc("interface A {} interface B {} " +
+                "class X (A, B) {} " +
+                "class Holder`T A&B` { var v T; } " +
+                "func f() { var h Holder`X`; }");
+        checkFail("interface A {} interface B {} " +
+                "class X (A) {} " +
+                "class Holder`T A&B` { var v T; } " +
+                "func f() { var h Holder`X`; }");
+    }
+
+    @Test
+    public void testGenericConstraint7() {
+        // 域约束 T:class / T:interface
+        checkSucc("class A {} " +
+                "class Holder`T class` { var v T; } " +
+                "func f() { var h Holder`A`; }");
+        checkFail("interface I {} " +
+                "class Holder`T class` { var v T; } " +
+                "func f() { var h Holder`*I`; }");
+    }
+
+    @Test
+    public void testGenericConstraint8() {
+        checkSucc("interface I {} " +
+                "class Holder`T interface` { var v T; } " +
+                "func f() { var h Holder`*?I`; }");
+        checkFail("class A {} " +
+                "class Holder`T interface` { var v T; } " +
+                "func f() { var h Holder`A`; }");
+    }
+
+    @Test
+    public void testGenericConstraint9() {
+        // 多类型参数：各自约束独立
+        checkSucc("interface IA {} interface IB {} " +
+                "class A (IA) {} class B (IB) {} " +
+                "class Pair`TA IA, TB IB` { var a TA; var b TB; } " +
+                "func f() { var p Pair`A, B`; }");
+        checkFail("interface IA {} interface IB {} " +
+                "class A (IA) {} class B {} " +
+                "class Pair`TA IA, TB IB` { var a TA; var b TB; } " +
+                "func f() { var p Pair`A, B`; }");
+    }
+
+    @Test
+    public void testGenericConstraint10() {
+        // 同胞引用：前向合法
+        var d = "class A {} ";
+        checkSucc(d + "class Box`T A, E T` { var a T; var b E; }");
+        checkFail(d + "class Box`T A, E S` { var a T; var b E; }");
+    }
+
+    @Test
+    public void testGenericConstraint11() {
+        // 自引用：resolve 不到，报 not defined
+        checkFail("class A {} " +
+                "class Box`T T` { var a T; }");
+    }
+
+    @Test
+    public void testGenericConstraint12() {
+        // 反向引用：同 11
+        checkFail("class A {} " +
+                "class Box`T E, E A` { var a T; var b E; }");
+    }
+
+    @Test
+    public void testGenericConstraint13() {
+        // 同胞约束链：E 的约束 T 展开为 IA
+        checkSucc("interface IA {} " +
+                "class A (IA) {} class B (IA) {} " +
+                "class Box`T IA, E T` { var a T; var b E; } " +
+                "func f() { var b Box`A, B`; }");
+        checkFail("interface IA {} " +
+                "class A (IA) {} class B {} " +
+                "class Box`T IA, E T` { var a T; var b E; } " +
+                "func f() { var b Box`A, B`; }");
+    }
+
+    @Test
+    public void testGenericConstraint14() {
+        // 约束引用泛型类型 Cat`*IA`
+        checkSucc("interface IA {} class Cat`U IA` (IA) {} " +
+                "class Box`T Cat`*IA`` { var v T; } " +
+                "func f() { var b Box`Cat`*IA``; }");
+        checkFail("interface IA {} class Cat`U IA` (IA) {} " +
+                "class Box`T Cat`*IA`` { var v T; } " +
+                "func f() { var b Box`int`; }");
+    }
+
+    @Test
+    public void testGenericConstraint15() {
+        // 嵌套约束：L 的约束 List`B`（B 为同胞），实参 Bar 满足
+        checkSucc("class List`E` {} class Bar {} " +
+                "class C`B Bar, L List`B`` { var v L; var w B; } " +
+                "func f() { var c C`Bar, List`Bar``; }");
+    }
+
+    @Test
+    public void testGenericConstraint16() {
+        // 反例：List`E Car`，B=Bar/Bus 不满足 E 的约束 Car
+        checkFail("interface Car {} class List`E Car` {} class Bar {} " +
+                "class C`B Bar, L List`B`` { var v L; var w B; }");
+        checkFail("interface Car {} class List`E Car` {} class Bar {} " +
+                "class C`B Bar, L List`B`` { var v L; var w B; } " +
+                "func f() { var c C`Bar, List`Bar``; }");
+        checkFail("interface Car {} class List`E Car` {} class Bar {} " +
+                "class Bus : Bar (Car) {} " +
+                "class C`B Bar, L List`B`` { var v L; var w B; } " +
+                "func f() { var c C`Bus, List`Bus``; }");
+    }
+
+    @Test
+    public void testGenericConstraint17() {
+        // 函数推断调用：T 由实参推断，约束检查生效
+        checkSucc("interface I {} class A (I) {} " +
+                "func f`T I`(x T) {} " +
+                "func g() { var a A; f(a); }");
+        checkFail("interface I {} class A (I) {} class B {} " +
+                "func f`T I`(x T) {} " +
+                "func g() { var b B; f(b); }");
+    }
+
+    @Test
+    public void testGenericConstraint18() {
+        // 函数显式实参：直接给类型参数，约束检查生效
+        checkSucc("interface I {} class A (I) {} " +
+                "func f`T I`(x T) {} " +
+                "func g() { var a A; f`A`(a); }");
+        checkFail("interface I {} class A (I) {} " +
+                "func f`T I`(x T) {} " +
+                "func g() { f`int`(1); }");
+    }
+
+    @Test
+    public void testGenericConstraint19() {
+        // 方法推断调用
+        checkSucc("interface I {} class A (I) {} " +
+                "class C { func m`T I`(x T) {} } " +
+                "func g() { var c C; var a A; c.m(a); }");
+        checkFail("interface I {} class A (I) {} class B {} " +
+                "class C { func m`T I`(x T) {} } " +
+                "func g() { var c C; var b B; c.m(b); }");
+    }
+
+    @Test
+    public void testGenericConstraint20() {
+        // 方法显式实参
+        checkSucc("interface I {} class A (I) {} " +
+                "class C { func m`T I`(x T) {} } " +
+                "func g() { var c C; var a A; c.m`A`(a); }");
+        checkFail("interface I {} class A (I) {} " +
+                "class C { func m`T I`(x T) {} } " +
+                "func g() { var c C; c.m`int`(1); }");
+    }
+
+    @Test
+    public void testGenericConstraint21() {
+        // 函数 primitive 约束：T:int32
+        checkSucc("func f`T int32`(x T) {} " +
+                "func g() { f`int32`(1); }");
+        checkFail("func f`T int32`(x T) {} " +
+                "func g() { f`int`(1); }");
+    }
+
+    @Test
+    public void testGenericConstraint22() {
+        // 函数级同胞约束链：E 的约束 T 展开为 IA
+        checkSucc("interface IA {} class A (IA) {} class B (IA) {} " +
+                "func f`T IA, E T`(x T, y E) {} " +
+                "func g() { var a A; var b B; f`A, B`(a, b); }");
+        checkFail("interface IA {} class A (IA) {} class B {} " +
+                "func f`T IA, E T`(x T, y E) {} " +
+                "func g() { var a A; var b B; f`A, B`(a, b); }");
+    }
+
+    // ===== 叶子节点单模式 (primaryConstraint) =====
+
+    @Test
+    public void testGenericConstraint23() {
+        // 形态标记 * 是修饰符而非类型，不能单独作为约束
+        checkFail("class A {} " +
+                "class Box`T *` {} " +
+                "func f() { var h Box`*A`; }");
+        // 对照：!*（非引用）是完整类型集合，合法
+        checkSucc("struct S {} class Box`T !*` { var v T; } " +
+                "func f() { var h Box`S`; }");
+    }
+
+    @Test
+    public void testGenericConstraint24() {
+        // 形态标记 ? 是修饰符而非类型，不能单独作为约束
+        checkFail("class A {} " +
+                "class Box`T ?` { var v T; } " +
+                "func f() { var h Box`*?A`; }");
+    }
+
+    @Test
+    public void testGenericConstraint25() {
+        // 形态标记 # 是修饰符而非类型，不能单独作为约束
+        checkFail("class A {} " +
+                "class Box`T #` {} " +
+                "func f() { var h Box`*#A`; }");
+    }
+
+    @Test
+    public void testGenericConstraint26() {
+        // 形态标记 @Attr 是修饰符而非类型，不能单独作为约束
+        checkFail("attribute Attr {} @Attr class A {} " +
+                "class Box`T @Attr` { var v T; } " +
+                "func f() { var h Box`A`; }");
+    }
+
+    @Test
+    public void testGenericConstraint27() {
+        // 排除约束 T !A：实参不能是 A
+        checkSucc("class A {} class B {} " +
+                "class Box`T !A` { var v T; } " +
+                "func f() { var h Box`B`; }");
+        checkFail("class A {} class B {} " +
+                "class Box`T !A` { var v T; } " +
+                "func f() { var h Box`A`; }");
+    }
+
+    @Test
+    public void testGenericConstraint28() {
+        // 括号约束 T (A)：等价于 A
+        checkSucc("interface I {} class A (I) {} " +
+                "class Box`T (I)` { var v T; } " +
+                "func f() { var h Box`A`; }");
+        checkFail("interface I {} class A {} " +
+                "class Box`T (I)` { var v T; } " +
+                "func f() { var h Box`A`; }");
+    }
+
+    @Test
+    public void testGenericConstraint29() {
+        // 域约束：enum/struct/union
+        checkSucc("enum Color { R } " +
+                "class Box`T enum` { var v T; } " +
+                "func f() { var h Box`Color`; }");
+        checkFail("enum Color { R } " +
+                "class Box`T enum` { var v T; } " +
+                "func f() { var h Box`int`; }");
+        checkSucc("struct P { x int; } " +
+                "class Box`T struct` { var v T; } " +
+                "func f() { var h Box`P`; }");
+        checkFail("struct P { x int; } " +
+                "class Box`T struct` { var v T; } " +
+                "func f() { var h Box`int`; }");
+        checkSucc("union U { a int; } " +
+                "class Box`T union` { var v T; } " +
+                "func f() { var h Box`U`; }");
+        checkFail("union U { a int; } " +
+                "class Box`T union` { var v T; } " +
+                "func f() { var h Box`int`; }");
+    }
+
+    @Test
+    public void testGenericConstraint30() {
+        // 域约束：attribute/func
+        checkSucc("attribute D {} " +
+                "class Box`T attribute` { var v T; } " +
+                "func f() { var h Box`D`; }");
+        checkFail("attribute D {} " +
+                "class Box`T attribute` { var v T; } " +
+                "func f() { var h Box`int`; }");
+        checkSucc("class Box`T func` { var v T; } " +
+                "func f() { var h Box`func()`; }");
+        checkFail("class Box`T func` { var v T; } " +
+                "func f() { var h Box`int`; }");
+    }
+
+    // ===== 泛型视图成员查找（optimizeGenericView）=====
+
+    @Test
+    public void testGenericConstraint31() {
+        // 字段查找：约束提供视图，字段类型 L 经 gm 映射为 Box`P`
+        var def = "class P {} " +
+                "class Box`E` { var v E; } " +
+                "class C`B P, L Box`B`` { var l L; } ";
+        checkSucc(def + "func f`T C`P, Box`P```(t T) { var a Box`P` = t.l; }");
+        // 反例：T 无约束 → 无视图，t.l 报 member not defined
+        checkFail(def + "func f`T`(t T) { var a Box`P` = t.l; }");
+    }
+
+    @Test
+    public void testGenericConstraint32() {
+        // 方法查找：方法原型经 gm 实例化（返回 B → P）
+        var def = "class P {} " +
+                "class Box`E` { var v E; } " +
+                "class C`B P, L Box`B`` { var l L; var w B; func m#() B { return this.w; } } ";
+        checkSucc(def + "func f`T C`P, Box`P```(t T) { var p P = t.m(); }");
+        // 反例：视图无此方法
+        checkFail(def + "func f`T C`P, Box`P```(t T) { var p P = t.none(); }");
+    }
+
+    @Test
+    public void testGenericConstraint33() {
+        // 可调用字段：视图字段为函数类型时可直接调用
+        var def = "class P {} " +
+                "class C`B P` { var f func() B; } ";
+        checkSucc(def + "func f`T C`P``(t T) { var p P = t.f(); }");
+        // 反例：视图无此成员
+        checkFail(def + "func f`T C`P``(t T) { var p P = t.g(); }");
+    }
+
+    // ===== sameView 强化：union/intersect 成员"相同"判断 =====
+
+    @Test
+    public void testGenericConstraint34() {
+        // 字段 immutable 维度：var vs const 不同 → 无共同保证，剔除
+        var d = "class A { var f int; } class B { const f int; } ";
+        checkFail(d + "func f`T (A | B)`(t T) { var i int = t.f; }");
+        // 两侧声明一致（var）→ 保留
+        d = "class A { var f int; } class B { var f int; } ";
+        checkSucc(d + "func f`T (A | B)`(t T) { var i int = t.f; }");
+    }
+
+    @Test
+    public void testGenericConstraint35() {
+        // 字段 modifier 属性维度：@X vs 无 → 剔除
+        var d = "attribute X {} class A { @X var f int; } class B { var f int; } ";
+        checkFail(d + "func f`T (A | B)`(t T) { var i int = t.f; }");
+        // 两侧属性一致（@X）→ 保留
+        d = "attribute X {} class A { @X var f int; } class B { @X var f int; } ";
+        checkSucc(d + "func f`T (A | B)`(t T) { var i int = t.f; }");
+    }
+
+    @Test
+    public void testGenericConstraint36() {
+        // 方法 unmodifiable 维度：m vs m# → 剔除
+        var d = "class A { func m() int { return 0; } } class B { func m#() int { return 0; } } ";
+        checkFail(d + "func f`T (A | B)`(t T) { var i int = t.m(); }");
+        // 两侧一致（m#）→ 保留，不可变方法可直接调用
+        d = "class A { func m#() int { return 0; } } class B { func m#() int { return 0; } } ";
+        checkSucc(d + "func f`T (A | B)`(t T) { var i int = t.m(); }");
+    }
+
+    @Test
+    public void testGenericConstraint37() {
+        // 方法 escaped 维度：m* vs m → 剔除
+        var d = "class A { func m*() int { return 0; } } class B { func m() int { return 0; } } ";
+        checkFail(d + "func f`T (A | B)`(t T) { var i int = t.m(); }");
+        // 两侧一致（非 escaped）→ 保留，可修改方法需 var 主体调用
+        d = "class A { func m() int { return 0; } } class B { func m() int { return 0; } } ";
+        checkSucc(d + "func f`T (A | B)`(t T) { var v = t; var i int = v.m(); }");
+    }
+
+    @Test
+    public void testGenericConstraint38() {
+        // 方法 modifier 属性维度：@X vs 无 → 剔除
+        var d = "attribute X {} class A { @X func m#() int { return 0; } } " +
+                "class B { func m#() int { return 0; } } ";
+        checkFail(d + "func f`T (A | B)`(t T) { var i int = t.m(); }");
+        // 两侧属性一致（@X）→ 保留
+        d = "attribute X {} class A { @X func m#() int { return 0; } } " +
+                "class B { @X func m#() int { return 0; } } ";
+        checkSucc(d + "func f`T (A | B)`(t T) { var i int = t.m(); }");
+    }
+
+    @Test
+    public void testGenericConstraint39() {
+        // intersect（AND）方向：成员并集，冲突剔除
+        var d = "class A { var f int; var g int; } " +
+                "class B { var f int; var g float; } ";
+        checkSucc(d + "func f`T (A & B)`(t T) { var i int = t.f; }");
+        checkFail(d + "func f`T (A & B)`(t T) { var i int = t.g; }");
+    }
+
+    @Test
+    public void testGenericConstraint40() {
+        // 视图字段写路径：值参数（const 主体）不可写；var 局部可写
+        var d = "class A { var f int; } class B { var f int; } ";
+        checkFail(d + "func f`T (A | B)`(t T) { t.f = 1; }");
+        checkSucc(d + "func f`T (A | B)`(t T) { var v = t; v.f = 1; }");
+        // 视图 const 字段不可写
+        d = "class A { const f int; } class B { const f int; } ";
+        checkFail(d + "func f`T (A | B)`(t T) { var v = t; v.f = 1; }");
+        // AND 方向：共同字段可写，冲突字段剔除后不可写
+        d = "class A { var f int; var g int; } class B { var f int; var g float; } ";
+        checkSucc(d + "func f`T (A & B)`(t T) { var v = t; v.f = 1; }");
+        checkFail(d + "func f`T (A & B)`(t T) { var v = t; v.g = 1; }");
+    }
+
+    @Test
+    public void testGenericConstraint41() {
+        // ① 不能 new：非公共必填字段
+        var d = "class A{ var id *int; } class B{ var id *int; } ";
+        checkFail(d + "func f`T (A | B)`(){ var a = new(T); }");
+        // 混合 union：A 不可 new、B 可 new → unknown → 保守拒绝
+        d = "class A{ var id *int; } class B{} ";
+        checkFail(d + "func f`T (A | B)`(){ var a = new(T); }");
+        // ② 能 new 但不支持初始化：int | Cat 可无参 new；Cat 字段不泄漏进视图
+        d = "class Cat{ var name int; } ";
+        checkSucc(d + "func f`T (int | Cat)`(){ var a = new(T); }");
+        checkFail(d + "func f`T (int | Cat)`(t T) { var x int = t.name; }");
+        // ③ 能 new 可选初始化：无必填字段 / 可空字段
+        d = "class A{} class B{} ";
+        checkSucc(d + "func f`T (A | B)`(){ var a = new(T); }");
+        d = "class A{ var id *?int; } class B{ var id *?int; } ";
+        checkSucc(d + "func f`T (A | B)`(){ var a = new(T); }");
+        // ④ 能 new 但必须初始化：export 必填字段 → 无参 new 拒绝；具体类型可带参 new
+        d = "class A{ export var id *int; } class B{ export var id *int; } ";
+        checkFail(d + "func f`T (A | B)`(){ var a = new(T); }");
+        checkSucc(d + "func f(){ var a = new(A,{id=new(int)}); }");
+    }
+
+    @Test
+    public void testGenericConstraint42() {
+        // 泛型带参 new：参数类型必须与 T 完全一致（assignable 对泛型
+        // 退化为两边都是 T），具体类型参数与字面量均拒绝
+        var d = "class A{} class B{} ";
+        checkSucc(d + "func f`T (A | B)`(t T){ var a = new(T, t); }");
+        checkFail(d + "func f`T (A | B)`(){ var a = new(T, new(A)); }");
+        checkFail(d + "func f`T (A | B)`(){ var a = new(T, 5); }");
+        // 参数是实例类型：引用不是实例，new(T, new(T, t)) 的 *T 拒绝
+        // （与具体路径 new(A, new(A)) 一致）
+        checkFail(d + "func f`T (A | B)`(t T){ var a = new(T, new(T, t)); }");
+        // 无 default：object-literal 实参拒（'default' 门控）
+        checkFail(d + "func f`T (A | B)`(){ var a = new(T, {}); }");
+        // 空类并集：default + 视图字段空但确定可 new → 空字面量放行
+        checkSucc(d + "func f`T default (A | B)`(){ var a = new(T, {}); }");
+        // 混合并集单侧必填：视图丢失字段信息（newable 不确定）→ 拒
+        checkFail("class A{ var i *int; } class B{} " +
+                "func f`T default (A | B)`(){ var a = new(T, {}); }");
+        // 非 CLASS/STRUCT 域（int | Cat）：{} 无法初始化 → 拒
+        checkFail("class Cat{ var name int; } " +
+                "func f`T default (int | Cat)`(){ var a = new(T, {}); }");
+    }
+
+    @Test
+    public void testGenericConstraint48() {
+        // 必填字段（非 export）：类型可 new，但必须经实例初始化
+        // （初始化按实例检查；new 与值类型变量是两种创建途径）
+        var d = "class A{ var i *int; } ";
+        // 无参 new(T) 拒（必填未提供，与 default 无关）
+        checkFail(d + "func f`T (A)`(){ var b *T = new(T); }");
+        // 无 default：object-literal 初始化拒（'default' 门控）
+        checkFail(d + "func f`T (A)`(){ var b *T = new(T, {i=new(int)}); }");
+        checkFail(d + "func f`T (A)`(){ var a T = {i=new(int)}; }");
+        checkFail(d + "func f`T (A)`(){ var a T = {}; }");
+        // default + 带 object-literal new(T, {i=...}) 放行
+        checkSucc(d + "func f`T default (A)`(){ var b *T = new(T, {i=new(int)}); }");
+        // 值类型变量自动创建实例：var a T = {i=...} 放行
+        checkSucc(d + "func f`T default (A)`(){ var a T = {i=new(int)}; }");
+        // 反例：缺必填字段 / 多余字段 / 字段类型不符
+        checkFail(d + "func f`T default (A)`(){ var a T = {}; }");
+        checkFail(d + "func f`T default (A)`(){ var a T = {x=new(int)}; }");
+        checkFail(d + "func f`T default (A)`(){ var a T = {i=5}; }");
+        checkFail(d + "func f`T default (A)`(){ var a *T = {i=new(int)}; }");
+        // 无值初始化：必填未提供拒
+        checkFail(d + "func f`T default (A)`(){ var a T; }");
+        // 无必填字段的类：无参 new(T) 放行（不受 default 影响）
+        checkSucc("class B{} func f`T (B)`(){ var b *T = new(T); }");
+        // default 外层边界：实参在视图外新增必填字段 → 拒（B:A 的 j 不在 A 视图）
+        checkFail("class A{ var i *int; } class B:A{ var j *bool; } " +
+                "func far`T default (A)`(){ var a T = {i=new(int)}; } " +
+                "func away(){ far`B`(); }");
+        // 视图外新增非必填字段 → 放行
+        checkSucc("class A{ var i *int; } class C:A{ var k bool; } " +
+                "func far`T default (A)`(){ var a T = {i=new(int)}; } " +
+                "func away(){ far`C`(); }");
+    }
+
+    @Test
+    public void testGenericConstraint49() {
+        // default 声明处检查：'default' 是约束的一部分，必须有约束
+        checkFail("func f`T default`(){}");
+        // default 外层边界：引用实参形态未知（引用字面量是 nil）→ 拒
+        checkFail("class A{} class B:A{} " +
+                "func far`T default (A)`(){ var a T = {}; } " +
+                "func away(){ far`*B`(); }");
+        // 具体实参本身含视图内必填字段 → 字面量按视图校验后放行
+        checkSucc("class A{ var i *int; } " +
+                "func far`T default (A)`(){ var a T = {i=new(int)}; } " +
+                "func away(){ far`A`(); }");
+    }
+
+    @Test
+    public void testGenericConstraint50() {
+        // ---- 值类型变量路径的 default 门控（对照 new(T, {}) 路径）----
+        checkFail("class A{} class B{} " +
+                "func f`T (A | B)`(){ var a T = {}; }");
+        checkSucc("class A{} class B{} " +
+                "func f`T default (A | B)`(){ var a T = {}; }");
+
+        // ---- 空视图约束 + 具体实参视图外必填：far 内 {} 放行（A 空类确定可 new），
+        //      但 B:A 的必填 j 不在 A 视图 → 实例化处拒 ----
+        checkFail("class A{} class B:A{ var j *bool; } " +
+                "func far`T default (A)`(){ var a T = {}; } " +
+                "func away(){ far`B`(); }");
+        // 实参自身（A 空类无必填）→ 放行
+        checkSucc("class A{} " +
+                "func far`T default (A)`(){ var a T = {}; } " +
+                "func away(){ far`A`(); }");
+
+        // ---- union 约束 + 单侧实参视图外必填：union 视图 intersect 丢字段，
+        //      A 的必填 i 不在视图 → far`A` 拒；无必填的 B 放行 ----
+        checkFail("class A{ var i *int; } class B{} " +
+                "func far`T default (A | B)`(){} " +
+                "func away(){ far`A`(); }");
+        checkSucc("class A{ var i *int; } class B{} " +
+                "func far`T default (A | B)`(){} " +
+                "func away(){ far`B`(); }");
+
+        // ---- new(T, {}) 缺必填字段：default 放行门控后按视图字段检查拒 ----
+        checkFail("class A{ var i *int; } " +
+                "func f`T default (A)`(){ var b *T = new(T, {}); }");
+
+        // ---- 泛型方法：default 参数 + 调用处视图外必填 ----
+        checkFail("class A{ var i *int; } class B:A{ var j *bool; } " +
+                "class C{ func m`T default (A)`(){ var a T = {i=new(int)}; } " +
+                "func n(){ m`B`(); } }");
+        checkSucc("class A{ var i *int; } class C:A{ var k bool; } " +
+                "class D{ func m`T default (A)`(){ var a T = {i=new(int)}; } " +
+                "func n(){ m`C`(); } }");
+
+        // ---- struct 约束：视图字段校验路径（struct 字段是值类型，无必填）----
+        checkSucc("struct S{ i int; } " +
+                "func far`T default (S)`(){ var a T = {i=1}; } " +
+                "func away(){ far`S`(); }");
+        checkFail("struct S{ i int; } " +
+                "func far`T default (S)`(){ var a T = {x=1}; }");
+    }
+
+    @Test
+    public void testGenericConstraint51() {
+        // newable（能否构造）与 hasRequiredInit（能否省略参数）正交：
+        // 单侧必填 union 无参 new 由聚合判据拒（A 的必填 id 在视图外）
+        checkFail("class A{ export var id *int; } class B{} " +
+                "func f`T (A | B)`(){ var a = new(T); }");
+        // 对照：拷贝构造不受必填影响（实例已完整存在）
+        checkSucc("class A{ export var id *int; } class B{} " +
+                "func f`T (A | B)`(t T){ var a = new(T, t); }");
+        // 单约束非 export 必填：无参 new(T) 拒，判据与普通类型 new(A) 对齐
+        checkFail("class A{ var i *int; } func f`T (A)`(){ var a = new(T); }");
+        checkFail("class A{ var i *int; } func f(){ var a = new(A); }");
+        // 对照：无必填字段的单约束无参 new 放行
+        checkSucc("class A{ var i int; } func f`T (A)`(){ var a = new(T); }");
+        // 枚举：泛型无参 new 放行（newable 提取修复，与具体 new(E) 一致）
+        checkSucc("enum E{A,} func f`T (E)`(){ var a = new(T); }");
+        // var a T; 声明路径同判据：单侧必填 union 聚合补全视图字段
+        checkFail("class A{ var i *int; } class B{} " +
+                "func f`T (A | B)`(){ var a T; }");
+    }
+
+    @Test
+    public void testGenericConstraint52() {
+        // ---- L4909：无约束 T（view none）→ "can't support new instance" ----
+        checkFail("func f`T`(){ var a = new(T); }");
+
+        // ---- L4913：isRefer null（域约束 class）或 true（引用约束 *）----
+        checkFail("func f`T (class)`(){ var a = new(T); }");
+        checkFail("func f`T *`(){ var a = new(T); }");
+
+        // ---- L4918：域守卫 FUNC / INTERFACE（定义约束，isRefer=false）----
+        checkFail("func F=(); func f`T (F)`(){ var a = new(T); }");
+        checkFail("interface I{} func f`T (I)`(){ var a = new(T); }");
+
+        // ---- L4933：newable 非 true（域约束 struct 未知；混合并集一侧不可构造）----
+        checkFail("func f`T (struct)`(){ var a = new(T); }");
+        checkFail("class A{} func F=(); func f`T (A | F)`(){ var a = new(T); }");
+        checkFail("class A{} interface I{} func f`T (A | I)`(){ var a = new(T); }");
+    }
+
+    @Test
+    public void testGenericConstraint53() {
+        // ---- L5280：optimize(ObjectExpression) 引用字面量初始化拒绝 ----
+        // 反例：引用类型 *A 用字面量 {} 初始化，应拒
+        checkFail("class A{} func f(){ var a *A = {}; }");
+        // 正例对照：引用经 new 初始化放行
+        checkSucc("class A{} func f(){ var a *A = new(A); }");
+    }
+
+    @Test
+    public void testGenericConstraint54() {
+        // ---- L4771-4780：optimizeGenericView 泛型视图字段为 func 约束泛型参数，转为可调用 ----
+        // 正例：T 约束为 func prototype，视图字段 t 可作为函数调用
+        checkSucc("func Task=()int; class Box`T (Task)`{ var t T; } " +
+                "func f`B (Box)`(b B) int { return b.t(); }");
+        // 反例：T 约束为 int（非可调用），t 成员不可调用
+        checkFail("class Box`T (int)`{ var t T; } " +
+                "func f`B (Box)`(b B) int { return b.t(); }");
+        // 补充正例：返回值参与运算
+        checkSucc("func Task=()int; class Box`T (Task)`{ var t T; } " +
+                "func f`B (Box)`(b B) int { return b.t() + 1; }");
+    }
+
+    @Test
+    public void testGenericConstraint55() {
+        // ---- L5027：funcPrototype GenericType 链递归（类级同胞参数引用）----
+        // 正例：U 约束为 func prototype，T 约束为 U（同胞参数），t 可调用
+        checkSucc("func Task=()int; class B`U (Task), T (U)`{ func m(x T) int { return x(); } }");
+        // 反例：U 约束为 int，T 继承 U=int，x 不可调用
+        checkFail("class B`U (int), T (U)`{ func m(x T) int { return x(); } }");
+    }
+
+    @Test
+    public void testGenericConstraint56() {
+        // ---- L519-529：literalSafe DerivedTypeDeclarer 分支（default + 类级嵌套泛型实参）----
+        // 正例：实参 Box`A` 视图（含 i）⊇ 声明 default 视图 {i}，字面量初始化放行
+        checkSucc("class A{ var i int; } class Box`P default (A)` : A { var p P; } " +
+                "func far`T default (A)`(){ var a T = {i=1}; } " +
+                "func away(){ far`Box`A``(); }");
+        // 反例：实参 Box`B` 视图 {i,j} ⊄ 声明 default 视图 {i}，default-init 不支持（error 记录）
+        checkFail("class A{ var i int; } class B:A{ var j *bool; } " +
+                "class Box`P default (B)` : A { var p P; } " +
+                "func far`T default (A)`(){ var a T = {i=1}; } " +
+                "func away(){ far`Box`B``(); }");
+    }
+
+    @Test
+    public void testGenericConstraint60() {
+        // ---- L503-514：literalSafe GenericTypeDeclarer 链（实参为泛型参数自身）----
+        // 反例 A：L509 实参 U 无 default → 不可字面量初始化
+        checkFail("func f`P, U, T default (U)`(){ f`U, U, U`(); }");
+        // 反例 B：L509 false（(Y→X) 实参 X 无 default）+ L513-514 allMatch true（(T→Y) 链匹配）
+        checkFail("func f`X, Y default (X), T default (Y)`(){ f`X, X, Y`(); }");
+        // 反例 C：L503 实参 *Y 是引用形态 → 不可字面量初始化
+        checkFail("class A{} func f`Y default (A), T default (Y)`(){ f`*Y, *Y`(); }");
+    }
+
+    @Test
+    public void testGenericConstraint61() {
+        // ---- L4747-4749：optimizeGenericView 经泛型视图调逃逸方法（非 Strong 形态拒绝）----
+        var d = "class A{func run*(){}} ";
+        // 正例：*T 引用形态（kind=STRONG）可调逃逸方法
+        checkSucc(d + "func f`T (A)`(t *T){ t.run(); }");
+        // 反例：T 值形态（非 STRONG）调逃逸方法拒
+        checkFail(d + "func f`T (A)`(t T){ t.run(); }");
+        // 反例补充：经 var 中转仍拒（检查作用于调用点，非形参形态）
+        checkFail(d + "func f`T (A)`(t T){ var a = t; a.run(); }");
+    }
+
+    @Test
+    public void testGenericConstraint62() {
+        // ---- 重构等价性：泛型类方法调用，方法签名交叉引用声明类型变量 T 与方法自身泛型 E ----
+        // mapMethod 用声明类型 gm 实例化 T，optimizeMethod 以 EMPTY 父映射实例化 E。
+        // 若 mapMethod 未提前实例化 T，或 parent→EMPTY 丢失了 T 的解析，返回类型会错。
+        var d = "class A`T`{ var v T; func m`E`(x E) T { return this.v; } } ";
+        // 正例：T→int、E→bool，返回 int
+        checkSucc(d + "func f(a *A`int`){ var i int = a.m`bool`(true); }");
+        // 反例：返回类型不匹配（证明 T 确实被实例化为 int，而非保留/误判）
+        checkFail(d + "func f(a *A`int`){ var b bool = a.m`bool`(true); }");
+    }
+
+    @Test
+    public void testGenericConstraint63() {
+        // ---- 重构守卫：枚举 token 字段（name 为 [*]byte 强引用）不污染 hasRequiredInit ----
+        // TypeTool.allFields 新增枚举分支后，若 hasRequiredInitOf 不加
+        // instanceof ClassField/StructureField 守卫，枚举 new(T) 会被 name 字段误报 required init。
+        checkSucc("enum E{A,} func f`T (E)`(){ var a = new(T); }");
+        // union 边界：enum 字段不计入（放行），class 必填字段仍计入（守卫不误伤）
+        checkSucc("enum E{A,} struct S{ i int; } " +
+                "func f`T (E | S)`(){ var a = new(T); }");
+        checkFail("enum E{A,} class C{ var i *int; } " +
+                "func f`T (E | C)`(){ var a = new(T); }");
+    }
+
+    @Test
+    public void testGenericConstraint64() {
+        // ---- ∅ 排查：AND 两侧矛盾，无任何类型可匹配 → 无效约束 ----
+        // 补集矛盾：* & !*（引用 且 非引用）
+        checkFail("class Box`T * & !*` {} ");
+        // 域矛盾：class & struct（一个类型只有一个域）
+        checkFail("class Box`T class & struct` {} ");
+        // 域矛盾（具体类型 + 域）：A（class）& interface
+        checkFail("class A {} class Box`T (A) & interface` {} ");
+        // 域矛盾：class & interface（不同域）
+        checkFail("class Box`T class & interface` {} ");
+        // 对照：!* & struct（非引用 且 struct 域）合法，不误报
+        checkSucc("struct S { i int; } class Box`T !* & struct` { var v T; } ");
+    }
+
+    @Test
+    public void testGenericConstraint65() {
+        // ---- concept 内也受形态标记依附校验约束 ----
+        // 正例：concept 引用完整类型集合
+        checkSucc("concept Ct = class | struct; class Box`T Ct` { var v T; }");
+        // 反例：concept 的 expr 是形态标记（不能单独出现）
+        checkFail("concept Ct = *; class Box`T Ct` { var v T; }");
+    }
+
+    @Test
+    public void testGenericConstraint66() {
+        // ---- 同胞参数同约束：实参为类型变量，约束集合相等时放行 ----
+        // concept Val 约束 U，函数 g 的 T 也被 Val 约束，T 与 U 约束相等 → include 判定成功
+        var d = "concept Val = primitive | struct | union | enum; " +
+                "class R`U Val` { var u U; } ";
+        checkSucc(d + "func g`T Val`(r R`T`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint67() {
+        // ---- 实参约束为所需约束的真子集（int ⊆ Val）：子集包含放行 ----
+        // T 被 int 约束，int 是 Val 的子集 → include 判定成功
+        var d = "concept Val = primitive | struct | union | enum; " +
+                "class R`U Val` { var u U; } ";
+        checkSucc(d + "func h`S int`(r R`S`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint68() {
+        // ---- 无约束类型变量（全集 ⊄ Val）：保守拒绝 ----
+        // S 无约束（全集），全集不是 Val 的子集 → include 判定失败，拒绝
+        var d = "concept Val = primitive | struct | union | enum; " +
+                "class R`U Val` { var u U; } ";
+        checkFail(d + "func h`S`(r R`S`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint69() {
+        // ---- 域约束 vs 具体 primitive 实参约束 ----
+        // 正例：Box 约束 primitive，实参 S 被 int 约束（int 属 primitive 域）→ 放行
+        checkSucc("class Box`T primitive` { var v T; } " +
+                "func g`S int`(b Box`S`) {}");
+        // 反例：Box 约束 primitive，实参 X 被 struct 类型 S 约束（S 是 struct 非 primitive）→ 拒绝
+        checkFail("class Box`T primitive` { var v T; } " +
+                "struct S {} func g`X S`(b Box`X`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint70() {
+        // ---- 概念嵌套包含（Prim ⊆ Val；反向 Val ⊄ Prim）----
+        // 正例：Prim（primitive）⊆ Val（primitive|struct|union|enum），R 要求 Val，T 被 Prim 约束 → 放行
+        checkSucc("concept Val = primitive | struct | union | enum; concept Prim = primitive; " +
+                "class R`U Val` { var u U; } func g`T Prim`(r R`T`) {}");
+        // 反例：Val ⊄ Prim，R 要求 Prim，T 被 Val 约束 → 拒绝
+        checkFail("concept Val = primitive | struct | union | enum; concept Prim = primitive; " +
+                "class R`U Prim` { var u U; } func g`T Val`(r R`T`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint71() {
+        // ---- 类继承单类型包含（B : A 子类约束对 A 约束）----
+        // 正例：B 继承 A（B : A），Box 要求 A，S 被 B 约束（B ⊆ A）→ 放行
+        checkSucc("class A {} class B : A {} class Box`T A` { var v T; } " +
+                "func g`S B`(b Box`S`) {}");
+        // 反例：B 不继承 A，S 被 B 约束（B ⊄ A）→ 拒绝
+        checkFail("class A {} class B {} class Box`T A` { var v T; } " +
+                "func g`S B`(b Box`S`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint72() {
+        // ---- 引用性维度（ReferTypeConstraint，标记只能作二元操作数，见 checkMarker）----
+        // 正例（include YES 路径）：T 被 interface 约束（referenced()==YES）
+        //   → Refer.include 的 x.referenced()==Tri.YES 放行
+        checkSucc("class Box`X (* | int)` { var v X; } func g`T interface`(b Box`T`) {}");
+        // 正例（contains 具体引用类型）：*A（强引用）→ maybeRefer().has() 命中
+        checkSucc("class A {} class Box`X (* | int)` { var v X; } func g(b Box`*A`) {}");
+        // 反例（contains 裸类型实参）：A 无引用标记，maybeRefer 空 → containsByConstraint 失败，int 域也不匹配
+        checkFail("class A {} class Box`X (* | int)` { var v X; } func g(b Box`A`) {}");
+        // 反例（include NO 路径）：T 被 primitive 约束（值类型）⊄ *any，右侧 int 域也 ⊉ primitive
+        checkFail("class Box`X (* | int)` { var v X; } func g`T primitive`(b Box`T`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint73() {
+        // ---- 可空维度（OptionalTypeConstraint，X (? | int)）----
+        // 反例（include 保守 false）：T 被 struct 约束，? 无上近似投影 → 拒绝
+        checkFail("class Box`X (? | int)` { var v X; } func g`T struct`(b Box`T`) {}");
+        // 正例（contains 可空实参）：*?A（可选引用，!required）命中
+        checkSucc("class A {} class Box`X (? | int)` { var v X; } func g(b Box`*?A`) {}");
+        // 正例（contains 值类型实参）：int 无 refer → containsByConstraint 失败，右侧 int 域命中
+        checkSucc("class Box`X (? | int)` { var v X; } func g(b Box`int`) {}");
+        // 反例（contains 强引用实参）：*A 是 required 引用 ⊄ ?，且 int 域不匹配 class
+        checkFail("class A {} class Box`X (? | int)` { var v X; } func g(b Box`*A`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint74() {
+        // ---- 不可变/属性维度（Unmodifiable/Attribute，标记作二元操作数）----
+        // 反例（Unmod include 保守 false）：T 被 struct 约束 → 拒绝
+        checkFail("class Box`X (# | int)` { var v X; } func g`T struct`(b Box`T`) {}");
+        // 正例（Unmod contains 不可变实参）：*#A（unmodifiable）命中
+        checkSucc("class A {} class Box`X (# | int)` { var v X; } func g(b Box`*#A`) {}");
+        // 正例（Unmod contains 值类型实参）：int 无 refer → 右侧 int 域命中
+        checkSucc("class Box`X (# | int)` { var v X; } func g(b Box`int`) {}");
+        // 反例（Unmod contains 强引用实参）：*A 非不可变 ⊄ #，int 域也不匹配
+        checkFail("class A {} class Box`X (# | int)` { var v X; } func g(b Box`*A`) {}");
+        // 正例（Attr contains 带属性实参）：@D class A 命中
+        checkSucc("attribute D {} @D class A {} class Box`X (@D | int)` { var v X; } func g(b Box`A`) {}");
+        // 反例（Attr contains 无属性实参）：A 无 @D ⊄ @D，int 域也不匹配 class
+        checkFail("attribute D {} class A {} class Box`X (@D | int)` { var v X; } func g(b Box`A`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint75() {
+        // ---- 括号语法（analyse 已提前剥壳，等价性验证）----
+        // 正例：(primitive) 约束 + T primitive → 剥壳后 equals 放行
+        checkSucc("class Box`X (primitive)` { var v X; } func g`T primitive`(b Box`T`) {}");
+        // 正例（反向）：primitive 约束 + T 被 (primitive) 约束
+        checkSucc("class Box`X primitive` { var v X; } func g`T (primitive)`(b Box`T`) {}");
+        // 正例（嵌套括号）：((primitive)) 剥两层
+        checkSucc("class Box`X primitive` { var v X; } func g`T ((primitive))`(b Box`T`) {}");
+        // 反例：struct 域 ⊄ primitive
+        checkFail("struct S { i int; } class Box`X (primitive)` { var v X; } func g`T (S)`(b Box`T`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint76() {
+        // ---- 补集约束（ExcludeTypeConstraint include 仅 equals；contains 类型变量分支）----
+        // 正例：!int ⊆ !int（基例）
+        checkSucc("class Box`X !int` { var v X; } func g`T !int`(b Box`T`) {}");
+        // 反例：int ⊄ !int → 拒绝
+        checkFail("class Box`X !int` { var v X; } func g`T int`(b Box`T`) {}");
+        // 正例（具体类型侧）：非 int 类型满足 !int
+        checkSucc("struct A { i int; } class Box`X !int` { var v X; } func g(b Box`A`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint77() {
+        // ---- 二元分解补全（AND 两侧 / OR 右侧 / equals 基例）----
+        // 正例：int ⊆ int & primitive（include AND 分解，两侧均命中）
+        checkSucc("class Box`X int & primitive` { var v X; } func g`T int`(b Box`T`) {}");
+        // 正例：int & primitive ⊆ int & primitive（include equals 基例，不分解）
+        checkSucc("class Box`X int & primitive` { var v X; } func g`T int & primitive`(b Box`T`) {}");
+        // 正例（contains 具体实参 AND 分解）：int 同时命中两侧
+        checkSucc("class Box`X int & primitive` { var v X; } func g(b Box`int`) {}");
+        // 反例：struct 域 ⊄ int & primitive（include AND 左侧失败短路）
+        checkFail("struct S { i int; } class Box`X int & primitive` { var v X; } func g`T (S)`(b Box`T`) {}");
+        // 正例：struct 域 ⊆ primitive | struct（include OR 右侧命中）
+        checkSucc("class Box`X primitive | struct` { var v X; } func g`T struct`(b Box`T`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint78() {
+        // ---- DefinedTypeConstraint 形态补全 ----
+        // 正例：无约束同胞 U（全集）经 OR 分解命中 include 的 oc.none() 分支
+        checkSucc("class R`U, X primitive | U` {} func g`T struct`(r R`int, T`) {}");
+        // 正例：int ⊆ int（PrimitiveType 形态 contains 类型变量分支 + include equals）
+        checkSucc("class R`U int` { var u U; } func g`T int`(r R`T`) {}");
+        // 反例：int8 ⊄ int（PrimitiveType 单例，非 equals 即拒绝）
+        checkFail("class R`U int` { var u U; } func g`T int8`(r R`T`) {}");
+        // 反例：primitive 域 ⊄ int（x 非 DefinedTypeConstraint → 保守拒绝）
+        checkFail("class R`U int` { var u U; } func g`T primitive`(r R`T`) {}");
+        // 反例：int8 ⊄ A（definedType 为 DerivedType 而 x 为 PrimitiveType → 兜底拒绝）
+        checkFail("class A {} class R`U A` { var u U; } func g`T int8`(r R`T`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint79() {
+        // ---- DefinedTypeConstraint.contains 同胞参数引用（definedType 为 GenericType）----
+        // 正例（L58-60 同一 param 恒真）：方法签名内 R`U, U` 自引用，V 的约束 U 与实参 U 同参数
+        checkSucc("class R`U, V U` { func m(x R`U, U`) {} }");
+        // 正例（L74 oc.none 短路）：V 的约束是无约束同胞 U，具体实参 A 放行
+        checkSucc("class A {} class R`U, V U` { var v V; } func g(r R`A, A`) {}");
+        // 正例（L74 oc.has + contains true）：U 被 Val 约束，A : Val → 具体实参 A 放行
+        checkSucc("class Val {} class A : Val {} class R`U Val, V U` { var v V; } func g(r R`A, A`) {}");
+        // 反例（L74 oc.has + contains false）：A 与 Val 无关 → 拒绝
+        checkFail("class Val {} class A {} class R`U Val, V U` { var v V; } func g(r R`A, A`) {}");
+        // 反例（L88 rDef 非 ObjectDefinition）：约束为 struct S，实参为另一个 struct → 拒绝
+        checkFail("struct S { i int; } struct S2 { i int; } class Box`X S` { var v X; } func g(b Box`S2`) {}");
+        // 反例（L89 tDef 非 ObjectDefinition）：约束为 class Val，实参为 struct → 拒绝
+        checkFail("class Val {} struct S { i int; } class Box`X Val` { var v X; } func g(b Box`S`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint80() {
+        // ---- include 委托同胞约束 + Binary AND 左真右假 ----
+        // 正例（include L105 oc.has + include true）：U 约束 int，T 约束 int → int ⊆ int
+        checkSucc("class R`U int, V U` { var u U; } func g`T int`(r R`int, T`) {}");
+        // 反例（include L105 oc.has + include false）：T 约束 struct ⊄ int → 拒绝
+        checkFail("class R`U int, V U` { var u U; } func g`T struct`(r R`int, T`) {}");
+        // 反例（Binary.contains AND 左真右假）：具体实参 A 命中左侧 A，不命中右侧 B
+        checkFail("class A {} class B {} class Box`X A & B` { var v X; } func g(b Box`A`) {}");
+        // 反例（Binary.contains AND 左侧失败短路）：具体实参 C 与 A、B 均无关
+        checkFail("class A {} class B {} class C {} class Box`X A & B` { var v X; } func g(b Box`C`) {}");
+        // 反例（Binary.include AND 左真右假）：T 约束为 A，A.include 命中而 B.include 失败
+        checkFail("class A {} class B {} class Box`X A & B` { var v X; } func g`T A`(b Box`T`) {}");
+    }
+
+    @Test
+    public void testGenericConstraint81() {
+        // ---- 补集约束 ExcludeTypeConstraint 投影族（referenced/members/newable/domains）----
+        // 反例（L48 Exclude.referenced=not(operand.referenced())；operand int referenced=NO → not(NO)=YES）：
+        // new(T) L4862 referenced()!=NO 报错 only value-type，覆盖 Exclude.referenced + Tri.not(NO)
+        checkFail("func f`T !int`(){ var a = new(T); }");
+        // 反例（L54 members 空下近似；L59 newable=not(operand.newable())；operand interface newable=BOTH → not(BOTH)=BOTH）：
+        // referenced=not(YES)=NO 通过 L4862，members()/newable() 相继被调，newable!=YES → can't new type
+        checkFail("func f`T !interface`(){ var a = new(T); }");
+        // 反例（L65 domains=allDomains 减 operand.domains()；literalInitable L3616/3619 调 members/domains）：
+        // !int.members 空、domains={PRIMITIVE} 被移除后 size≠1 → 不可字面量初始化
+        checkFail("func f`T default !int`(){ var a T = {}; }");
+    }
+
+    @Test
+    public void testGenericConstraint82() {
+        // ---- 属性约束 AttributeTypeConstraint 投影 + Binary AND（急切求值）----
+        // 正例：@D.referenced=BOTH、newable=BOTH、members 空；int.referenced=NO、newable=YES。
+        // Binary AND referenced=meet(BOTH,NO)=NO 通过 L4862；members=MemberSet.and(空,空)；newable=meet(BOTH,YES)=YES。
+        // 覆盖 Attribute.referenced/members/newable + Binary.referenced/members/newable AND + Tri.meet(BOTH,NO)/meet(BOTH,YES)
+        checkSucc("attribute D {} func f`T @D & int`(){ var a = new(T); }");
+        // 反例（Attribute.domains L66=allDomains）：literalInitable L3619 调 domains；
+        // Binary AND domains=retainAll(Attribute.domains, primitive={PRIMITIVE}) size≠1 → 不可字面量初始化
+        checkFail("attribute D {} func f`T default @D & primitive`(){ var a T = {}; }");
+    }
+
+    @Test
+    public void testGenericConstraint83() {
+        // ---- 可空/只读/引用约束（? # *）投影族 + Exclude 取反触发 newable ----
+        // 反例：?.referenced=YES → Binary AND referenced=meet(YES,NO)=BOTH 于 L4862 报错；
+        // 覆盖 Optional.referenced + Binary.referenced AND + Tri.meet(YES,NO) 兜底 BOTH 分支
+        checkFail("func f`T ? & int`(){ var a = new(T); }");
+        // 反例：同模式覆盖 Unmodifiable.referenced（#.referenced=YES）
+        checkFail("func f`T # & int`(){ var a = new(T); }");
+        // 反例：同模式覆盖 Refer.referenced（*.referenced=YES）
+        checkFail("func f`T * & int`(){ var a = new(T); }");
+        // 反例：!? → Exclude.referenced=not(Optional.referenced=YES)=NO 通过 L4862；
+        // newable=not(Optional.newable=BOTH)=BOTH → can't new；覆盖 Optional.referenced+newable + Tri.not(YES)/not(BOTH)
+        checkFail("func f`T !?`(){ var a = new(T); }");
+        // 反例：同模式覆盖 Unmodifiable.referenced+newable
+        checkFail("func f`T !#`(){ var a = new(T); }");
+        // 反例：同模式覆盖 Refer.referenced+newable
+        checkFail("func f`T !*`(){ var a = new(T); }");
+        // 反例（literalInitable）：?.members 空、domains=allDomains；Binary AND domains=retainAll→{PRIMITIVE} size≠1；
+        // 覆盖 Optional.members/domains + Binary.members/domains AND + allDomains
+        checkFail("func f`T default ? & primitive`(){ var a T = {}; }");
+        // 反例：同模式覆盖 Unmodifiable.members/domains
+        checkFail("func f`T default # & primitive`(){ var a T = {}; }");
+        // 反例：同模式覆盖 Refer.members/domains
+        checkFail("func f`T default * & primitive`(){ var a T = {}; }");
+    }
+
+    @Test
+    public void testGenericConstraint84() {
+        // ---- ConceptTypeConstraint 投影委托 + Tri.meet 等值分支 + Binary 全 AND 通过 ----
+        // 正例：concept Val 委托 expr()；Val.referenced=NO（域 OR 全 NO）、members 空、newable=BOTH。
+        // Binary AND referenced=meet(NO,NO)=NO 通过；newable=meet(BOTH,YES)=YES；
+        // 覆盖 Concept.referenced/members/newable + Tri.meet(NO,NO) 等值分支
+        checkSucc("concept Val = primitive | struct | union | enum; func f`T Val & int`(){ var a = new(T); }");
+        // 反例（Concept.domains L54 委托 expr().domains()）：literalInitable 调 domains；
+        // Val.domains=4 域，Binary AND retainAll 后 {PRIMITIVE} size≠1 → 不可字面量初始化
+        checkFail("concept Val = primitive | struct | union | enum; func f`T default Val & primitive`(){ var a T = {}; }");
+        // 正例：int & primitive → referenced=meet(NO,NO)=NO、newable=meet(YES,BOTH)=YES；
+        // 覆盖 Tri.meet(NO,NO) 等值 + meet(YES,BOTH) b==BOTH 分支 + Binary 全 AND 通过路径
+        checkSucc("func f`T int & primitive`(){ var a = new(T); }");
+    }
+
+    @Test
+    public void testGenericConstraint85() {
+        // ---- DefinedTypeConstraint 的 GenericType 形态委托分支（L128-131/L149-152/L164-167/L179-182）----
+        // 正例：V 的约束是 DefinedTypeConstraint(GenericType U)，U 约束 int；
+        // new(V) L4862 referenced 委托 int→NO 通过，members 委托→空，newable 委托→YES；
+        // 覆盖 DefinedType.referenced/members/newable 的 GenericType 分支
+        checkSucc("class R`U int, V U` { func m(){ var a = new(V); } }");
+        // 反例（domains GenericType 分支 L179-182）：literalInitable 调 V.members（委托 int 空）与 V.domains（委托 int={PRIMITIVE} size≠1）；
+        // 覆盖 DefinedType.domains 的 GenericType 分支
+        checkFail("class R`U int, V default U` { func m(){ var a V = {}; } }");
+    }
+
+    @Test
+    public void testGenericConstraint86() {
+        // ---- DefinedTypeConstraint 的 GenericType 形态 oc.none() 分支（无约束同胞参数 U）----
+        // 反例（referenced L131 oc.none→BOTH）：U 无约束，V 约束=DefinedTypeConstraint(GenericType U)；
+        // new(V) L4862 referenced()=BOTH != NO 报错 only value-type；覆盖 referenced 的 oc.none() 分支
+        checkFail("class R`U, V U` { func m(){ var a = new(V); } }");
+        // 反例（members L151 oc.none→空 + domains L181 oc.none→allDomains）：literalInitable L3616/3619
+        // 调 V.members/V.domains，allDomains size≠1 → 不可字面量初始化；覆盖 members/domains 的 oc.none() 分支
+        checkFail("class R`U, V default U` { func m(){ var a V = {}; } }");
+        // 正例（newable L166 oc.none→BOTH）：V 约束=Binary(U & int)，referenced=meet(BOTH,NO)=NO 通过 L4862，
+        // members=MemberSet.and(空,空)，newable=meet(BOTH,YES)=YES；覆盖 newable 的 oc.none() 分支 + Binary AND 另一侧
+        checkSucc("class R`U, V U & int` { func m(){ var a = new(V); } }");
+    }
+
+    @Test
+    public void testGenericConstraint87() {
+        // ---- Tri.join 的 YES|NO 兜底分支（L44）+ BOTH 侧分支（L42）----
+        // 反例（Tri.join YES|NO→BOTH 兜底）：T 约束=Binary(? | int)，referenced=join(Optional.referenced=YES,
+        // int.referenced=NO)=BOTH，new(T) L4862 referenced()!=NO 报错；覆盖 join 的 a≠b 且 a/b 均非 BOTH 兜底分支
+        checkFail("func f`T (? | int)`(){ var a = new(T); }");
+        // 反例（join a==BOTH 短路 L42）：T 约束=Binary(@D | int)，referenced=join(Attribute.referenced=BOTH,
+        // int=NO)=BOTH 于 L4862 报错；覆盖 join 的 a==BOTH 返回分支
+        checkFail("attribute D {} func f`T (@D | int)`(){ var a = new(T); }");
+        // 反例（join b==BOTH 短路 L42）：T 约束=Binary(int | @D)，referenced=join(int=NO,
+        // Attribute.referenced=BOTH)=BOTH 于 L4862 报错；覆盖 join 的 b==BOTH 返回分支
+        checkFail("attribute D {} func f`T (int | @D)`(){ var a = new(T); }");
+    }
+
+    @Test
+    public void testGenericConstraint57() {
+        // ---- L523：literalSafe 非 Structure/Class 定义（enum/union/prototype 实参）default 分支 ----
+        // 正例：enum 实参 default 放行
+        checkSucc("enum E{A,B} func far`T default (E)`(){} func away(){ far`E`(); }");
+        // 正例：union 实参 default 放行（字段须整数类型）
+        checkSucc("union U{A int; B byte;} func far`T default (U)`(){} func away(){ far`U`(); }");
+        // 正例：func prototype 实参 default 放行
+        checkSucc("func P=()int; func far`T default (P)`(){} func away(){ far`P`(); }");
+    }
+
+    @Test
+    public void testGenericConstraint58() {
+        // ---- L1144：collectConstraintTypeDeps 原始类型约束回退（class 泛型参数被 primitive 约束）----
+        // 正例：类泛型参数被 primitive（int）约束，不产生类依赖，放行
+        checkSucc("class Box`T (int)`{ var t T; }");
+        // 正例对照：类泛型参数被类（A）约束，走 DerivedType 分支，放行
+        checkSucc("class A{} class Box`T (A)`{ var t T; }");
+    }
+
+    @Test
+    public void testGenericConstraint59() {
+        // ---- L5166-5167：findSymbol 泛型函数作值引用 + 显式类型参数（else 分支）----
+        // 正例：显式类型参数 c`int` 作值引用，实参 int 放行
+        checkSucc("func c`T`(t T){} func f(){ var h = c`int`; h(1); }");
+        // 反例：T=int 已实例化，bool 实参拒
+        checkFail("func c`T`(t T){} func f(){ var h = c`int`; h(false); }");
+        // 补充反例对照：无显式类型参数的裸引用走 infer 分支（L5155 已覆盖）
+        checkFail("func c`T`(t T){} func f(){ var h = c; }");
+    }
+
+    // ===== GenericTypeDeclarer 形态检查：*T / ?T =====
+
+    @Test
+    public void testGenericConstraint43() {
+        // *T：值类型约束（class 域）可引用，并能经视图访问成员
+        var d = "class A{ var i int; } ";
+        checkSucc(d + "func f`T (A)`(p *T){ var i int = p.i; }");
+        // 反例：无约束（无视图）/ func / interface / func|class 混合域
+        checkFail("func f`T`(p *T){}");
+        checkFail("func F=(); func f`T (F)`(p *T){}");
+        checkFail("interface I{} func f`T (I)`(p *T){}");
+        checkFail("class A{} func F=(); func f`T (A | F)`(p *T){}");
+    }
+
+    @Test
+    public void testGenericConstraint44() {
+        // ?T：仅 func 约束，可空函数类型，nil 检查后才能调用
+        checkSucc("func F=(); func f`T (F)`(p ?T){ if (p != nil) { p(); } }");
+        // 反例：值域 / 无约束 / func|class 混合域
+        checkFail("class A{} func f`T (A)`(p ?T){}");
+        checkFail("func f`T`(p ?T){}");
+        checkFail("class A{} func F=(); func f`T (A | F)`(p ?T){}");
+        // 反例：可空未 nil 检查即调用（required 传播到 checkOptional）
+        checkFail("func F=(); func f`T (F)`(p ?T){ p(); }");
+    }
+
+    @Test
+    public void testGenericConstraint45() {
+        // func 域：引用形态一律拒绝（含 optional/readonly 修饰）
+        var d = "func F=(); ";
+        checkFail(d + "func f`T (F)`(p *T){}");
+        checkFail(d + "func f`T (F)`(p *?T){}");
+        checkFail(d + "func f`T (F)`(p *#T){}");
+    }
+
+    // ===== findCallable：函数原型约束的变量/字段可调用 =====
+
+    @Test
+    public void testGenericConstraint46() {
+        // 变量：原型约束 T (Task) 解析出签名后可直接调用
+        checkSucc("func Task=()int; func f`T (Task)`(t T) int { return t(); }");
+        // 反例：无约束 / 值域 / 复合约束（不同原型不合并）
+        checkFail("func Task=()int; func f`T`(t T) int { return t(); }");
+        checkFail("class A{} func f`T (A)`(t T) int { return t(); }");
+        checkFail("func Task1=()int; func Task2=()int; " +
+                "func f`T (Task1 | Task2)`(t T) int { return t(); }");
+    }
+
+    @Test
+    public void testGenericConstraint47() {
+        // 类内字段：原型约束字段 t() 可调用
+        checkSucc("func Task=()int; class Box`T (Task)`{ var t T; " +
+                "func m#() int { return t(); } }");
+        checkSucc("func Task=()int; class Box`T (Task)`{ var t T; " +
+                "func m#() int { return this.t(); } }");
+        // 反例：值域字段不可调用
+        checkFail("class A{} class Box`T (A)`{ var t T; " +
+                "func m#() int { return t(); } }");
+        // 实例字段：A (Task) 实例的 T 字段经 gm 映射为函数类型后可调用
+        checkSucc("func Task=()int; class Box`T (Task)`{ var t T; } " +
+                "func f(b Box`Task`) int { return b.t(); }");
+        // 反例：值域实例的 T 字段映射为值类型，不可调用
+        checkFail("class A{} class Box`T (A)`{ var t T; } " +
+                "func f(b Box`A`){ b.t(); }");
+    }
+
+    @Test
+    public void testGenericConcept1() {
+        var d = "class A {} class B {} concept Ct = A | !B ; ";
+        d += "class Box`T Ct` { var v T; } ";
+        checkSucc(d + "func f() { var h Box`A`; }");
+        checkFail(d + "func f() { var h Box`B`; }");
+    }
+
+    @Test
+    public void testGenericConcept2() {
+        var d = "class A {} class B {} concept Ct = A ; ";
+        d += "concept Cr = Ct | !B; class Box`T Ct` {} ";
+        checkSucc(d + "func f() { var h Box`A`; }");
+        checkFail(d + "func f() { var h Box`B`; }");
+    }
+
 }

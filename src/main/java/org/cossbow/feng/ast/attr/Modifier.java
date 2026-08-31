@@ -5,6 +5,8 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.SymbolMap;
 import org.cossbow.feng.util.Optional;
 
+import java.util.Objects;
+
 public class Modifier extends Entity {
     /**
      * Export to other modules for use
@@ -49,5 +51,19 @@ public class Modifier extends Entity {
     public static Modifier empty(boolean export) {
         return new Modifier(Position.ZERO, export,
                 new SymbolMap<>());
+    }
+
+    //
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof Modifier m &&
+                export == m.export &&
+                attributes.equals(m.attributes);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(export, attributes);
     }
 }

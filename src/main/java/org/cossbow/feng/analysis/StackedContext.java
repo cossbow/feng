@@ -6,6 +6,7 @@ import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.VariadicArgument;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.ast.type.Concept;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.util.Stack;
 
@@ -43,6 +44,11 @@ public class StackedContext implements SymbolContext {
     @Override
     public boolean isLocal(Symbol s) {
         return getScope().isLocal(s);
+    }
+
+    @Override
+    public Optional<Concept> findConcept(Symbol symbol) {
+        return getScope().findConcept(symbol);
     }
 
     @Override
