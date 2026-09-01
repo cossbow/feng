@@ -545,7 +545,7 @@ public class StmtWriter extends CWriter<StmtWriter> {
                 }
 
                 write(cc.body());
-                write("Feng$dec(_ex); ");  // 释放帧持有引用
+                write("Feng$release_ns(&_ex); ");  // 释放帧持有引用（& 传槽位地址）
                 write("_frame").write(depth).write(".state = 1; /* caught */").newLine();
                 dedent().write('}');
             }
