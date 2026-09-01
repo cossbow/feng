@@ -45,7 +45,8 @@ typedef struct Feng$Header {
 #ifdef FENG_DEBUG_MEMORY
 // ===== leak checker (single shared list + report, defined in builtin.c) =====
 extern Feng$Header* Feng$debug_list;
-extern void feng$debug(bool all);
+// 返回泄漏块数（refcnt != 0）；测试 runner 据此在退出时返回非零。
+extern int feng$debug(bool all);
 #endif
 
 static inline void* Feng$alloc(int64_t size) {

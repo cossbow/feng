@@ -400,7 +400,7 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
         write("#ifdef FENG_DEBUG_MEMORY").newLine();
         write("Feng$Header* Feng$debug_list = NULL;").newLine();
         newLine();
-        write("void feng$debug(bool all) {").indent().newLine();
+        write("int feng$debug(bool all) {").indent().newLine();
         write("printf(\"==== memory stat ====\\n\");").newLine();
         write("int total = 0, leaked = 0;").newLine();
         write("for (Feng$Header* h = Feng$debug_list; h; h = h->next) {").indent().newLine();
@@ -412,10 +412,13 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
         dedent().write("}").newLine();
         dedent().write("}").newLine();
         write("printf(\"==== end memory stat (total=%d, leaked=%d) ====\\n\", total, leaked);").newLine();
+        write("return leaked;").newLine();
         dedent().write("}").newLine();
         newLine();
+        // 优先级 101：晚于 globals_cleanup(102)，此时全局强引用已释放；
+        // 若有泄漏块，直接 _Exit(1) 让测试进程非零退出（_Exit 不重入清理）。
         write("__attribute__((destructor(101))) static void Feng$debug_fini(void) {").indent().newLine();
-        write("feng$debug(false);").newLine();
+        write("if (feng$debug(false) > 0) _Exit(1);").newLine();
         dedent().write("}").newLine();
         write("#endif").newLine();
         newLine();

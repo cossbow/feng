@@ -20,7 +20,7 @@ static inline void Feng$cleanup_arr_ArraySRef_Byte(Feng$ArraySRef_ArraySRef_Byte
 // ===== leak checker =====
 Feng$Header* Feng$debug_list = NULL;
 
-void feng$debug(bool all) {
+int feng$debug(bool all) {
     printf("==== memory stat ====\n");
     int total = 0, leaked = 0;
     for (Feng$Header* h = Feng$debug_list; h; h = h->next) {
@@ -32,6 +32,7 @@ void feng$debug(bool all) {
         }
     }
     printf("==== end memory stat (total=%d, leaked=%d) ====\n", total, leaked);
+    return leaked;
 }
 #endif
 
