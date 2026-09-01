@@ -1,0 +1,44 @@
+
+class Node`E` {
+    var v E;
+    var prev,next *?Node`E`;
+}
+
+class List`E` {
+    var head *?Node`E`;
+
+    func add(v E) {
+        var h = head;
+        var n = new(Node`E`, {v=v});
+        if (h == nil) {
+            head = n;
+            return;
+        }
+        n.next = h;
+        h.prev = n;
+        head = n;
+    }
+
+    macro resource free() {
+        var cur = head;
+        for (cur != nil) {
+            cur.prev = nil;
+            cur = cur.next;
+        }
+    }
+}
+
+func test(n int) {
+    var list = new(List`int`);
+
+    for(var i int=0; i<n; i+=1) {
+        list.add(i+100);
+    }
+
+    for(var c *?Node`int`=list.head; c!=nil; c=c.next) {
+    }
+}
+
+func main() {
+    test(10);
+}

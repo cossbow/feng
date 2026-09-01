@@ -546,6 +546,8 @@ public class Monomorphization {
         // binaryOperators/unaryOperators/indexOperator 收方法，漏拷会让
         // 具体化类缺 `feng$macro$index$get/set`（index-override-2 报
         // Vector_A$...index$get 未声明）。
+        cd.resourceFree().use(m ->
+                concrete.resourceFree().set(instantiateMacro(m, gm)));
         cd.binaryOperators().forEach((op, m) ->
                 concrete.binaryOperators().put(op, instantiateMacro(m, gm)));
         cd.unaryOperators().forEach((op, m) ->
