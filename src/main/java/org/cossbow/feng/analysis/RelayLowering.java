@@ -153,8 +153,15 @@ public class RelayLowering {
                 }
                 yield ds;
             }
+            case AssertStatement as -> lowerAssert(as);
             default -> s;
         };
+    }
+
+    private Statement lowerAssert(AssertStatement as) {
+        var ce = lowerExpression(as.condition());
+        as.condition(ce);
+        return as;
     }
 
     private void lowerBodied(Statement body) {

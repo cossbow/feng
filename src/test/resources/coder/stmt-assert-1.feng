@@ -1,0 +1,14 @@
+
+class A {
+    func valid() bool {
+        return true;
+    }
+}
+
+func get() *A {
+    return new(A);
+}
+
+func main() {
+    assert(get().valid());
+}
