@@ -5,6 +5,7 @@ import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Mangle;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.Expression;
+import org.cossbow.feng.ast.expr.SymbolExpression;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
@@ -371,9 +372,17 @@ public class StmtWriter extends CWriter<StmtWriter> {
         if (rs.result().none()) return write("return").endStmt();
         var re = rs.result().get();
         var rt = context.enterProc.prototype().returnSet().must();
-        // 强引用返回：返回值 inc，参数 cleanup 平衡
+        // 强引用返回：返回值 inc，参数 cleanup 平衡；
+        // 值类型含强引用（copies 表）须 Feng$copy（inc），否则调用方 pin 的
+        // cleanup 多 dec 一次 → 静态 constString 等被 free（bad-free）。
+        // 例外：copy 函数体里的 `return src`（SymbolExpression）是转移已 inc
+        // 好的所有权，不能再 inc，否则 Feng$copy(src) 无限递归。
         write("return ");
-        context.exprs.writeValue(re, rt, false);
+        if (re instanceof SymbolExpression) {
+            context.exprs.writeValue(re, rt, false);
+        } else {
+            context.exprs.writeValue(re, rt);
+        }
         return endStmt();
     }
 
