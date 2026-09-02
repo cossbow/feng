@@ -1,6 +1,7 @@
 package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.Identifier;
+import org.cossbow.feng.ast.IdentifierMap;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
@@ -9,6 +10,7 @@ import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.proc.Procedure;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.var.*;
+import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Lazy;
 
 import java.util.ArrayList;
@@ -96,47 +98,66 @@ public class RelayLowering {
 
     // ---- statements ----
 
-    private void lowerBlockStatement(BlockStatement bs) {
+    private BlockStatement lowerBlockStatement(BlockStatement bs) {
         var old = bs.list();
         var newList = new ArrayList<Statement>(old.size());
         for (var s : old) newList.add(lowerStatement(s));
         bs.list(newList);
+        return bs;
+    }
+
+    private Branch lowerBranch(Branch br) {
+        var bs = lowerBlockStatement(br.body());
+        return new Branch(br.pos(), bs);
+    }
+
+    private SwitchBranch lowerBranch(SwitchBranch br) {
+        var bs = lowerBlockStatement(br.body());
+        var cs = br.constants().stream().map(this::lowerExpression).toList();
+        return new SwitchBranch(br.pos(), cs, bs);
+    }
+
+    private ForStatement lowerStatement(
+            ConditionalForStatement cfs) {
+        var init = cfs.initializer().map(this::lowerStatement);
+        var upd = cfs.updater().map(this::lowerStatement);
+        var cond = lowerExpression(cfs.condition());
+        var body = lowerBlockStatement(cfs.body());
+        return new ConditionalForStatement(cfs.pos(),
+                body, init, cond, upd);
     }
 
     private Statement lowerStatement(Statement s) {
         return switch (s) {
             case CallStatement cs -> lowerCallStatement(cs);
-            case BlockStatement bs -> {
-                lowerBlockStatement(bs);
-                yield bs;
-            }
+            case BlockStatement bs -> lowerBlockStatement(bs);
             case IfStatement is -> {
-                is.init(is.init().map(this::lowerStatement));
-                is.condition(lowerExpression(is.condition()));
-                lowerBlockStatement(is.yes());
-                is.not().use(this::lowerBodied);
-                yield is;
+                var init = is.init().map(this::lowerStatement);
+                var cond = (lowerExpression(is.condition()));
+                var yes = lowerBlockStatement(is.yes());
+                var not = is.not().map(this::lowerStatement);
+                yield new IfStatement(is.pos(), init, cond, yes, not);
             }
             case ForStatement fs -> {
                 if (fs instanceof ConditionalForStatement cfs) {
-                    cfs.initializer(cfs.initializer().map(this::lowerStatement));
-                    lowerBlockStatement(cfs.body());
-                } else if (fs instanceof IterableForStatement ifs) {
-                    lowerBlockStatement(ifs.body());
+                    yield lowerStatement(cfs);
                 }
-                yield fs;
+                yield ErrorUtil.unreachable();
             }
             case ReturnStatement rs -> {
-                rs.result().use(this::lowerExpression);
+                var v = rs.result().map(this::lowerExpression);
+                rs.result(v);
                 yield rs;
             }
             case SwitchStatement ss -> {
-                ss.init(ss.init().map(this::lowerStatement));
+                var init = ss.init().map(this::lowerStatement);
+                var cond = lowerExpression(ss.value());
                 for (var br : ss.branches()) {
                     lowerBlockStatement(br.body());
                 }
-                ss.defaultBranch().use(br -> lowerBlockStatement(br.body()));
-                yield ss;
+                var brs = ss.branches().stream().map(this::lowerBranch).toList();
+                var dbr = ss.defaultBranch().map(this::lowerBranch);
+                yield new SwitchStatement(ss.pos(), init, cond, brs, dbr);
             }
             case TryStatement ts -> {
                 lowerBlockStatement(ts.body());
@@ -154,23 +175,21 @@ public class RelayLowering {
                 yield ds;
             }
             case AssertStatement as -> lowerAssert(as);
+            case ThrowStatement ts -> {
+                var e = lowerExpression(ts.exception());
+                yield new ThrowStatement(ts.pos(), e);
+            }
+            case LabeledStatement ls -> {
+                var tgt = lowerStatement(ls.target());
+                yield new LabeledStatement(ls.pos(), ls.label(), tgt);
+            }
             default -> s;
         };
     }
 
     private Statement lowerAssert(AssertStatement as) {
         var ce = lowerExpression(as.condition());
-        as.condition(ce);
-        return as;
-    }
-
-    private void lowerBodied(Statement body) {
-        if (body instanceof BlockStatement bs) {
-            lowerBlockStatement(bs);
-        } else {
-            // single-statement else branch: lower directly
-            // (the result stays in the Optional<Statement> holder)
-        }
+        return new AssertStatement(as.pos(), ce);
     }
 
     // ---- assignment statement: operand pinning ----
@@ -210,7 +229,7 @@ public class RelayLowering {
 
         if (pins.isEmpty() && preStmts.isEmpty()) return as;
 
-        var stmts = new ArrayList<Statement>(preStmts);
+        var stmts = new ArrayList<>(preStmts);
         if (!pins.isEmpty()) stmts.add(new DeclarationStatement(as.pos(), pins));
         stmts.add(as);
         return new BlockStatement(as.pos(), stmts);
@@ -322,10 +341,22 @@ public class RelayLowering {
                 var n = new ReferEqualExpression(re.pos(),
                         (PrimaryExpression) left,
                         (PrimaryExpression) right, re.same());
-                re.resultType.use(n.resultType::set);
+                n.resultType.set(re.resultType);
                 var ds = new DeclarationStatement(re.pos(), pins);
                 var be = new BlockExpression(re.pos(), List.of(ds), n);
-                be.resultType.set(n.resultType.must());
+                be.resultType.set(n.resultType);
+                yield be;
+            }
+            case CheckNilExpression ce -> {
+                var pins = new ArrayList<Variable>();
+                var subject = pinOperand(ce.subject(), pins);
+                if (pins.isEmpty()) yield ce;
+                var n = new CheckNilExpression(ce.pos(),
+                        subject, ce.nil());
+                n.resultType.set(ce.resultType);
+                var ds = new DeclarationStatement(ce.pos(), pins);
+                var be = new BlockExpression(ce.pos(), List.of(ds), n);
+                be.resultType.set(n.resultType);
                 yield be;
             }
             case MemberOfExpression me -> lowerMemberOf(me);
@@ -355,10 +386,14 @@ public class RelayLowering {
                 yield ae;
             }
             case ObjectExpression oe -> {
+                var entries = new IdentifierMap<Expression>();
                 for (var n : oe.entries().nodes()) {
-                    lowerExpression(n.value());
+                    var v = lowerExpression(n.value());
+                    entries.set(n.key(), v);
                 }
-                yield oe;
+                var n = new ObjectExpression(oe.pos(), entries, oe.type());
+                n.resultType.set(oe.resultType);
+                yield n;
             }
             // nodes with final children: deep lowering skipped
             // (they don't typically contain UAF-vulnerable patterns)
