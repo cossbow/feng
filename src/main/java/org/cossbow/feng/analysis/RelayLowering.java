@@ -10,7 +10,6 @@ import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.proc.Procedure;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.var.*;
-import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Lazy;
 
 import java.util.ArrayList;
@@ -272,6 +271,9 @@ public class RelayLowering {
      * managed references AND it is transient (unbound = temporary).
      */
     private boolean needPinOperandSubject(Expression subject) {
+        // @Sync 字段读取（Feng$load_sl 原子 +1）即使 subject 是 bound 的，
+        // 也必须 pin 出来在作用域结束释放；否则链式访问 a.b.c 中 a.b 的 +1 泄漏。
+        if (subject.resultType.match(TypeDeclarer::markSync)) return true;
         if (!subject.unbound()) return false;
         return needPin(subject.resultType.must());
     }
@@ -325,11 +327,62 @@ public class RelayLowering {
     // ---- expression lowering ----
 
     private Expression lowerExpression(Expression e) {
-        return switch (e) {
+        Expression r = switch (e) {
             case CallExpression ce -> lowerCallExpression(ce);
             case BinaryExpression be -> {
-                be.left(pinOperand(lowerExpression(be.left())));
-                be.right(pinOperand(lowerExpression(be.right())));
+                var left = (pinOperand(lowerExpression(be.left())));
+                var right = (pinOperand(lowerExpression(be.right())));
+                yield new BinaryExpression(be.pos(), be.operator(),
+                        left, right);
+            }
+            case UnaryExpression ue -> {
+                var op = lowerExpression(ue.operand());
+                yield new UnaryExpression(ue.pos(), ue.operator(), op);
+            }
+            case ConditionalExpression ce -> {
+                var condition = lowerExpression(ce.condition());
+                var pins = new ArrayList<Variable>();
+                var yes = pinOperand(ce.yes(), pins);
+                var not = pinOperand(ce.not(), pins);
+                var n = new ConditionalExpression(ce.pos(), condition, yes, not);
+                n.resultType.set(ce.resultType);
+                if (pins.isEmpty()) yield n;
+                var ds = new DeclarationStatement(ce.pos(), pins);
+                var be = new BlockExpression(ce.pos(), List.of(ds), n);
+                be.resultType.set(n.resultType);
+                yield be;
+            }
+            case ConvertExpression ce -> {
+                var op = lowerExpression(ce.operand());
+                yield new ConvertExpression(ce.pos(), ce.primitive(), op);
+            }
+            case EnumIdExpression ee -> {
+                var idx = lowerExpression(ee.index());
+                yield new EnumIdExpression(ee.pos(), ee.def(), idx);
+            }
+            case IsExpression ie -> {
+                var pins = new ArrayList<Variable>();
+                var subject = pinOperand(ie.subject(), pins);
+                if (pins.isEmpty()) yield ie;
+                var n = new IsExpression(ie.pos(),
+                        (PrimaryExpression) subject, ie.type());
+                n.needCheck(ie.needCheck());
+                n.resultType.set(ie.resultType);
+                var ds = new DeclarationStatement(ie.pos(), pins);
+                var be = new BlockExpression(ie.pos(), List.of(ds), n);
+                be.resultType.set(n.resultType);
+                yield be;
+            }
+            case MethodExpression me -> {
+                var pins = new ArrayList<Variable>();
+                var subject = pinOperand(me.subject(), pins);
+                if (pins.isEmpty()) yield me;
+                var n = new MethodExpression(me.pos(),
+                        (PrimaryExpression) subject, me.method(), me.generic());
+                n.resultType.set(me.resultType);
+                var ds = new DeclarationStatement(me.pos(), pins);
+                var be = new BlockExpression(me.pos(), List.of(ds), n);
+                be.resultType.set(n.resultType);
                 yield be;
             }
             case ReferEqualExpression re -> {
@@ -375,16 +428,17 @@ public class RelayLowering {
                 yield be;
             }
             case TupleExpression te -> {
-                var newElems = new ArrayList<Expression>(te.elements().size());
-                for (var el : te.elements()) newElems.add(lowerExpression(el));
-                te.elements(newElems);
-                yield te;
+                var li = te.elements().stream().map(this::lowerExpression).toList();
+                yield new TupleExpression(te.pos(), li, te.types());
+            }
+            case TupleIndexExpression tie -> {
+                var subject = lowerExpression(tie.subject());
+                yield new TupleIndexExpression(tie.pos(),
+                        (PrimaryExpression) subject, tie.index());
             }
             case ArrayExpression ae -> {
-                var newElems = new ArrayList<Expression>(ae.elements().size());
-                for (var el : ae.elements()) newElems.add(lowerExpression(el));
-                ae.elements(newElems);
-                yield ae;
+                var li = ae.elements().stream().map(this::lowerExpression).toList();
+                yield new ArrayExpression(ae.pos(), li, ae.type());
             }
             case ObjectExpression oe -> {
                 var entries = new IdentifierMap<Expression>();
@@ -392,14 +446,14 @@ public class RelayLowering {
                     var v = lowerExpression(n.value());
                     entries.set(n.key(), v);
                 }
-                var n = new ObjectExpression(oe.pos(), entries, oe.type());
-                n.resultType.set(oe.resultType);
-                yield n;
+                yield new ObjectExpression(oe.pos(), entries, oe.type());
             }
             // nodes with final children: deep lowering skipped
             // (they don't typically contain UAF-vulnerable patterns)
             default -> e;
         };
+        r.resultType.set(e.resultType);
+        return r;
     }
 
     /**
