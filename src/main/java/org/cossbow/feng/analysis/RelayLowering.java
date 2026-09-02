@@ -142,7 +142,8 @@ public class RelayLowering {
                 if (fs instanceof ConditionalForStatement cfs) {
                     yield lowerStatement(cfs);
                 }
-                yield ErrorUtil.unreachable();
+                var ifs = (IterableForStatement) fs;
+                yield lowerStatement(ifs.replace.must());
             }
             case ReturnStatement rs -> {
                 var v = rs.result().map(this::lowerExpression);
