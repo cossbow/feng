@@ -463,6 +463,8 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
         write("passed++;").newLine();
         dedent().write("} else {").newLine();
         indent().write("Feng$ex_top = _frame.prev;").newLine();
+        write("void* _ex = _frame.exception;").newLine();
+        write("Feng$release_ns(&_ex);").newLine();
         write("printf(\"FAIL\\n\");").newLine();
         write("failed++;").newLine();
         dedent().write("}").newLine();
