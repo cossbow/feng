@@ -15,6 +15,7 @@ import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Groups;
+import org.cossbow.feng.util.Stack;
 
 import java.util.HashMap;
 import java.util.List;
@@ -47,7 +48,8 @@ public class StmtWriter extends CWriter<StmtWriter> {
 
     private boolean insideTryFinally = false;
     private int tryFinallyDepth = 0;
-    private final Map<ForStatement, Groups.G2<Label, Label>> loopLabels = new HashMap<>();
+    // 当前`continue`/`break`不支持带label的控制，因此简化为栈控制
+    private final Stack<Groups.G2<Label, Label>> loopLabels = new Stack<>();
 
     // ===================================================================
     //  语句大分发
@@ -284,12 +286,12 @@ public class StmtWriter extends CWriter<StmtWriter> {
     }
 
     private StmtWriter write(BreakStatement s) {
-        var g = loopLabels.get(s.target.must());
+        var g = loopLabels.peek();
         return write("goto ").write(g.b()).endStmt();
     }
 
     private StmtWriter write(ContinueStatement s) {
-        var g = loopLabels.get(s.target.must());
+        var g = loopLabels.peek();
         return write("goto ").write(g.a()).endStmt();
     }
 
@@ -314,7 +316,7 @@ public class StmtWriter extends CWriter<StmtWriter> {
         var lg = Groups.g2(
                 new Label(new Identifier("loopNext")),
                 new Label(new Identifier("loopExit")));
-        loopLabels.put(fs, lg);
+        loopLabels.push(lg);
         write('{').indent();
         fs.initializer().use(this::write);
         write("for(;;) {").indent();
@@ -330,6 +332,7 @@ public class StmtWriter extends CWriter<StmtWriter> {
         dedent().write('}').newLine();
         write(lg.b()).write(":").endStmt();
         dedent().write('}').newLine();
+        loopLabels.pop();
         return this;
     }
 

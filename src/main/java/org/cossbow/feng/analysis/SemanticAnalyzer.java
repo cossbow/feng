@@ -2344,13 +2344,11 @@ public class SemanticAnalyzer {
             return semantic("break of loop: %s", e.pos());
 
         if (e.label().none()) {
-            e.target.set(loopStack.peek());
             return e;
         }
 
         var ls = checkLabel(e.label().get());
         if (ls.target() instanceof ForStatement fs) {
-            e.target.set(fs);
             return e;
         }
         return semantic("break label '%s' is marked for-loop: %s",
@@ -2362,13 +2360,11 @@ public class SemanticAnalyzer {
             return semantic("continue out of loop: %s", e.pos());
 
         if (e.label().none()) {
-            e.target.set(loopStack.peek());
             return e;
         }
 
         var ls = checkLabel(e.label().get());
         if (ls.target() instanceof ForStatement fs) {
-            e.target.set(fs);
             return e;
         }
         return semantic("continue label '%s' is marked for-loop: %s",

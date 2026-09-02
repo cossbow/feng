@@ -3,7 +3,6 @@ package org.cossbow.feng.ast.stmt;
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.gen.GenericMap;
-import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
 public class ContinueStatement extends Statement {
@@ -18,8 +17,6 @@ public class ContinueStatement extends Statement {
     public Optional<Identifier> label() {
         return label;
     }
-
-    public final Lazy<ForStatement> target = Lazy.nil();
 
     @Override
     public ContinueStatement mirror() {
