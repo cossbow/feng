@@ -28,6 +28,19 @@ class Tree`T` {
     var root *?TreeNode`T`;
     var size int;
 
+    // ===== 清理释放 =====
+
+    func unlinkParent(n *?TreeNode`T`) {
+        if (n == nil) return;
+        n.parent = nil;
+        unlinkParent(n.left);
+        unlinkParent(n.right);
+    }
+
+    macro resource free() {
+        clear();
+    }
+
     // ===== 内部辅助 =====
 
     func isRed(node *?TreeNode`T`) bool {
@@ -353,6 +366,7 @@ class Tree`T` {
     }
 
     export func clear() {
+        unlinkParent(root);
         root = nil;
         size = 0;
     }
