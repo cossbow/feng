@@ -93,7 +93,11 @@ public class TypeWriter extends CWriter<TypeWriter> {
             if (td.refer().has()) write('*');
             return this;
         }
-        if (def instanceof EnumDefinition) return write(Primitive.INT);
+        if (def instanceof EnumDefinition) {
+            write(Primitive.INT);
+            if (td.refer().has()) write('*');
+            return this;
+        }
         if (insideStructBody) {
             if (def instanceof StructureDefinition sd) {
                 write(sd.domain().name).write(' ');

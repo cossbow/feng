@@ -8,6 +8,7 @@ import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.DefinedType;
 import org.cossbow.feng.ast.gen.DerivedType;
+import org.cossbow.feng.ast.gen.GenericType;
 import org.cossbow.feng.ast.gen.PrimitiveType;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
@@ -78,6 +79,10 @@ public class ExprWriter extends CWriter<ExprWriter> {
      * 符号名或 mangle 名（泛型具体化）。
      */
     private ExprWriter writeType(DerivedType dt) {
+        if (dt.def() instanceof EnumDefinition) {
+            context.types.write(Primitive.INT);
+            return this;
+        }
         context.types.write(dt);
         return this;
     }
@@ -1281,9 +1286,10 @@ public class ExprWriter extends CWriter<ExprWriter> {
      */
     private ExprWriter writeDefinedType(org.cossbow.feng.ast.gen.DefinedType t) {
         return switch (t) {
-            case org.cossbow.feng.ast.gen.PrimitiveType pt -> write(pt.primitive());
-            case DerivedType dt -> writeType(dt);
-            case org.cossbow.feng.ast.gen.GenericType gt -> write(gt.name());
+            case PrimitiveType pt -> write(pt.primitive());
+            case DerivedType dt -> dt.def() instanceof EnumDefinition
+                    ? write(Primitive.INT) : writeType(dt);
+            case GenericType gt -> write(gt.name());
             case null, default -> ErrorUtil.unreachable();
         };
     }
@@ -1321,6 +1327,8 @@ public class ExprWriter extends CWriter<ExprWriter> {
      */
     private TypeDefinition resolveNewDef(NewDefinedType ndt,
                                          TypeDefinition def) {
+        if (def instanceof EnumDefinition)
+            return Primitive.INT.type();
         if (ndt.type() instanceof DerivedType d) {
             return concreteClassDef(d, def);
         }

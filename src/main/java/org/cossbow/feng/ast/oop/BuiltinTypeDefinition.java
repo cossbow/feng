@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.oop;
 
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
+import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.TypeDomain;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
@@ -14,7 +15,7 @@ import org.cossbow.feng.ast.gen.TypeParameters;
  * no vtable, and no user-defined methods.
  */
 abstract
-public class BuiltinTypeDefinition extends org.cossbow.feng.ast.TypeDefinition {
+public class BuiltinTypeDefinition extends TypeDefinition {
 
     protected BuiltinTypeDefinition(Position pos,
                                     Symbol symbol,
