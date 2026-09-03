@@ -169,10 +169,12 @@ public final class ReleaserBuilder {
                     return;
                 }
             }
+            // boxed（struct / enum 强引用）：dec→free，无 destroy
+            releaseBoxed(td, lv, out);
             return;
         }
         if (ref.match(r -> r.isKind(ReferKind.STRONG))) {
-            // boxed（primitive / struct / enum 强引用）：dec→free，无 destroy
+            // boxed（primitive 强引用）：dec→free，无 destroy
             releaseBoxed(td, lv, out);
         }
     }
