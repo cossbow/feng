@@ -3647,38 +3647,52 @@ public class SemanticAnalyzer {
         return false;
     }
 
-    private Optional<TypeDeclarer> derivedTypeBinOp(
-            DerivedTypeDeclarer l, DerivedTypeDeclarer r,
+    private Optional<Expression> derivedTypeBinOp(
+            DerivedTypeDeclarer lt, DerivedTypeDeclarer rt,
+            Expression le, Expression re,
             BinaryExpression e) {
-        var ld = l.def();
-        var rd = r.def();
+        var ld = lt.def();
+        var rd = rt.def();
         if (!ld.equals(rd)) return Optional.empty();
 
-        if (ld instanceof ClassDefinition lc) {
-            var op = e.operator();
-            if (lc.binaryOperators().containsKey(op))
-                return Optional.of(l);
+        if (!(ld instanceof ClassDefinition lc)) {
+            return Optional.empty();
         }
+        var m = lc.binaryOperators().get(e.operator());
+        if (m == null) return Optional.empty();
 
-        return Optional.empty();
+        var me = new MethodExpression(le.pos(),
+                (PrimaryExpression) le, m);
+        me.resultType.set(new AnonFuncTypeDeclarer(le.pos(), true,
+                m.prototype()));
+        var ce = new CallExpression(e.pos(), me, List.of(re),
+                m.prototype());
+        return Optional.of(ce);
     }
 
-    private Optional<TypeDeclarer> derivedTypeBinOp(
-            TypeDeclarer l, TypeDeclarer r, BinaryExpression e) {
-        if (l instanceof DerivedTypeDeclarer ltd &&
-                r instanceof DerivedTypeDeclarer rtd) {
-            var ot = derivedTypeBinOp(ltd, rtd, e);
-            if (ot.has()) return ot;
+    private Groups.G2<Expression, TypeDeclarer> derivedTypeBinOp(
+            Groups.G2<Expression, TypeDeclarer> l,
+            Groups.G2<Expression, TypeDeclarer> r,
+            BinaryExpression e) {
+
+        if (l.b() instanceof DerivedTypeDeclarer ltd &&
+                r.b() instanceof DerivedTypeDeclarer rtd) {
+            var oe = derivedTypeBinOp(ltd, rtd, l.a(), r.a(), e);
+            if (oe.has()) {
+                return Groups.g2(oe.get(), l.b());
+            }
         }
 
-        if (e.operator() != BinaryOperator.EQ &&
-                e.operator() != BinaryOperator.NE)
-            return Optional.empty();
+        var op = e.operator();
+        if (op == BinaryOperator.EQ || op == BinaryOperator.NE) {
+            if (assignable(l.b(), r.b(), Optional.empty(), e).ok) {
+                var n = new BinaryExpression(e.pos(), op, l.a(), r.a());
+                return Groups.g2(n, Primitive.BOOL.declarer(e.pos()));
+            }
+        }
 
-        if (assignable(l, r, Optional.empty(), e).ok)
-            return Optional.of(Primitive.BOOL.declarer(e.pos()));
-
-        return Optional.empty();
+        return semantic("not support %s %s %s: %s",
+                l.b(), op, r.b(), e.pos());
     }
 
 
@@ -3705,9 +3719,11 @@ public class SemanticAnalyzer {
         var lr = l.b().maybeRefer();
         var rr = r.b().maybeRefer();
         if (lr.none() && rr.none()) {
-            var n = new BinaryExpression(e.pos(), op, l.a(), r.a());
             var t = primitiveBinOp(l.b(), r.b(), e);
-            if (t.none()) t = derivedTypeBinOp(l.b(), r.b(), e);
+            if (t.none()) {
+                return derivedTypeBinOp(l, r, e);
+            }
+            var n = new BinaryExpression(e.pos(), op, l.a(), r.a());
             if (t.has()) return Groups.g2(n, t.get());
 
             return semantic("not support %s %s %s: %s",
@@ -3717,11 +3733,9 @@ public class SemanticAnalyzer {
         var isEqOp = BinaryOperator.SetEquals.contains(op);
         if (isEqOp && referCompare(l.b(), r.b(), e).ok) {
             var t = Primitive.BOOL.declarer(e.pos());
-            var x = (PrimaryExpression) l.a();
-            var y = (PrimaryExpression) r.a();
             var n = new ReferEqualExpression(e.pos(),
-                    (PrimaryExpression) x,
-                    (PrimaryExpression) y,
+                    (PrimaryExpression) l.a(),
+                    (PrimaryExpression) r.a(),
                     e.operator() == BinaryOperator.EQ);
             return Groups.g2(n, t);
         }
@@ -3793,9 +3807,31 @@ public class SemanticAnalyzer {
         if (o.a() instanceof LiteralExpression le) {
             return optimizeLit(e, le);
         }
-        if (checkUnaryOperate(e.operator(), o.b())) {
-            var n = new UnaryExpression(e.pos(), e.operator(), o.a());
-            return Groups.g2(n, o.b());
+        var op = e.operator();
+
+        var td = o.b();
+        var isValue = td.maybeRefer().none();
+        if (isValue && td instanceof PrimitiveTypeDeclarer ptd) {
+            var p = ptd.primitive();
+            if (p.isInteger() || (p.isFloat() && op != UnaryOperator.INVERT)
+                    || (p.isBool() && op == UnaryOperator.INVERT)) {
+                var n = new UnaryExpression(e.pos(), e.operator(), o.a());
+                return Groups.g2(n, o.b());
+            }
+        } else if (isValue && td instanceof DerivedTypeDeclarer dtd) {
+            var def = dtd.def();
+            if (def instanceof ClassDefinition cd) {
+                var m = cd.unaryOperators().get(op);
+                if (m != null) {
+                    var me = new MethodExpression(o.a().pos(),
+                            (PrimaryExpression) o.a(), m);
+                    me.resultType.set(new AnonFuncTypeDeclarer(me.pos(),
+                            true, m.prototype()));
+                    var ce = new CallExpression(e.pos(), me,
+                            List.of(), m.prototype());
+                    return Groups.g2(ce, td);
+                }
+            }
         }
         return semantic("type '%s' not support operator '%s': %s",
                 o.b(), e.operator(), e.pos());

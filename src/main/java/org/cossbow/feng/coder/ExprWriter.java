@@ -18,6 +18,7 @@ import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
+import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
@@ -504,29 +505,29 @@ public class ExprWriter extends CWriter<ExprWriter> {
 
     // ---- 二元 / 一元运算 ----
 
+    private boolean needMemcmp(TypeDeclarer lt) {
+        if (lt.maybeRefer().has()) return false;
+        if (lt instanceof PrimitiveTypeDeclarer)
+            return false;
+        if (lt instanceof ArrayTypeDeclarer)
+            return true;
+        if (lt instanceof TupleTypeDeclarer)
+            return true;
+        if (!(lt instanceof DerivedTypeDeclarer dtd))
+            return false;
+        var def = dtd.def();
+        return !(def instanceof EnumDefinition);
+    }
+
     private ExprWriter write(BinaryExpression e) {
         var op = e.operator();
         // ReleaserBuilder 生成的表达式无 resultType（dump 前置 pass AST）：缺失时跳过
-        // 需要类型的优化分支（类运算符重载 / memcmp / pow），直接走 cBinOp。
+        // 需要类型的优化分支（memcmp / pow），直接走 cBinOp。
         var ltOpt = e.left().resultType.get();
         if (ltOpt.has()) {
             var lt = ltOpt.get();
-            // 类运算符重载 → 直调宏方法（ClassMeta.methodSymbol 符号公式）
-            if (lt instanceof DerivedTypeDeclarer dtd
-                    && dtd.def() instanceof ClassDefinition lc) {
-                var owner = lc;
-                var cm = owner.binaryOperators().get(op);
-                while (cm == null && owner.parent().has()) {
-                    owner = owner.parent().must();
-                    cm = owner.binaryOperators().get(op);
-                }
-                if (cm != null)
-                    return writeOperatorCall(owner, cm, List.of(e.left(), e.right()));
-            }
             if ((op == BinaryOperator.EQ || op == BinaryOperator.NE)
-                    && lt.maybeRefer().none()
-                    && !(lt instanceof PrimitiveTypeDeclarer)
-                    && !(lt instanceof EnumTypeDeclarer)) {
+                    && needMemcmp(lt)) {
                 // 值类型 struct/class 比较 → memcmp
                 write("memcmp(&(").write(e.left()).write("), &(");
                 write(e.right()).write("), sizeof(").writeType(lt).write("))");
@@ -549,19 +550,6 @@ public class ExprWriter extends CWriter<ExprWriter> {
 
     private ExprWriter write(UnaryExpression e) {
         var op = e.operator();
-        var ot = e.operand().resultType.must();
-        // 类运算符重载 → 直调宏方法
-        if (ot instanceof DerivedTypeDeclarer dtd
-                && dtd.def() instanceof ClassDefinition oc) {
-            var owner = oc;
-            var cm = owner.unaryOperators().get(op);
-            while (cm == null && owner.parent().has()) {
-                owner = owner.parent().must();
-                cm = owner.unaryOperators().get(op);
-            }
-            if (cm != null)
-                return writeOperatorCall(owner, cm, List.of(e.operand()));
-        }
         switch (op) {
             case NEGATIVE -> write('-');
             case INVERT -> {
@@ -573,31 +561,6 @@ public class ExprWriter extends CWriter<ExprWriter> {
         }
         write('(').write(e.operand()).write(')');
         return this;
-    }
-
-    /**
-     * 类运算符宏直调：{@code ({ $Class _op0 = (v); $Class$macro$op(&_op0); })}。
-     * 符号名用 {@link ClassMeta#methodSymbol}（运算符 name 已是 macro id）。
-     */
-    private ExprWriter writeOperatorCall(
-            ClassDefinition cd, ClassMethod cm, List<Expression> operands) {
-        write("({ ");
-        var args = new ArrayList<String>(operands.size());
-        for (int i = 0; i < operands.size(); i++) {
-            var a = operands.get(i);
-            var isRef = a.resultType.must().maybeRefer().has();
-            var n = "_op" + i;
-            args.add(isRef ? n : "&" + n);
-            write(cd.symbol());
-            if (isRef) write('*');
-            write(' ').write(n).write(" = (").write(a).write("); ");
-        }
-        write(ClassMeta.methodSymbol(cd, cm.name())).write('(');
-        for (int i = 0; i < args.size(); i++) {
-            if (i > 0) write(COMMA);
-            write(args.get(i));
-        }
-        return write("); })");
     }
 
     private String cBinOp(BinaryOperator op) {
