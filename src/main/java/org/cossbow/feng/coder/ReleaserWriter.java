@@ -105,6 +105,10 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
 
     /**
      * 初始化器是否需要运行时求值（非 C 编译期常量）。
+     * <p>
+     * ObjectExpression / ArrayExpression 生成 C compound literal
+     * {@code (Type){...}}，在 static storage 初始化器中不合法（C11 §6.7.9p4），
+     * 因此即使内部字段全是字面量，也必须移到 constructor 做运行时赋值。
      */
     private boolean isRuntimeInit(Expression e) {
         if (e instanceof NewExpression || e instanceof CallExpression
@@ -112,12 +116,12 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
             return true;
         if (e instanceof VariableExpression)
             return true;
+        if (e instanceof ObjectExpression)
+            return true;  // compound literal (Type){...} not valid in static init
+        if (e instanceof ArrayExpression)
+            return true;  // compound literal (Type){{...}} not valid in static init
         if (e instanceof TupleExpression te)
             return te.elements().stream().anyMatch(this::isRuntimeInit);
-        if (e instanceof ObjectExpression oe)
-            return oe.entries().values().stream().anyMatch(this::isRuntimeInit);
-        if (e instanceof ArrayExpression ae)
-            return ae.elements().stream().anyMatch(this::isRuntimeInit);
         if (e instanceof BinaryExpression be)
             return isRuntimeInit(be.left()) || isRuntimeInit(be.right());
         if (e instanceof UnaryExpression ue)

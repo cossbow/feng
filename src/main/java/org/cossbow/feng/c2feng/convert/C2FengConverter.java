@@ -47,6 +47,8 @@ public class C2FengConverter {
     // ========== Typedef registration ==========
 
     public void addTypedef(CTypedef typedef) {
+        // Skip implementation-reserved identifiers (e.g. __mbstate_t, __int8_t)
+        if (typedef.name().startsWith("_")) return;
         typedefs.put(typedef.name(), typedef.underlyingType());
     }
 
@@ -54,6 +56,8 @@ public class C2FengConverter {
 
     public void addStruct(CStructType struct) {
         if (!struct.isComplete()) return;
+        if (struct.anonymous()) return;
+        if (struct.tagName().startsWith("_")) return;
 
         var fields = new IdentifierMap<StructureField>();
         for (var cf : struct.fields()) {
@@ -76,6 +80,8 @@ public class C2FengConverter {
 
     public void addUnion(CUnionType union) {
         if (!union.isComplete()) return;
+        if (union.anonymous()) return;
+        if (union.tagName().startsWith("_")) return;
 
         var fields = new IdentifierMap<StructureField>();
         for (var cf : union.fields()) {
@@ -97,6 +103,7 @@ public class C2FengConverter {
     // ========== Enum → const int constants ==========
 
     public void addEnum(CEnumType enumType) {
+        if (enumType.tagName().startsWith("_")) return;
         long nextVal = 0;
         for (var c : enumType.constants()) {
             long val = c.value().getOrElse(nextVal);
@@ -120,6 +127,8 @@ public class C2FengConverter {
     public void addFunction(CFunction func) {
         if (func.linkage() == CLinkage.STATIC) return;
         if (func.linkage() == CLinkage.EXTERN) return;
+        // Skip implementation-reserved identifiers (names starting with '_')
+        if (func.name().startsWith("_")) return;
 
         var params = new ArrayList<Parameter>();
         for (var p : func.parameters()) {
@@ -148,16 +157,22 @@ public class C2FengConverter {
     // ========== Global variable ==========
 
     public void addGlobalVar(CGlobalVar gv) {
+        var id = new Identifier(gv.name());
+        // Skip implementation-reserved identifiers (e.g. __stderr_FILENO)
+        if (gv.name().startsWith("_")) return;
+        // Skip if a Feng-side declaration already exists for this name
+        // (e.g. C header's stdin/stdout/stderr vs Feng const stdin/stdout/stderr)
+        if (table.variables.exists(id)) return;
         var export = gv.linkage() == CLinkage.DEFAULT;
         var v = new Variable(ZERO,
                 modifier(export),
                 gv.isConst() ? Declare.CONST : Declare.VAR,
-                new Identifier(gv.name()),
+                id,
                 Lazy.of(convertType(gv.type())),
                 Lazy.nil());
-        table.variables.add(new Identifier(gv.name()),
+        table.variables.add(id,
                 new GlobalVariable(export, v,
-                        symbol(new Identifier(gv.name()))));
+                        symbol(id)));
     }
 
     // ========== Core type conversion ==========
@@ -192,7 +207,15 @@ public class C2FengConverter {
             Map.entry("float", Primitive.FLOAT32),
             Map.entry("double", Primitive.FLOAT64),
             Map.entry("_Bool", Primitive.BOOL),
-            Map.entry("size_t", Primitive.UINT64)
+            Map.entry("size_t", Primitive.UINT64),
+            Map.entry("uint64_t", Primitive.UINT64),
+            Map.entry("int64_t", Primitive.INT64),
+            Map.entry("uint32_t", Primitive.UINT32),
+            Map.entry("int32_t", Primitive.INT32),
+            Map.entry("uint16_t", Primitive.UINT16),
+            Map.entry("int16_t", Primitive.INT16),
+            Map.entry("uint8_t", Primitive.UINT8),
+            Map.entry("int8_t", Primitive.INT8)
     );
 
     private TypeDeclarer mapPrimitiveType(CPrimitiveType pt) {

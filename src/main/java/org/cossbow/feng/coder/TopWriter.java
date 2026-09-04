@@ -91,8 +91,9 @@ public class TopWriter extends CWriter<TopWriter> {
             write("#define __HEADER_").write(name).newLine();
             return;
         }
-        if (context.debug) write("#define FENG_DEBUG").newLine();
-        if (context.memchk) write("#define FENG_DEBUG_MEMORY").newLine();
+        // FENG_DEBUG / FENG_DEBUG_MEMORY are now passed via -D flags
+        // in the Makefile/CMakeLists so builtin.c (pre-compiled runtime)
+        // also sees them, keeping Feng$Header layout consistent.
     }
 
     private void includeHeaders() {
@@ -157,9 +158,8 @@ public class TopWriter extends CWriter<TopWriter> {
             if (fd.builtin() || fd.procedure().has()) continue;
             var cName = fd.symbol().name().value();
             // Skip C implementation-reserved identifiers (names starting
-            // with '_') that pollute system headers, except for explicitly
-            // needed functions like __acrt_iob_func.
-            if (cName.startsWith("_") && !"__acrt_iob_func".equals(cName)) continue;
+            // with '_') that pollute system headers.
+            if (cName.startsWith("_")) continue;
             var prefix = fm.path().toString() + "$";
             var retType = cTypeOf(fd.prototype().returnType());
             var inlineKw = "static inline ";

@@ -344,9 +344,13 @@ public class Compiler {
             if (!isC && !cSources.isEmpty()) w.write(" ${C_SOURCES}");
             w.write(")\n");
 
+            var cmakeDebugFlags = debug ? "-g -Og -DFENG_DEBUG" : "-O2";
             w.write("\ntarget_compile_options(${PROJECT_NAME} PRIVATE " +
-                    (debug ? "-g -Og" : "-O2") +
+                    cmakeDebugFlags +
                     " -Wno-incompatible-pointer-types)");
+            if (System.getProperties().containsKey("feng.memchk"))
+                w.write("\ntarget_compile_options(${PROJECT_NAME} PRIVATE"
+                        + " -DFENG_DEBUG_MEMORY)");
             if (sanitizer != null && !sanitizer.isEmpty()) {
                 w.write("\ntarget_compile_options(${PROJECT_NAME} PRIVATE"
                         + " -fsanitize=" + sanitizer + " -fno-omit-frame-pointer)\n");
@@ -390,9 +394,13 @@ public class Compiler {
 
         var moreFlags = (sanitizer == null || sanitizer.isEmpty())
                 ? "" : " -fsanitize=" + sanitizer + " -fno-omit-frame-pointer";
-        if (debug) moreFlags += " -g -Og";
+        if (debug) moreFlags += " -g -Og -DFENG_DEBUG";
         else moreFlags += " -O2";
         moreFlags += " -Wno-incompatible-pointer-types";
+        // Pass FENG_DEBUG_MEMORY via -D so the pre-compiled runtime
+        // (builtin.c) also sees it, keeping Feng$Header layout consistent.
+        if (System.getProperties().containsKey("feng.memchk"))
+            moreFlags += " -DFENG_DEBUG_MEMORY";
 
         // cross-compilation: add target triple + OS define so C #ifdef matches
         if (os.isCross()) {
@@ -406,6 +414,7 @@ public class Compiler {
 
             w.write(compilerVar + " ?= " + ccDefault + "\n");
             if (!isC) w.write("CC ?= clang\n");
+            w.write("AR ?= ar\n");
             w.write(flagsVar + " ?= " + stdFlag + moreFlags + "\n");
             if (!isC) w.write("CFLAGS ?= --std=c11 " + moreFlags + "\n\n");
             else w.write("\n");
@@ -427,7 +436,7 @@ public class Compiler {
             } else {
                 w.write("TARGET := lib" + pkg + ".a\n\n");
                 w.write("$(TARGET): $(OBJS)\n");
-                w.write("\t" + arVar + " rcs $@ $^\n\n");
+                w.write("\t$(" + arVar + ") rcs $@ $^\n\n");
             }
 
             w.write("$(OBJS): Header.h\n\n");
