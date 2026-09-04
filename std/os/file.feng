@@ -1,4 +1,5 @@
 import std$string;
+import std$os$platform;
 
 export
 enum OpenMode {
@@ -107,11 +108,11 @@ func strLen(len int) int {
 }
 
 export
-const stdin = file(__acrt_iob_func(0));
+const stdin = file(platform$feng_stdin());
 export
-const stdout = file(__acrt_iob_func(1));
+const stdout = file(platform$feng_stdout());
 export
-const stderr = file(__acrt_iob_func(2));
+const stderr = file(platform$feng_stderr());
 
 export
 func printf(fmt [&#]byte, ...) {
@@ -140,21 +141,21 @@ func cBufToString(buf [*#]byte, maxLen int) string$String {
 export
 func makeDir(path [&#]byte) bool {
     var cpath = toCStr(path);
-    return mkdir(cpath.values) == 0;
+    return platform$mkdir(cpath.values) == 0;
 }
 
 // Remove a file. Returns true on success.
 export
 func removeFile(path [&#]byte) bool {
     var cpath = toCStr(path);
-    return remove(cpath.values) == 0;
+    return platform$remove(cpath.values) == 0;
 }
 
 // Remove an empty directory. Returns true on success.
 export
 func removeDir(path [&#]byte) bool {
     var cpath = toCStr(path);
-    return rmdir(cpath.values) == 0;
+    return platform$rmdir(cpath.values) == 0;
 }
 
 // ===== File/path existence =====
@@ -163,21 +164,21 @@ func removeDir(path [&#]byte) bool {
 export
 func exists(path [&#]byte) bool {
     var cpath = toCStr(path);
-    return access(cpath.values, 0) == 0;
+    return platform$access(cpath.values, 0) == 0;
 }
 
 // Check if a file or directory is readable.
 export
 func isReadable(path [&#]byte) bool {
     var cpath = toCStr(path);
-    return access(cpath.values, 4) == 0;
+    return platform$access(cpath.values, 4) == 0;
 }
 
 // Check if a file or directory is writable.
 export
 func isWritable(path [&#]byte) bool {
     var cpath = toCStr(path);
-    return access(cpath.values, 2) == 0;
+    return platform$access(cpath.values, 2) == 0;
 }
 
 // ===== Environment variables =====
@@ -186,12 +187,12 @@ func isWritable(path [&#]byte) bool {
 export
 func getEnvVar(name [&#]byte) string$String {
     var cname = toCStr(name);
-    var ptr = getenv(cname.values);
+    var ptr = platform$getenv(cname.values);
     if (ptr == 0) { return string$EMPTY; }
-    var len = int(strlen(ptr));
+    var len = int(platform$strlen(ptr));
     if (len == 0) { return string$EMPTY; }
     var buf = new([len]byte);
-    memcpy(buf.values, ptr, uint64(len));
+    platform$memcpy(buf.values, ptr, uint64(len));
     return string$utf8(buf);
 }
 
@@ -210,7 +211,7 @@ func setEnvVar(name, value [&#]byte) bool {
         env[pos] = value[i]; pos += 1;
     }
     env[pos] = 0;
-    return putenv(env.values) == 0;
+    return platform$putenv(env.values) == 0;
 }
 
 // ===== Current directory =====
@@ -219,7 +220,7 @@ func setEnvVar(name, value [&#]byte) bool {
 export
 func getWorkDir() string$String {
     var buf = new([4096]byte);
-    var ptr = getcwd(buf.values, 4096);
+    var ptr = platform$getcwd(buf.values, 4096);
     if (ptr == 0) { return string$EMPTY; }
     return cBufToString(buf, 4096);
 }
@@ -228,5 +229,5 @@ func getWorkDir() string$String {
 export
 func changeDir(path [&#]byte) bool {
     var cpath = toCStr(path);
-    return chdir(cpath.values) == 0;
+    return platform$chdir(cpath.values) == 0;
 }

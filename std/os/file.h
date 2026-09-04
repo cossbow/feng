@@ -1,12 +1,8 @@
+#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
-// POSIX-style declarations for cross-platform compatibility
-int mkdir(const char *path);
-int rmdir(const char *path);
-int access(const char *path, int mode);
-char *getcwd(char *buf, int size);
-int chdir(const char *path);
-void *memcpy(void *dest, const void *src, size_t n);
-int putenv(const char *envstring);
+// stdio functions used by File class — kept in std/os directly
+// because they are simple C library calls with no platform differences.
+// Platform-specific functions (feng_stdin, mkdir, getenv, etc.)
+// are in std/os/platform instead.
