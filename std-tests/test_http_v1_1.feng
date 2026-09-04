@@ -1,0 +1,640 @@
+// ===== M1 单测：std$http$codec$v1_1 — method / status / headers =====
+// 对应 docs/http-plan.md 里程碑 M1；纯函数、无网络。
+
+import std$testing;
+import std$string;
+import std$http$codec$v1_1 codec;
+
+// ===== helpers =====
+
+func eqBytes(a, b [*#]byte) bool {
+    if (a.length != b.length) { return false; }
+    for (var i = 0; i < a.length; i += 1) {
+        if (a[i] != b[i]) { return false; }
+    }
+    return true;
+}
+
+// 后端缺陷规避（复现见 target/probe-m1/probe_meta_bug.feng）：
+// [*]类值数组的元素赋值后 $meta 为 NULL，虚分派方法（equals → $meta->$compare）
+// 崩溃，拷贝到局部也无法恢复；字段级方法（bytes）不碰 meta 可用。
+// 故对数组元素一律按字节比较，后端修复后可改回 equals。
+func eqStr(s string$String, e [*#]byte) bool {
+    var b = s.bytes();
+    if (b == nil) { return e.length == 0; }
+    if (b.length != e.length) { return false; }
+    for (var i = 0; i < b.length; i += 1) {
+        if (b[i] != e[i]) { return false; }
+    }
+    return true;
+}
+
+// 解析成功返回 Method.id，失败返回 -1（枚举比较走 .id，同 std/os 的模式）
+func methodIdOf(lit [&#]byte) int {
+    var r = codec$parseMethod(lit);
+    if (!r.1) { return -1; }
+    var m = r.0;
+    return m.id;
+}
+
+// =====================================================
+// parseMethod
+// =====================================================
+
+@Test
+func testParseMethodAll() {
+    // Method 定义序：GET=0 HEAD=1 POST=2 PUT=3 DELETE=4
+    //               CONNECT=5 OPTIONS=6 TRACE=7 PATCH=8
+    testing$assertTrue(methodIdOf("GET") == 0);
+    testing$assertTrue(methodIdOf("HEAD") == 1);
+    testing$assertTrue(methodIdOf("POST") == 2);
+    testing$assertTrue(methodIdOf("PUT") == 3);
+    testing$assertTrue(methodIdOf("DELETE") == 4);
+    testing$assertTrue(methodIdOf("CONNECT") == 5);
+    testing$assertTrue(methodIdOf("OPTIONS") == 6);
+    testing$assertTrue(methodIdOf("TRACE") == 7);
+    testing$assertTrue(methodIdOf("PATCH") == 8);
+}
+
+@Test
+func testParseMethodUnknown() {
+    var r = codec$parseMethod("FOO");
+    testing$assertFalse(r.1);
+}
+
+@Test
+func testParseMethodCaseSensitive() {
+    var r = codec$parseMethod("get");
+    testing$assertFalse(r.1);
+}
+
+@Test
+func testParseMethodEmpty() {
+    var r = codec$parseMethod("");
+    testing$assertFalse(r.1);
+}
+
+// =====================================================
+// methodName（round-trip：parse→name 应还原原文）
+// =====================================================
+
+// 数组元素（强引用右值）不能直接传 [&#]byte 参数（规范 §3.3 幽灵引用仅收
+// const 引用变量与临时量），经 [*#]byte 参数（隐式 const）中转
+func roundTripOne(lit [*#]byte) bool {
+    var r = codec$parseMethod(lit);
+    if (!r.1) { return false; }
+    var m = r.0;
+    return eqBytes(codec$methodName(m), lit);
+}
+
+@Test
+func testMethodNameRoundTrip() {
+    testing$assertTrue(roundTripOne("GET"));
+    testing$assertTrue(roundTripOne("HEAD"));
+    testing$assertTrue(roundTripOne("POST"));
+    testing$assertTrue(roundTripOne("PUT"));
+    testing$assertTrue(roundTripOne("DELETE"));
+    testing$assertTrue(roundTripOne("CONNECT"));
+    testing$assertTrue(roundTripOne("OPTIONS"));
+    testing$assertTrue(roundTripOne("TRACE"));
+    testing$assertTrue(roundTripOne("PATCH"));
+}
+
+// =====================================================
+// statusText
+// =====================================================
+
+@Test
+func testStatusTextCommon() {
+    testing$assertTrue(eqBytes(codec$statusText(200), "OK"));
+    testing$assertTrue(eqBytes(codec$statusText(201), "Created"));
+    testing$assertTrue(eqBytes(codec$statusText(204), "No Content"));
+    testing$assertTrue(eqBytes(codec$statusText(302), "Found"));
+    testing$assertTrue(eqBytes(codec$statusText(304), "Not Modified"));
+    testing$assertTrue(eqBytes(codec$statusText(400), "Bad Request"));
+    testing$assertTrue(eqBytes(codec$statusText(404), "Not Found"));
+    testing$assertTrue(eqBytes(codec$statusText(405), "Method Not Allowed"));
+    testing$assertTrue(eqBytes(codec$statusText(431), "Request Header Fields Too Large"));
+    testing$assertTrue(eqBytes(codec$statusText(500), "Internal Server Error"));
+    testing$assertTrue(eqBytes(codec$statusText(501), "Not Implemented"));
+    testing$assertTrue(eqBytes(codec$statusText(503), "Service Unavailable"));
+}
+
+@Test
+func testStatusTextUnknown() {
+    // 未知码返回空（RFC 允许 reason phrase 为空）
+    testing$assertTrue(eqBytes(codec$statusText(599), ""));
+    testing$assertTrue(eqBytes(codec$statusText(299), ""));
+}
+
+// =====================================================
+// Headers 模型
+// =====================================================
+
+@Test
+func testHeadersAddGet() {
+    var hs = codec$newHeaders();
+    hs.add(string$utf8("Host"), string$utf8("example.com"));
+    var r = hs.get(string$utf8("Host"));
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0.equals(string$utf8("example.com")));
+    testing$assertTrue(hs.length() == 1);
+}
+
+@Test
+func testHeadersGetCaseInsensitive() {
+    var hs = codec$newHeaders();
+    hs.add(string$utf8("Content-Type"), string$utf8("text/html"));
+    var r = hs.get(string$utf8("content-type"));
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0.equals(string$utf8("text/html")));
+}
+
+@Test
+func testHeadersGetMissing() {
+    var hs = codec$newHeaders();
+    var r = hs.get(string$utf8("Host"));
+    testing$assertFalse(r.1);
+}
+
+@Test
+func testHeadersGetAllDuplicates() {
+    // Set-Cookie 等可重复头：按到达顺序保留
+    var hs = codec$newHeaders();
+    hs.add(string$utf8("Set-Cookie"), string$utf8("a=1"));
+    hs.add(string$utf8("X-Other"), string$utf8("v"));
+    hs.add(string$utf8("set-cookie"), string$utf8("b=2"));
+    var all = hs.getAll(string$utf8("SET-COOKIE"));
+    testing$assertTrue(all.length == 2);
+    testing$assertTrue(eqStr(all[0], "a=1"));
+    testing$assertTrue(eqStr(all[1], "b=2"));
+    testing$assertTrue(hs.length() == 3);
+}
+
+@Test
+func testHeadersSetReplaces() {
+    var hs = codec$newHeaders();
+    hs.add(string$utf8("Content-Length"), string$utf8("5"));
+    hs.add(string$utf8("Content-Length"), string$utf8("9"));
+    hs.set(string$utf8("content-length"), string$utf8("12"));
+    var all = hs.getAll(string$utf8("Content-Length"));
+    testing$assertTrue(all.length == 1);
+    testing$assertTrue(eqStr(all[0], "12"));
+}
+
+@Test
+func testHeadersSetAppendWhenMissing() {
+    var hs = codec$newHeaders();
+    hs.set(string$utf8("Host"), string$utf8("a.com"));
+    testing$assertTrue(hs.length() == 1);
+    var r = hs.get(string$utf8("Host"));
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0.equals(string$utf8("a.com")));
+}
+
+@Test
+func testHeadersRemove() {
+    var hs = codec$newHeaders();
+    hs.add(string$utf8("A"), string$utf8("1"));
+    hs.add(string$utf8("b"), string$utf8("2"));
+    testing$assertTrue(hs.remove(string$utf8("a")));
+    testing$assertFalse(hs.remove(string$utf8("a")));
+    testing$assertTrue(hs.length() == 1);
+    var r = hs.get(string$utf8("B"));
+    testing$assertTrue(r.1);
+}
+
+@Test
+func testHeadersEmpty() {
+    var hs = codec$newHeaders();
+    testing$assertTrue(hs.isEmpty());
+    testing$assertTrue(hs.length() == 0);
+}
+
+// =====================================================
+// Headers.writeTo
+// =====================================================
+
+@Test
+func testHeadersWriteTo() {
+    var hs = codec$newHeaders();
+    hs.add(string$utf8("Host"), string$utf8("example.com"));
+    hs.add(string$utf8("Content-Length"), string$utf8("5"));
+    var sb = string$newBuilderRef();
+    hs.writeTo(sb);
+    var s = sb.build();
+    var expect = string$utf8("Host: example.com\r\nContent-Length: 5\r\n");
+    testing$assertTrue(s.equals(expect));
+}
+
+@Test
+func testHeadersWriteToEmpty() {
+    var hs = codec$newHeaders();
+    var sb = string$newBuilderRef();
+    hs.writeTo(sb);
+    testing$assertTrue(sb.isEmpty());
+}
+
+// =====================================================
+// parseHeaderLine
+// =====================================================
+
+@Test
+func testParseHeaderLineBasic() {
+    var r = codec$parseHeaderLine(string$utf8("Host: example.com"));
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.0.equals(string$utf8("Host")));
+    testing$assertTrue(r.1.equals(string$utf8("example.com")));
+}
+
+@Test
+func testParseHeaderLineNoSpaceAfterColon() {
+    var r = codec$parseHeaderLine(string$utf8("Host:example.com"));
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.0.equals(string$utf8("Host")));
+    testing$assertTrue(r.1.equals(string$utf8("example.com")));
+}
+
+@Test
+func testParseHeaderLineTrimOWS() {
+    var r = codec$parseHeaderLine(string$utf8("Host:  \texample.com \t"));
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.1.equals(string$utf8("example.com")));
+}
+
+@Test
+func testParseHeaderLineEmptyValue() {
+    var r = codec$parseHeaderLine(string$utf8("X-Empty:"));
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.0.equals(string$utf8("X-Empty")));
+    testing$assertTrue(r.1.equals(string$EMPTY));
+}
+
+@Test
+func testParseHeaderLineSpaceBeforeColon() {
+    // RFC 9112 §5.1：name 与冒号间不允许空白
+    var r = codec$parseHeaderLine(string$utf8("Host : x"));
+    testing$assertFalse(r.2);
+}
+
+@Test
+func testParseHeaderLineNoColon() {
+    var r = codec$parseHeaderLine(string$utf8("nocolon"));
+    testing$assertFalse(r.2);
+}
+
+@Test
+func testParseHeaderLineEmptyName() {
+    var r = codec$parseHeaderLine(string$utf8(": value"));
+    testing$assertFalse(r.2);
+}
+
+// =====================================================
+// writeTo → parseHeaderLine round-trip
+// =====================================================
+
+@Test
+func testHeaderLineRoundTrip() {
+    var hs = codec$newHeaders();
+    hs.add(string$utf8("Host"), string$utf8("example.com"));
+    hs.add(string$utf8("User-Agent"), string$utf8("feng-test/1.0"));
+
+    // 序列化（输出字节正确性由 testHeadersWriteTo 覆盖）
+    var sb = string$newBuilderRef();
+    hs.writeTo(sb);
+
+    // 逐行解析出的 name/value，能经 get 按大小写不敏感找到
+    var r0 = codec$parseHeaderLine(string$utf8("Host: example.com"));
+    var r1 = codec$parseHeaderLine(string$utf8("User-Agent: feng-test/1.0"));
+    testing$assertTrue(r0.2 && r1.2);
+
+    var gr = hs.get(string$utf8("HOST"));
+    testing$assertTrue(gr.1);
+    testing$assertTrue(r0.1.equals(gr.0));
+
+    var gua = hs.get(string$utf8("user-agent"));
+    testing$assertTrue(gua.1);
+    testing$assertTrue(r1.1.equals(gua.0));
+}
+
+// =====================================================
+// M2: parseVersion / parseRequestHead
+// =====================================================
+
+func bodyEq(b [*?#]byte, e [*#]byte) bool {
+    if (b == nil) { return e.length == 0; }
+    if (b.length != e.length) { return false; }
+    for (var i = 0; i < b.length; i += 1) {
+        if (b[i] != e[i]) { return false; }
+    }
+    return true;
+}
+
+@Test
+func testParseVersion() {
+    var r = codec$parseVersion("HTTP/1.1");
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0 == codec$Version.HTTP11);
+    r = codec$parseVersion("HTTP/1.0");
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0 == codec$Version.HTTP10);
+    r = codec$parseVersion("HTTP/2.0");
+    testing$assertFalse(r.1);
+    r = codec$parseVersion("http/1.1");
+    testing$assertFalse(r.1);
+}
+
+@Test
+func testParseRequestHeadGet() {
+    var r = codec$parseRequestHead("GET /index.html HTTP/1.1\r\nHost: example.com\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.OK);
+    var req = r.0;
+    if (req == nil) { testing$fail(string$utf8("req nil")); return; }
+    testing$assertTrue(req.method == codec$Method.GET);
+    testing$assertTrue(req.version == codec$Version.HTTP11);
+    testing$assertTrue(eqStr(req.target, "/index.html"));
+    testing$assertTrue(req.headers.length() == 1);
+    testing$assertTrue(req.body == nil);
+}
+
+@Test
+func testParseRequestHeadFragmented() {
+    // 第一段：请求行 + 部分头（无结尾空行）→ NeedMore
+    var r = codec$parseRequestHead("GET / HTTP/1.1\r\nHost: example.com\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.NeedMore);
+    // 第二段：补全 → OK
+    r = codec$parseRequestHead("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.OK);
+}
+
+@Test
+func testParseRequestHeadBody() {
+    var r = codec$parseRequestHead("POST /submit HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\n\r\nhello");
+    testing$assertTrue(r.1 == codec$ParseState.OK);
+    var req = r.0;
+    if (req == nil) { testing$fail(string$utf8("req nil")); return; }
+    testing$assertTrue(req.method == codec$Method.POST);
+    testing$assertTrue(bodyEq(req.body, "hello"));
+}
+
+@Test
+func testParseRequestHeadBodyIncomplete() {
+    // body 未到齐（声明 5 字节，只给了 2 字节）→ NeedMore
+    var r = codec$parseRequestHead("POST / HTTP/1.1\r\nContent-Length: 5\r\n\r\nhe");
+    testing$assertTrue(r.1 == codec$ParseState.NeedMore);
+}
+
+@Test
+func testParseRequestHeadNoBody() {
+    var r = codec$parseRequestHead("GET / HTTP/1.1\r\nHost: x\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.OK);
+    var req = r.0;
+    if (req == nil) { testing$fail(string$utf8("req nil")); return; }
+    testing$assertTrue(req.body == nil);
+}
+
+@Test
+func testParseRequestHeadZeroBody() {
+    var r = codec$parseRequestHead("GET / HTTP/1.1\r\nContent-Length: 0\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.OK);
+    var req = r.0;
+    if (req == nil) { testing$fail(string$utf8("req nil")); return; }
+    testing$assertTrue(req.body == nil);
+}
+
+@Test
+func testParseRequestHeadBadContentLength() {
+    // Content-Length 存在但值非法 → BadRequest（RFC 9112 §8.6）
+    var r = codec$parseRequestHead("POST / HTTP/1.1\r\nContent-Length: abc\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.BadRequest);
+}
+
+@Test
+func testParseRequestHeadBadRequestLine() {
+    // 请求行只有 2 段
+    var r = codec$parseRequestHead("GET /\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.BadRequest);
+    // 请求行 4 段（版本后多余空格）
+    r = codec$parseRequestHead("GET / HTTP/1.1 extra\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.BadRequest);
+}
+
+@Test
+func testParseRequestHeadUnknownMethod() {
+    var r = codec$parseRequestHead("FOO / HTTP/1.1\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.BadRequest);
+}
+
+@Test
+func testParseRequestHeadUnknownVersion() {
+    var r = codec$parseRequestHead("GET / HTTP/2.0\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.BadRequest);
+}
+
+@Test
+func testParseRequestHeadBadHeader() {
+    var r = codec$parseRequestHead("GET / HTTP/1.1\r\nBad-Header-Line\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.BadRequest);
+}
+
+@Test
+func testParseRequestHeadTooLarge() {
+    // 构造超过 MAX_HEAD_BYTES(16384) 的头部
+    var sb = string$newBuilderRef();
+    sb.appendBytes("GET / HTTP/1.1\r\nX-Long: ");
+    for (var i = 0; i < 17000; i += 1) {
+        sb.appendByte(97);
+    }
+    sb.appendBytes("\r\n\r\n");
+    var s = sb.build();
+    var b = s.bytes();
+    if (b == nil) { testing$fail(string$utf8("build nil")); return; }
+    var r = codec$parseRequestHead(b);
+    testing$assertTrue(r.1 == codec$ParseState.TooLarge);
+}
+
+// =====================================================
+// M3: serializeResponse / parseTarget / parseQuery
+// =====================================================
+
+// 字面量 → [*#]byte（规避编译器后端 bug：字面量右值不能直接赋给可空数组引用字段，
+// 见 target/probe-m3/probe_d.feng，UnreachableException）
+func litBytes(lit [*#]byte) [*#]byte {
+    return lit;
+}
+
+@Test
+func testSerializeResponseEmpty() {
+    var resp = codec$newResponse(200);
+    var s = codec$serializeResponse(resp);
+    testing$assertTrue(eqStr(s, "HTTP/1.1 200 OK\r\n\r\n"));
+}
+
+@Test
+func testSerializeResponseBody() {
+    var resp = codec$newResponse(200);
+    resp.body = litBytes("hello");
+    var s = codec$serializeResponse(resp);
+    testing$assertTrue(eqStr(s, "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"));
+}
+
+@Test
+func testSerializeResponseExplicitContentLength() {
+    var resp = codec$newResponse(200);
+    resp.headers.add(string$utf8("Content-Length"), string$utf8("99"));
+    resp.body = litBytes("hello");
+    var s = codec$serializeResponse(resp);
+    testing$assertTrue(eqStr(s, "HTTP/1.1 200 OK\r\nContent-Length: 99\r\n\r\nhello"));
+}
+
+@Test
+func testSerializeResponseHeaders() {
+    var resp = codec$newResponse(404);
+    resp.headers.add(string$utf8("Content-Type"), string$utf8("text/plain"));
+    var s = codec$serializeResponse(resp);
+    testing$assertTrue(eqStr(s, "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\n"));
+}
+
+@Test
+func testParseTarget() {
+    var r = codec$parseTarget(string$utf8("/index.html"));
+    testing$assertTrue(eqStr(r.0, "/index.html"));
+    testing$assertTrue(eqStr(r.1, ""));
+    r = codec$parseTarget(string$utf8("/search?q=feng"));
+    testing$assertTrue(eqStr(r.0, "/search"));
+    testing$assertTrue(eqStr(r.1, "q=feng"));
+    r = codec$parseTarget(string$utf8("/path?"));
+    testing$assertTrue(eqStr(r.0, "/path"));
+    testing$assertTrue(eqStr(r.1, ""));
+}
+
+@Test
+func testParseQuery() {
+    var qp = codec$parseQuery(string$utf8("a=1&b=2"));
+    testing$assertTrue(qp.length == 2);
+    testing$assertTrue(eqStr(qp[0].name, "a"));
+    testing$assertTrue(eqStr(qp[0].value, "1"));
+    testing$assertTrue(eqStr(qp[1].name, "b"));
+    testing$assertTrue(eqStr(qp[1].value, "2"));
+}
+
+@Test
+func testParseQueryDecode() {
+    var qp = codec$parseQuery(string$utf8("q=hello+world&u=%2Fhome%2Ffeng&empty="));
+    testing$assertTrue(qp.length == 3);
+    testing$assertTrue(eqStr(qp[0].value, "hello world"));
+    testing$assertTrue(eqStr(qp[1].value, "/home/feng"));
+    testing$assertTrue(eqStr(qp[2].value, ""));
+}
+
+@Test
+func testParseQueryNoEquals() {
+    var qp = codec$parseQuery(string$utf8("flag"));
+    testing$assertTrue(qp.length == 1);
+    testing$assertTrue(eqStr(qp[0].name, "flag"));
+    testing$assertTrue(eqStr(qp[0].value, ""));
+}
+
+@Test
+func testParseQueryEmpty() {
+    var qp = codec$parseQuery(string$utf8(""));
+    testing$assertTrue(qp.length == 0);
+}
+
+@Test
+func testParseRequestHeadTargetSplit() {
+    var r = codec$parseRequestHead("GET /search?q=feng HTTP/1.1\r\nHost: x\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.OK);
+    var req = r.0;
+    if (req == nil) { testing$fail(string$utf8("req nil")); return; }
+    testing$assertTrue(eqStr(req.target, "/search?q=feng"));
+    testing$assertTrue(eqStr(req.path, "/search"));
+    testing$assertTrue(eqStr(req.query, "q=feng"));
+}
+
+// =====================================================
+// M4: chunked 编解码
+// =====================================================
+
+@Test
+func testEncodeChunkedBasic() {
+    var s = codec$encodeChunked("hello", 0);
+    testing$assertTrue(eqStr(s, "5\r\nhello\r\n0\r\n\r\n"));
+}
+
+@Test
+func testEncodeChunkedMultiBlock() {
+    var s = codec$encodeChunked("hello", 2);
+    testing$assertTrue(eqStr(s, "2\r\nhe\r\n2\r\nll\r\n1\r\no\r\n0\r\n\r\n"));
+}
+
+@Test
+func testEncodeChunkedEmpty() {
+    var s = codec$encodeChunked("", 0);
+    testing$assertTrue(eqStr(s, "0\r\n\r\n"));
+}
+
+@Test
+func testDecodeChunkedBasic() {
+    var r = codec$decodeChunked("5\r\nhello\r\n0\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.OK);
+    var body = r.0;
+    if (body == nil) { testing$fail(string$utf8("body nil")); return; }
+    testing$assertTrue(eqStr(body.data, "hello"));
+}
+
+@Test
+func testDecodeChunkedMultiBlock() {
+    var r = codec$decodeChunked("2\r\nhe\r\n2\r\nll\r\n1\r\no\r\n0\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.OK);
+    var body = r.0;
+    if (body == nil) { testing$fail(string$utf8("body nil")); return; }
+    testing$assertTrue(eqStr(body.data, "hello"));
+}
+
+@Test
+func testDecodeChunkedEmpty() {
+    var r = codec$decodeChunked("0\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.OK);
+    var body = r.0;
+    if (body == nil) { testing$fail(string$utf8("body nil")); return; }
+    testing$assertTrue(eqStr(body.data, ""));
+}
+
+@Test
+func testDecodeChunkedTrailer() {
+    var r = codec$decodeChunked("5\r\nhello\r\n0\r\nX-Test: v\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.OK);
+    var body = r.0;
+    if (body == nil) { testing$fail(string$utf8("body nil")); return; }
+    testing$assertTrue(eqStr(body.data, "hello"));
+    var tr = body.trailers.get(string$utf8("X-Test"));
+    testing$assertTrue(tr.1);
+    testing$assertTrue(eqStr(tr.0, "v"));
+}
+
+@Test
+func testDecodeChunkedBadSize() {
+    var r = codec$decodeChunked("zz\r\nhello\r\n0\r\n\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.BadRequest);
+}
+
+@Test
+func testDecodeChunkedIncomplete() {
+    // 缺结束块的空行
+    var r = codec$decodeChunked("5\r\nhello\r\n0\r\n");
+    testing$assertTrue(r.1 == codec$ParseState.NeedMore);
+}
+
+@Test
+func testChunkedRoundTrip() {
+    var src = "hello chunked world";
+    var enc = codec$encodeChunked(src, 3);
+    var eb = enc.bytes();
+    if (eb == nil) { testing$fail(string$utf8("enc nil")); return; }
+    var r = codec$decodeChunked(eb);
+    testing$assertTrue(r.1 == codec$ParseState.OK);
+    var body = r.0;
+    if (body == nil) { testing$fail(string$utf8("body nil")); return; }
+    testing$assertTrue(eqStr(body.data, "hello chunked world"));
+}

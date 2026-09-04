@@ -1,0 +1,159 @@
+// ===== std$http$codec$v1_1 — 头部模型（RFC 9112 §5）=====
+
+import std$string;
+import std$container;
+
+// 单个头字段行（模块内部类型，外部经 Headers 的方法访问）
+class Header final {
+    export var name  string$String;
+    export var value string$String;
+}
+
+// 有序头字段表：线性扫描（典型报文头 <30 个，计划 §3.2）；
+// 同名字段按到达顺序保留（Set-Cookie 等可重复头）。
+// 类级 @Sync：仅标记可同步、不生成原子操作（计划 §4）。
+//
+// 实现约定（计划 §9）：
+// - this.list 是可空字段，流分析不收窄字段 → 一律先拷贝到局部 var 再判空
+//   （同 std/container map.feng / vec.feng 的模式）；
+// - const 参数不可调用非 # 方法，需先拷贝到 var 局部；
+// - 方法返回值不可直接链式调用（C 后端对右值取地址）。
+//@Sync
+export
+class Headers final {
+    var list *?container$Vector`Header`;
+
+    export func add(name string$String, value string$String) {
+        var h Header = {name=name, value=value};
+        var v = list;
+        if (v == nil) {
+            var nv = new(container$Vector`Header`);
+            list = nv;
+            nv.append(h);
+            return;
+        }
+        v.append(h);
+    }
+
+    // 同名（大小写不敏感）全部替换为单个字段，无同名则追加
+    export func set(name string$String, value string$String) {
+        remove(name);
+        add(name, value);
+    }
+
+    // 取第一个同名值（大小写不敏感），ok=false 表示不存在
+    export func get(name string$String) (string$String, bool) {
+        var v = list;
+        if (v == nil) { return (string$EMPTY, false); }
+        var nm = name;
+        var lower = nm.toLower();
+        for (var i = 0; i < v.length(); i += 1) {
+            var h = v.get(i);
+            var hn = h.name;
+            var hnl = hn.toLower();
+            if (hnl.equals(lower)) { return (h.value, true); }
+        }
+        return (string$EMPTY, false);
+    }
+
+    // 取全部同名值（按到达顺序），不存在返回空切片
+    export func getAll(name string$String) [*]string$String {
+        var v = list;
+        if (v == nil) { return new([0]string$String); }
+        var nm = name;
+        var lower = nm.toLower();
+        var n = 0;
+        for (var i = 0; i < v.length(); i += 1) {
+            var h = v.get(i);
+            var hn = h.name;
+            var hnl = hn.toLower();
+            if (hnl.equals(lower)) { n += 1; }
+        }
+        var r = new([n]string$String);
+        var idx = 0;
+        for (var i = 0; i < v.length(); i += 1) {
+            var h = v.get(i);
+            var hn = h.name;
+            var hnl = hn.toLower();
+            if (hnl.equals(lower)) {
+                r[idx] = h.value;
+                idx += 1;
+            }
+        }
+        return r;
+    }
+
+    // 删除全部同名字段，返回是否发生删除
+    export func remove(name string$String) bool {
+        var v = list;
+        if (v == nil) { return false; }
+        var nm = name;
+        var lower = nm.toLower();
+        var removed = false;
+        for (var i = v.length() - 1; i >= 0; i -= 1) {
+            var h = v.get(i);
+            var hn = h.name;
+            var hnl = hn.toLower();
+            if (hnl.equals(lower)) {
+                v.removeAt(i);
+                removed = true;
+            }
+        }
+        return removed;
+    }
+
+    export func length() int {
+        var v = list;
+        if (v == nil) { return 0; }
+        return v.length();
+    }
+
+    export func isEmpty() bool {
+        return length() == 0;
+    }
+
+    // 逐行写出 "name: value CRLF"（序列化用）
+    export func writeTo(sb *string$StringBuilder) {
+        var v = list;
+        if (v == nil) { return; }
+        var b = sb;
+        for (var i = 0; i < v.length(); i += 1) {
+            var h = v.get(i);
+            b.append(h.name);
+            b.appendByte(58);   // ':'
+            b.appendByte(32);   // ' '
+            b.append(h.value);
+            b.appendByte(13);   // CR
+            b.appendByte(10);   // LF
+        }
+    }
+}
+
+// 工厂
+export
+func newHeaders() Headers {
+    return {};
+}
+
+// 解析单个头字段行（不含 CRLF）："name: value"。
+// 从严：无冒号 / 空名 / 冒号前空白均判非法（RFC 9112 §5.1），
+// value 两端 OWS（空格、TAB）剥离。
+export
+func parseHeaderLine(line string$String) (string$String, string$String, bool) {
+    var ln = line;
+    var nb = ln.bytes();
+    if (nb == nil) { return (string$EMPTY, string$EMPTY, false); }
+    if (nb.length == 0) { return (string$EMPTY, string$EMPTY, false); }
+    var idx = -1;
+    for (var i = 0; i < nb.length; i += 1) {
+        if (nb[i] == 58) { idx = i; break; }
+    }
+    if (idx <= 0) { return (string$EMPTY, string$EMPTY, false); }
+    if (nb[idx - 1] == 32 || nb[idx - 1] == 9) {
+        return (string$EMPTY, string$EMPTY, false);
+    }
+    var name = ln.substring(0, idx);
+    var raw = ln.substring(idx + 1, nb.length);
+    var value = raw.trim();
+    return (name, value, true);
+}

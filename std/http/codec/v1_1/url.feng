@@ -1,0 +1,113 @@
+// ===== std$http$codec$v1_1 — request-target 与 query 解析（RFC 9110 §4.2 / §7）=====
+//
+// 一期仅支持 origin-form：`/path?query`。
+// query 按 application/x-www-form-urlencoded 解码：%XX → 字节，'+' → 空格。
+
+import std$string;
+
+// 单个查询参数
+export
+class QueryPair final {
+    export var name  string$String;
+    export var value string$String;
+}
+
+// 十六进制字符 → 0..15；非法返回 -1
+func hexVal(c byte) int {
+    if (c >= 48 && c <= 57) { return int(c) - 48; }         // '0'..'9'
+    if (c >= 65 && c <= 70) { return int(c) - 65 + 10; }    // 'A'..'F'
+    if (c >= 97 && c <= 102) { return int(c) - 97 + 10; }   // 'a'..'f'
+    return -1;
+}
+
+// 解码一个 x-www-form-urlencoded 片段：%XX → 字节，'+' → 空格。
+// 不含 % 或 + 时原样返回（零拷贝）。
+func decodeComponent(s string$String) string$String {
+    var b = s.bytes();
+    if (b == nil) { return string$EMPTY; }
+    var hasSpecial = false;
+    for (var i = 0; i < b.length; i += 1) {
+        if (b[i] == 37 || b[i] == 43) { hasSpecial = true; break; }   // '%' / '+'
+    }
+    if (!hasSpecial) { return s; }
+
+    var out = string$newBuilderRef();
+    for (var i = 0; i < b.length; i += 1) {
+        var c = b[i];
+        if (c == 43) {                       // '+'
+            out.appendByte(32);              // ' '
+        } else if (c == 37 && i + 2 < b.length) {   // '%XX'
+            var hi = hexVal(b[i + 1]);
+            var lo = hexVal(b[i + 2]);
+            if (hi >= 0 && lo >= 0) {
+                out.appendByte(byte(hi * 16 + lo));
+                i += 2;
+            } else {
+                out.appendByte(c);
+            }
+        } else {
+            out.appendByte(c);
+        }
+    }
+    var r = out.build();
+    return r;
+}
+
+// 拆分 origin-form target：`/path?query` → (path, query)。
+// 无 '?' 时 query 为 EMPTY；'?' 后为空串时为合法空 query。
+export
+func parseTarget(target string$String) (string$String, string$String) {
+    var t = target;
+    var b = t.bytes();
+    if (b == nil) { return (string$EMPTY, string$EMPTY); }
+    var q = -1;
+    for (var i = 0; i < b.length; i += 1) {
+        if (b[i] == 63) { q = i; break; }   // '?'
+    }
+    if (q < 0) { return (t, string$EMPTY); }
+    var p = t.substring(0, q);
+    var qu = t.substring(q + 1, b.length);
+    return (p, qu);
+}
+
+// 解析 query 串为参数对（按 '&' 切分，每段按首个 '=' 切 name/value，
+// 无 '=' 则 name=段、value=EMPTY；两段均做 %XX 解码）。
+// 返回 [*]QueryPair（含 0 个元素的空数组表示无参数）。
+export
+func parseQuery(q string$String) [*]QueryPair {
+    var qq = q;
+    var b = qq.bytes();
+    if (b == nil || b.length == 0) { return new([0]QueryPair); }
+
+    var segs = 1;
+    for (var i = 0; i < b.length; i += 1) {
+        if (b[i] == 38) { segs += 1; }   // '&'
+    }
+
+    var r = new([segs]QueryPair);
+    var idx = 0;
+    var start = 0;
+    for (var i = 0; i <= b.length; i += 1) {
+        if (i == b.length || b[i] == 38) {
+            // 段 [start, i)
+            var eq = -1;
+            for (var j = start; j < i; j += 1) {
+                if (b[j] == 61) { eq = j; break; }   // '='
+            }
+            var name string$String;
+            var value string$String;
+            if (eq < 0) {
+                name = qq.substring(start, i);
+                value = string$EMPTY;
+            } else {
+                name = qq.substring(start, eq);
+                value = qq.substring(eq + 1, i);
+            }
+            var dp QueryPair = {name=decodeComponent(name), value=decodeComponent(value)};
+            r[idx] = dp;
+            idx += 1;
+            start = i + 1;
+        }
+    }
+    return r;
+}

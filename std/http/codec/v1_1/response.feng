@@ -1,0 +1,54 @@
+// ===== std$http$codec$v1_1 — 响应模型与序列化（RFC 9112 §4）=====
+
+import std$string;
+
+// 响应报文模型
+@Sync
+export
+class Response final {
+    export var version    Version;
+    export var statusCode int;
+    export var headers    Headers;
+    export var body       [*?#]byte;
+}
+
+// 工厂：默认 HTTP/1.1，空头部，无体（强引用）
+export
+func newResponse(code int) *Response {
+    return new(Response, {version=Version.HTTP11, statusCode=code});
+}
+
+// 序列化为完整响应报文（状态行 + 头部 + 空行 + body）。
+// 若 body 非 nil 且头部未显式设置 Content-Length，则自动补上。
+// 返回 String（值类型，字节由引用计数管理，生命周期安全）。
+export
+func serializeResponse(r *Response) string$String {
+    var sb = string$newBuilderRef();
+    sb.appendBytes(versionName(r.version));
+    sb.appendByte(32);   // ' '
+    sb.appendInt(r.statusCode);
+    sb.appendByte(32);   // ' '
+    sb.appendBytes(statusText(r.statusCode));
+    sb.appendBytes("\r\n");
+
+    var hh = r.headers;
+    hh.writeTo(sb);
+
+    var body = r.body;
+    if (body != nil) {
+        var clr = hh.get(string$utf8("Content-Length"));
+        if (!clr.1) {
+            sb.appendBytes("Content-Length: ");
+            sb.appendInt(body.length);
+            sb.appendBytes("\r\n");
+        }
+    }
+
+    sb.appendBytes("\r\n");
+    if (body != nil) {
+        var bs = string$utf8(body);
+        sb.append(bs);
+    }
+    var out = sb.build();
+    return out;
+}

@@ -1,0 +1,167 @@
+// ===== std$http$codec$v1_1 — 请求模型与增量解析（RFC 9112 §3）=====
+
+import std$string;
+
+// HTTP 版本
+export
+enum Version {
+    HTTP10, HTTP11,
+}
+
+// 解析 HTTP 版本 token（"HTTP/1.0" / "HTTP/1.1"）
+export
+func parseVersion(s [&#]byte) (Version, bool) {
+    if (matchLit(s, "HTTP/1.1")) { return (Version.HTTP11, true); }
+    if (matchLit(s, "HTTP/1.0")) { return (Version.HTTP10, true); }
+    return (Version.HTTP11, false);
+}
+
+// 版本规范名（序列化用）
+export
+func versionName(v Version) [*#]byte {
+    switch (v) {
+    case HTTP10 { return "HTTP/1.0"; }
+    case HTTP11 { return "HTTP/1.1"; }
+    }
+}
+
+// 增量解析状态
+export
+enum ParseState {
+    OK, NeedMore, BadRequest, TooLarge,
+}
+
+// 防御上限（协议层常量，计划 §3.3）
+export const MAX_HEAD_BYTES int = 16384;
+export const MAX_HEADERS    int = 100;
+
+// 请求报文模型（path/query 由 M3 的 url.feng 解析填充）
+@Sync
+export
+class Request final {
+    export var method  Method;
+    export var target  string$String;   // 原始 request-target
+    export var path    string$String;   // origin-form 的路径部分（M3 填）
+    export var query   string$String;   // 原始 query（M3 填）
+    export var version Version;
+    export var headers Headers;
+    export var body    [*?#]byte;       // 无体或尚未到齐则为 nil
+}
+
+// —— 内部 helper ——
+
+// 在 [from, data.length) 内找 CRLF，返回 '\r' 位置；找不到返回 -1
+func findCRLF(data [&#]byte, from int) int {
+    for (var i = from; i + 1 < data.length; i += 1) {
+        if (data[i] == 13 && data[i + 1] == 10) { return i; }
+    }
+    return -1;
+}
+
+// 拷贝 [from, to) 字节段为新的字节数组（body 需独立于输入缓冲生命周期）
+func sliceBytes(data [&#]byte, from, to int) [*#]byte {
+    if (to <= from) { return new([0]byte); }
+    var n = to - from;
+    var r = new([n]byte);
+    for (var i = 0; i < n; i += 1) { r[i] = data[from + i]; }
+    return r;
+}
+
+// 字节段转 String
+func sliceStr(data [&#]byte, from, to int) string$String {
+    return string$utf8(sliceBytes(data, from, to));
+}
+
+// 读 Content-Length 头（大小写不敏感）：
+// 返回 -1 = 无该头（无 body）；-2 = 头存在但值非法；>=0 = 合法长度。
+func contentLength(h Headers) int {
+    var hh = h;
+    var r = hh.get(string$utf8("Content-Length"));
+    if (!r.1) { return -1; }
+    var v = r.0;
+    var b = v.bytes();
+    if (b == nil) { return -2; }
+    if (b.length == 0) { return -2; }
+    var n = 0;
+    for (var i = 0; i < b.length; i += 1) {
+        var c = int(b[i]);
+        if (c < 48 || c > 57) { return -2; }
+        n = n * 10 + (c - 48);
+    }
+    return n;
+}
+
+// 增量解析请求：请求行 + 头部 + Content-Length 定界的 body。
+// 返回 (req, state)：
+//   OK        → 头部完整，body 已按 Content-Length 到齐（或本就无体），req 非 nil；
+//   NeedMore  → 头部尚未完整（未到空行）或 body 未到齐，调用方继续累积；
+//   BadRequest→ 请求行非 3 段 / 方法未知 / 版本未知 / 头字段非法；
+//   TooLarge  → 头部累计超过 MAX_HEAD_BYTES 或头部条数超 MAX_HEADERS。
+// 无状态、可重入：每次对累积缓冲全量重扫（一期从简，计划 §3.1）。
+export
+func parseRequestHead(data [&#]byte) (*?Request, ParseState) {
+    // 1. 请求行
+    var lineEnd = findCRLF(data, 0);
+    if (lineEnd < 0) {
+        if (data.length > MAX_HEAD_BYTES) { return (nil, ParseState.TooLarge); }
+        return (nil, ParseState.NeedMore);
+    }
+    // 请求行按单个空格切 3 段
+    var sp1 = -1;
+    var sp2 = -1;
+    for (var i = 0; i < lineEnd; i += 1) {
+        if (data[i] == 32) {
+            if (sp1 < 0) { sp1 = i; }
+            else if (sp2 < 0) { sp2 = i; break; }
+        }
+    }
+    if (sp1 <= 0 || sp2 < 0) { return (nil, ParseState.BadRequest); }
+    // 版本段后不得再有空格（严格 3 段）
+    for (var i = sp2 + 1; i < lineEnd; i += 1) {
+        if (data[i] == 32) { return (nil, ParseState.BadRequest); }
+    }
+
+    var mr = parseMethod(sliceBytes(data, 0, sp1));
+    if (!mr.1) { return (nil, ParseState.BadRequest); }
+    var vr = parseVersion(sliceBytes(data, sp2 + 1, lineEnd));
+    if (!vr.1) { return (nil, ParseState.BadRequest); }
+
+    var req = new(Request);
+    req.method = mr.0;
+    req.target = sliceStr(data, sp1 + 1, sp2);
+    req.version = vr.0;
+    var tp = parseTarget(req.target);
+    req.path = tp.0;
+    req.query = tp.1;
+
+    // 2. 头部（直到空行）
+    var pos = lineEnd + 2;
+    var headBytes = lineEnd + 2;
+    var headCount = 0;
+    for (true) {
+        var e = findCRLF(data, pos);
+        if (e < 0) {
+            if (data.length > MAX_HEAD_BYTES) { return (nil, ParseState.TooLarge); }
+            return (nil, ParseState.NeedMore);
+        }
+        if (e == pos) { pos = e + 2; break; }   // 空行 = 头部结束
+        headBytes = e + 2;
+        if (headBytes > MAX_HEAD_BYTES) { return (nil, ParseState.TooLarge); }
+        headCount += 1;
+        if (headCount > MAX_HEADERS) { return (nil, ParseState.TooLarge); }
+        var hr = parseHeaderLine(sliceStr(data, pos, e));
+        if (!hr.2) { return (nil, ParseState.BadRequest); }
+        req.headers.add(hr.0, hr.1);
+        pos = e + 2;
+    }
+
+    // 3. body（仅 Content-Length 定界）
+    var cl = contentLength(req.headers);
+    if (cl == -2) { return (nil, ParseState.BadRequest); }
+    if (cl > 0) {
+        var need = pos + cl;
+        if (need > data.length) { return (nil, ParseState.NeedMore); }
+        req.body = sliceBytes(data, pos, need);
+    }
+    return (req, ParseState.OK);
+}

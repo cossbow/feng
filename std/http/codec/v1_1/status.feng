@@ -1,0 +1,32 @@
+// ===== std$http$codec$v1_1 — 状态码与原因短语（RFC 9110 §15）=====
+//
+// 仅覆盖常用码；未知码返回 ""（RFC 允许 reason phrase 为空）。
+
+export
+func statusText(code int) [*#]byte {
+    if (code == 200) { return "OK"; }
+    if (code == 201) { return "Created"; }
+    if (code == 204) { return "No Content"; }
+    if (code == 301) { return "Moved Permanently"; }
+    if (code == 302) { return "Found"; }
+    if (code == 304) { return "Not Modified"; }
+    if (code == 307) { return "Temporary Redirect"; }
+    if (code == 308) { return "Permanent Redirect"; }
+    if (code == 400) { return "Bad Request"; }
+    if (code == 401) { return "Unauthorized"; }
+    if (code == 403) { return "Forbidden"; }
+    if (code == 404) { return "Not Found"; }
+    if (code == 405) { return "Method Not Allowed"; }
+    if (code == 408) { return "Request Timeout"; }
+    if (code == 411) { return "Length Required"; }
+    if (code == 413) { return "Content Too Large"; }
+    if (code == 414) { return "URI Too Long"; }
+    if (code == 431) { return "Request Header Fields Too Large"; }
+    if (code == 500) { return "Internal Server Error"; }
+    if (code == 501) { return "Not Implemented"; }
+    if (code == 502) { return "Bad Gateway"; }
+    if (code == 503) { return "Service Unavailable"; }
+    if (code == 504) { return "Gateway Timeout"; }
+    if (code == 505) { return "HTTP Version Not Supported"; }
+    return "";
+}

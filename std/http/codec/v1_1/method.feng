@@ -1,0 +1,47 @@
+// ===== std$http$codec$v1_1 — HTTP methods（RFC 9110 §9）=====
+
+export
+enum Method {
+    GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH,
+}
+
+// 字面量字节比较（模块内私有）
+func matchLit(s [&#]byte, lit [&#]byte) bool {
+    if (s.length != lit.length) { return false; }
+    for (var i = 0; i < s.length; i += 1) {
+        if (s[i] != lit[i]) { return false; }
+    }
+    return true;
+}
+
+// 解析方法 token（大小写敏感）。
+// 非标准方法返回 ok=false，由调用方决定回 501 还是放行（计划 §3.2）。
+export
+func parseMethod(s [&#]byte) (Method, bool) {
+    if (matchLit(s, "GET")) { return (Method.GET, true); }
+    if (matchLit(s, "HEAD")) { return (Method.HEAD, true); }
+    if (matchLit(s, "POST")) { return (Method.POST, true); }
+    if (matchLit(s, "PUT")) { return (Method.PUT, true); }
+    if (matchLit(s, "DELETE")) { return (Method.DELETE, true); }
+    if (matchLit(s, "CONNECT")) { return (Method.CONNECT, true); }
+    if (matchLit(s, "OPTIONS")) { return (Method.OPTIONS, true); }
+    if (matchLit(s, "TRACE")) { return (Method.TRACE, true); }
+    if (matchLit(s, "PATCH")) { return (Method.PATCH, true); }
+    return (Method.GET, false);
+}
+
+// 方法规范名（序列化用）；switch 覆盖全部枚举值时自身即终止语句，无 default、无尾 return。
+export
+func methodName(m Method) [*#]byte {
+    switch (m) {
+    case GET { return "GET"; }
+    case HEAD { return "HEAD"; }
+    case POST { return "POST"; }
+    case PUT { return "PUT"; }
+    case DELETE { return "DELETE"; }
+    case CONNECT { return "CONNECT"; }
+    case OPTIONS { return "OPTIONS"; }
+    case TRACE { return "TRACE"; }
+    case PATCH { return "PATCH"; }
+    }
+}

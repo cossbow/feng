@@ -1,0 +1,116 @@
+// ===== std$http$codec$v1_1 — chunked 传输编码（RFC 9112 §7.1）=====
+//
+// 纯函数：字节进、字节出。decode 增量、可重入，对累积缓冲全量重扫（一期从简）。
+// 复用同模块 findCRLF / sliceStr（request.feng）、hexVal（url.feng）、
+// parseHeaderLine（headers.feng）、ParseState 枚举。
+
+import std$string;
+
+// 单个 chunk 数据上限（防恶意超大 chunk；MAX_BODY_BYTES 由调用方另控）
+export const MAX_CHUNK_SIZE int = 16777216;   // 16 MiB
+
+// 解码结果：拼接后的 body + trailer 头
+@Sync
+export
+class ChunkedBody final {
+    export var data     string$String;   // 拼接所有 chunk 的字节
+    export var trailers Headers;         // trailer 头字段（可能为空）
+}
+
+// 十六进制格式化（小写，无前导零）
+func formatHex(v int) [*#]byte {
+    if (v == 0) { return "0"; }
+    var buf [16]byte;
+    var i = 0;
+    var x = v;
+    for (x > 0) {
+        var d = x & 15;
+        if (d < 10) { buf[i] = byte(48 + d); }
+        else { buf[i] = byte(87 + d); }   // 'a'..'f'
+        x = x >> 4;
+        i += 1;
+    }
+    var r = new([i]byte);
+    for (var j = 0; j < i; j += 1) { r[j] = buf[i - 1 - j]; }
+    return r;
+}
+
+// 解析 chunk 大小（十六进制，遇 ';' chunk-ext 停止）；空/非法返回 -1
+func parseChunkSize(data [&#]byte, start, end int) int {
+    var size = 0;
+    var has = false;
+    for (var i = start; i < end; i += 1) {
+        var c = data[i];
+        if (c == 59) { break; }   // ';'
+        var d = hexVal(c);
+        if (d < 0) { return -1; }
+        size = size * 16 + d;
+        has = true;
+    }
+    if (!has) { return -1; }
+    return size;
+}
+
+// 编码：把 data 按 chunkSize 切块 → "size\r\n数据\r\n ... 0\r\n\r\n"。
+// chunkSize <= 0 时用 4096。
+export
+func encodeChunked(data [&#]byte, chunkSize int) string$String {
+    var sb = string$newBuilderRef();
+    var cs = chunkSize;
+    if (cs <= 0) { cs = 4096; }
+    var pos = 0;
+    for (pos < data.length) {
+        var n = cs;
+        if (pos + n > data.length) { n = data.length - pos; }
+        sb.appendBytes(formatHex(n));
+        sb.appendBytes("\r\n");
+        sb.write(data, pos, n);
+        sb.appendBytes("\r\n");
+        pos += n;
+    }
+    sb.appendBytes("0\r\n\r\n");
+    var out = sb.build();
+    return out;
+}
+
+// 解码 chunked 体。返回 (body, state)：
+//   OK        → 到结束块 0 + 空行，body 非 nil；
+//   NeedMore  → 数据未到齐（缺 chunk 大小行 / 数据 / trailer / 结束空行）；
+//   BadRequest→ chunk 大小非法 / 数据后无 CRLF / trailer 字段非法；
+//   TooLarge  → 单个 chunk 超 MAX_CHUNK_SIZE。
+export
+func decodeChunked(data [&#]byte) (*?ChunkedBody, ParseState) {
+    var sb = string$newBuilderRef();
+    var body = new(ChunkedBody);
+    var pos = 0;
+    for (true) {
+        var lineEnd = findCRLF(data, pos);
+        if (lineEnd < 0) { return (nil, ParseState.NeedMore); }
+        var size = parseChunkSize(data, pos, lineEnd);
+        if (size < 0) { return (nil, ParseState.BadRequest); }
+        pos = lineEnd + 2;
+        if (size == 0) {
+            // 结束块：解析 trailer 直到空行
+            for (true) {
+                var e = findCRLF(data, pos);
+                if (e < 0) { return (nil, ParseState.NeedMore); }
+                if (e == pos) {   // 空行 = 结束
+                    var s = sb.build();
+                    body.data = s;
+                    return (body, ParseState.OK);
+                }
+                var hr = parseHeaderLine(sliceStr(data, pos, e));
+                if (!hr.2) { return (nil, ParseState.BadRequest); }
+                body.trailers.add(hr.0, hr.1);
+                pos = e + 2;
+            }
+        }
+        if (size > MAX_CHUNK_SIZE) { return (nil, ParseState.TooLarge); }
+        if (pos + size + 2 > data.length) { return (nil, ParseState.NeedMore); }
+        if (data[pos + size] != 13 || data[pos + size + 1] != 10) {
+            return (nil, ParseState.BadRequest);
+        }
+        sb.write(data, pos, size);
+        pos += size + 2;
+    }
+}
