@@ -144,6 +144,12 @@ public class ExprWriter extends CWriter<ExprWriter> {
      */
     private ExprWriter castRef(Expression v, TypeDeclarer t, boolean noRefInc) {
         var rt = v.resultType.must();
+        if (v instanceof LiteralExpression le &&
+                le.literal() instanceof StringLiteral &&
+                ArrayTypeDeclarer.isByteArray(t)) {
+            context.exprs.writeValue(v, t);
+            return this;
+        }
         if (t.baseTypeSame(rt)) {
             // SRef 数组 → PRef 数组：包装 .$values & .$length 字段
             if (t instanceof ArrayTypeDeclarer tat && rt instanceof ArrayTypeDeclarer rat

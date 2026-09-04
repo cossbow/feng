@@ -17,9 +17,7 @@ import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Stack;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 语句发射器（阶段 4b）。
