@@ -315,7 +315,7 @@ public class TypeWriter extends CWriter<TypeWriter> {
             write("static struct { Feng$Header header; struct { Byte $values[")
                     .write(sl.length()).write("]; } array; } ");
             literalString(sl);
-            write(" = {{.refcnt = 1}, {{");
+            write(" = {{.refcnt = 1, .global = 1}, {{");
             for (byte b : sl.value()) write(b).write(',');
             write("}}}").endStmt();
         }

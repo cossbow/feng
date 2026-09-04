@@ -40,6 +40,8 @@ typedef struct Feng$Header {
 #endif
     _Alignas(max_align_t)
     int refcnt;
+    // global/static constant（如字符串池）：不参与引用计数，也永不释放
+    bool global : 1;
 } Feng$Header;
 
 #ifdef FENG_DEBUG_MEMORY
@@ -54,6 +56,7 @@ static inline void* Feng$alloc(int64_t size) {
     if (!p) abort();
     Feng$Header* fh = (Feng$Header*) p;
     fh->refcnt = 1;
+    fh->global = 0;
 #ifdef FENG_DEBUG_MEMORY
     fh->next = Feng$debug_list;
     Feng$debug_list = fh;
@@ -71,6 +74,7 @@ static inline Feng$Header* Feng$headerOf(void* p) {
 
 static inline void Feng$free(void* p) {
     if (!p) return;
+    if (Feng$headerOf(p)->global) return;  // global/static constant: never free
 #ifndef FENG_DEBUG_MEMORY
     free(Feng$headerOf(p));
 #endif
@@ -79,7 +83,9 @@ static inline void Feng$free(void* p) {
 // atomic inc/dec — cast plain int* to atomic_int* (Linux kernel style)
 static inline void* Feng$inc(void* p) {
     if (!p) return p;
-    int* prc = &Feng$headerOf(p)->refcnt;
+    Feng$Header* fh = Feng$headerOf(p);
+    if (fh->global) return p;
+    int* prc = &fh->refcnt;
     int ref = atomic_fetch_add((atomic_int*)prc, 1);
     if (ref < 1) abort();
     return p;
@@ -88,7 +94,9 @@ static inline void* Feng$inc(void* p) {
 // return true if refcnt reaches 0 (caller should release)
 static inline bool Feng$dec(void* p) {
     if (!p) return false;
-    int* prc = &Feng$headerOf(p)->refcnt;
+    Feng$Header* fh = Feng$headerOf(p);
+    if (fh->global) return false;
+    int* prc = &fh->refcnt;
     int ref = atomic_fetch_sub((atomic_int*)prc, 1) - 1;
     if (ref == 0) return true;
 #ifdef FENG_DEBUG_MEMORY
@@ -102,14 +110,18 @@ static inline bool Feng$dec(void* p) {
 // ===== non-atomic reference counting (non-sync types, single-threaded) =====
 static inline void* Feng$inc_ns(void* p) {
     if (!p) return p;
-    int ref = ++Feng$headerOf(p)->refcnt;
+    Feng$Header* fh = Feng$headerOf(p);
+    if (fh->global) return p;
+    int ref = ++fh->refcnt;
     if (ref <= 1) abort();
     return p;
 }
 
 static inline bool Feng$dec_ns(void* p) {
     if (!p) return false;
-    int ref = --Feng$headerOf(p)->refcnt;
+    Feng$Header* fh = Feng$headerOf(p);
+    if (fh->global) return false;
+    int ref = --fh->refcnt;
     if (ref == 0) return true;
 #ifdef FENG_DEBUG_MEMORY
     if (ref < 0) return false;  // allow over-release so the leak report still prints
@@ -206,7 +218,7 @@ static inline void* Feng$load_sl(void** f) {
     } while (!atomic_compare_exchange_weak((atomic_uintptr_t*)f, &raw, locked));
     // lock acquired; read ptr & inc refcnt
     void* p = (void*)(raw & ~(uintptr_t)1);
-    if (p) {
+    if (p && !Feng$headerOf(p)->global) {
         int* prc = &Feng$headerOf(p)->refcnt;
         atomic_fetch_add((atomic_int*)prc, 1);
     }
@@ -229,7 +241,7 @@ static inline void Feng$store_sl(void** f, void* src) {
     // lock acquired
     void* old = (void*)(raw & ~(uintptr_t)1);
     // inc src
-    if (src) {
+    if (src && !Feng$headerOf(src)->global) {
         int* prc = &Feng$headerOf(src)->refcnt;
         atomic_fetch_add((atomic_int*)prc, 1);
     }
@@ -325,6 +337,7 @@ static inline const struct Feng$Meta* Feng$objMeta(void* p) {
 // ===== destructor dispatch (Issue 1 root fix) =====
 // 非 final 虚派发实体；final 类不经过它（无 $meta），由 codegen 静态调 Feng$destroy_X。
 static inline void Feng$vDestroy(void* p) {
+    if (Feng$headerOf(p)->global) return;  // global/static constant: no destructor
     Feng$objMeta(p)->destroy(p);
 }
 
