@@ -583,17 +583,11 @@ public final class ReleaserBuilder {
 
     // ---- 辅助构造 ----
 
-    private static TypeDeclarer link(TypeDefinition def) {
-        var dt = def.link();
-        return new DerivedTypeDeclarer(def.pos(), dt,
-                new Refer(def.pos(), ReferKind.PHANTOM, true, false));
-    }
-
     private static PrimaryExpression self(ClassDefinition cd) {
         var e = new CurrentExpression(cd.pos(), cd.symbol(), true);
         // expectType / resultType 都要设置：expectType 供虚引用参数（&expr），
         // resultType 供 ofMember 判 ->（destroy 内 self->$field 是 X* 指针访问）
-        var t = link(cd);
+        var t = cd.refer(cd.pos(), ReferKind.PHANTOM);
         e.expectType.set(t);
         e.resultType.set(t);
         return e;

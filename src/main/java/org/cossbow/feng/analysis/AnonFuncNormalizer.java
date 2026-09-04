@@ -5,12 +5,14 @@ import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
+import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.ast.oop.ClassDefinition;
-import org.cossbow.feng.ast.proc.*;
+import org.cossbow.feng.ast.proc.FixedParameter;
+import org.cossbow.feng.ast.proc.Procedure;
+import org.cossbow.feng.ast.proc.Prototype;
+import org.cossbow.feng.ast.proc.PrototypeDefinition;
 import org.cossbow.feng.ast.stmt.*;
-import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.dag.DAGGraph;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Groups;
@@ -331,7 +333,8 @@ public class AnonFuncNormalizer {
             pd = createProtoDef(key, normalized);
             protoMap.put(key, pd);
         }
-        var dt = pd.link();
+        var dt = new DerivedType(a.pos(), pd.symbol(),
+                TypeArguments.EMPTY);
         var result = new NamedFuncTypeDeclarer(a.pos(),
                 a.required(), dt, Lazy.of(pd));
         result.prototype(pd.prototype());

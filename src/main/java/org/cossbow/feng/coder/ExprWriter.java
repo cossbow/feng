@@ -6,11 +6,7 @@ import org.cossbow.feng.analysis.meta.VTable;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
-import org.cossbow.feng.ast.gen.DefinedType;
-import org.cossbow.feng.ast.gen.DerivedType;
-import org.cossbow.feng.ast.gen.GenericType;
-import org.cossbow.feng.ast.gen.PrimitiveType;
-import org.cossbow.feng.ast.gen.TypeArguments;
+import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.lit.Literal;
 import org.cossbow.feng.ast.lit.NilLiteral;
@@ -18,7 +14,6 @@ import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
-import org.cossbow.feng.ast.proc.FunctionDefinition;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
@@ -1132,8 +1127,7 @@ public class ExprWriter extends CWriter<ExprWriter> {
         var def = resolveNewDef(ndt, findType(ndt.type()));
         var nonFinal = def instanceof ClassDefinition cd && !cd.isFinal();
         var isBuiltin = def.builtin();
-        var dt = def.link(e.pos());
-        var et = new DerivedTypeDeclarer(e.pos(), dt);
+        var rt = e.resultType.must();
         e.arg().use(a -> {
             // new(Foo, {id=2}) → 块表达式：alloc + 赋值字段
             write("({ ").writeDefinedType(ndt.type()).write(" *_p = (")
@@ -1148,7 +1142,7 @@ public class ExprWriter extends CWriter<ExprWriter> {
                 write("Feng$alloc(sizeof(").writeDefinedType(ndt.type()).write("))");
             write("; ");
             // 整体拷贝（struct 拷贝或引用拷贝 + inc）
-            write("*_p = ").writeValue(a, et).endStmt();
+            write("*_p = ").writeValue(a, rt.derefer().must()).endStmt();
             if (nonFinal) {
                 // 整体拷贝覆盖了 $meta 指针（源值 $meta 可能 NULL 或不同类）；
                 // 恢复新类型的 meta，使 vDestroy 派发到正确析构。
