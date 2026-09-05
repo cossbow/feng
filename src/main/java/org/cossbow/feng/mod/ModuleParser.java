@@ -184,7 +184,7 @@ public class ModuleParser {
     private FModule parseOneModule(Path module) throws IOException {
         try (var ls = Files.list(absPath(module))) {
             var list = ls.toList();
-            var files = new ArrayList<Path>();
+            List<Path> files = new ArrayList<>();
             var cFiles = new ArrayList<Path>();
             for (var it : list) {
                 if (!Files.isRegularFile(it)) continue;
@@ -195,6 +195,7 @@ public class ModuleParser {
                     cFiles.add(it.toAbsolutePath().normalize());
                 }
             }
+            files = filterFengWhitelist(absPath(module), files);
             return parseModuleFiles(module, files, cFiles);
         }
     }
@@ -256,6 +257,36 @@ public class ModuleParser {
         }
     }
 
+    /**
+     * Filter .feng files by the os-specific {@code feng =} whitelist from
+     * {@code feng.cfg} (if any). When the current os has a whitelist, only
+     * the listed file names are kept; a whitelisted name that does not exist
+     * in the directory is a configuration error.
+     */
+    private List<Path> filterFengWhitelist(Path dir, List<Path> files)
+            throws IOException {
+        var cfg = ModuleConfig.load(dir);
+        var whitelist = cfg.fengFiles(os);
+        if (whitelist.isEmpty()) return files;
+
+        var wanted = new HashSet<>(whitelist);
+        var present = new HashSet<String>();
+        var kept = new ArrayList<Path>(files.size());
+        for (var f : files) {
+            var name = f.getFileName().toString();
+            present.add(name);
+            if (wanted.contains(name)) kept.add(f);
+        }
+        for (var name : whitelist) {
+            if (!present.contains(name)) {
+                return ErrorUtil.modFail(
+                        "feng.cfg: whitelisted source '%s' not found in %s",
+                        name, dir);
+            }
+        }
+        return kept;
+    }
+
     private List<Groups.G3<Path, List<Path>, List<Path>>> scanModule()
             throws IOException {
         var result = new ArrayList<Groups.G3<Path, List<Path>, List<Path>>>();
@@ -282,6 +313,7 @@ public class ModuleParser {
                         }
                     }
                 }
+                files = filterFengWhitelist(dir, files);
                 if (files.isEmpty() && !hasHeaders) {
                     continue;
                 }

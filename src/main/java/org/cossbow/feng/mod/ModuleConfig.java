@@ -16,6 +16,7 @@ import java.util.*;
  * # Common options — applied on all oss
  * link = m
  * testing = false
+ * feng = io_common.feng
  *
  * # os-specific section
  * [windows]
@@ -23,11 +24,12 @@ import java.util.*;
  *
  * [linux]
  * link = pthread,dl
+ * feng = ioring_linux.feng
  * }</pre>
  * <p>
  * Common options (outside any {@code [section]}) are always active.
  * os-specific options are merged on top when the current OS matches.
- * Keys are comma-separated where applicable (e.g. {@code link}).
+ * Keys are comma-separated where applicable (e.g. {@code link}, {@code feng}).
  */
 public class ModuleConfig {
 
@@ -37,13 +39,26 @@ public class ModuleConfig {
     private final List<String> commonLinkLibs;
     /** Libraries keyed by os name (e.g. "windows", "linux"). */
     private final Map<String, List<String>> osLinkLibs;
+    /** .feng whitelist from the common section (applied on all oss). */
+    private final List<String> commonFengFiles;
+    /**
+     * os-specific .feng whitelist keyed by os name. Merged with
+     * {@link #commonFengFiles}: when the merged list is non-empty for the
+     * target os, only the listed .feng files of the module directory are
+     * compiled; all other .feng files are ignored.
+     */
+    private final Map<String, List<String>> osFengFiles;
     private final boolean testing;
 
     private ModuleConfig(List<String> commonLinkLibs,
                          Map<String, List<String>> osLinkLibs,
+                         List<String> commonFengFiles,
+                         Map<String, List<String>> osFengFiles,
                          boolean testing) {
         this.commonLinkLibs = List.copyOf(commonLinkLibs);
         this.osLinkLibs = Map.copyOf(osLinkLibs);
+        this.commonFengFiles = List.copyOf(commonFengFiles);
+        this.osFengFiles = Map.copyOf(osFengFiles);
         this.testing = testing;
     }
 
@@ -74,6 +89,18 @@ public class ModuleConfig {
         return osLinkLibs.getOrDefault(os, List.of());
     }
 
+    /**
+     * .feng source whitelist resolved for the given <em>target</em> os:
+     * common section merged with os-specific section.
+     * Empty means no filtering (all .feng files in the module are compiled);
+     * otherwise only the listed file names are compiled for this os.
+     */
+    public List<String> fengFiles(TargetOS target) {
+        var merged = new LinkedHashSet<>(commonFengFiles);
+        merged.addAll(osFengFiles.getOrDefault(target.configKey(), List.of()));
+        return List.copyOf(merged);
+    }
+
     /** Whether this module is marked as test-only. */
     public boolean testing() {
         return testing;
@@ -82,7 +109,7 @@ public class ModuleConfig {
     // --- sentinel & factory ---
 
     public static final ModuleConfig EMPTY =
-            new ModuleConfig(List.of(), Map.of(), false);
+            new ModuleConfig(List.of(), Map.of(), List.of(), Map.of(), false);
 
     /**
      * Load configuration from a module directory.
@@ -99,6 +126,8 @@ public class ModuleConfig {
 
         var commonLink = new ArrayList<String>();
         var platLink = new LinkedHashMap<String, List<String>>();
+        var commonFeng = new ArrayList<String>();
+        var platFeng = new LinkedHashMap<String, List<String>>();
         var testing = false;
 
         String section = ""; // "" = common, else os name
@@ -136,6 +165,14 @@ public class ModuleConfig {
                     if (section.isEmpty()) {
                         testing = Boolean.parseBoolean(value);
                     }
+                } else if ("feng".equals(key)) {
+                    // .feng whitelist — common + os-specific
+                    if (section.isEmpty()) {
+                        commonFeng.addAll(parseList(value));
+                    } else {
+                        platFeng.computeIfAbsent(section, k -> new ArrayList<>())
+                                .addAll(parseList(value));
+                    }
                 }
             }
         }
@@ -147,8 +184,15 @@ public class ModuleConfig {
             dedupPlat.put(e.getKey(),
                     List.copyOf(new LinkedHashSet<>(e.getValue())));
         }
+        var dedupCommonFeng = new ArrayList<>(new LinkedHashSet<>(commonFeng));
+        var dedupFeng = new LinkedHashMap<String, List<String>>();
+        for (var e : platFeng.entrySet()) {
+            dedupFeng.put(e.getKey(),
+                    List.copyOf(new LinkedHashSet<>(e.getValue())));
+        }
 
-        return new ModuleConfig(dedupCommon, dedupPlat, testing);
+        return new ModuleConfig(dedupCommon, dedupPlat,
+                dedupCommonFeng, dedupFeng, testing);
     }
 
     // ---- internal helpers ----
