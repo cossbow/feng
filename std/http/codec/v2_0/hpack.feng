@@ -1,0 +1,327 @@
+// ===== std$http$codec$v2_0 — HPACK 头部块解码（RFC 7541）=====
+//
+// 纯 Fēng、无 I/O。静态表（附录 A，61 项）+ 动态表（§4.4，解码侧）
+// + 头部块解码（§6）。编码侧暂缓。
+// 字符串字面量的 Huffman 解码复用同模块 huffman.feng 的 huffmanDecode，
+// 变长整数复用 frame.feng 的 decodeVarInt。
+
+// ===== 头字段列表（解码输出 / H4 连接层复用）=====
+//
+// 模块内自研动态数组：规避跨模块泛型（container$Vector`Header`）实例化的
+// C 代码生成顺序问题（泛型实例化类型声明在本模块头，引用方头文件先包含会报
+// unknown type name）。Header 字段可空 → 数组元素可零值初始化。
+
+export
+class HeaderList final {
+    var buf [*?]Header;   // 内部缓冲（惰性分配）
+    var len int;          // 元素个数
+
+    export func length() int { return len; }
+
+    // 越界返回空头字段（调用方应先查 length）
+    export func get(index int) Header {
+        var b = buf;
+        if (b == nil) { return ({name="", value=""}); }
+        if (index < 0 || index >= len) { return ({name="", value=""}); }
+        return b[index];
+    }
+
+    export func append(e Header) {
+        var b = buf;
+        if (b == nil) {
+            var nb = new([8]Header);
+            buf = nb;
+            nb[0] = e;
+            len = 1;
+            return;
+        }
+        if (len >= b.length) {
+            var nb = new([len * 2]Header);
+            for (var i = 0; i < len; i += 1) { nb[i] = b[i]; }
+            buf = nb;
+            nb[len] = e;
+            len += 1;
+            return;
+        }
+        b[len] = e;
+        len += 1;
+    }
+}
+
+export
+func newHeaderList() *HeaderList {
+    return new(HeaderList);
+}
+
+// ===== 头字段模型 =====
+//
+// name/value 为可空强引用只读字节视图：静态表条目直接指向字符串字面量
+// （常量数据段，永不失效）；动态表条目与解码输出为独立拷贝。
+// 可空使类可被零值初始化（new 无需初始化器、数组元素可留空）。
+
+export
+class Header final {
+    export var name  [*?#]byte;
+    export var value [*?#]byte;
+}
+
+// 条目占用字节数（RFC 7541 §4.1：name 长 + value 长 + 32）
+func entrySize(nm [*?#]byte, v [*?#]byte) int {
+    var nl = 0;
+    if (nm != nil) { nl = nm.length; }
+    var vl = 0;
+    if (v != nil) { vl = v.length; }
+    return nl + vl + 32;
+}
+
+// ===== 静态表（RFC 7541 附录 A，索引 1..61）=====
+//
+// 以查找函数实现而非 const 引用数组：C 后端对含引用字段的 const 数组会生成
+// 含 Feng$inc_ns() 运行时调用的全局初始化器（非编译期常量）。字符串字面量指向
+// 常量数据段，永不失效，与 const 数组语义等价。index 由调用方保证在 1..61。
+
+func staticEntry(index int) Header {
+    if (index == 1) { return ({name=":authority", value=""}); }
+    if (index == 2) { return ({name=":method", value="GET"}); }
+    if (index == 3) { return ({name=":method", value="POST"}); }
+    if (index == 4) { return ({name=":path", value="/"}); }
+    if (index == 5) { return ({name=":path", value="/index.html"}); }
+    if (index == 6) { return ({name=":scheme", value="http"}); }
+    if (index == 7) { return ({name=":scheme", value="https"}); }
+    if (index == 8) { return ({name=":status", value="200"}); }
+    if (index == 9) { return ({name=":status", value="204"}); }
+    if (index == 10) { return ({name=":status", value="206"}); }
+    if (index == 11) { return ({name=":status", value="304"}); }
+    if (index == 12) { return ({name=":status", value="400"}); }
+    if (index == 13) { return ({name=":status", value="404"}); }
+    if (index == 14) { return ({name=":status", value="500"}); }
+    if (index == 15) { return ({name="accept-charset", value=""}); }
+    if (index == 16) { return ({name="accept-encoding", value="gzip, deflate"}); }
+    if (index == 17) { return ({name="accept-language", value=""}); }
+    if (index == 18) { return ({name="accept-ranges", value=""}); }
+    if (index == 19) { return ({name="accept", value=""}); }
+    if (index == 20) { return ({name="access-control-allow-origin", value=""}); }
+    if (index == 21) { return ({name="age", value=""}); }
+    if (index == 22) { return ({name="allow", value=""}); }
+    if (index == 23) { return ({name="authorization", value=""}); }
+    if (index == 24) { return ({name="cache-control", value=""}); }
+    if (index == 25) { return ({name="content-disposition", value=""}); }
+    if (index == 26) { return ({name="content-encoding", value=""}); }
+    if (index == 27) { return ({name="content-language", value=""}); }
+    if (index == 28) { return ({name="content-length", value=""}); }
+    if (index == 29) { return ({name="content-location", value=""}); }
+    if (index == 30) { return ({name="content-range", value=""}); }
+    if (index == 31) { return ({name="content-type", value=""}); }
+    if (index == 32) { return ({name="cookie", value=""}); }
+    if (index == 33) { return ({name="date", value=""}); }
+    if (index == 34) { return ({name="etag", value=""}); }
+    if (index == 35) { return ({name="expect", value=""}); }
+    if (index == 36) { return ({name="expires", value=""}); }
+    if (index == 37) { return ({name="from", value=""}); }
+    if (index == 38) { return ({name="host", value=""}); }
+    if (index == 39) { return ({name="if-match", value=""}); }
+    if (index == 40) { return ({name="if-modified-since", value=""}); }
+    if (index == 41) { return ({name="if-none-match", value=""}); }
+    if (index == 42) { return ({name="if-range", value=""}); }
+    if (index == 43) { return ({name="if-unmodified-since", value=""}); }
+    if (index == 44) { return ({name="last-modified", value=""}); }
+    if (index == 45) { return ({name="link", value=""}); }
+    if (index == 46) { return ({name="location", value=""}); }
+    if (index == 47) { return ({name="max-forwards", value=""}); }
+    if (index == 48) { return ({name="proxy-authenticate", value=""}); }
+    if (index == 49) { return ({name="proxy-authorization", value=""}); }
+    if (index == 50) { return ({name="range", value=""}); }
+    if (index == 51) { return ({name="referer", value=""}); }
+    if (index == 52) { return ({name="refresh", value=""}); }
+    if (index == 53) { return ({name="retry-after", value=""}); }
+    if (index == 54) { return ({name="server", value=""}); }
+    if (index == 55) { return ({name="set-cookie", value=""}); }
+    if (index == 56) { return ({name="strict-transport-security", value=""}); }
+    if (index == 57) { return ({name="transfer-encoding", value=""}); }
+    if (index == 58) { return ({name="user-agent", value=""}); }
+    if (index == 59) { return ({name="vary", value=""}); }
+    if (index == 60) { return ({name="via", value=""}); }
+    if (index == 61) { return ({name="www-authenticate", value=""}); }
+    return ({name="", value=""});
+}
+
+// ===== 动态表（RFC 7541 §2.3.3 / §4.4，解码侧）=====
+//
+// 容量上限 4096 / 最小条目 32 字节 → 至多 128 条，固定数组足够。
+// 数组语义：buf[0] = 最新条目；最旧条目在尾部（先驱逐）。
+// 全局索引 = 静态(1..61) + 动态(62..，动态索引 62 指向 buf[0])。
+
+const DYNAMIC_SLOTS int = 128;
+
+export
+class HeaderTable final {
+    var cap   int;            // 当前容量（SETTINGS_HEADER_TABLE_SIZE，默认 4096）
+    var total int;            // 已用字节数
+    var n     int;            // 动态条目数
+    var buf [128]Header;      // 条目（buf[0] = 最新）
+
+    // 复位为默认容量、清空
+    export func reset() {
+        cap = DEFAULT_HEADER_TABLE_SIZE;
+        total = 0;
+        n = 0;
+    }
+
+    export func capacity() int { return cap; }
+    export func size() int { return total; }
+
+    // 当前总条目数（静态 61 + 动态）
+    export func length() int { return n + 61; }
+
+    // 全局索引查找（1 起；≤61 静态，>61 动态）
+    export func lookup(index int) (Header, bool) {
+        if (index >= 1 && index <= 61) { return (staticEntry(index), true); }
+        var d = index - 61;
+        if (d >= 1 && d <= n) { return (buf[d - 1], true); }
+        return ({name="", value=""}, false);
+    }
+
+    // §4.4 插入：新条目超容量 → 清空整个表；
+    // 否则从最旧起驱逐直至放得下，然后插到 buf[0]。
+    export func add(e Header) {
+        var es = entrySize(e.name, e.value);
+        if (es > cap) { n = 0; total = 0; return; }
+        for (total + es > cap && n > 0) { evictLast(); }
+        var i = n;
+        for (i > 0) { buf[i] = buf[i - 1]; i -= 1; }
+        buf[0] = e;
+        n += 1;
+        total += es;
+    }
+
+    // §6.3 动态表容量更新：降低容量时逐出最旧条目
+    export func setCapacity(size int) {
+        cap = size;
+        for (total > cap && n > 0) { evictLast(); }
+    }
+
+    func evictLast() {
+        var e = buf[n - 1];
+        n -= 1;
+        total -= entrySize(e.name, e.value);
+    }
+}
+
+// 工厂：新建解码侧动态表（容量 = 默认 4096）
+export
+func newHeaderTable() *HeaderTable {
+    var t = new(HeaderTable);
+    t.reset();
+    return t;
+}
+
+// ===== 字符串字面量（RFC 7541 §5.2）=====
+//
+// H(1) | 长度(7) | 数据；H=1 时数据为 Huffman 编码（复用 huffmanDecode）。
+// 返回 (字节拷贝, 下一偏移, ok)；ok=false 表示数据不足或 Huffman 非法。
+
+func readString(data [&#]byte, from int) ([*?#]byte, int, bool) {
+    if (from >= data.length) { return (nil, from, false); }
+    var b0 = int(data[from]);
+    var huff = (b0 & 0x80) != 0;
+    var r = decodeVarInt(data, from, 7);
+    if (!r.2) { return (nil, from, false); }
+    var n = int(r.0);
+    var pos = from + r.1;
+    if (pos + n > data.length) { return (nil, from, false); }
+    if (huff) {
+        var hr = huffmanDecode(data, pos, n);
+        if (!hr.1) { return (nil, from, false); }
+        var s = hr.0;
+        if (s == nil) { return (nil, from, false); }
+        return (s, pos + n, true);
+    }
+    var raw = new([n]byte);
+    for (var i = 0; i < n; i += 1) { raw[i] = data[pos + i]; }
+    return (raw, pos + n, true);
+}
+
+// ===== 字面量头字段（§6.2.x）=====
+//
+// pos 指向模式字节；prefixBits = 名称索引位数（6：增量索引，4：不索引/永不索引）。
+// 名称索引为 0 时名称以字符串字面量紧随模式字节。
+// 返回 (头字段, 下一偏移, ok)。
+
+func readLiteral(data [&#]byte, pos int, prefixBits int, table *HeaderTable) (Header, int, bool) {
+    var b0 = int(data[pos]);
+    var name [*?#]byte = "";
+    var value [*?#]byte = "";
+    var p = pos;
+    var mask = (1 << prefixBits) - 1;
+    if ((b0 & mask) == 0) {
+        // 名称是字符串字面量（紧随模式字节之后）
+        var sr = readString(data, pos + 1);
+        if (!sr.2) { return ({name="", value=""}, pos, false); }
+        name = sr.0;
+        p = sr.1;
+    } else {
+        var t = table;
+        var r = decodeVarInt(data, pos, prefixBits);
+        if (!r.2) { return ({name="", value=""}, pos, false); }
+        var lr = t.lookup(int(r.0));
+        if (!lr.1) { return ({name="", value=""}, pos, false); }
+        name = lr.0.name;
+        p = pos + r.1;
+    }
+    var vr = readString(data, p);
+    if (!vr.2) { return ({name="", value=""}, pos, false); }
+    value = vr.0;
+    p = vr.1;
+    return ({name=name, value=value}, p, true);
+}
+
+// ===== 头部块解码（RFC 7541 §6）=====
+//
+// 解码 data[from..to) 内的头部块（可跨 HEADERS/CONTINUATION 帧，帧重组由连接层做）。
+// 5 种表示：
+//   1xxxxxxx  Indexed Header Field（§6.1）
+//   01xxxxxx  Literal with Incremental Indexing（§6.2.1）
+//   001xxxxx  Dynamic Table Size Update（§6.3）
+//   0000xxxx  Literal without Indexing（§6.2.2）
+//   0001xxxx  Literal Never Indexed（§6.2.3）
+// 返回 (头部列表, ok)；ok=false 表示数据非法（压缩错误）或长度不足。
+
+export
+func decodeHeaderBlock(data [&#]byte, from, to int, table *HeaderTable) (*?HeaderList, bool) {
+    var t = table;
+    var hs = newHeaderList();
+    var pos = from;
+    var end = to;
+    for (pos < end) {
+        var b0 = int(data[pos]);
+        if ((b0 & 0x80) != 0) {
+            // §6.1 Indexed
+            var r = decodeVarInt(data, pos, 7);
+            if (!r.2) { return (nil, false); }
+            var lr = t.lookup(int(r.0));
+            if (!lr.1) { return (nil, false); }
+            hs.append(lr.0);
+            pos += r.1;
+        } else if ((b0 & 0x40) != 0) {
+            // §6.2.1 Literal with Incremental Indexing
+            var lr = readLiteral(data, pos, 6, t);
+            if (!lr.2) { return (nil, false); }
+            hs.append(lr.0);
+            t.add(lr.0);
+            pos = lr.1;
+        } else if ((b0 & 0x20) != 0) {
+            // §6.3 Dynamic Table Size Update
+            var r = decodeVarInt(data, pos, 5);
+            if (!r.2) { return (nil, false); }
+            t.setCapacity(int(r.0));
+            pos += r.1;
+        } else {
+            // §6.2.2 without Indexing / §6.2.3 Never Indexed
+            var lr = readLiteral(data, pos, 4, t);
+            if (!lr.2) { return (nil, false); }
+            hs.append(lr.0);
+            pos = lr.1;
+        }
+    }
+    return (hs, true);
+}

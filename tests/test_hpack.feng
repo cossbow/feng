@@ -1,0 +1,348 @@
+// ===== hpack.feng 单元测试（RFC 7541 附录 C 官方向量 + 错误用例）=====
+// 对应 docs/http-2.0-protocol.md 里程碑 H3；纯函数、无网络。
+// 头部块解码 + 动态表维护（含 SETTINGS_HEADER_TABLE_SIZE=256 下的逐出）。
+
+import std$testing;
+import std$http$codec$v2_0 h2;
+
+// ===== helpers =====
+
+func hexToBytes(h [*#]byte) [*]byte {
+    var n = h.length;
+    var r = new([n / 2]byte);
+    for (var i = 0; i < n / 2; i += 1) {
+        r[i] = byte(hexVal(h[i * 2]) << 4 | hexVal(h[i * 2 + 1]));
+    }
+    return r;
+}
+
+func hexVal(c byte) int {
+    if (int(c) >= 48 && int(c) <= 57) { return int(c) - 48; }      // '0'..'9'
+    if (int(c) >= 97 && int(c) <= 102) { return int(c) - 97 + 10; } // 'a'..'f'
+    return 0;
+}
+
+func bytesEquals(a [*?#]byte, b [*#]byte) bool {
+    if (a == nil) { return false; }
+    if (a.length != b.length) { return false; }
+    for (var i = 0; i < a.length; i += 1) {
+        if (a[i] != b[i]) { return false; }
+    }
+    return true;
+}
+
+// 校验解码结果第 idx 个字段 == (name, value)
+func checkHeader(hs *h2$HeaderList, idx int, name, value [*#]byte) bool {
+    if (hs.length() <= idx) { return false; }
+    var h = hs.get(idx);
+    if (!bytesEquals(h.name, name)) { return false; }
+    if (!bytesEquals(h.value, value)) { return false; }
+    return true;
+}
+
+// 解码一个头部块，返回 (是否成功, 头部列表)；表由调用方持有
+// 失败时返回空表占位（调用方只在 ok=true 时使用列表）
+func decodeBlock(t *h2$HeaderTable, hex [*#]byte) (bool, *h2$HeaderList) {
+    var data = hexToBytes(hex);
+    var r = h2$decodeHeaderBlock(data, 0, data.length, t);
+    if (!r.1) { return (false, h2$newHeaderList()); }
+    var hs = r.0;
+    if (hs == nil) { return (false, h2$newHeaderList()); }
+    return (true, hs);
+}
+
+// ===== C.2 独立表示示例 =====
+
+@Test
+func testC2_1_incremental_indexing() {
+    // 400a 637573746f6d2d6b6579 0d 637573746f6d2d686561646572
+    // custom-key: custom-header（字面量名 + 字面量值，加入动态表）
+    var t = h2$newHeaderTable();
+    var r = decodeBlock(t, "400a637573746f6d2d6b65790d637573746f6d2d686561646572");
+    testing$assertTrue(r.0);
+    var hs = r.1;
+    testing$assertTrue(hs.length() == 1);
+    testing$assertTrue(checkHeader(hs, 0, "custom-key", "custom-header"));
+    // 动态表：1 条，大小 10+13+32=55
+    testing$assertTrue(t.length() == 62);
+    testing$assertTrue(t.size() == 55);
+    var e = t.lookup(62);
+    testing$assertTrue(e.1);
+    testing$assertTrue(bytesEquals(e.0.name, "custom-key"));
+    testing$assertTrue(bytesEquals(e.0.value, "custom-header"));
+}
+
+@Test
+func testC2_2_without_indexing() {
+    // 04 0c 2f73616d706c652f70617468
+    // :path: /sample/path（索引名 + 字面量值，不入动态表）
+    var t = h2$newHeaderTable();
+    var r = decodeBlock(t, "040c2f73616d706c652f70617468");
+    testing$assertTrue(r.0);
+    var hs = r.1;
+    testing$assertTrue(hs.length() == 1);
+    testing$assertTrue(checkHeader(hs, 0, ":path", "/sample/path"));
+    testing$assertTrue(t.length() == 61);   // 动态表为空
+}
+
+@Test
+func testC2_3_never_indexed() {
+    // 10 08 70617373776f7264 06 736563726574
+    // password: secret（字面量名 + 字面量值，永不索引）
+    var t = h2$newHeaderTable();
+    var r = decodeBlock(t, "100870617373776f726406736563726574");
+    testing$assertTrue(r.0);
+    var hs = r.1;
+    testing$assertTrue(hs.length() == 1);
+    testing$assertTrue(checkHeader(hs, 0, "password", "secret"));
+    testing$assertTrue(t.length() == 61);
+}
+
+@Test
+func testC2_4_indexed() {
+    // 82 → 静态表索引 2：:method: GET
+    var t = h2$newHeaderTable();
+    var r = decodeBlock(t, "82");
+    testing$assertTrue(r.0);
+    var hs = r.1;
+    testing$assertTrue(hs.length() == 1);
+    testing$assertTrue(checkHeader(hs, 0, ":method", "GET"));
+    testing$assertTrue(t.length() == 61);
+}
+
+// ===== C.3 请求示例（无 Huffman，同一连接共享动态表）=====
+
+@Test
+func testC3_requests() {
+    var t = h2$newHeaderTable();
+
+    // C.3.1：索引引用 + :authority 增量索引
+    var r = decodeBlock(t, "828684410f7777772e6578616d706c652e636f6d");
+    testing$assertTrue(r.0);
+    var hs = r.1;
+    testing$assertTrue(hs.length() == 4);
+    testing$assertTrue(checkHeader(hs, 0, ":method", "GET"));
+    testing$assertTrue(checkHeader(hs, 1, ":scheme", "http"));
+    testing$assertTrue(checkHeader(hs, 2, ":path", "/"));
+    testing$assertTrue(checkHeader(hs, 3, ":authority", "www.example.com"));
+    testing$assertTrue(t.length() == 62);
+    testing$assertTrue(t.size() == 57);
+
+    // C.3.2：动态索引 62（:authority）+ cache-control 增量索引
+    r = decodeBlock(t, "828684be58086e6f2d6361636865");
+    testing$assertTrue(r.0);
+    hs = r.1;
+    testing$assertTrue(hs.length() == 5);
+    testing$assertTrue(checkHeader(hs, 3, ":authority", "www.example.com"));
+    testing$assertTrue(checkHeader(hs, 4, "cache-control", "no-cache"));
+    testing$assertTrue(t.length() == 63);
+    testing$assertTrue(t.size() == 110);
+
+    // C.3.3：动态索引 63（:authority）+ 字面量名 custom-key
+    r = decodeBlock(t, "828785bf400a637573746f6d2d6b65790c637573746f6d2d76616c7565");
+    testing$assertTrue(r.0);
+    hs = r.1;
+    testing$assertTrue(hs.length() == 5);
+    testing$assertTrue(checkHeader(hs, 0, ":method", "GET"));
+    testing$assertTrue(checkHeader(hs, 1, ":scheme", "https"));
+    testing$assertTrue(checkHeader(hs, 2, ":path", "/index.html"));
+    testing$assertTrue(checkHeader(hs, 3, ":authority", "www.example.com"));
+    testing$assertTrue(checkHeader(hs, 4, "custom-key", "custom-value"));
+    testing$assertTrue(t.length() == 64);
+    testing$assertTrue(t.size() == 164);
+}
+
+// ===== C.4 请求示例（Huffman 编码）=====
+
+@Test
+func testC4_requests_huffman() {
+    var t = h2$newHeaderTable();
+
+    var r = decodeBlock(t, "828684418cf1e3c2e5f23a6ba0ab90f4ff");
+    testing$assertTrue(r.0);
+    var hs = r.1;
+    testing$assertTrue(hs.length() == 4);
+    testing$assertTrue(checkHeader(hs, 3, ":authority", "www.example.com"));
+    testing$assertTrue(t.size() == 57);
+
+    r = decodeBlock(t, "828684be5886a8eb10649cbf");
+    testing$assertTrue(r.0);
+    hs = r.1;
+    testing$assertTrue(hs.length() == 5);
+    testing$assertTrue(checkHeader(hs, 4, "cache-control", "no-cache"));
+    testing$assertTrue(t.size() == 110);
+
+    r = decodeBlock(t, "828785bf408825a849e95ba97d7f8925a849e95bb8e8b4bf");
+    testing$assertTrue(r.0);
+    hs = r.1;
+    testing$assertTrue(hs.length() == 5);
+    testing$assertTrue(checkHeader(hs, 4, "custom-key", "custom-value"));
+    testing$assertTrue(t.size() == 164);
+}
+
+// ===== C.5 响应示例（无 Huffman，SETTINGS_HEADER_TABLE_SIZE=256 → 逐出）=====
+
+@Test
+func testC5_responses_eviction() {
+    var t = h2$newHeaderTable();
+    t.setCapacity(256);
+
+    // C.5.1
+    var r = decodeBlock(t,
+        "4803333032580770726976617465611d4d6f6e2c203231204f637420323031332032303a31333a323120474d546e1768747470733a2f2f7777772e6578616d706c652e636f6d");
+    testing$assertTrue(r.0);
+    var hs = r.1;
+    testing$assertTrue(hs.length() == 4);
+    testing$assertTrue(checkHeader(hs, 0, ":status", "302"));
+    testing$assertTrue(checkHeader(hs, 1, "cache-control", "private"));
+    testing$assertTrue(checkHeader(hs, 2, "date", "Mon, 21 Oct 2013 20:13:21 GMT"));
+    testing$assertTrue(checkHeader(hs, 3, "location", "https://www.example.com"));
+    testing$assertTrue(t.length() == 65);
+    testing$assertTrue(t.size() == 222);
+
+    // C.5.2：插入 :status 307 时逐出 :status 302
+    r = decodeBlock(t, "4803333037c1c0bf");
+    testing$assertTrue(r.0);
+    hs = r.1;
+    testing$assertTrue(hs.length() == 4);
+    testing$assertTrue(checkHeader(hs, 0, ":status", "307"));
+    testing$assertTrue(checkHeader(hs, 1, "cache-control", "private"));
+    testing$assertTrue(checkHeader(hs, 2, "date", "Mon, 21 Oct 2013 20:13:21 GMT"));
+    testing$assertTrue(checkHeader(hs, 3, "location", "https://www.example.com"));
+    // 动态索引 62 现为 :status: 307（旧的 :status: 302 已被逐出）
+    testing$assertTrue(t.length() == 65);
+    testing$assertTrue(t.size() == 222);
+    var e = t.lookup(62);
+    testing$assertTrue(e.1);
+    testing$assertTrue(bytesEquals(e.0.name, ":status"));
+    testing$assertTrue(bytesEquals(e.0.value, "307"));
+
+    // C.5.3：date 变更 + content-encoding + set-cookie 增量索引触发多次逐出
+    // （原始编码；Huffman 版见 C.6.3）
+    r = decodeBlock(t,
+        "88c1611d4d6f6e2c203231204f637420323031332032303a31333a323220474d54c05a04677a69707738666f6f3d4153444a4b48514b425a584f5157454f50495541585157454f49553b206d61782d6167653d333630303b2076657273696f6e3d31");
+    testing$assertTrue(r.0);
+    hs = r.1;
+    testing$assertTrue(hs.length() == 6);
+    testing$assertTrue(checkHeader(hs, 0, ":status", "200"));
+    testing$assertTrue(checkHeader(hs, 1, "cache-control", "private"));
+    testing$assertTrue(checkHeader(hs, 2, "date", "Mon, 21 Oct 2013 20:13:22 GMT"));
+    testing$assertTrue(checkHeader(hs, 3, "location", "https://www.example.com"));
+    testing$assertTrue(checkHeader(hs, 4, "content-encoding", "gzip"));
+    testing$assertTrue(checkHeader(hs, 5, "set-cookie",
+        "foo=ASDJKHQKBZXOQWEOPIUAXQWEOIU; max-age=3600; version=1"));
+    // 逐出后动态表剩 3 条：set-cookie / content-encoding / date
+    testing$assertTrue(t.length() == 64);
+    testing$assertTrue(t.size() == 215);
+    var e2 = t.lookup(62);
+    testing$assertTrue(e2.1);
+    testing$assertTrue(bytesEquals(e2.0.name, "set-cookie"));
+}
+
+// ===== C.6 响应示例（Huffman 编码，SETTINGS_HEADER_TABLE_SIZE=256）=====
+
+@Test
+func testC6_responses_huffman() {
+    var t = h2$newHeaderTable();
+    t.setCapacity(256);
+
+    // C.6.1
+    var r = decodeBlock(t,
+        "488264025885aec3771a4b6196d07abe941054d444a8200595040b8166e082a62d1bff6e919d29ad171863c78f0b97c8e9ae82ae43d3");
+    testing$assertTrue(r.0);
+    var hs = r.1;
+    testing$assertTrue(hs.length() == 4);
+    testing$assertTrue(checkHeader(hs, 0, ":status", "302"));
+    testing$assertTrue(checkHeader(hs, 1, "cache-control", "private"));
+    testing$assertTrue(checkHeader(hs, 2, "date", "Mon, 21 Oct 2013 20:13:21 GMT"));
+    testing$assertTrue(checkHeader(hs, 3, "location", "https://www.example.com"));
+    testing$assertTrue(t.size() == 222);
+
+    // C.6.2：:status 307（Huffman）
+    r = decodeBlock(t, "4883640effc1c0bf");
+    testing$assertTrue(r.0);
+    hs = r.1;
+    testing$assertTrue(hs.length() == 4);
+    testing$assertTrue(checkHeader(hs, 0, ":status", "307"));
+    testing$assertTrue(checkHeader(hs, 3, "location", "https://www.example.com"));
+    testing$assertTrue(t.size() == 222);
+
+    // C.6.3：content-encoding: gzip + set-cookie 大值（Huffman，多次逐出）
+    r = decodeBlock(t,
+        "88c16196d07abe941054d444a8200595040b8166e084a62d1bffc05a839bd9ab77ad94e7821dd7f2e6c7b335dfdfcd5b3960d5af27087f3672c1ab270fb5291f9587316065c003ed4ee5b1063d5007");
+    testing$assertTrue(r.0);
+    hs = r.1;
+    testing$assertTrue(hs.length() == 6);
+    testing$assertTrue(checkHeader(hs, 0, ":status", "200"));
+    testing$assertTrue(checkHeader(hs, 1, "cache-control", "private"));
+    testing$assertTrue(checkHeader(hs, 2, "date", "Mon, 21 Oct 2013 20:13:22 GMT"));
+    testing$assertTrue(checkHeader(hs, 3, "location", "https://www.example.com"));
+    testing$assertTrue(checkHeader(hs, 4, "content-encoding", "gzip"));
+    testing$assertTrue(checkHeader(hs, 5, "set-cookie",
+        "foo=ASDJKHQKBZXOQWEOPIUAXQWEOIU; max-age=3600; version=1"));
+}
+
+// ===== 动态表容量更新（§6.3）=====
+
+@Test
+func testSizeUpdate_clear_and_restore() {
+    // 先插入 custom-key: custom-header（55 字节）
+    var t = h2$newHeaderTable();
+    var r = decodeBlock(t, "400a637573746f6d2d6b65790d637573746f6d2d686561646572");
+    testing$assertTrue(r.0);
+    testing$assertTrue(t.size() == 55);
+
+    // 头部块开头出现 Dynamic Table Size Update: 0 → 清空动态表；
+    // 随后 40 增量索引条目（55 字节 > 容量 0）不入表（RFC 7541 §4.4）
+    r = decodeBlock(t, "20400a637573746f6d2d6b65790d637573746f6d2d686561646572");
+    testing$assertTrue(r.0);
+    var hs = r.1;
+    testing$assertTrue(hs.length() == 1);
+    testing$assertTrue(checkHeader(hs, 0, "custom-key", "custom-header"));
+    testing$assertTrue(t.capacity() == 0);
+    testing$assertTrue(t.size() == 0);      // 容量 0 后条目被清空
+    testing$assertTrue(t.length() == 61);   // 只剩静态表
+}
+
+// ===== 错误用例 =====
+
+// 解码应当失败的输入
+func expectFail(t *h2$HeaderTable, hex [*#]byte) bool {
+    var r = decodeBlock(t, hex);
+    return !r.0;
+}
+
+@Test
+func testErr_index_zero() {
+    // 80 → Indexed，索引 0（非法）
+    var t = h2$newHeaderTable();
+    testing$assertTrue(expectFail(t, "80"));
+}
+
+@Test
+func testErr_index_out_of_range() {
+    // ff 01 → Indexed，索引 128 > 61+0（非法）
+    var t = h2$newHeaderTable();
+    testing$assertTrue(expectFail(t, "ff01"));
+}
+
+@Test
+func testErr_truncated_value() {
+    // 值字面量长度超剩余数据
+    var t = h2$newHeaderTable();
+    testing$assertTrue(expectFail(t, "400a637573746f6d2d6b65790d"));
+}
+
+@Test
+func testErr_bad_huffman_padding() {
+    // :authority + Huffman 值，末字节 0xfe（填充非全 1）→ Huffman 解码失败
+    var t = h2$newHeaderTable();
+    testing$assertTrue(expectFail(t, "418cf1e3c2e5f23a6ba0ab90f4fe"));
+}
+
+@Test
+func testErr_eos_in_huffman_value() {
+    // Huffman 值内出现 EOS（0xffffffffffffff）
+    var t = h2$newHeaderTable();
+    testing$assertTrue(expectFail(t, "4187ffffffffffffff"));
+}

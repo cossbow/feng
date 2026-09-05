@@ -1,0 +1,452 @@
+// ===== std$http$codec$v2_0 — 二进制帧编解码（RFC 9113 §4 / §6）=====
+//
+// 纯 Fēng、无 I/O：只做「字节 ⇄ 帧」双向转换，不持有连接。
+// 帧头 9 字节手工拆装（大端），规避 C 位域字节序/布局问题（计划 §4.1）。
+// 帧类型 / 标志位见 RFC 9113 §6；变长整数见 RFC 7541 §5.1。
+
+// ===== 帧类型（id == 线格式字节值）=====
+
+export
+enum FrameType {
+    DATA, HEADERS, PRIORITY, RST_STREAM, SETTINGS,
+    PUSH_PROMISE, PING, GOAWAY, WINDOW_UPDATE, CONTINUATION,
+}
+
+// ===== 帧标志位 =====
+
+export const FLAG_ACK         int = 0x01;   // SETTINGS / PING
+export const FLAG_END_STREAM  int = 0x01;   // DATA / HEADERS
+export const FLAG_END_HEADERS int = 0x04;   // HEADERS / PUSH_PROMISE / CONTINUATION
+export const FLAG_PADDED      int = 0x08;   // DATA / HEADERS / PUSH_PROMISE
+export const FLAG_PRIORITY    int = 0x20;   // HEADERS
+
+// ===== 尺寸常量 =====
+
+export const FRAME_HEAD_SIZE int = 9;         // 帧头字节数
+export const MAX_FRAME_LEN   int = 0xFFFFFF;  // 24 位 Length 上限
+export const DEFAULT_MAX_FRAME_SIZE int = 16384;  // RFC 9113 §6.5.2 默认
+export const INITIAL_WINDOW_SIZE    int = 65535;  // RFC 9113 §6.9.2 默认
+export const DEFAULT_HEADER_TABLE_SIZE int = 4096; // RFC 7541 §4.2 默认
+
+// ===== Frame 模型 =====
+//
+// type 用 int 存线格式字节值（0..255）：扩展帧类型（RFC 9113 §8）必须能
+// 「忽略不报错」，而语言无 int→enum 转换，故不直接存 FrameType 枚举。
+
+@Sync
+export
+class Frame final {
+    export var length   int;          // payload 长度（不含 9 字节头）
+    export var type     int;          // 帧类型字节值（FrameType.id）
+    export var flags    int;          // 帧标志位（0..255）
+    export var streamId int;          // 31 位流标识（0 = 连接级）
+    export var payload  [*?#]byte;    // payload（无 payload 为 nil）
+}
+
+// ===== 字节段拷贝（payload 需独立于输入缓冲生命周期）=====
+
+func sliceBytes(data [&#]byte, from, to int) [*#]byte {
+    if (to <= from) { return new([0]byte); }
+    var n = to - from;
+    var r = new([n]byte);
+    for (var i = 0; i < n; i += 1) { r[i] = data[from + i]; }
+    return r;
+}
+
+// ===== 帧头拆装（RFC 9113 §4.1）=====
+//
+// Length(24) | Type(8) | Flags(8) | R(1) | StreamId(31)，共 9 字节，大端。
+// streamId 最高位 R 恒 0（保留）。
+
+// 拆帧头：data 从 from 起须 ≥ 9 字节。
+// 返回 (length, type, flags, streamId, ok)。
+export
+func parseFrameHead(data [&#]byte, from int) (int, int, int, int, bool) {
+    if (from + FRAME_HEAD_SIZE > data.length) { return (0, 0, 0, 0, false); }
+    var length = (int(data[from]) << 16) | (int(data[from + 1]) << 8) | int(data[from + 2]);
+    var type = int(data[from + 3]);
+    var flags = int(data[from + 4]);
+    var streamId = int((uint32(data[from + 5]) & 0x7F) << 24) |
+                   int((uint32(data[from + 6]) << 16)) |
+                   int((uint32(data[from + 7]) << 8)) |
+                   int(uint32(data[from + 8]));
+    return (length, type, flags, streamId, true);
+}
+
+// 装帧头（length ≤ 0xFFFFFF；streamId ≤ 0x7FFFFFFF）
+export
+func encodeFrameHead(type, flags, streamId, length int) [*#]byte {
+    var h = new([FRAME_HEAD_SIZE]byte);
+    h[0] = byte((length >> 16) & 0xFF);
+    h[1] = byte((length >> 8) & 0xFF);
+    h[2] = byte(length & 0xFF);
+    h[3] = byte(type & 0xFF);
+    h[4] = byte(flags & 0xFF);
+    h[5] = byte((streamId >> 24) & 0x7F);
+    h[6] = byte((streamId >> 16) & 0xFF);
+    h[7] = byte((streamId >> 8) & 0xFF);
+    h[8] = byte(streamId & 0xFF);
+    return h;
+}
+
+// 解析一个完整帧：data 从 from 起须含 9 字节头 + length 字节 payload。
+// 返回 (frame, 下一帧起始偏移, ok)；ok=false 表示数据不足（NeedMore）。
+// 注意：不校验 length 是否超对端 maxFrameSize（由连接层判定）。
+export
+func parseFrame(data [&#]byte, from int) (*?Frame, int, bool) {
+    var hr = parseFrameHead(data, from);
+    if (!hr.4) { return (nil, from, false); }
+    var length = hr.0;
+    if (from + FRAME_HEAD_SIZE + length > data.length) { return (nil, from, false); }
+    var f = new(Frame);
+    f.length = length;
+    f.type = hr.1;
+    f.flags = hr.2;
+    f.streamId = hr.3;
+    if (length == 0) { f.payload = nil; }   // 无 payload 为 nil（与 makeFrame 一致）
+    else { f.payload = sliceBytes(data, from + FRAME_HEAD_SIZE, from + FRAME_HEAD_SIZE + length); }
+    return (f, from + FRAME_HEAD_SIZE + length, true);
+}
+
+// 完整帧序列化：帧头 + payload
+export
+func encodeFrame(f *Frame) [*#]byte {
+    var head = encodeFrameHead(f.type, f.flags, f.streamId, f.length);
+    var payload = f.payload;
+    var total = FRAME_HEAD_SIZE;
+    if (payload != nil) { total += payload.length; }
+    var out = new([total]byte);
+    for (var i = 0; i < FRAME_HEAD_SIZE; i += 1) { out[i] = head[i]; }
+    if (payload != nil) {
+        for (var i = 0; i < payload.length; i += 1) { out[FRAME_HEAD_SIZE + i] = payload[i]; }
+    }
+    return out;
+}
+
+// 便捷构造：由 (type, flags, streamId, payload) 组装帧
+export
+func makeFrame(type, flags, streamId int, payload [*?#]byte) *Frame {
+    var f = new(Frame);
+    f.type = type;
+    f.flags = flags;
+    f.streamId = streamId;
+    f.payload = payload;
+    if (payload == nil) { f.length = 0; }
+    else { f.length = payload.length; }
+    return f;
+}
+
+// ===== 变长整数（RFC 7541 §5.1，HPACK 复用）=====
+//
+// N 位前缀：值 < 2^N-1 直接放入前缀；否则前缀全 1，随后每字节 7 位
+// （MSB=1 表示还有下一字节），值累加。decoder 用「前缀位全 1」判定续接。
+
+// 解码：返回 (值, 已消费字节数, ok)；ok=false 表示数据不足（截断）。
+export
+func decodeVarInt(data [&#]byte, from int, prefixBits int) (uint32, int, bool) {
+    if (from >= data.length) { return (0, 0, false); }
+    var mask uint32 = uint32((1 << prefixBits) - 1);
+    var b0 = data[from];
+    var v uint32 = uint32(b0) & mask;
+    if (v < mask) { return (v, 1, true); }
+    // 前缀位全 1 → 续接 7 位组
+    var shift = 0;
+    var i = from + 1;
+    for (i < data.length) {
+        var b = data[i];
+        v += uint32(b & 127) << shift;
+        i += 1;
+        if ((b & 128) == 0) { return (v, i - from, true); }
+        shift += 7;
+        if (shift > 28) { return (0, i - from, false); }   // 超 uint32 上限
+    }
+    return (0, data.length - from, false);                  // 截断
+}
+
+// 编码：返回字节序列（不含调用方需并入的模式位；前缀位全 1 时由调用方 OR）。
+// 最大 1 + 5 字节（uint32 / 7 位）。
+export
+func encodeVarInt(v uint32, prefixBits int) [*#]byte {
+    var mask uint32 = uint32((1 << prefixBits) - 1);
+    var buf [6]byte;
+    var n = 0;
+    if (v < mask) {
+        buf[0] = byte(v);
+        n = 1;
+    } else {
+        var rest = v - mask;
+        buf[0] = byte(mask);
+        n = 1;
+        for (rest >= 128) {
+            buf[n] = byte((rest % 128) + 128);
+            rest = rest / 128;
+            n += 1;
+        }
+        buf[n] = byte(rest);
+        n += 1;
+    }
+    var r = new([n]byte);
+    for (var i = 0; i < n; i += 1) { r[i] = buf[i]; }
+    return r;
+}
+
+// ===== 各帧 payload 编解码（RFC 9113 §6）=====
+
+// ---- DATA（§6.1）：[Pad Length]? Data [Pad]*（PADDED）----
+// 返回 (数据字节, ok)；数据不含 pad。
+export
+func parseDataPayload(payload [&#]byte, padded bool) ([*?#]byte, bool) {
+    var pos = 0;
+    var padLen = 0;
+    if (padded) {
+        if (payload.length < 1) { return (nil, false); }
+        padLen = int(payload[0]);
+        pos = 1;
+    }
+    if (padLen > payload.length - pos) { return (nil, false); }
+    var n = payload.length - pos - padLen;
+    var r = new([n]byte);
+    for (var i = 0; i < n; i += 1) { r[i] = payload[pos + i]; }
+    return (r, true);
+}
+
+// ---- HEADERS（§6.2）：[Pad Length]? [Priority]? Fragment [Pad]* ----
+// Priority = E(1) | StreamDep(31) | Weight(8)。
+
+export
+class HeadersBlock final {
+    export var fragment     [*?#]byte;
+    export var hasPriority  bool;
+    export var exclusive    bool;
+    export var depStreamId  int;
+    export var weight       int;    // 1..256
+}
+
+// 解析 HEADERS / PUSH_PROMISE / CONTINUATION 的 fragment（PUSH_PROMISE 的
+// promised stream id 由专用函数处理）。
+export
+func parseHeadersPayload(payload [&#]byte, padded, priority bool) (*?HeadersBlock, bool) {
+    var pos = 0;
+    var padLen = 0;
+    if (padded) {
+        if (payload.length < 1) { return (nil, false); }
+        padLen = int(payload[0]);
+        pos = 1;
+    }
+    if (padLen > payload.length - pos) { return (nil, false); }
+    var blk = new(HeadersBlock);
+    var fragStart = pos;
+    if (priority) {
+        if (payload.length - pos < 5) { return (nil, false); }
+        blk.hasPriority = true;
+        blk.exclusive = (payload[pos] & 0x80) != 0;
+        blk.depStreamId = int((uint32(payload[pos]) & 0x7F) << 24) |
+                          int((uint32(payload[pos + 1]) << 16)) |
+                          int((uint32(payload[pos + 2]) << 8)) |
+                          int(uint32(payload[pos + 3]));
+        blk.weight = int(payload[pos + 4]) + 1;
+        fragStart = pos + 5;
+    }
+    if (fragStart > payload.length - padLen) { return (nil, false); }
+    blk.fragment = sliceBytes(payload, fragStart, payload.length - padLen);
+    return (blk, true);
+}
+
+// 组装 HEADERS payload：fragment（暂不生成 padding/priority，压缩优化后置）
+export
+func encodeHeadersPayload(fragment [&#]byte) [*#]byte {
+    var r = new([fragment.length]byte);
+    for (var i = 0; i < fragment.length; i += 1) { r[i] = fragment[i]; }
+    return r;
+}
+
+// ---- PRIORITY（§6.3）：E | StreamDep(31) | Weight(8) ----
+// 返回 (depStreamId, weight, exclusive, ok)。一期只解析、忽略（RFC 9218 已废弃）。
+export
+func parsePriorityPayload(payload [&#]byte) (int, int, bool, bool) {
+    if (payload.length != 5) { return (0, 0, false, false); }
+    var exclusive = (payload[0] & 0x80) != 0;
+    var dep = int((uint32(payload[0]) & 0x7F) << 24) |
+              int((uint32(payload[1]) << 16)) |
+              int((uint32(payload[2]) << 8)) |
+              int(uint32(payload[3]));
+    var weight = int(payload[4]) + 1;
+    return (dep, weight, exclusive, true);
+}
+
+// ---- RST_STREAM（§6.4）：ErrorCode(32) ----
+export
+func parseRstStreamPayload(payload [&#]byte) (int, bool) {
+    if (payload.length != 4) { return (0, false); }
+    var err = int((uint32(payload[0]) << 24) |
+                  (uint32(payload[1]) << 16) |
+                  (uint32(payload[2]) << 8) |
+                   uint32(payload[3]));
+    return (err, true);
+}
+
+export
+func encodeRstStreamPayload(err int) [*#]byte {
+    var r = new([4]byte);
+    r[0] = byte((err >> 24) & 0xFF);
+    r[1] = byte((err >> 16) & 0xFF);
+    r[2] = byte((err >> 8) & 0xFF);
+    r[3] = byte(err & 0xFF);
+    return r;
+}
+
+// ---- SETTINGS（§6.5）：(id uint16, value uint32) * N，6 字节一组 ----
+
+export
+class Setting final {
+    export var id    int;
+    export var value uint32;
+}
+
+export
+func parseSettingsPayload(payload [&#]byte) ([*]Setting, bool) {
+    if ((payload.length % 6) != 0) { return (new([0]Setting), false); }
+    var n = payload.length / 6;
+    var r = new([n]Setting);
+    for (var i = 0; i < n; i += 1) {
+        var p = i * 6;
+        var st Setting = {
+            id=int((uint16(payload[p]) << 8) | uint16(payload[p + 1])),
+            value=(uint32(payload[p + 2]) << 24) |
+                  (uint32(payload[p + 3]) << 16) |
+                  (uint32(payload[p + 4]) << 8)  |
+                   uint32(payload[p + 5]),
+        };
+        r[i] = st;
+    }
+    return (r, true);
+}
+
+export
+func encodeSettingsPayload(settings [&#]Setting) [*#]byte {
+    var n = settings.length;
+    var out = new([n * 6]byte);
+    for (var i = 0; i < n; i += 1) {
+        var p = i * 6;
+        var st = settings[i];
+        var id = st.id;
+        var v = st.value;
+        out[p] = byte((id >> 8) & 0xFF);
+        out[p + 1] = byte(id & 0xFF);
+        out[p + 2] = byte(v >> 24);
+        out[p + 3] = byte(v >> 16);
+        out[p + 4] = byte(v >> 8);
+        out[p + 5] = byte(v);
+    }
+    return out;
+}
+
+// ---- PUSH_PROMISE（§6.6）：[Pad Length]? PromisedStreamId(31) Fragment [Pad]* ----
+// 一期不做 server push；此函数供完整解析与测试。
+
+export
+class PushPromiseBlock final {
+    export var promisedId int;
+    export var fragment    [*?#]byte;
+}
+
+export
+func parsePushPromisePayload(payload [&#]byte, padded bool) (*?PushPromiseBlock, bool) {
+    var pos = 0;
+    var padLen = 0;
+    if (padded) {
+        if (payload.length < 1) { return (nil, false); }
+        padLen = int(payload[0]);
+        pos = 1;
+    }
+    if (padLen > payload.length - pos) { return (nil, false); }
+    if (payload.length - pos < 4) { return (nil, false); }
+    var blk = new(PushPromiseBlock);
+    blk.promisedId = int((uint32(payload[pos]) & 0x7F) << 24) |
+                     int((uint32(payload[pos + 1]) << 16)) |
+                     int((uint32(payload[pos + 2]) << 8)) |
+                     int(uint32(payload[pos + 3]));
+    var fragStart = pos + 4;
+    if (fragStart > payload.length - padLen) { return (nil, false); }
+    blk.fragment = sliceBytes(payload, fragStart, payload.length - padLen);
+    return (blk, true);
+}
+
+// ---- PING（§6.7）：8 字节 opaque ----
+
+export
+func parsePingPayload(payload [&#]byte) ([*?#]byte, bool) {
+    if (payload.length != 8) { return (nil, false); }
+    var r = new([8]byte);
+    for (var i = 0; i < 8; i += 1) { r[i] = payload[i]; }
+    return (r, true);
+}
+
+export
+func encodePingPayload(opaque [&#]byte) [*#]byte {
+    var r = new([8]byte);
+    var n = opaque.length;
+    if (n > 8) { n = 8; }
+    for (var i = 0; i < n; i += 1) { r[i] = opaque[i]; }
+    return r;
+}
+
+// ---- GOAWAY（§6.8）：LastStreamId(31) ErrorCode(32) [Debug]* ----
+// 返回 (lastStreamId, errorCodeId, debugData, ok)。
+
+export
+func parseGoawayPayload(payload [&#]byte) (int, int, [*?#]byte, bool) {
+    if (payload.length < 8) { return (0, 0, nil, false); }
+    var last = int((uint32(payload[0]) & 0x7F) << 24) |
+               int((uint32(payload[1]) << 16)) |
+               int((uint32(payload[2]) << 8)) |
+               int(uint32(payload[3]));
+    var err = int((uint32(payload[4]) << 24) |
+                  (uint32(payload[5]) << 16) |
+                  (uint32(payload[6]) << 8) |
+                   uint32(payload[7]));
+    var debug = sliceBytes(payload, 8, payload.length);
+    return (last, err, debug, true);
+}
+
+export
+func encodeGoawayPayload(lastStreamId, err int, debug [&#]byte) [*#]byte {
+    var n = debug.length;
+    var out = new([8 + n]byte);
+    out[0] = byte((lastStreamId >> 24) & 0x7F);
+    out[1] = byte((lastStreamId >> 16) & 0xFF);
+    out[2] = byte((lastStreamId >> 8) & 0xFF);
+    out[3] = byte(lastStreamId & 0xFF);
+    out[4] = byte((err >> 24) & 0xFF);
+    out[5] = byte((err >> 16) & 0xFF);
+    out[6] = byte((err >> 8) & 0xFF);
+    out[7] = byte(err & 0xFF);
+    for (var i = 0; i < n; i += 1) { out[8 + i] = debug[i]; }
+    return out;
+}
+
+// ---- WINDOW_UPDATE（§6.9）：R(1) | WindowSizeIncrement(31) ----
+// 返回 (increment, ok)。increment == 0 属协议错误，由连接层判定。
+
+export
+func parseWindowUpdatePayload(payload [&#]byte) (int, bool) {
+    if (payload.length != 4) { return (0, false); }
+    var incr = int((uint32(payload[0]) & 0x7F) << 24) |
+               int((uint32(payload[1]) << 16)) |
+               int((uint32(payload[2]) << 8)) |
+               int(uint32(payload[3]));
+    return (incr, true);
+}
+
+export
+func encodeWindowUpdatePayload(increment int) [*#]byte {
+    var r = new([4]byte);
+    r[0] = byte((increment >> 24) & 0x7F);
+    r[1] = byte((increment >> 16) & 0xFF);
+    r[2] = byte((increment >> 8) & 0xFF);
+    r[3] = byte(increment & 0xFF);
+    return r;
+}
+
+// ---- CONTINUATION（§6.10）：Header Block Fragment ----
+// payload 即 fragment，无额外字段；复用 sliceBytes / HeadersBlock。

@@ -1,0 +1,617 @@
+// ===== std$http$codec$v2_0 — 连接级状态与帧分派（RFC 9113 §5 / §6）=====
+//
+// 纯 Fēng、无 I/O：dispatch 喂入已解码帧，返回「应执行的动作」列表
+// （回帧 / 头部上抛 / DATA 上抛 / 流关闭 / 连接错误），网络层负责执行。
+// 本端/对端 Settings、连接级窗口、流表、HPACK 解码器状态全部聚合于 Connection。
+
+// ===== SETTINGS 参数 ID（RFC 9113 §6.5.2）=====
+
+export const SETTINGS_HEADER_TABLE_SIZE      int = 0x01;
+export const SETTINGS_ENABLE_PUSH            int = 0x02;
+export const SETTINGS_MAX_CONCURRENT_STREAMS int = 0x03;
+export const SETTINGS_INITIAL_WINDOW_SIZE    int = 0x04;
+export const SETTINGS_MAX_FRAME_SIZE         int = 0x05;
+export const SETTINGS_MAX_HEADER_LIST_SIZE   int = 0x06;
+
+// RFC 默认值：MAX_CONCURRENT_STREAMS 未设置 = 无限制
+export const DEFAULT_MAX_CONCURRENT_STREAMS int = 0x7FFFFFFF;
+
+// ===== Settings 模型（本端要发的 / 对端已通告的）=====
+
+export
+class Settings final {
+    export var headerTableSize int;       // 0x01，默认 4096
+    export var enablePush int;            // 0x02，默认 0（本端恒 0，不做 server push）
+    export var maxConcurrentStreams int;  // 0x03，默认无限制
+    export var initialWindowSize int;     // 0x04，默认 65535
+    export var maxFrameSize int;          // 0x05，默认 16384
+    export var maxHeaderListSize int;     // 0x06，默认 0 = 无限制
+}
+
+export
+func newSettings() *Settings {
+    var s = new(Settings);
+    s.headerTableSize = DEFAULT_HEADER_TABLE_SIZE;
+    s.enablePush = 0;
+    s.maxConcurrentStreams = DEFAULT_MAX_CONCURRENT_STREAMS;
+    s.initialWindowSize = INITIAL_WINDOW_SIZE;
+    s.maxFrameSize = DEFAULT_MAX_FRAME_SIZE;
+    s.maxHeaderListSize = 0;
+    return s;
+}
+
+// 应用一条 SETTINGS 参数：返回 (错误码, 是否失败)。
+// 失败时错误码 ∈ {PROTOCOL_ERROR, FLOW_CONTROL_ERROR}，连接层转连接错误；
+// 未知参数 ID 忽略（RFC 9113 §6.5.2）。
+export
+func applySetting(s *Settings, id int, v uint32) (int, bool) {
+    if (id == SETTINGS_HEADER_TABLE_SIZE) {
+        s.headerTableSize = int(v);
+        return (ErrorCode.NO_ERROR.id, false);
+    }
+    if (id == SETTINGS_ENABLE_PUSH) {
+        if (v != 0) { return (ErrorCode.PROTOCOL_ERROR.id, true); }  // 恒 0，对端发非 0 → 错误
+        s.enablePush = int(v);
+        return (ErrorCode.NO_ERROR.id, false);
+    }
+    if (id == SETTINGS_MAX_CONCURRENT_STREAMS) {
+        s.maxConcurrentStreams = int(v);
+        return (ErrorCode.NO_ERROR.id, false);
+    }
+    if (id == SETTINGS_INITIAL_WINDOW_SIZE) {
+        if (v > 0x7FFFFFFF) { return (ErrorCode.FLOW_CONTROL_ERROR.id, true); }
+        s.initialWindowSize = int(v);
+        return (ErrorCode.NO_ERROR.id, false);
+    }
+    if (id == SETTINGS_MAX_FRAME_SIZE) {
+        if (v < 16384 || v > 0xFFFFFF) { return (ErrorCode.PROTOCOL_ERROR.id, true); }
+        s.maxFrameSize = int(v);
+        return (ErrorCode.NO_ERROR.id, false);
+    }
+    if (id == SETTINGS_MAX_HEADER_LIST_SIZE) {
+        s.maxHeaderListSize = int(v);
+        return (ErrorCode.NO_ERROR.id, false);
+    }
+    return (ErrorCode.NO_ERROR.id, false);
+}
+
+// ===== 帧分派动作 =====
+//
+// dispatch 的输出：网络层据此写 socket / 上抛数据 / 关闭连接。
+// Fēng 无 sum type，用 kind 判别 + 各字段承载。
+
+export
+enum ActionKind {
+    ActionSendFrame,     // frame：待写出帧（SETTINGS ACK / WINDOW_UPDATE / RST_STREAM / GOAWAY / PING ACK）
+    ActionHeaders,       // 头部块解码完成：streamId + headers
+    ActionData,          // DATA 载荷上抛：streamId + data
+    ActionStreamClosed,  // 流正常关闭（END_STREAM 双方齐）：streamId
+    ActionStreamReset,   // 流被 RST_STREAM / 流错误：streamId + errorCode
+    ActionConnError,     // 连接错误：errorCode（应同时已发 GOAWAY，见 frame）
+    ActionGoaway,        // 收到对端 GOAWAY：errorCode + streamId=0
+}
+
+export
+class Action final {
+    export var kind ActionKind;         // 动作类型
+    export var frame *?Frame;           // ActionSendFrame：待写出帧
+    export var streamId int;            // 相关流（0 = 连接级）
+    export var errorCode int;           // ActionStreamReset / ActionConnError / ActionGoaway
+    export var headers *?HeaderList;    // ActionHeaders：解码出的头部块
+    export var data [*?#]byte;          // ActionData：DATA 载荷
+}
+
+// ===== 动作列表（模块本地动态数组，规避跨模块泛型）=====
+
+class ActionList final {
+    var buf [*?]Action;
+    var len int;
+
+    func length() int { return len; }
+
+    func get(index int) Action {
+        var b = buf;
+        if (b == nil) { return ({}); }
+        if (index < 0 || index >= len) { return ({}); }
+        return b[index];
+    }
+
+    func append(e Action) {
+        var b = buf;
+        if (b == nil) {
+            var nb = new([8]Action);
+            buf = nb;
+            nb[0] = e;
+            len = 1;
+            return;
+        }
+        if (len >= b.length) {
+            var nb = new([len * 2]Action);
+            for (var i = 0; i < len; i += 1) { nb[i] = b[i]; }
+            buf = nb;
+            nb[len] = e;
+            len += 1;
+            return;
+        }
+        b[len] = e;
+        len += 1;
+    }
+
+    // 导出为精确长度数组（dispatch 的返回类型）
+    func toArray() [*]Action {
+        var out = new([len]Action);
+        for (var i = 0; i < len; i += 1) { out[i] = get(i); }
+        return out;
+    }
+}
+
+// ===== Connection =====
+
+export
+class Connection final {
+    export var local *Settings;         // 本端设置（要发给对端的）
+    export var peer *Settings;          // 对端设置（从对端 SETTINGS 解析）
+    export var hpack *HeaderTable;      // HPACK 解码器（解码侧动态表）
+    var isServer bool;                  // 本端角色（决定流 id 奇偶与开流方向）
+    export var connSendWindow int;      // 连接级发送窗口（对端通告）
+    export var connRecvWindow int;      // 连接级接收窗口（本端）
+    export var connRecvUnacked int;     // 连接级已收未回补
+    export var nextStreamId int;        // 本端将发起的流 id（客户端 1,3,5…；服务端 2,4,6…）
+    export var lastPeerStreamId int;    // 对端发起的最大流 id（GOAWAY / 复用检测）
+    export var streamCount int;         // 活跃（未关）流数
+    export var goawaySent bool;         // 已发 GOAWAY（连接进入关闭流程）
+    export var goawayRecv bool;         // 已收对端 GOAWAY
+    export var goawayLastStreamId int;  // 对端 GOAWAY 携带的 lastStreamId
+    export var goawayErrCode int;       // 对端 GOAWAY 携带的错误码
+    var streams [*?]*?Stream;           // 流表（按下标 = streamId，元素为指针）
+}
+
+// 工厂：新建连接（isServer = 本端是否服务端）
+export
+func newConnection(isServer bool) *Connection {
+    var c = new(Connection, {local=newSettings(), peer=newSettings(), hpack=newHeaderTable(), isServer=isServer});
+    c.connSendWindow = INITIAL_WINDOW_SIZE;
+    c.connRecvWindow = INITIAL_WINDOW_SIZE;
+    c.connRecvUnacked = 0;
+    c.nextStreamId = 1;
+    if (isServer) { c.nextStreamId = 2; }
+    c.lastPeerStreamId = 0;
+    c.streamCount = 0;
+    c.goawaySent = false;
+    c.goawayRecv = false;
+    return c;
+}
+
+// ===== 流表访问（按下标 = streamId，惰性扩容）=====
+
+func findStream(c *Connection, id int) *?Stream {
+    var ss = c.streams;
+    if (ss == nil) { return nil; }
+    if (id < 0 || id >= ss.length) { return nil; }
+    return ss[id];
+}
+
+func putStream(c *Connection, s *Stream) {
+    var id = s.id;
+    var ss = c.streams;
+    if (ss == nil) {
+        var nb = new([id + 1]*?Stream);
+        nb[id] = s;
+        c.streams = nb;
+        return;
+    }
+    if (id >= ss.length) {
+        var nb = new([id + 1]*?Stream);
+        for (var i = 0; i < ss.length; i += 1) { nb[i] = ss[i]; }
+        nb[id] = s;
+        c.streams = nb;
+        return;
+    }
+    ss[id] = s;
+}
+
+// 查询流的当前状态（测试 / 网络层用）；流不存在返回 Closed
+export
+func streamState(c *Connection, id int) StreamState {
+    var s = findStream(c, id);
+    if (s == nil) { return StreamState.Closed; }
+    return s.state;
+}
+
+// 查询流的接收窗口（测试 / 网络层用）；流不存在返回 0
+export
+func streamRecvWindow(c *Connection, id int) int {
+    var s = findStream(c, id);
+    if (s == nil) { return 0; }
+    return s.recvWindow;
+}
+
+// 查询流的发送窗口（测试 / 网络层用）；流不存在返回 0
+export
+func streamSendWindow(c *Connection, id int) int {
+    var s = findStream(c, id);
+    if (s == nil) { return 0; }
+    return s.sendWindow;
+}
+
+// 本端发起新流（仅客户端；服务端不主动开流——本层无 push）。
+// 返回新流 id；角色不符 / 连接关闭中 / 超并发上限 / id 耗尽返回 0。
+export
+func openClientStream(c *Connection) int {
+    if (c.isServer) { return 0; }
+    if (c.goawaySent || c.goawayRecv) { return 0; }
+    if (c.local.maxConcurrentStreams > 0 && c.streamCount >= c.local.maxConcurrentStreams) { return 0; }
+    var id = c.nextStreamId;
+    if (id > 0x7FFFFFFF) { return 0; }
+    var r = transition(StreamState.Idle, StreamEvent.EventHeaders);
+    var s = new(Stream);
+    s.id = id;
+    s.state = r.0;
+    s.sendWindow = c.peer.initialWindowSize;
+    s.recvWindow = c.local.initialWindowSize;
+    c.streamCount += 1;
+    putStream(c, s);
+    c.nextStreamId += 2;
+    return id;
+}
+
+// ===== 动作构造 / 错误原语 =====
+
+// 头部块解码（HPACK）→ ActionHeaders；失败 → COMPRESSION_ERROR 连接错误
+func decodeBlockAction(c *Connection, s *Stream, frag [*#]byte, al *ActionList) {
+    var r = decodeHeaderBlock(frag, 0, frag.length, c.hpack);
+    if (!r.1) { connError(c, ErrorCode.COMPRESSION_ERROR.id, al); return; }
+    var hs = r.0;
+    if (hs == nil) { connError(c, ErrorCode.COMPRESSION_ERROR.id, al); return; }
+    var a Action = {kind=ActionKind.ActionHeaders, streamId=s.id, headers=hs};
+    al.append(a);
+}
+
+// 流错误：回 RST_STREAM + 把流置为 Closed + 上抛 StreamReset
+func streamError(c *Connection, sid, code int, al *ActionList) {
+    var payload = encodeRstStreamPayload(code);
+    var f = makeFrame(FrameType.RST_STREAM.id, 0, sid, payload);
+    var a Action = {kind=ActionKind.ActionSendFrame, frame=f, streamId=sid};
+    al.append(a);
+    var s = findStream(c, sid);
+    if (s != nil) {
+        var r = transition(s.state, StreamEvent.EventRstStream);
+        if (r.1) {
+            s.state = r.0;
+            if (c.streamCount > 0) { c.streamCount -= 1; }
+        }
+    }
+    var b Action = {kind=ActionKind.ActionStreamReset, streamId=sid, errorCode=code};
+    al.append(b);
+}
+
+// 连接错误：发 GOAWAY + 上抛 ConnError（只发一次，连接进入关闭流程）
+func connError(c *Connection, code int, al *ActionList) {
+    if (c.goawaySent) { return; }
+    c.goawaySent = true;
+    var payload = encodeGoawayPayload(c.lastPeerStreamId, code, "");
+    var f = makeFrame(FrameType.GOAWAY.id, 0, 0, payload);
+    var a Action = {kind=ActionKind.ActionSendFrame, frame=f, streamId=0, errorCode=code};
+    al.append(a);
+    var b Action = {kind=ActionKind.ActionConnError, streamId=0, errorCode=code};
+    al.append(b);
+}
+
+// 收到 END_STREAM：状态转移 + 若双方都发完则关流
+func endStreamRecv(c *Connection, s *Stream, al *ActionList) {
+    var r = transition(s.state, StreamEvent.EventEndStreamRecv);
+    if (!r.1) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); return; }
+    s.state = r.0;
+    if (s.state.id == StreamState.Closed.id) {
+        if (c.streamCount > 0) { c.streamCount -= 1; }
+        var a Action = {kind=ActionKind.ActionStreamClosed, streamId=s.id};
+        al.append(a);
+    }
+}
+
+// 帧 payload 转非空视图（零长帧 payload 为 nil，不拷贝）
+func payloadView(p [*?#]byte) [*#]byte {
+    if (p == nil) { return new([0]byte); }
+    return p;
+}
+
+// ===== 帧分派主入口 =====
+//
+// 喂入一个已解码帧，返回动作列表。顺序执行、无递归、纯状态转移。
+// 连接级校验先行：帧尺寸 / 连接级帧 streamId=0 / 流级帧 streamId≠0。
+
+export
+func dispatch(c *Connection, f *Frame) [*]Action {
+    var al = new(ActionList);
+    if (c.goawaySent) { return al.toArray(); }   // 连接已进入关闭流程：不再处理
+    var t = f.type;
+    var sid = f.streamId;
+    if (f.length > c.local.maxFrameSize) {
+        connError(c, ErrorCode.FRAME_SIZE_ERROR.id, al);
+        return al.toArray();
+    }
+    if (t == FrameType.SETTINGS.id) {
+        if (sid != 0) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); }
+        else { dispatchSettings(c, f, al); }
+    }
+    else if (t == FrameType.PING.id) {
+        if (sid != 0) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); }
+        else { dispatchPing(c, f, al); }
+    }
+    else if (t == FrameType.GOAWAY.id) {
+        if (sid != 0) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); }
+        else { dispatchGoaway(c, f, al); }
+    }
+    else if (t == FrameType.WINDOW_UPDATE.id) {
+        dispatchWindowUpdate(c, f, al);
+    }
+    else if (t == FrameType.DATA.id) {
+        if (sid == 0) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); }
+        else { dispatchData(c, f, al); }
+    }
+    else if (t == FrameType.HEADERS.id) {
+        if (sid == 0) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); }
+        else { dispatchHeaders(c, f, al); }
+    }
+    else if (t == FrameType.CONTINUATION.id) {
+        if (sid == 0) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); }
+        else { dispatchContinuation(c, f, al); }
+    }
+    else if (t == FrameType.RST_STREAM.id) {
+        if (sid == 0) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); }
+        else { dispatchRstStream(c, f, al); }
+    }
+    else if (t == FrameType.PUSH_PROMISE.id) {
+        // 不做 server push（ENABLE_PUSH=0）：收到即协议错误（RFC 9113 §6.6）
+        connError(c, ErrorCode.PROTOCOL_ERROR.id, al);
+    }
+    // PRIORITY 及未知帧类型：忽略不报错（RFC 9218 已废弃旧机制；RFC 9113 §8）
+    return al.toArray();
+}
+
+// ===== SETTINGS（§6.5）=====
+
+func dispatchSettings(c *Connection, f *Frame, al *ActionList) {
+    if ((f.flags & FLAG_ACK) != 0) { return; }   // ACK 无需响应
+    var prevInitial = c.peer.initialWindowSize;
+    var pl = f.payload;
+    if (pl != nil) {
+        if ((f.length % 6) != 0) { connError(c, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+        var r = parseSettingsPayload(pl);
+        if (!r.1) { connError(c, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+        var ss = r.0;
+        for (var i = 0; i < ss.length; i += 1) {
+            var st = ss[i];
+            var ar = applySetting(c.peer, st.id, st.value);
+            if (ar.1) { connError(c, ar.0, al); return; }
+        }
+    }
+    // INITIAL_WINDOW_SIZE 变更 → 调整所有流发送窗口（RFC 9113 §6.9.2）；
+    // 超上限 → FLOW_CONTROL_ERROR 连接错误
+    var delta = c.peer.initialWindowSize - prevInitial;
+    if (delta != 0) {
+        var ss2 = c.streams;
+        if (ss2 != nil) {
+            for (var i = 0; i < ss2.length; i += 1) {
+                var st2 = ss2[i];
+                if (st2 != nil) {
+                    var nw = st2.sendWindow + delta;
+                    if (nw > 0x7FFFFFFF) { connError(c, ErrorCode.FLOW_CONTROL_ERROR.id, al); return; }
+                    st2.sendWindow = nw;
+                }
+            }
+        }
+    }
+    // 回 SETTINGS ACK
+    var ack = makeFrame(FrameType.SETTINGS.id, FLAG_ACK, 0, nil);
+    var a Action = {kind=ActionKind.ActionSendFrame, frame=ack, streamId=0};
+    al.append(a);
+}
+
+// ===== PING（§6.7）=====
+
+func dispatchPing(c *Connection, f *Frame, al *ActionList) {
+    if ((f.flags & FLAG_ACK) != 0) { return; }
+    if (f.length != 8) { connError(c, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+    var pr = parsePingPayload(payloadView(f.payload));
+    if (!pr.1) { connError(c, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+    // 回 PING ACK，opaque 原样返回
+    var ack = makeFrame(FrameType.PING.id, FLAG_ACK, 0, pr.0);
+    var a Action = {kind=ActionKind.ActionSendFrame, frame=ack, streamId=0};
+    al.append(a);
+}
+
+// ===== GOAWAY（§6.8）=====
+
+func dispatchGoaway(c *Connection, f *Frame, al *ActionList) {
+    if (f.length < 8) { connError(c, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+    var gr = parseGoawayPayload(payloadView(f.payload));
+    if (!gr.3) { connError(c, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+    c.goawayRecv = true;
+    c.goawayLastStreamId = gr.0;
+    c.goawayErrCode = gr.1;
+    var a Action = {kind=ActionKind.ActionGoaway, streamId=0, errorCode=gr.1};
+    al.append(a);
+}
+
+// ===== WINDOW_UPDATE（§6.9）=====
+
+func dispatchWindowUpdate(c *Connection, f *Frame, al *ActionList) {
+    if (f.length != 4) { connError(c, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+    var wr = parseWindowUpdatePayload(payloadView(f.payload));
+    if (!wr.1) { connError(c, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+    var incr = wr.0;
+    if (f.streamId == 0) {
+        var cr = addSendWindow(c.connSendWindow, incr);
+        if (!cr.1) {
+            // incr==0 → PROTOCOL_ERROR；超上限 → FLOW_CONTROL_ERROR（RFC 9113 §6.9）
+            if (incr == 0) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); }
+            else { connError(c, ErrorCode.FLOW_CONTROL_ERROR.id, al); }
+            return;
+        }
+        c.connSendWindow = cr.0;
+        return;
+    }
+    // 流级窗口
+    var s = findStream(c, f.streamId);
+    if (s == nil) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); return; }
+    if (s.state.id == StreamState.Closed.id) { return; }   // 已关流：忽略（竞态容忍）
+    var sr = addSendWindow(s.sendWindow, incr);
+    if (!sr.1) {
+        if (incr == 0) { streamError(c, s.id, ErrorCode.PROTOCOL_ERROR.id, al); }
+        else { streamError(c, s.id, ErrorCode.FLOW_CONTROL_ERROR.id, al); }
+        return;
+    }
+    s.sendWindow = sr.0;
+}
+
+// ===== DATA（§6.1）=====
+
+func dispatchData(c *Connection, f *Frame, al *ActionList) {
+    var s = findStream(c, f.streamId);
+    if (s == nil) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); return; }   // 未开流收 DATA
+    if (s.state.id == StreamState.Closed.id || s.state.id == StreamState.HalfClosedRemote.id) {
+        streamError(c, s.id, ErrorCode.STREAM_CLOSED.id, al);
+        return;
+    }
+    var padded = (f.flags & FLAG_PADDED) != 0;
+    var pl = payloadView(f.payload);
+    var dr = parseDataPayload(pl, padded);
+    if (!dr.1) { streamError(c, s.id, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+    var body = dr.0;
+    var size = 0;
+    if (body != nil) { size = body.length; }
+    // 流量控制：扣减流级 + 连接级接收窗口
+    var wr = consumeRecvWindow(s.recvWindow, c.connRecvWindow, size);
+    if (!wr.2) { streamError(c, s.id, ErrorCode.FLOW_CONTROL_ERROR.id, al); return; }
+    s.recvWindow = wr.0;
+    c.connRecvWindow = wr.1;
+    s.recvUnacked += size;
+    c.connRecvUnacked += size;
+    // 窗口回补（流级）：通告增量后本地窗口同步放大
+    var upd = windowUpdateAmount(s.recvUnacked);
+    if (upd > 0) {
+        s.recvUnacked -= upd;
+        s.recvWindow += upd;
+        var wf = makeFrame(FrameType.WINDOW_UPDATE.id, 0, s.id, encodeWindowUpdatePayload(upd));
+        var a Action = {kind=ActionKind.ActionSendFrame, frame=wf, streamId=s.id};
+        al.append(a);
+    }
+    // 窗口回补（连接级）
+    var updc = windowUpdateAmount(c.connRecvUnacked);
+    if (updc > 0) {
+        c.connRecvUnacked -= updc;
+        c.connRecvWindow += updc;
+        var wfc = makeFrame(FrameType.WINDOW_UPDATE.id, 0, 0, encodeWindowUpdatePayload(updc));
+        var ac Action = {kind=ActionKind.ActionSendFrame, frame=wfc, streamId=0};
+        al.append(ac);
+    }
+    // DATA 上抛
+    var d Action = {kind=ActionKind.ActionData, streamId=s.id, data=body};
+    al.append(d);
+    // END_STREAM → 状态转移
+    if ((f.flags & FLAG_END_STREAM) != 0) { endStreamRecv(c, s, al); }
+}
+
+// ===== HEADERS（§6.2）=====
+
+// 解析 PADDED/PRIORITY、解码头部块、处理 END_STREAM（s 必非 nil）
+func handleHeadersPayload(c *Connection, s *Stream, f *Frame, al *ActionList) {
+    var padded = (f.flags & FLAG_PADDED) != 0;
+    var priority = (f.flags & FLAG_PRIORITY) != 0;
+    var hr = parseHeadersPayload(payloadView(f.payload), padded, priority);
+    if (!hr.1) { streamError(c, s.id, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+    var blk = hr.0;
+    if (blk == nil) { streamError(c, s.id, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+    if ((f.flags & FLAG_END_HEADERS) != 0) {
+        // 单帧头部块：直接解码
+        decodeBlockAction(c, s, payloadView(blk.fragment), al);
+    } else {
+        // 跨 CONTINUATION：累积 fragment
+        s.headerFrag = blk.fragment;
+        s.headerPending = true;
+    }
+    // END_STREAM → 状态转移
+    if ((f.flags & FLAG_END_STREAM) != 0) { endStreamRecv(c, s, al); }
+}
+
+func dispatchHeaders(c *Connection, f *Frame, al *ActionList) {
+    var sid = f.streamId;
+    var s = findStream(c, sid);
+    if (s == nil) {
+        // 新流：仅服务端可收（客户端不做 push → 不接收新流）
+        if (!c.isServer) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); return; }
+        if ((sid % 2) == 0) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); return; }  // 服务端只收奇数（客户端）流
+        if (sid <= c.lastPeerStreamId) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); return; }  // 复用/递减
+        c.lastPeerStreamId = sid;
+        // 并发流上限 → 拒绝（RFC 9113 §5.1.2，REFUSED_STREAM）
+        if (c.local.maxConcurrentStreams > 0 && c.streamCount >= c.local.maxConcurrentStreams) {
+            streamError(c, sid, ErrorCode.REFUSED_STREAM.id, al);
+            return;
+        }
+        var ns = new(Stream);
+        ns.id = sid;
+        var tr = transition(StreamState.Idle, StreamEvent.EventHeaders);
+        ns.state = tr.0;
+        ns.sendWindow = c.peer.initialWindowSize;
+        ns.recvWindow = c.local.initialWindowSize;
+        c.streamCount += 1;
+        putStream(c, ns);
+        handleHeadersPayload(c, ns, f, al);
+        return;
+    }
+    // 既有流：尾随头（trailers）仅可在对端发送侧仍开时出现
+    if (s.state.id == StreamState.Closed.id || s.state.id == StreamState.HalfClosedRemote.id) {
+        streamError(c, s.id, ErrorCode.STREAM_CLOSED.id, al);
+        return;
+    }
+    if (s.headerPending) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); return; }  // 前一块未完又来 HEADERS
+    handleHeadersPayload(c, s, f, al);
+}
+
+// ===== CONTINUATION（§6.10）=====
+
+func dispatchContinuation(c *Connection, f *Frame, al *ActionList) {
+    var s = findStream(c, f.streamId);
+    if (s == nil || !s.headerPending) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); return; }
+    // 追加 fragment
+    var frag = f.payload;
+    var fl = 0;
+    if (frag != nil) { fl = frag.length; }
+    var old = s.headerFrag;
+    var ol = 0;
+    if (old != nil) { ol = old.length; }
+    var nf = new([ol + fl]byte);
+    if (old != nil) {
+        for (var i = 0; i < ol; i += 1) { nf[i] = old[i]; }
+    }
+    if (frag != nil) {
+        for (var i = 0; i < fl; i += 1) { nf[ol + i] = frag[i]; }
+    }
+    s.headerFrag = nf;
+    if ((f.flags & FLAG_END_HEADERS) != 0) {
+        // 块完成：解码并清空重组状态
+        var frag2 = s.headerFrag;
+        s.headerFrag = nil;
+        s.headerPending = false;
+        decodeBlockAction(c, s, payloadView(frag2), al);
+    }
+    // CONTINUATION 不带 END_STREAM（RFC 9113 §6.10 无该标志位）
+}
+
+// ===== RST_STREAM（§6.4）=====
+
+func dispatchRstStream(c *Connection, f *Frame, al *ActionList) {
+    var s = findStream(c, f.streamId);
+    if (s == nil) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); return; }   // idle 流收 RST → 连接错误
+    if (f.length != 4) { connError(c, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+    var rr = parseRstStreamPayload(payloadView(f.payload));
+    if (!rr.1) { connError(c, ErrorCode.FRAME_SIZE_ERROR.id, al); return; }
+    if (s.state.id == StreamState.Closed.id) { return; }   // 已关流：忽略
+    var r = transition(s.state, StreamEvent.EventRstStream);
+    if (!r.1) { connError(c, ErrorCode.PROTOCOL_ERROR.id, al); return; }
+    s.state = r.0;
+    if (c.streamCount > 0) { c.streamCount -= 1; }
+    var a Action = {kind=ActionKind.ActionStreamReset, streamId=f.streamId, errorCode=rr.0};
+    al.append(a);
+}

@@ -1,0 +1,703 @@
+// ===== connection.feng 单元测试（RFC 9113 §5/§6 帧分派）=====
+// 对应 docs/http-2.0-protocol.md 里程碑 H4；纯函数、无网络。
+// Settings 应用 / SETTINGS·PING 回帧 / HEADERS+CONTINUATION 重组解码 /
+// DATA 窗口扣减与回补 / RST·GOAWAY·WINDOW_UPDATE 分派 / 连接错误路径。
+
+import std$testing;
+import std$http$codec$v2_0 h2;
+
+// ===== helpers =====
+
+func hexToBytes(h [*#]byte) [*]byte {
+    var n = h.length;
+    var r = new([n / 2]byte);
+    for (var i = 0; i < n / 2; i += 1) {
+        r[i] = byte(hexVal(h[i * 2]) << 4 | hexVal(h[i * 2 + 1]));
+    }
+    return r;
+}
+
+func hexVal(c byte) int {
+    if (int(c) >= 48 && int(c) <= 57) { return int(c) - 48; }
+    if (int(c) >= 97 && int(c) <= 102) { return int(c) - 97 + 10; }
+    return 0;
+}
+
+func bytesEquals(a [*?#]byte, b [*#]byte) bool {
+    if (a == nil) { return false; }
+    if (a.length != b.length) { return false; }
+    for (var i = 0; i < a.length; i += 1) {
+        if (a[i] != b[i]) { return false; }
+    }
+    return true;
+}
+
+// 统计某类动作数
+func countKind(acts [*]h2$Action, kind h2$ActionKind) int {
+    var n = 0;
+    for (var i = 0; i < acts.length; i += 1) {
+        if (acts[i].kind.id == kind.id) { n += 1; }
+    }
+    return n;
+}
+
+// 恰好一个 SendFrame（type/flags/sid 全匹配）
+func isSendFrame(acts [*]h2$Action, typeId, flags, sid int) bool {
+    if (acts.length != 1) { return false; }
+    var a = acts[0];
+    if (a.kind.id != h2$ActionKind.ActionSendFrame.id) { return false; }
+    var f = a.frame;
+    if (f == nil) { return false; }
+    if (f.type != typeId) { return false; }
+    if (f.flags != flags) { return false; }
+    if (f.streamId != sid) { return false; }
+    return true;
+}
+
+// 恰好一次 ConnError 且错误码匹配
+func isConnError(acts [*]h2$Action, code int) bool {
+    if (countKind(acts, h2$ActionKind.ActionConnError) != 1) { return false; }
+    for (var i = 0; i < acts.length; i += 1) {
+        if (acts[i].kind.id == h2$ActionKind.ActionConnError.id) { return acts[i].errorCode == code; }
+    }
+    return false;
+}
+
+// 校验解码出的第 idx 个头字段
+func checkHeader(hs *h2$HeaderList, idx int, name, value [*#]byte) bool {
+    if (hs == nil) { return false; }
+    if (hs.length() <= idx) { return false; }
+    var h = hs.get(idx);
+    if (!bytesEquals(h.name, name)) { return false; }
+    if (!bytesEquals(h.value, value)) { return false; }
+    return true;
+}
+
+// 用 C.3.1 请求头（:method GET 等 4 字段）在流 1 打开流
+func openStream(c *h2$Connection) bool {
+    var data = hexToBytes("828684410f7777772e6578616d706c652e636f6d");
+    var f = h2$makeFrame(h2$FrameType.HEADERS.id, 0x04, 1, data);   // END_HEADERS
+    var acts = h2$dispatch(c, f);
+    return countKind(acts, h2$ActionKind.ActionHeaders) == 1;
+}
+
+// 构造 n 字节 DATA 帧
+func mkDataFrame(sid, n, flags int) *h2$Frame {
+    var p = new([n]byte);
+    for (var i = 0; i < n; i += 1) { p[i] = byte(i & 0xFF); }
+    return h2$makeFrame(h2$FrameType.DATA.id, flags, sid, p);
+}
+
+// =====================================================
+// Settings
+// =====================================================
+
+@Test
+func testSettingsDefaults() {
+    var s = h2$newSettings();
+    testing$assertTrue(s.headerTableSize == 4096);
+    testing$assertTrue(s.enablePush == 0);
+    testing$assertTrue(s.maxConcurrentStreams == 0x7FFFFFFF);
+    testing$assertTrue(s.initialWindowSize == 65535);
+    testing$assertTrue(s.maxFrameSize == 16384);
+    testing$assertTrue(s.maxHeaderListSize == 0);
+}
+
+@Test
+func testApplySetting() {
+    var s = h2$newSettings();
+    var r = h2$applySetting(s, h2$SETTINGS_HEADER_TABLE_SIZE, 8192);
+    testing$assertFalse(r.1);
+    testing$assertTrue(s.headerTableSize == 8192);
+    r = h2$applySetting(s, h2$SETTINGS_MAX_CONCURRENT_STREAMS, 100);
+    testing$assertFalse(r.1);
+    testing$assertTrue(s.maxConcurrentStreams == 100);
+    r = h2$applySetting(s, h2$SETTINGS_INITIAL_WINDOW_SIZE, 100000);
+    testing$assertFalse(r.1);
+    testing$assertTrue(s.initialWindowSize == 100000);
+    r = h2$applySetting(s, h2$SETTINGS_MAX_FRAME_SIZE, 65536);
+    testing$assertFalse(r.1);
+    testing$assertTrue(s.maxFrameSize == 65536);
+    r = h2$applySetting(s, h2$SETTINGS_MAX_HEADER_LIST_SIZE, 8192);
+    testing$assertFalse(r.1);
+    testing$assertTrue(s.maxHeaderListSize == 8192);
+    // 未知参数 ID：忽略不失败
+    r = h2$applySetting(s, 0xFF, 1);
+    testing$assertFalse(r.1);
+    // ENABLE_PUSH 非 0 → PROTOCOL_ERROR
+    r = h2$applySetting(s, h2$SETTINGS_ENABLE_PUSH, 1);
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0 == h2$ErrorCode.PROTOCOL_ERROR.id);
+    // INITIAL_WINDOW_SIZE 超 2^31-1 → FLOW_CONTROL_ERROR
+    r = h2$applySetting(s, h2$SETTINGS_INITIAL_WINDOW_SIZE, 0x80000000);
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0 == h2$ErrorCode.FLOW_CONTROL_ERROR.id);
+    // MAX_FRAME_SIZE 越界 → PROTOCOL_ERROR
+    r = h2$applySetting(s, h2$SETTINGS_MAX_FRAME_SIZE, 16383);
+    testing$assertTrue(r.1);
+    r = h2$applySetting(s, h2$SETTINGS_MAX_FRAME_SIZE, 16777216);
+    testing$assertTrue(r.1);
+}
+
+// =====================================================
+// SETTINGS 帧分派
+// =====================================================
+
+@Test
+func testDispatchEmptySettings() {
+    var c = h2$newConnection(true);
+    var f = h2$makeFrame(h2$FrameType.SETTINGS.id, 0, 0, nil);
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isSendFrame(acts, h2$FrameType.SETTINGS.id, 0x01, 0));   // SETTINGS ACK
+}
+
+@Test
+func testDispatchSettingsApply() {
+    var c = h2$newConnection(true);
+    // MAX_CONCURRENT_STREAMS=5 + MAX_FRAME_SIZE=32768
+    var data = hexToBytes("000300000005000500008000");
+    var f = h2$makeFrame(h2$FrameType.SETTINGS.id, 0, 0, data);
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isSendFrame(acts, h2$FrameType.SETTINGS.id, 0x01, 0));
+    testing$assertTrue(c.peer.maxConcurrentStreams == 5);
+    testing$assertTrue(c.peer.maxFrameSize == 32768);
+}
+
+@Test
+func testDispatchSettingsAck() {
+    var c = h2$newConnection(true);
+    var f = h2$makeFrame(h2$FrameType.SETTINGS.id, 0x01, 0, nil);   // ACK
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(acts.length == 0);
+}
+
+@Test
+func testDispatchSettingsOnStream() {
+    var c = h2$newConnection(true);
+    var f = h2$makeFrame(h2$FrameType.SETTINGS.id, 0, 1, nil);      // 连接级帧带 streamId
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isConnError(acts, h2$ErrorCode.PROTOCOL_ERROR.id));
+    testing$assertTrue(c.goawaySent);
+}
+
+@Test
+func testDispatchSettingsBadValue() {
+    var c = h2$newConnection(true);
+    var data = hexToBytes("000200000001");   // ENABLE_PUSH=1 → 协议错误
+    var f = h2$makeFrame(h2$FrameType.SETTINGS.id, 0, 0, data);
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isConnError(acts, h2$ErrorCode.PROTOCOL_ERROR.id));
+}
+
+@Test
+func testSettingsInitialWindowAdjust() {
+    var c = h2$newConnection(true);
+    testing$assertTrue(openStream(c));   // 流 1 sendWindow = 65535
+    // 对端 SETTINGS: INITIAL_WINDOW_SIZE=100 → 既有流发送窗口改为 100
+    var data = hexToBytes("000400000064");
+    var f = h2$makeFrame(h2$FrameType.SETTINGS.id, 0, 0, data);
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isSendFrame(acts, h2$FrameType.SETTINGS.id, 0x01, 0));
+    testing$assertTrue(h2$streamSendWindow(c, 1) == 100);
+}
+
+// =====================================================
+// PING
+// =====================================================
+
+@Test
+func testDispatchPing() {
+    var c = h2$newConnection(true);
+    var op = new([8]byte);
+    for (var i = 0; i < 8; i += 1) { op[i] = byte(i + 1); }
+    var f = h2$makeFrame(h2$FrameType.PING.id, 0, 0, op);
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isSendFrame(acts, h2$FrameType.PING.id, 0x01, 0));
+    var fr = acts[0].frame;
+    if (fr == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(bytesEquals(fr.payload, op));   // opaque 原样返回
+}
+
+@Test
+func testDispatchPingAck() {
+    var c = h2$newConnection(true);
+    var op = new([8]byte);
+    var f = h2$makeFrame(h2$FrameType.PING.id, 0x01, 0, op);
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(acts.length == 0);
+}
+
+// =====================================================
+// HEADERS（新流 / 尾随头 / 错误路径）
+// =====================================================
+
+@Test
+func testDispatchHeadersNewStream() {
+    var c = h2$newConnection(true);
+    var data = hexToBytes("828684410f7777772e6578616d706c652e636f6d");
+    var f = h2$makeFrame(h2$FrameType.HEADERS.id, 0x04, 1, data);
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionHeaders) == 1);
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionSendFrame) == 0);
+    // 解码出 4 字段请求头
+    var a = acts[0];
+    testing$assertTrue(a.streamId == 1);
+    var hs = a.headers;
+    if (hs == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(hs.length() == 4);
+    testing$assertTrue(checkHeader(hs, 0, ":method", "GET"));
+    testing$assertTrue(checkHeader(hs, 1, ":scheme", "http"));
+    testing$assertTrue(checkHeader(hs, 2, ":path", "/"));
+    testing$assertTrue(checkHeader(hs, 3, ":authority", "www.example.com"));
+    // 流打开 + 对端流 id 记录
+    testing$assertTrue(h2$streamState(c, 1).id == h2$StreamState.Open.id);
+    testing$assertTrue(c.lastPeerStreamId == 1);
+}
+
+@Test
+func testDispatchHeadersEndStream() {
+    var c = h2$newConnection(true);
+    var data = hexToBytes("828684410f7777772e6578616d706c652e636f6d");
+    var f = h2$makeFrame(h2$FrameType.HEADERS.id, 0x05, 1, data);   // END_HEADERS|END_STREAM
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionHeaders) == 1);
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionStreamClosed) == 0);  // 仅对端发完
+    testing$assertTrue(h2$streamState(c, 1).id == h2$StreamState.HalfClosedRemote.id);
+}
+
+@Test
+func testDispatchHeadersEvenStream() {
+    var c = h2$newConnection(true);
+    var data = hexToBytes("828684410f7777772e6578616d706c652e636f6d");
+    var f = h2$makeFrame(h2$FrameType.HEADERS.id, 0x04, 2, data);   // 服务端收偶数流 → 协议错误
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isConnError(acts, h2$ErrorCode.PROTOCOL_ERROR.id));
+}
+
+@Test
+func testDispatchHeadersOnClient() {
+    var c = h2$newConnection(false);
+    var data = hexToBytes("828684410f7777772e6578616d706c652e636f6d");
+    var f = h2$makeFrame(h2$FrameType.HEADERS.id, 0x04, 1, data);   // 客户端不收新流
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isConnError(acts, h2$ErrorCode.PROTOCOL_ERROR.id));
+}
+
+@Test
+func testDispatchHeadersStreamZero() {
+    var c = h2$newConnection(true);
+    var f = h2$makeFrame(h2$FrameType.HEADERS.id, 0x04, 0, nil);
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isConnError(acts, h2$ErrorCode.PROTOCOL_ERROR.id));
+}
+
+@Test
+func testMaxConcurrentStreamsRefused() {
+    var c = h2$newConnection(true);
+    c.local.maxConcurrentStreams = 1;
+    testing$assertTrue(openStream(c));   // 流 1 占用上限
+    var data = hexToBytes("828684410f7777772e6578616d706c652e636f6d");
+    var f = h2$makeFrame(h2$FrameType.HEADERS.id, 0x04, 3, data);
+    var acts = h2$dispatch(c, f);
+    // RST_STREAM(REFUSED_STREAM) + StreamReset，不建流
+    testing$assertTrue(acts.length == 2);
+    testing$assertTrue(acts[0].kind.id == h2$ActionKind.ActionSendFrame.id);
+    testing$assertTrue(acts[1].kind.id == h2$ActionKind.ActionStreamReset.id);
+    testing$assertTrue(acts[1].errorCode == h2$ErrorCode.REFUSED_STREAM.id);
+    testing$assertTrue(h2$streamState(c, 3).id == h2$StreamState.Closed.id);   // 未建流
+}
+
+// =====================================================
+// CONTINUATION（跨帧头部块重组）
+// =====================================================
+
+@Test
+func testDispatchContinuationReassembly() {
+    var c = h2$newConnection(true);
+    // HEADERS 带块前段（无 END_HEADERS）
+    var f = h2$makeFrame(h2$FrameType.HEADERS.id, 0, 1, hexToBytes("8286"));
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(acts.length == 0);   // 不解码，等 CONTINUATION
+    // CONTINUATION 带块后段 + END_HEADERS
+    var f2 = h2$makeFrame(h2$FrameType.CONTINUATION.id, 0x04, 1,
+                          hexToBytes("84410f7777772e6578616d706c652e636f6d"));
+    acts = h2$dispatch(c, f2);
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionHeaders) == 1);
+    var hs = acts[0].headers;
+    if (hs == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(hs.length() == 4);
+    testing$assertTrue(checkHeader(hs, 3, ":authority", "www.example.com"));
+}
+
+@Test
+func testDispatchContinuationWithoutPending() {
+    var c = h2$newConnection(true);
+    // 无前置 HEADERS 的 CONTINUATION → 协议错误
+    var f = h2$makeFrame(h2$FrameType.CONTINUATION.id, 0x04, 1, hexToBytes("84"));
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isConnError(acts, h2$ErrorCode.PROTOCOL_ERROR.id));
+}
+
+// =====================================================
+// DATA（窗口扣减 / 回补 / 超窗）
+// =====================================================
+
+@Test
+func testDispatchData() {
+    var c = h2$newConnection(true);
+    testing$assertTrue(openStream(c));
+    var acts = h2$dispatch(c, mkDataFrame(1, 100, 0));
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionData) == 1);
+    var a = acts[0];
+    testing$assertTrue(a.streamId == 1);
+    testing$assertTrue(a.data != nil);
+    var d = a.data;
+    if (d != nil) { testing$assertTrue(d.length == 100); }
+    // 窗口扣减：65535 - 100
+    testing$assertTrue(h2$streamRecvWindow(c, 1) == 65435);
+    testing$assertTrue(c.connRecvWindow == 65435);
+    testing$assertTrue(c.connRecvUnacked == 100);
+}
+
+@Test
+func testDispatchDataEndStream() {
+    var c = h2$newConnection(true);
+    testing$assertTrue(openStream(c));
+    var acts = h2$dispatch(c, mkDataFrame(1, 100, 0x01));   // END_STREAM
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionData) == 1);
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionStreamClosed) == 0);  // 本端未发 END_STREAM
+    testing$assertTrue(h2$streamState(c, 1).id == h2$StreamState.HalfClosedRemote.id);
+}
+
+@Test
+func testDataWindowUpdate() {
+    var c = h2$newConnection(true);
+    testing$assertTrue(openStream(c));
+    // 2 × 16384 = 32768 ≥ 阈值 32767 → 流级 + 连接级各回 WINDOW_UPDATE 32768
+    var acts = h2$dispatch(c, mkDataFrame(1, 16384, 0));
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionData) == 1);
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionSendFrame) == 0);
+    acts = h2$dispatch(c, mkDataFrame(1, 16384, 0));
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionSendFrame) == 2);
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionData) == 1);
+    // 回补后窗口复位，未回补清零
+    testing$assertTrue(h2$streamRecvWindow(c, 1) == 65535);
+    testing$assertTrue(c.connRecvWindow == 65535);
+    testing$assertTrue(c.connRecvUnacked == 0);
+    // 第三帧 16384 < 阈值：只上抛，不回补
+    acts = h2$dispatch(c, mkDataFrame(1, 16384, 0));
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionData) == 1);
+    testing$assertTrue(countKind(acts, h2$ActionKind.ActionSendFrame) == 0);
+    testing$assertTrue(h2$streamRecvWindow(c, 1) == 65535 - 16384);
+    testing$assertTrue(c.connRecvUnacked == 16384);
+}
+
+@Test
+func testDataFlowControlError() {
+    var c = h2$newConnection(true);
+    c.local.initialWindowSize = 100;   // 缩小本端接收窗口
+    testing$assertTrue(openStream(c)); // 流 1 recvWindow = 100
+    var acts = h2$dispatch(c, mkDataFrame(1, 16384, 0));
+    // RST_STREAM(FLOW_CONTROL_ERROR) + StreamReset，流关闭
+    testing$assertTrue(acts.length == 2);
+    testing$assertTrue(acts[0].kind.id == h2$ActionKind.ActionSendFrame.id);
+    testing$assertTrue(acts[1].kind.id == h2$ActionKind.ActionStreamReset.id);
+    testing$assertTrue(acts[1].errorCode == h2$ErrorCode.FLOW_CONTROL_ERROR.id);
+    var rf = acts[0].frame;
+    if (rf == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(rf.type == h2$FrameType.RST_STREAM.id);
+    testing$assertTrue(rf.streamId == 1);
+    testing$assertTrue(h2$streamState(c, 1).id == h2$StreamState.Closed.id);
+}
+
+@Test
+func testDataAfterEndStream() {
+    var c = h2$newConnection(true);
+    var data = hexToBytes("828684410f7777772e6578616d706c652e636f6d");
+    var f = h2$makeFrame(h2$FrameType.HEADERS.id, 0x05, 1, data);   // END_HEADERS|END_STREAM
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(h2$streamState(c, 1).id == h2$StreamState.HalfClosedRemote.id);
+    // 对端已 END_STREAM 后再收 DATA → STREAM_CLOSED 流错误
+    acts = h2$dispatch(c, mkDataFrame(1, 100, 0));
+    testing$assertTrue(acts.length == 2);
+    testing$assertTrue(acts[0].kind.id == h2$ActionKind.ActionSendFrame.id);
+    testing$assertTrue(acts[1].kind.id == h2$ActionKind.ActionStreamReset.id);
+    testing$assertTrue(acts[1].errorCode == h2$ErrorCode.STREAM_CLOSED.id);
+}
+
+@Test
+func testDataUnknownStream() {
+    var c = h2$newConnection(true);
+    var acts = h2$dispatch(c, mkDataFrame(5, 100, 0));   // 未开流收 DATA
+    testing$assertTrue(isConnError(acts, h2$ErrorCode.PROTOCOL_ERROR.id));
+}
+
+// =====================================================
+// WINDOW_UPDATE
+// =====================================================
+
+@Test
+func testWindowUpdateConn() {
+    var c = h2$newConnection(true);
+    var f = h2$makeFrame(h2$FrameType.WINDOW_UPDATE.id, 0, 0, h2$encodeWindowUpdatePayload(1000));
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(acts.length == 0);
+    testing$assertTrue(c.connSendWindow == 65535 + 1000);
+}
+
+@Test
+func testWindowUpdateStream() {
+    var c = h2$newConnection(true);
+    testing$assertTrue(openStream(c));
+    var f = h2$makeFrame(h2$FrameType.WINDOW_UPDATE.id, 0, 1, h2$encodeWindowUpdatePayload(1000));
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(acts.length == 0);
+    testing$assertTrue(h2$streamSendWindow(c, 1) == 65535 + 1000);
+}
+
+@Test
+func testWindowUpdateZeroIncrement() {
+    var c = h2$newConnection(true);
+    // 连接级 increment=0 → 连接错误 PROTOCOL_ERROR
+    var f = h2$makeFrame(h2$FrameType.WINDOW_UPDATE.id, 0, 0, h2$encodeWindowUpdatePayload(0));
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isConnError(acts, h2$ErrorCode.PROTOCOL_ERROR.id));
+}
+
+// =====================================================
+// RST_STREAM / GOAWAY / PUSH_PROMISE / PRIORITY / 未知帧
+// =====================================================
+
+@Test
+func testDispatchRstStream() {
+    var c = h2$newConnection(true);
+    testing$assertTrue(openStream(c));
+    var f = h2$makeFrame(h2$FrameType.RST_STREAM.id, 0, 1, h2$encodeRstStreamPayload(8));
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(acts.length == 1);
+    testing$assertTrue(acts[0].kind.id == h2$ActionKind.ActionStreamReset.id);
+    testing$assertTrue(acts[0].streamId == 1);
+    testing$assertTrue(acts[0].errorCode == h2$ErrorCode.CANCEL.id);
+    testing$assertTrue(h2$streamState(c, 1).id == h2$StreamState.Closed.id);
+}
+
+@Test
+func testDispatchRstStreamIdle() {
+    var c = h2$newConnection(true);
+    // idle 流收 RST → 连接错误（RFC 9113 §5.1）
+    var f = h2$makeFrame(h2$FrameType.RST_STREAM.id, 0, 3, h2$encodeRstStreamPayload(8));
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isConnError(acts, h2$ErrorCode.PROTOCOL_ERROR.id));
+}
+
+@Test
+func testDispatchGoaway() {
+    var c = h2$newConnection(true);
+    var f = h2$makeFrame(h2$FrameType.GOAWAY.id, 0, 0, h2$encodeGoawayPayload(7, 0, ""));
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(acts.length == 1);
+    testing$assertTrue(acts[0].kind.id == h2$ActionKind.ActionGoaway.id);
+    testing$assertTrue(acts[0].errorCode == 0);
+    testing$assertTrue(c.goawayRecv);
+    testing$assertTrue(c.goawayLastStreamId == 7);
+}
+
+@Test
+func testDispatchPushPromise() {
+    var c = h2$newConnection(true);
+    // 不做 push：收到 PUSH_PROMISE → 协议错误
+    var f = h2$makeFrame(h2$FrameType.PUSH_PROMISE.id, 0, 1, new([4]byte));
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isConnError(acts, h2$ErrorCode.PROTOCOL_ERROR.id));
+}
+
+@Test
+func testDispatchPriorityIgnored() {
+    var c = h2$newConnection(true);
+    var f = h2$makeFrame(h2$FrameType.PRIORITY.id, 0, 1, new([5]byte));
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(acts.length == 0);
+}
+
+@Test
+func testDispatchUnknownTypeIgnored() {
+    var c = h2$newConnection(true);
+    // 未知帧类型 0x0A（RFC 9113 §8：忽略不报错）
+    var f = h2$makeFrame(0x0A, 0, 0, new([4]byte));
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(acts.length == 0);
+}
+
+@Test
+func testDispatchFrameTooLarge() {
+    var c = h2$newConnection(true);
+    var big = new([20000]byte);   // > 默认 maxFrameSize 16384
+    var f = h2$makeFrame(h2$FrameType.DATA.id, 0, 1, big);
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isConnError(acts, h2$ErrorCode.FRAME_SIZE_ERROR.id));
+}
+
+// =====================================================
+// 连接关闭流程 / 客户端开流
+// =====================================================
+
+@Test
+func testDispatchAfterConnError() {
+    var c = h2$newConnection(true);
+    var f = h2$makeFrame(h2$FrameType.SETTINGS.id, 0, 1, nil);   // SETTINGS 带流 → 连接错误
+    var acts = h2$dispatch(c, f);
+    testing$assertTrue(isConnError(acts, h2$ErrorCode.PROTOCOL_ERROR.id));
+    // 已发 GOAWAY 后不再处理任何帧
+    var f2 = h2$makeFrame(h2$FrameType.PING.id, 0, 0, new([8]byte));
+    acts = h2$dispatch(c, f2);
+    testing$assertTrue(acts.length == 0);
+}
+
+@Test
+func testOpenClientStream() {
+    var cli = h2$newConnection(false);
+    var s1 = h2$openClientStream(cli);
+    testing$assertTrue(s1 == 1);
+    testing$assertTrue(h2$streamState(cli, 1).id == h2$StreamState.Open.id);
+    var s2 = h2$openClientStream(cli);
+    testing$assertTrue(s2 == 3);
+    testing$assertTrue(h2$streamState(cli, 3).id == h2$StreamState.Open.id);
+    // 服务端不能主动开流
+    var srv = h2$newConnection(true);
+    testing$assertTrue(h2$openClientStream(srv) == 0);
+}
+
+// =====================================================
+// 端到端会话（H5：字节流 ↔ 帧 ↔ 分派，纯内存模拟网络层）
+// =====================================================
+// 网络层模型：一端把帧序列编码为连续字节流（wireOf），另一端按
+// Length 字段拆帧循环分派（feedStream）。停位（pos）机制模拟 TCP
+// 累计缓冲：数据不足时停住，追加字节后从原停位续拆，不重复处理。
+
+// 帧序列 → 连续字节流（encodeFrame 返回只读视图，需逐字节拷贝）
+func wireOf(frames [*]*?h2$Frame) [*]byte {
+    var total = 0;
+    for (var i = 0; i < frames.length; i += 1) {
+        var f = frames[i];
+        if (f != nil) { total += h2$encodeFrame(f).length; }
+    }
+    var out = new([total]byte);
+    var pos = 0;
+    for (var i = 0; i < frames.length; i += 1) {
+        var f = frames[i];
+        if (f != nil) {
+            var eb = h2$encodeFrame(f);
+            for (var j = 0; j < eb.length; j += 1) { out[pos + j] = eb[j]; }
+            pos += eb.length;
+        }
+    }
+    return out;
+}
+
+// 从 from 起拆帧分派，返回 (已处理帧数, 下一帧停位)；数据不足停位保持
+func feedStream(c *h2$Connection, data [*]byte, from int) (int, int) {
+    var pos = from;
+    var n = 0;
+    for (pos < data.length) {
+        var r = h2$parseFrame(data, pos);
+        if (!r.2) { break; }
+        var f = r.0;
+        if (f != nil) {
+            h2$dispatch(c, f);
+            n += 1;
+            pos = r.1;
+        } else { break; }
+    }
+    return (n, pos);
+}
+
+// 字节段拷贝（encodeFrame 视图只读，拼接需经此复制）
+func copyInto(dst [*]byte, dpos int, src [*]byte, spos, n int) {
+    for (var i = 0; i < n; i += 1) { dst[dpos + i] = src[spos + i]; }
+}
+
+// 一次喂完整字节流：SETTINGS(并发100) + HEADERS(C.3.1) + DATA(100) + DATA(50,END_STREAM)
+@Test
+func testEndToEndSession() {
+    var c = h2$newConnection(true);
+    var frames = new([4]*?h2$Frame);
+    frames[0] = h2$makeFrame(h2$FrameType.SETTINGS.id, 0, 0, hexToBytes("000300000064"));
+    frames[1] = h2$makeFrame(h2$FrameType.HEADERS.id, 0x04, 1, hexToBytes("828684410f7777772e6578616d706c652e636f6d"));
+    frames[2] = mkDataFrame(1, 100, 0);
+    frames[3] = mkDataFrame(1, 50, 0x01);   // END_STREAM
+    var wire = wireOf(frames);
+    var r = feedStream(c, wire, 0);
+    testing$assertTrue(r.0 == 4);
+    testing$assertTrue(r.1 == wire.length);
+    testing$assertTrue(c.peer.maxConcurrentStreams == 100);
+    testing$assertTrue(h2$streamState(c, 1).id == h2$StreamState.HalfClosedRemote.id);
+    testing$assertTrue(h2$streamRecvWindow(c, 1) == 65385);   // 65535-150
+    testing$assertTrue(c.connRecvWindow == 65385);
+    testing$assertTrue(c.connRecvUnacked == 150);
+}
+
+// 分片：100/112 两片分喂（第一片停在 DATA(100) 载荷中间），累计拆 4 帧
+@Test
+func testEndToEndSplitFrames() {
+    var c = h2$newConnection(true);
+    var frames = new([4]*?h2$Frame);
+    frames[0] = h2$makeFrame(h2$FrameType.SETTINGS.id, 0, 0, hexToBytes("000300000064"));
+    frames[1] = h2$makeFrame(h2$FrameType.HEADERS.id, 0x04, 1, hexToBytes("828684410f7777772e6578616d706c652e636f6d"));
+    frames[2] = mkDataFrame(1, 100, 0);
+    frames[3] = mkDataFrame(1, 50, 0x01);
+    var wire = wireOf(frames);              // 212 字节
+    var first = new([100]byte);             // 第一片 [0,100) 停在 DATA(100) 载荷中
+    copyInto(first, 0, wire, 0, 100);
+    var r = feedStream(c, first, 0);
+    testing$assertTrue(r.0 == 2);           // SETTINGS + HEADERS
+    testing$assertTrue(r.1 == 44);          // 15 + 29，DATA(100) 帧不完整
+    // 追加剩余字节到同一缓冲，从停位续拆
+    var full = new([wire.length]byte);
+    copyInto(full, 0, first, 0, 100);
+    copyInto(full, 100, wire, 100, wire.length - 100);
+    r = feedStream(c, full, r.1);
+    testing$assertTrue(r.0 == 2);           // DATA(100) + DATA(50,END_STREAM)
+    testing$assertTrue(r.1 == full.length);
+    testing$assertTrue(h2$streamState(c, 1).id == h2$StreamState.HalfClosedRemote.id);
+    testing$assertTrue(h2$streamRecvWindow(c, 1) == 65385);
+    testing$assertTrue(c.connRecvWindow == 65385);
+}
+
+// 握手：服务端收 SETTINGS → 回 ACK；ACK 编码后客户端解析分派无回声
+@Test
+func testEndToEndSettingsHandshake() {
+    var srv = h2$newConnection(true);
+    var cs = h2$makeFrame(h2$FrameType.SETTINGS.id, 0, 0, hexToBytes("000300000064"));
+    var acts = h2$dispatch(srv, cs);
+    testing$assertTrue(isSendFrame(acts, h2$FrameType.SETTINGS.id, 0x01, 0));
+    testing$assertTrue(srv.peer.maxConcurrentStreams == 100);
+    // ACK 帧 → 字节 → 客户端解析 + 分派
+    var ack = acts[0].frame;
+    if (ack == nil) { testing$assertTrue(false); return; }
+    var ab = h2$encodeFrame(ack);
+    var cli = h2$newConnection(false);
+    var pr = h2$parseFrame(ab, 0);
+    testing$assertTrue(pr.2);
+    var af = pr.0;
+    if (af == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(af.type == h2$FrameType.SETTINGS.id);
+    testing$assertTrue(af.flags == 0x01);
+    var cacts = h2$dispatch(cli, af);
+    testing$assertTrue(cacts.length == 0);   // ACK 不再回声
+}
+
+// 客户端收 WINDOW_UPDATE 字节：流级 + 连接级发送窗口增大
+@Test
+func testEndToEndWindowUpdate() {
+    var cli = h2$newConnection(false);
+    testing$assertTrue(h2$openClientStream(cli) == 1);
+    var frames = new([2]*?h2$Frame);
+    frames[0] = h2$makeFrame(h2$FrameType.WINDOW_UPDATE.id, 0, 1, h2$encodeWindowUpdatePayload(32768));
+    frames[1] = h2$makeFrame(h2$FrameType.WINDOW_UPDATE.id, 0, 0, h2$encodeWindowUpdatePayload(32768));
+    var wire = wireOf(frames);
+    var r = feedStream(cli, wire, 0);
+    testing$assertTrue(r.0 == 2);
+    testing$assertTrue(r.1 == wire.length);
+    testing$assertTrue(h2$streamSendWindow(cli, 1) == 98303);   // 65535+32768
+    testing$assertTrue(cli.connSendWindow == 98303);
+}

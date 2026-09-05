@@ -1,0 +1,127 @@
+// ===== std$http$codec$v2_0 — 流状态机 + 流量控制（RFC 9113 §5 / §6.9）=====
+//
+// 纯 Fēng、无 I/O：只提供「状态如何转移 / 窗口是否放行」的判定原语，
+// 不替网络层做背压决策（计划 §7.2 / §11.4 隔离关键）。
+// 无 server push → 无 reserved 态（计划 §7.1）。
+
+// ===== 流状态（RFC 9113 §5.1，无 push 简化）=====
+
+export
+enum StreamState {
+    Idle,
+    Open,
+    HalfClosedLocal,
+    HalfClosedRemote,
+    Closed,
+}
+
+// ===== 流事件（驱动状态机的输入）=====
+
+export
+enum StreamEvent {
+    EventHeaders,       // HEADERS 帧（Idle 打开流 / 既有流尾随头）
+    EventEndStreamSent, // 本端发送了带 END_STREAM 的帧
+    EventEndStreamRecv, // 对端发来了带 END_STREAM 的帧
+    EventRstStream,     // RST_STREAM（本端或对端发起）
+}
+
+// ===== 状态转移矩阵 =====
+//
+// Idle ──EventHeaders──▶ Open          Open ──EndStreamSent──▶ HalfClosedLocal
+// Open ──EndStreamRecv──▶ HalfClosedRemote   HalfClosedLocal ──EndStreamRecv──▶ Closed
+// HalfClosedRemote ──EndStreamSent──▶ Closed   任意非 Idle ──RstStream──▶ Closed
+// 特殊：Idle 收 RST → 连接错误（RFC 9113 §5.1，返回 false）；
+//       Closed 收 RST → 忽略（返回 Closed,true，非错误）。
+// 返回 (新状态, ok)；ok=false 表示非法转移（→ RST_STREAM + 连接错误）。
+
+export
+func transition(s StreamState, ev StreamEvent) (StreamState, bool) {
+    switch (s) {
+    case Idle {
+        if (ev.id == StreamEvent.EventHeaders.id) { return (StreamState.Open, true); }
+        return (StreamState.Idle, false);
+    }
+    case Open {
+        if (ev.id == StreamEvent.EventEndStreamSent.id) { return (StreamState.HalfClosedLocal, true); }
+        if (ev.id == StreamEvent.EventEndStreamRecv.id) { return (StreamState.HalfClosedRemote, true); }
+        if (ev.id == StreamEvent.EventRstStream.id) { return (StreamState.Closed, true); }
+        return (StreamState.Open, false);
+    }
+    case HalfClosedLocal {
+        if (ev.id == StreamEvent.EventEndStreamRecv.id) { return (StreamState.Closed, true); }
+        if (ev.id == StreamEvent.EventRstStream.id) { return (StreamState.Closed, true); }
+        return (StreamState.HalfClosedLocal, false);
+    }
+    case HalfClosedRemote {
+        if (ev.id == StreamEvent.EventEndStreamSent.id) { return (StreamState.Closed, true); }
+        if (ev.id == StreamEvent.EventRstStream.id) { return (StreamState.Closed, true); }
+        return (StreamState.HalfClosedRemote, false);
+    }
+    case Closed {
+        if (ev.id == StreamEvent.EventRstStream.id) { return (StreamState.Closed, true); }
+        return (StreamState.Closed, false);
+    }
+    }
+}
+
+// ===== 流量控制（RFC 9113 §6.9）=====
+//
+// 连接级 + 流级各两个窗口：发送窗口（对端通告，DATA 受其限制）与
+// 接收窗口（本端，收 DATA 扣减、WINDOW_UPDATE 回补）。
+// 以下为纯判定/计算原语，实际回补时机由网络层策略决定（计划 §7.2）。
+
+// 接收窗口回补阈值（窗口减半即回补 = 初始窗口 65535 的一半）
+// 注：顶层 const 初始化表达式引用同模块其它文件 const 时，C 生成器不折叠
+//（输出未限定的 $INITIAL_WINDOW_SIZE 导致链接失败），故直接写字面量（§12.3）。
+export const RECV_UPDATE_THRESHOLD int = 32767;
+
+// 发送判定：size 字节 DATA 是否在连接级与流级窗口内
+export
+func canSend(connWindow, streamWindow, size int) bool {
+    if (size < 0) { return false; }
+    if (size > connWindow) { return false; }
+    if (size > streamWindow) { return false; }
+    return true;
+}
+
+// 扣减接收窗口（流级/连接级各扣）：超窗返回 (原窗口, 原窗口, false)（FLOW_CONTROL_ERROR）
+export
+func consumeRecvWindow(streamWindow, connWindow, size int) (int, int, bool) {
+    if (size < 0) { return (streamWindow, connWindow, false); }
+    if (size > streamWindow) { return (streamWindow, connWindow, false); }
+    if (size > connWindow) { return (streamWindow, connWindow, false); }
+    return (streamWindow - size, connWindow - size, true);
+}
+
+// 回补量：累计未回补字节达到阈值时返回应回补的增量，否则 0（不发 WINDOW_UPDATE）
+export
+func windowUpdateAmount(recvUnacked int) int {
+    if (recvUnacked >= RECV_UPDATE_THRESHOLD) { return recvUnacked; }
+    return 0;
+}
+
+// 发送窗口增量（收到对端 WINDOW_UPDATE）：increment 合法且不超上限则累加。
+// 返回 (新窗口, ok)。ok=false 时调用方按协议错误/流错误处理。
+export
+func addSendWindow(win, increment int) (int, bool) {
+    if (increment <= 0) { return (win, false); }
+    if (win + increment > 0x7FFFFFFF) { return (win, false); }
+    return (win + increment, true);
+}
+
+// ===== Stream 模型 =====
+//
+// 一个流的状态 + 流量控制窗口 + 头部块重组缓冲（HEADERS + CONTINUATION 拼接）。
+// 字段可空/零值 → new(Stream) 无需初始化器、流表数组元素可留空。
+
+@Sync
+export
+class Stream final {
+    export var id int;              // 流标识（1..0x7FFFFFFF）
+    export var state StreamState;   // 当前状态
+    export var sendWindow int;      // 对端通告的发送窗口（初始 = peer.initialWindowSize）
+    export var recvWindow int;      // 本端接收窗口（初始 = local.initialWindowSize）
+    export var recvUnacked int;     // 已收未回补字节（WINDOW_UPDATE 依据）
+    var headerFrag [*?#]byte;       // 头部块跨帧重组缓冲（END_HEADERS 后清空）
+    var headerPending bool;         // 头部块未完（期待 CONTINUATION）
+}

@@ -1,0 +1,130 @@
+// ===== huffman.feng 单元测试（RFC 7541 附录 C 官方向量 + 错误用例）=====
+
+import std$testing;
+import std$http$codec$v2_0 huff;
+
+// 官方向量：Huffman 编码串 hex → 期望明文（RFC 7541 C.4.1 / C.4.2 / C.4.3 / C.6.x）
+func hexToBytes(h [*#]byte) [*]byte {
+    var n = h.length;
+    var r = new([n / 2]byte);
+    for (var i = 0; i < n / 2; i += 1) {
+        r[i] = byte(hexVal(h[i * 2]) << 4 | hexVal(h[i * 2 + 1]));
+    }
+    return r;
+}
+
+func hexVal(c byte) int {
+    if (int(c) >= 48 && int(c) <= 57) { return int(c) - 48; }      // '0'..'9'
+    if (int(c) >= 97 && int(c) <= 102) { return int(c) - 97 + 10; } // 'a'..'f'
+    return 0;
+}
+
+func strEquals(b [*?#]byte, s [*#]byte) bool {
+    if (b == nil) { return false; }
+    if (b.length != s.length) { return false; }
+    for (var i = 0; i < b.length; i += 1) {
+        if (b[i] != s[i]) { return false; }
+    }
+    return true;
+}
+
+// 校验一个向量：hex → decode → 与期望字符串逐字节相等
+func checkVector(hex, expect [*#]byte) bool {
+    var data = hexToBytes(hex);
+    var r = huff$huffmanDecode(data, 0, data.length);
+    if (!r.1) { return false; }
+    return strEquals(r.0, expect);
+}
+
+@Test
+func testVector_www_example_com() {
+    testing$assertTrue(checkVector(
+        "f1e3c2e5f23a6ba0ab90f4ff",
+        "www.example.com"));
+}
+
+@Test
+func testVector_no_cache() {
+    testing$assertTrue(checkVector(
+        "a8eb10649cbf",
+        "no-cache"));
+}
+
+@Test
+func testVector_custom_key() {
+    testing$assertTrue(checkVector(
+        "25a849e95ba97d7f",
+        "custom-key"));
+}
+
+@Test
+func testVector_custom_value() {
+    testing$assertTrue(checkVector(
+        "25a849e95bb8e8b4bf",
+        "custom-value"));
+}
+
+@Test
+func testVector_date() {
+    testing$assertTrue(checkVector(
+        "d07abe941054d444a8200595040b8166e082a62d1bff",
+        "Mon, 21 Oct 2013 20:13:21 GMT"));
+}
+
+@Test
+func testVector_location() {
+    testing$assertTrue(checkVector(
+        "9d29ad171863c78f0b97c8e9ae82ae43d3",
+        "https://www.example.com"));
+}
+
+@Test
+func testVector_private() {
+    testing$assertTrue(checkVector(
+        "aec3771a4b",
+        "private"));
+}
+
+@Test
+func testVector_307() {
+    testing$assertTrue(checkVector(
+        "640eff",
+        "307"));
+}
+
+@Test
+func testVector_302() {
+    testing$assertTrue(checkVector(
+        "6402",
+        "302"));
+}
+
+// 错误用例
+func expectFail(hex [*#]byte) bool {
+    var data = hexToBytes(hex);
+    var r = huff$huffmanDecode(data, 0, data.length);
+    return !r.1;
+}
+
+@Test
+func testErr_eos_in_stream() {
+    // EOS 码（0x3fffffff / 30 位全 1）出现在流中 → 解码错误
+    testing$assertTrue(expectFail("ffffffffffffff"));
+}
+
+@Test
+func testErr_empty() {
+    var data = new([0]byte);
+    var r = huff$huffmanDecode(data, 0, 0);
+    testing$assertTrue(r.1);
+    var buf = r.0;
+    if (buf == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(buf.length == 0);
+}
+
+@Test
+func testErr_padding_bad() {
+    // 末尾填充不是全 1（'w'=1111000 后接 0 填充）→ 错误
+    // f1e3c2e5f23a6ba0ab90f4fe：与官方向量仅最后字节差 1 位（0xfe vs 0xff）
+    testing$assertTrue(expectFail("f1e3c2e5f23a6ba0ab90f4fe"));
+}

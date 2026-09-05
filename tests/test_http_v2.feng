@@ -1,0 +1,600 @@
+// ===== H1 单测：std$http$codec$v2_0 — frame.feng / error.feng =====
+// 对应 docs/http-2.0-protocol.md 里程碑 H1；纯函数、无网络。
+// 帧头 / 完整帧 round-trip、变长整数（RFC 7541 §5.1）、各 payload 编解码。
+
+import std$testing;
+import std$http$codec$v2_0 h2;
+
+// ===== helpers =====
+
+func eqBytes(a, b [*#]byte) bool {
+    if (a.length != b.length) { return false; }
+    for (var i = 0; i < a.length; i += 1) {
+        if (a[i] != b[i]) { return false; }
+    }
+    return true;
+}
+
+// 可空缓冲比较（parse 结果可能为 nil）
+func eqBuf(a [*?#]byte, b [*#]byte) bool {
+    if (a == nil) { return false; }
+    if (a.length != b.length) { return false; }
+    for (var i = 0; i < a.length; i += 1) {
+        if (a[i] != b[i]) { return false; }
+    }
+    return true;
+}
+
+// 拼接两个字节缓冲（多帧解析测试用）
+func concat(a, b [*#]byte) [*#]byte {
+    var r = new([a.length + b.length]byte);
+    for (var i = 0; i < a.length; i += 1) { r[i] = a[i]; }
+    for (var i = 0; i < b.length; i += 1) { r[a.length + i] = b[i]; }
+    return r;
+}
+
+// =====================================================
+// 枚举 id
+// =====================================================
+
+@Test
+func testFrameTypeIds() {
+    testing$assertTrue(h2$FrameType.DATA.id == 0);
+    testing$assertTrue(h2$FrameType.HEADERS.id == 1);
+    testing$assertTrue(h2$FrameType.PRIORITY.id == 2);
+    testing$assertTrue(h2$FrameType.RST_STREAM.id == 3);
+    testing$assertTrue(h2$FrameType.SETTINGS.id == 4);
+    testing$assertTrue(h2$FrameType.PUSH_PROMISE.id == 5);
+    testing$assertTrue(h2$FrameType.PING.id == 6);
+    testing$assertTrue(h2$FrameType.GOAWAY.id == 7);
+    testing$assertTrue(h2$FrameType.WINDOW_UPDATE.id == 8);
+    testing$assertTrue(h2$FrameType.CONTINUATION.id == 9);
+}
+
+@Test
+func testErrorCodeIds() {
+    testing$assertTrue(h2$ErrorCode.NO_ERROR.id == 0);
+    testing$assertTrue(h2$ErrorCode.PROTOCOL_ERROR.id == 1);
+    testing$assertTrue(h2$ErrorCode.INTERNAL_ERROR.id == 2);
+    testing$assertTrue(h2$ErrorCode.FLOW_CONTROL_ERROR.id == 3);
+    testing$assertTrue(h2$ErrorCode.SETTINGS_TIMEOUT.id == 4);
+    testing$assertTrue(h2$ErrorCode.STREAM_CLOSED.id == 5);
+    testing$assertTrue(h2$ErrorCode.FRAME_SIZE_ERROR.id == 6);
+    testing$assertTrue(h2$ErrorCode.REFUSED_STREAM.id == 7);
+    testing$assertTrue(h2$ErrorCode.CANCEL.id == 8);
+    testing$assertTrue(h2$ErrorCode.COMPRESSION_ERROR.id == 9);
+    testing$assertTrue(h2$ErrorCode.CONNECT_ERROR.id == 0x0A);
+    testing$assertTrue(h2$ErrorCode.ENHANCE_YOUR_CALM.id == 0x0B);
+    testing$assertTrue(h2$ErrorCode.INADEQUATE_SECURITY.id == 0x0C);
+    testing$assertTrue(h2$ErrorCode.HTTP_1_1_REQUIRED.id == 0x0D);
+}
+
+@Test
+func testErrorName() {
+    testing$assertTrue(eqBytes(h2$errorName(h2$ErrorCode.NO_ERROR), "NO_ERROR"));
+    testing$assertTrue(eqBytes(h2$errorName(h2$ErrorCode.PROTOCOL_ERROR), "PROTOCOL_ERROR"));
+    testing$assertTrue(eqBytes(h2$errorName(h2$ErrorCode.FRAME_SIZE_ERROR), "FRAME_SIZE_ERROR"));
+    testing$assertTrue(eqBytes(h2$errorName(h2$ErrorCode.ENHANCE_YOUR_CALM), "ENHANCE_YOUR_CALM"));
+    testing$assertTrue(eqBytes(h2$errorName(h2$ErrorCode.HTTP_1_1_REQUIRED), "HTTP_1_1_REQUIRED"));
+}
+
+// =====================================================
+// 帧头拆装（RFC 9113 §4.1）
+// =====================================================
+
+@Test
+func testFrameHeadRoundTrip() {
+    var h = h2$encodeFrameHead(1, 0x05, 3, 5);
+    testing$assertTrue(h.length == 9);
+    var r = h2$parseFrameHead(h, 0);
+    testing$assertTrue(r.4);
+    testing$assertTrue(r.0 == 5);       // length
+    testing$assertTrue(r.1 == 1);       // type = HEADERS
+    testing$assertTrue(r.2 == 0x05);    // flags = END_STREAM|END_HEADERS
+    testing$assertTrue(r.3 == 3);       // streamId
+}
+
+@Test
+func testFrameHeadMaxValues() {
+    var h = h2$encodeFrameHead(0xFF, 0xFF, 0x7FFFFFFF, 0xFFFFFF);
+    var r = h2$parseFrameHead(h, 0);
+    testing$assertTrue(r.4);
+    testing$assertTrue(r.0 == 0xFFFFFF);
+    testing$assertTrue(r.1 == 0xFF);
+    testing$assertTrue(r.2 == 0xFF);
+    testing$assertTrue(r.3 == 0x7FFFFFFF);
+}
+
+@Test
+func testFrameHeadTooShort() {
+    var d = new([8]byte);
+    var r = h2$parseFrameHead(d, 0);
+    testing$assertFalse(r.4);
+}
+
+@Test
+func testFrameHeadFromOffset() {
+    var buf = new([11]byte);
+    buf[0] = 0xAA; buf[1] = 0xBB;   // 前缀垃圾
+    buf[2] = 0x00; buf[3] = 0x00; buf[4] = 0x02;   // length=2
+    buf[5] = 0x06;                                   // type=PING
+    buf[6] = 0x00;                                   // flags
+    buf[7] = 0x00; buf[8] = 0x00; buf[9] = 0x00; buf[10] = 0x00;  // streamId=0
+    var r = h2$parseFrameHead(buf, 2);
+    testing$assertTrue(r.4);
+    testing$assertTrue(r.0 == 2);
+    testing$assertTrue(r.1 == 6);
+    testing$assertTrue(r.3 == 0);
+}
+
+// =====================================================
+// 完整帧 round-trip
+// =====================================================
+
+@Test
+func testFrameRoundTrip() {
+    var payload = new([4]byte);
+    payload[0] = 0xDE;
+    payload[1] = 0xAD;
+    payload[2] = 0xBE;
+    payload[3] = 0xEF;
+    var f = h2$makeFrame(0, 0x01, 7, payload);   // DATA | END_STREAM, stream 7
+    var wire = h2$encodeFrame(f);
+    testing$assertTrue(wire.length == 13);        // 9 头 + 4 payload
+    var fr = h2$parseFrame(wire, 0);
+    testing$assertTrue(fr.2);
+    var g = fr.0;
+    if (g == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(g.length == 4);
+    testing$assertTrue(g.type == 0);
+    testing$assertTrue(g.flags == 0x01);
+    testing$assertTrue(g.streamId == 7);
+    testing$assertTrue(eqBuf(g.payload, payload));
+}
+
+@Test
+func testFrameNoPayload() {
+    var f = h2$makeFrame(6, 0x01, 0, nil);        // PING ACK，无 payload
+    var wire = h2$encodeFrame(f);
+    testing$assertTrue(wire.length == 9);
+    var fr = h2$parseFrame(wire, 0);
+    testing$assertTrue(fr.2);
+    var g = fr.0;
+    if (g == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(g.length == 0);
+    testing$assertTrue(g.payload == nil);
+}
+
+@Test
+func testFrameNeedMore() {
+    var s = new([6]byte);
+    s[0] = 0x00; s[1] = 0x03; s[2] = 0x00; s[3] = 0x00; s[4] = 0x00; s[5] = 0x64;
+    var wire = h2$encodeFrame(h2$makeFrame(4, 0, 0, s));
+    // 只给 9 头 + 3 payload（缺 3）
+    var partial = new([12]byte);
+    for (var i = 0; i < 12; i += 1) { partial[i] = wire[i]; }
+    var fr = h2$parseFrame(partial, 0);
+    testing$assertFalse(fr.2);
+}
+
+@Test
+func testParseFramesSequential() {
+    var s = new([6]byte);
+    s[0] = 0x00; s[1] = 0x03; s[2] = 0x00; s[3] = 0x00; s[4] = 0x00; s[5] = 0x64;
+    var w = new([4]byte);
+    w[0] = 0x00; w[1] = 0x01; w[2] = 0x00; w[3] = 0x00;
+    var wire = concat(h2$encodeFrame(h2$makeFrame(4, 0, 0, s)),
+                      h2$encodeFrame(h2$makeFrame(8, 0, 0, w)));
+    var fr1 = h2$parseFrame(wire, 0);
+    testing$assertTrue(fr1.2);
+    var f1 = fr1.0;
+    if (f1 == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(f1.type == 4);
+    testing$assertTrue(f1.length == 6);
+    var fr2 = h2$parseFrame(wire, fr1.1);
+    testing$assertTrue(fr2.2);
+    var f2 = fr2.0;
+    if (f2 == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(f2.type == 8);
+    testing$assertTrue(f2.length == 4);
+}
+
+// =====================================================
+// 变长整数（RFC 7541 §5.1）
+// =====================================================
+
+@Test
+func testVarIntSingleByte() {
+    // 5 位前缀，值 10 < 31 → 单字节 0x0A（RFC 7541 C.1.1）
+    var d = new([1]byte);
+    d[0] = 0x0A;
+    var r = h2$decodeVarInt(d, 0, 5);
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.0 == 10);
+    testing$assertTrue(r.1 == 1);
+}
+
+@Test
+func testVarInt1337() {
+    // 5 位前缀，值 1337 → [0x1F, 0x9A, 0x0A]（RFC 7541 C.1.2）
+    var d = new([3]byte);
+    d[0] = 0x1F;
+    d[1] = 0x9A;
+    d[2] = 0x0A;
+    var r = h2$decodeVarInt(d, 0, 5);
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.0 == 1337);
+    testing$assertTrue(r.1 == 3);
+}
+
+@Test
+func testVarInt8bitPrefix() {
+    // 8 位前缀，值 1337 → [0xFF, 0xBA, 0x08]（1337-255=1082=0x43A）
+    var d = new([3]byte);
+    d[0] = 0xFF;
+    d[1] = 0xBA;
+    d[2] = 0x08;
+    var r = h2$decodeVarInt(d, 0, 8);
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.0 == 1337);
+    testing$assertTrue(r.1 == 3);
+}
+
+@Test
+func testVarIntEncodeBytes() {
+    var a = h2$encodeVarInt(31, 5);
+    // 值 31 == 2^5-1 不能单字节（单字节上限 2^N-2），扩展形式 [0x1F, 0x00]
+    testing$assertTrue(a.length == 2);
+    testing$assertTrue(int(a[0]) == 0x1F);
+    testing$assertTrue(int(a[1]) == 0x00);
+    var b = h2$encodeVarInt(32, 5);
+    testing$assertTrue(b.length == 2);
+    testing$assertTrue(int(b[0]) == 0x1F);
+    testing$assertTrue(int(b[1]) == 0x01);
+    var c = h2$encodeVarInt(1337, 5);
+    testing$assertTrue(c.length == 3);
+    testing$assertTrue(int(c[0]) == 0x1F);
+    testing$assertTrue(int(c[1]) == 0x9A);
+    testing$assertTrue(int(c[2]) == 0x0A);
+    var d = h2$encodeVarInt(1337, 8);
+    testing$assertTrue(d.length == 3);
+    testing$assertTrue(int(d[0]) == 0xFF);
+    testing$assertTrue(int(d[1]) == 0xBA);
+    testing$assertTrue(int(d[2]) == 0x08);
+}
+
+func varintRoundTrips(v uint32, prefixBits int) bool {
+    var enc = h2$encodeVarInt(v, prefixBits);
+    var dec = h2$decodeVarInt(enc, 0, prefixBits);
+    if (!dec.2) { return false; }
+    return dec.0 == v;
+}
+
+@Test
+func testVarIntRoundTrip() {
+    testing$assertTrue(varintRoundTrips(0, 5));
+    testing$assertTrue(varintRoundTrips(1, 5));
+    testing$assertTrue(varintRoundTrips(31, 5));
+    testing$assertTrue(varintRoundTrips(32, 5));
+    testing$assertTrue(varintRoundTrips(127, 8));
+    testing$assertTrue(varintRoundTrips(128, 8));
+    testing$assertTrue(varintRoundTrips(255, 8));
+    testing$assertTrue(varintRoundTrips(1337, 5));
+    testing$assertTrue(varintRoundTrips(1337, 8));
+    testing$assertTrue(varintRoundTrips(4095, 5));
+    testing$assertTrue(varintRoundTrips(65535, 5));
+    testing$assertTrue(varintRoundTrips(0xFFFFFFFF, 5));
+    testing$assertTrue(varintRoundTrips(0xFFFFFFFF, 8));
+}
+
+@Test
+func testVarIntTruncated() {
+    // 前缀全 1 + 续接字节，但缺终止字节 → 数据不足
+    var d = new([2]byte);
+    d[0] = 0x1F;
+    d[1] = 0x9A;
+    var r = h2$decodeVarInt(d, 0, 5);
+    testing$assertFalse(r.2);
+}
+
+@Test
+func testVarIntEmpty() {
+    var d = new([0]byte);
+    var r = h2$decodeVarInt(d, 0, 5);
+    testing$assertFalse(r.2);
+}
+
+// =====================================================
+// DATA payload（§6.1）
+// =====================================================
+
+@Test
+func testDataPayloadPlain() {
+    var p = new([3]byte);
+    p[0] = 0xAA; p[1] = 0xBB; p[2] = 0xCC;
+    var r = h2$parseDataPayload(p, false);
+    testing$assertTrue(r.1);
+    testing$assertTrue(eqBuf(r.0, p));
+}
+
+@Test
+func testDataPayloadPadded() {
+    var p = new([5]byte);
+    p[0] = 2;                   // Pad Length
+    p[1] = 0x68; p[2] = 0x69;   // "hi"
+    p[3] = 0x00; p[4] = 0x00;   // 2 个 pad 字节
+    var r = h2$parseDataPayload(p, true);
+    testing$assertTrue(r.1);
+    testing$assertTrue(eqBuf(r.0, "hi"));
+}
+
+@Test
+func testDataPayloadPadTooBig() {
+    var p = new([2]byte);
+    p[0] = 5;                   // Pad Length 超过剩余字节
+    p[1] = 0x41;
+    var r = h2$parseDataPayload(p, true);
+    testing$assertFalse(r.1);
+}
+
+// =====================================================
+// HEADERS payload（§6.2）
+// =====================================================
+
+@Test
+func testHeadersPayloadPlain() {
+    var p = new([2]byte);
+    p[0] = 0x82; p[1] = 0x84;
+    var r = h2$parseHeadersPayload(p, false, false);
+    testing$assertTrue(r.1);
+    var b = r.0;
+    if (b == nil) { testing$assertTrue(false); return; }
+    testing$assertFalse(b.hasPriority);
+    var frag = b.fragment;
+    if (frag == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(frag.length == 2);
+    testing$assertTrue(int(frag[0]) == 0x82);
+    testing$assertTrue(int(frag[1]) == 0x84);
+}
+
+@Test
+func testHeadersPayloadPriority() {
+    var p = new([6]byte);
+    p[0] = 0x80;                        // E=1
+    p[1] = 0x00; p[2] = 0x00; p[3] = 0x05;   // depStreamId=5
+    p[4] = 15;                          // weight 字段 = 15 → weight = 16
+    p[5] = 0xAA;                        // fragment 首字节
+    var r = h2$parseHeadersPayload(p, false, true);
+    testing$assertTrue(r.1);
+    var b = r.0;
+    if (b == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(b.hasPriority);
+    testing$assertTrue(b.exclusive);
+    testing$assertTrue(b.depStreamId == 5);
+    testing$assertTrue(b.weight == 16);
+    var frag = b.fragment;
+    if (frag == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(frag.length == 1);
+    testing$assertTrue(int(frag[0]) == 0xAA);
+}
+
+@Test
+func testHeadersPayloadPadded() {
+    var p = new([3]byte);
+    p[0] = 1;                   // Pad Length
+    p[1] = 0x82;                // fragment
+    p[2] = 0x00;                // 1 个 pad 字节
+    var r = h2$parseHeadersPayload(p, true, false);
+    testing$assertTrue(r.1);
+    var b = r.0;
+    if (b == nil) { testing$assertTrue(false); return; }
+    testing$assertFalse(b.hasPriority);
+    var frag = b.fragment;
+    if (frag == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(frag.length == 1);
+    testing$assertTrue(int(frag[0]) == 0x82);
+}
+
+@Test
+func testHeadersPayloadPriorityTooShort() {
+    var p = new([3]byte);
+    p[0] = 0x80; p[1] = 0x00; p[2] = 0x00;   // 仅 3 字节 < 5
+    var r = h2$parseHeadersPayload(p, false, true);
+    testing$assertFalse(r.1);
+}
+
+@Test
+func testEncodeHeadersPayload() {
+    var p = new([2]byte);
+    p[0] = 0x82; p[1] = 0x84;
+    var back = h2$encodeHeadersPayload(p);
+    testing$assertTrue(back.length == 2);
+    testing$assertTrue(int(back[0]) == 0x82);
+    testing$assertTrue(int(back[1]) == 0x84);
+}
+
+// =====================================================
+// PRIORITY payload（§6.3）
+// =====================================================
+
+@Test
+func testPriorityPayload() {
+    var p = new([5]byte);
+    p[0] = 0x80;                        // E=1
+    p[1] = 0x00; p[2] = 0x00; p[3] = 0x0A;   // dep=10
+    p[4] = 0x1F;                        // weight 字段 = 31 → weight = 32
+    var r = h2$parsePriorityPayload(p);
+    testing$assertTrue(r.3);
+    testing$assertTrue(r.0 == 10);
+    testing$assertTrue(r.1 == 32);
+    testing$assertTrue(r.2);
+}
+
+@Test
+func testPriorityPayloadWrongLen() {
+    var p = new([4]byte);
+    var r = h2$parsePriorityPayload(p);
+    testing$assertFalse(r.3);
+}
+
+// =====================================================
+// RST_STREAM payload（§6.4）
+// =====================================================
+
+@Test
+func testRstStreamRoundTrip() {
+    var p = new([4]byte);
+    p[0] = 0x00; p[1] = 0x00; p[2] = 0x00; p[3] = 0x0B;   // ENHANCE_YOUR_CALM
+    var r = h2$parseRstStreamPayload(p);
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0 == 0x0B);
+    var back = h2$encodeRstStreamPayload(0x0B);
+    testing$assertTrue(back.length == 4);
+    testing$assertTrue(int(back[0]) == 0x00);
+    testing$assertTrue(int(back[3]) == 0x0B);
+}
+
+// =====================================================
+// SETTINGS payload（§6.5）
+// =====================================================
+
+@Test
+func testSettingsRoundTrip() {
+    // id=3 (MAX_CONCURRENT_STREAMS), value=100
+    var p = new([6]byte);
+    p[0] = 0x00; p[1] = 0x03;
+    p[2] = 0x00; p[3] = 0x00; p[4] = 0x00; p[5] = 0x64;
+    var r = h2$parseSettingsPayload(p);
+    testing$assertTrue(r.1);
+    var st = r.0;
+    testing$assertTrue(st.length == 1);
+    testing$assertTrue(st[0].id == 3);
+    testing$assertTrue(st[0].value == 100);
+    // 编码回去应还原
+    var back = h2$encodeSettingsPayload(st);
+    testing$assertTrue(back.length == 6);
+    testing$assertTrue(int(back[0]) == 0x00);
+    testing$assertTrue(int(back[1]) == 0x03);
+    testing$assertTrue(int(back[5]) == 0x64);
+}
+
+@Test
+func testSettingsBadLength() {
+    var p = new([5]byte);   // 5 % 6 != 0
+    var r = h2$parseSettingsPayload(p);
+    testing$assertFalse(r.1);
+}
+
+@Test
+func testEncodeSettingsTwo() {
+    var arr = new([2]h2$Setting);
+    var s0 h2$Setting = { id=1, value=uint32(4096) };       // HEADER_TABLE_SIZE
+    var s1 h2$Setting = { id=4, value=uint32(100) };        // INITIAL_WINDOW_SIZE
+    arr[0] = s0;
+    arr[1] = s1;
+    var back = h2$encodeSettingsPayload(arr);
+    testing$assertTrue(back.length == 12);
+    testing$assertTrue(int(back[0]) == 0x00);
+    testing$assertTrue(int(back[1]) == 0x01);
+    // 4096 = 0x00001000，uint32 大端 → [0x00,0x00,0x10,0x00]
+    testing$assertTrue(int(back[2]) == 0x00);
+    testing$assertTrue(int(back[3]) == 0x00);
+    testing$assertTrue(int(back[4]) == 0x10);
+    testing$assertTrue(int(back[5]) == 0x00);
+    testing$assertTrue(int(back[6]) == 0x00);
+    testing$assertTrue(int(back[7]) == 0x04);
+    testing$assertTrue(int(back[11]) == 0x64);
+}
+
+// =====================================================
+// PUSH_PROMISE payload（§6.6）
+// =====================================================
+
+@Test
+func testPushPromisePayload() {
+    var p = new([5]byte);
+    p[0] = 0x00; p[1] = 0x00; p[2] = 0x00; p[3] = 0x06;   // promisedId=6
+    p[4] = 0xBB;
+    var r = h2$parsePushPromisePayload(p, false);
+    testing$assertTrue(r.1);
+    var b = r.0;
+    if (b == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(b.promisedId == 6);
+    var frag = b.fragment;
+    if (frag == nil) { testing$assertTrue(false); return; }
+    testing$assertTrue(frag.length == 1);
+    testing$assertTrue(int(frag[0]) == 0xBB);
+}
+
+// =====================================================
+// PING payload（§6.7）
+// =====================================================
+
+@Test
+func testPingRoundTrip() {
+    var p = new([8]byte);
+    p[0] = 0x01; p[1] = 0x02; p[2] = 0x03; p[3] = 0x04;
+    p[4] = 0x05; p[5] = 0x06; p[6] = 0x07; p[7] = 0x08;
+    var r = h2$parsePingPayload(p);
+    testing$assertTrue(r.1);
+    testing$assertTrue(eqBuf(r.0, p));
+    var back = h2$encodePingPayload(p);
+    testing$assertTrue(back.length == 8);
+    testing$assertTrue(int(back[7]) == 0x08);
+}
+
+@Test
+func testPingBadLength() {
+    var p = new([7]byte);
+    var r = h2$parsePingPayload(p);
+    testing$assertFalse(r.1);
+}
+
+// =====================================================
+// GOAWAY payload（§6.8）
+// =====================================================
+
+@Test
+func testGoawayRoundTrip() {
+    var p = new([11]byte);
+    p[0] = 0x00; p[1] = 0x00; p[2] = 0x00; p[3] = 0x07;   // lastStreamId=7
+    p[4] = 0x00; p[5] = 0x00; p[6] = 0x00; p[7] = 0x00;   // err=NO_ERROR
+    p[8] = 0x62; p[9] = 0x79; p[10] = 0x65;               // "bye"
+    var r = h2$parseGoawayPayload(p);
+    testing$assertTrue(r.3);
+    testing$assertTrue(r.0 == 7);
+    testing$assertTrue(r.1 == 0);
+    testing$assertTrue(eqBuf(r.2, "bye"));
+    var dbg = new([3]byte);
+    dbg[0] = 0x62; dbg[1] = 0x79; dbg[2] = 0x65;   // "bye"
+    var back = h2$encodeGoawayPayload(7, 0, dbg);
+    testing$assertTrue(back.length == 11);
+    testing$assertTrue(int(back[8]) == 0x62);
+    testing$assertTrue(int(back[9]) == 0x79);
+    testing$assertTrue(int(back[10]) == 0x65);
+}
+
+@Test
+func testGoawayTooShort() {
+    var p = new([7]byte);
+    var r = h2$parseGoawayPayload(p);
+    testing$assertFalse(r.3);
+}
+
+// =====================================================
+// WINDOW_UPDATE payload（§6.9）
+// =====================================================
+
+@Test
+func testWindowUpdateRoundTrip() {
+    var p = new([4]byte);
+    p[0] = 0x00; p[1] = 0x01; p[2] = 0x00; p[3] = 0x00;   // 65536
+    var r = h2$parseWindowUpdatePayload(p);
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0 == 65536);
+    var back = h2$encodeWindowUpdatePayload(65536);
+    testing$assertTrue(back.length == 4);
+    testing$assertTrue(int(back[0]) == 0x00);
+    testing$assertTrue(int(back[1]) == 0x01);
+    testing$assertTrue(int(back[3]) == 0x00);
+}

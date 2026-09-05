@@ -1,0 +1,172 @@
+// ===== stream.feng 单元测试（RFC 9113 §5 状态机 + §6.9 流量控制原语）=====
+// 对应 docs/http-2.0-protocol.md 里程碑 H4；纯函数、无网络。
+// 全状态 × 全事件转移矩阵 + 窗口判定/扣减/回补边界。
+
+import std$testing;
+import std$http$codec$v2_0 h2;
+
+// =====================================================
+// 枚举 id
+// =====================================================
+
+@Test
+func testStreamStateIds() {
+    testing$assertTrue(h2$StreamState.Idle.id == 0);
+    testing$assertTrue(h2$StreamState.Open.id == 1);
+    testing$assertTrue(h2$StreamState.HalfClosedLocal.id == 2);
+    testing$assertTrue(h2$StreamState.HalfClosedRemote.id == 3);
+    testing$assertTrue(h2$StreamState.Closed.id == 4);
+}
+
+@Test
+func testStreamEventIds() {
+    testing$assertTrue(h2$StreamEvent.EventHeaders.id == 0);
+    testing$assertTrue(h2$StreamEvent.EventEndStreamSent.id == 1);
+    testing$assertTrue(h2$StreamEvent.EventEndStreamRecv.id == 2);
+    testing$assertTrue(h2$StreamEvent.EventRstStream.id == 3);
+}
+
+// =====================================================
+// 状态转移矩阵（RFC 9113 §5.1，无 push）
+// =====================================================
+
+// 合法转移
+func valid(s h2$StreamState, ev h2$StreamEvent, want h2$StreamState) bool {
+    var r = h2$transition(s, ev);
+    if (!r.1) { return false; }
+    return r.0.id == want.id;
+}
+
+// 非法转移（返回 ok=false）
+func invalid(s h2$StreamState, ev h2$StreamEvent) bool {
+    var r = h2$transition(s, ev);
+    return !r.1;
+}
+
+@Test
+func testTransitionIdle() {
+    testing$assertTrue(valid(h2$StreamState.Idle, h2$StreamEvent.EventHeaders, h2$StreamState.Open));
+    // Idle 收 RST → 连接错误（RFC 9113 §5.1）
+    testing$assertTrue(invalid(h2$StreamState.Idle, h2$StreamEvent.EventRstStream));
+    testing$assertTrue(invalid(h2$StreamState.Idle, h2$StreamEvent.EventEndStreamSent));
+    testing$assertTrue(invalid(h2$StreamState.Idle, h2$StreamEvent.EventEndStreamRecv));
+}
+
+@Test
+func testTransitionOpen() {
+    testing$assertTrue(valid(h2$StreamState.Open, h2$StreamEvent.EventEndStreamSent, h2$StreamState.HalfClosedLocal));
+    testing$assertTrue(valid(h2$StreamState.Open, h2$StreamEvent.EventEndStreamRecv, h2$StreamState.HalfClosedRemote));
+    testing$assertTrue(valid(h2$StreamState.Open, h2$StreamEvent.EventRstStream, h2$StreamState.Closed));
+    testing$assertTrue(invalid(h2$StreamState.Open, h2$StreamEvent.EventHeaders));
+}
+
+@Test
+func testTransitionHalfClosedLocal() {
+    testing$assertTrue(valid(h2$StreamState.HalfClosedLocal, h2$StreamEvent.EventEndStreamRecv, h2$StreamState.Closed));
+    testing$assertTrue(valid(h2$StreamState.HalfClosedLocal, h2$StreamEvent.EventRstStream, h2$StreamState.Closed));
+    testing$assertTrue(invalid(h2$StreamState.HalfClosedLocal, h2$StreamEvent.EventEndStreamSent));
+    testing$assertTrue(invalid(h2$StreamState.HalfClosedLocal, h2$StreamEvent.EventHeaders));
+}
+
+@Test
+func testTransitionHalfClosedRemote() {
+    testing$assertTrue(valid(h2$StreamState.HalfClosedRemote, h2$StreamEvent.EventEndStreamSent, h2$StreamState.Closed));
+    testing$assertTrue(valid(h2$StreamState.HalfClosedRemote, h2$StreamEvent.EventRstStream, h2$StreamState.Closed));
+    testing$assertTrue(invalid(h2$StreamState.HalfClosedRemote, h2$StreamEvent.EventEndStreamRecv));
+    testing$assertTrue(invalid(h2$StreamState.HalfClosedRemote, h2$StreamEvent.EventHeaders));
+}
+
+@Test
+func testTransitionClosed() {
+    // Closed 收 RST → 忽略（非错误，RFC 9113 §5.1）
+    testing$assertTrue(valid(h2$StreamState.Closed, h2$StreamEvent.EventRstStream, h2$StreamState.Closed));
+    testing$assertTrue(invalid(h2$StreamState.Closed, h2$StreamEvent.EventHeaders));
+    testing$assertTrue(invalid(h2$StreamState.Closed, h2$StreamEvent.EventEndStreamSent));
+    testing$assertTrue(invalid(h2$StreamState.Closed, h2$StreamEvent.EventEndStreamRecv));
+}
+
+// =====================================================
+// 发送窗口判定 canSend（§7.2）
+// =====================================================
+
+@Test
+func testCanSend() {
+    testing$assertTrue(h2$canSend(65535, 65535, 0));
+    testing$assertTrue(h2$canSend(65535, 65535, 65535));
+    testing$assertTrue(h2$canSend(65535, 65535, 16384));
+    // 超过流级窗口
+    testing$assertFalse(h2$canSend(65535, 1000, 1001));
+    // 超过连接级窗口
+    testing$assertFalse(h2$canSend(1000, 65535, 1001));
+    // 负尺寸
+    testing$assertFalse(h2$canSend(65535, 65535, -1));
+    // 窗口耗尽
+    testing$assertFalse(h2$canSend(0, 0, 1));
+}
+
+// =====================================================
+// 接收窗口扣减 consumeRecvWindow
+// =====================================================
+
+@Test
+func testConsumeRecvWindow() {
+    var r = h2$consumeRecvWindow(65535, 65535, 1000);
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.0 == 64535);
+    testing$assertTrue(r.1 == 64535);
+    // 恰好扣完
+    r = h2$consumeRecvWindow(65535, 65535, 65535);
+    testing$assertTrue(r.2);
+    testing$assertTrue(r.0 == 0);
+    testing$assertTrue(r.1 == 0);
+    // 超流级窗口 → 失败
+    r = h2$consumeRecvWindow(100, 65535, 101);
+    testing$assertFalse(r.2);
+    // 超连接级窗口 → 失败
+    r = h2$consumeRecvWindow(65535, 100, 101);
+    testing$assertFalse(r.2);
+    // 负尺寸 → 失败
+    r = h2$consumeRecvWindow(65535, 65535, -5);
+    testing$assertFalse(r.2);
+}
+
+// =====================================================
+// 窗口回补量 windowUpdateAmount
+// =====================================================
+
+@Test
+func testWindowUpdateAmount() {
+    // 阈值 = INITIAL_WINDOW_SIZE / 2 = 32767
+    testing$assertTrue(h2$windowUpdateAmount(0) == 0);
+    testing$assertTrue(h2$windowUpdateAmount(100) == 0);
+    testing$assertTrue(h2$windowUpdateAmount(32766) == 0);
+    testing$assertTrue(h2$windowUpdateAmount(32767) == 32767);
+    testing$assertTrue(h2$windowUpdateAmount(32768) == 32768);
+    testing$assertTrue(h2$windowUpdateAmount(65535) == 65535);
+}
+
+// =====================================================
+// 发送窗口增量 addSendWindow
+// =====================================================
+
+@Test
+func testAddSendWindow() {
+    var r = h2$addSendWindow(65535, 1000);
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0 == 66535);
+    // increment == 0 → 非法（PROTOCOL_ERROR）
+    r = h2$addSendWindow(65535, 0);
+    testing$assertFalse(r.1);
+    // 负增量 → 非法
+    r = h2$addSendWindow(65535, -1);
+    testing$assertFalse(r.1);
+    // 超上限 0x7FFFFFFF → 非法（FLOW_CONTROL_ERROR）
+    r = h2$addSendWindow(0x7FFFFFFF, 1);
+    testing$assertFalse(r.1);
+    r = h2$addSendWindow(0x7FFFFFF0, 16);
+    testing$assertFalse(r.1);
+    // 恰好到上限 → 合法
+    r = h2$addSendWindow(0x7FFFFFF0, 15);
+    testing$assertTrue(r.1);
+    testing$assertTrue(r.0 == 0x7FFFFFFF);
+}
