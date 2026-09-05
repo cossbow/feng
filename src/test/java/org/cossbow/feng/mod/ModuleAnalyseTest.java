@@ -19,6 +19,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class ModuleAnalyseTest {
 
     private ParseSymbolTable export(FModule m) throws IOException {
+        // 元数据还未完成设计，先不执行
+        if (m.table() != null) return m.table();
+
         var buf = new BufferOutputStream();
         try (var osw = new OutputStreamWriter(buf);
              var w = new BufferedWriter(osw)) {

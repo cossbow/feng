@@ -6,9 +6,11 @@ import org.cossbow.feng.ast.Mangle;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.Expression;
 import org.cossbow.feng.ast.expr.SymbolExpression;
+import org.cossbow.feng.ast.expr.VariableExpression;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
+import org.cossbow.feng.ast.proc.Procedure;
 import org.cossbow.feng.ast.proc.Prototype;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.struct.StructureDefinition;
@@ -17,7 +19,9 @@ import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Groups;
 import org.cossbow.feng.util.Stack;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 语句发射器（阶段 4b）。
@@ -48,6 +52,11 @@ public class StmtWriter extends CWriter<StmtWriter> {
     private int tryFinallyDepth = 0;
     // 当前`continue`/`break`不支持带label的控制，因此简化为栈控制
     private final Stack<Groups.G2<Label, Label>> loopLabels = new Stack<>();
+    // 清理栈镜像条目的命名计数：enterProc 切换时归零（条目名仅需在函数内唯一）
+    private Procedure lastProc;
+    private int cleanupEntrySeq;
+    // 实际登记了清理栈镜像的局部变量（按 id 去重）——throw 时据此判断是否需要补引用
+    private final Set<Variable> mirroredVars = new HashSet<>();
 
     // ===================================================================
     //  语句大分发
@@ -92,19 +101,30 @@ public class StmtWriter extends CWriter<StmtWriter> {
     StmtWriter declareVar(TypeDeclarer t,
                           Runnable namer,
                           Runnable valuer) {
+        return declareVar(t, null, namer, valuer);
+    }
+
+    StmtWriter declareVar(TypeDeclarer t,
+                          Variable v,
+                          Runnable namer,
+                          Runnable valuer) {
         context.exprs.writeType(t).write(' ');
         namer.run();
         // 强引用 → FENG$DEC(cleanupFn)：cleanups 查表（SRef 数组 / final 类），
         // 查不到（非 final/接口/boxed）回退运行时函数。
-        var ref = t.maybeRefer();
-        if (ref.has() && ref.get().isKind(ReferKind.STRONG)) {
-            write(" FENG$DEC(").write(strongRefCleanupFn(t)).write(')');
-        } else if (ref.none() && needsDestroy(t)) {
-            write(" FENG$DEC(").write(valueCleanupFn(t)).write(')');
+        var fn = mirrorCleanupFn(t);
+        if (fn != null) {
+            write(" FENG$DEC(").write(fn).write(')');
         }
         write(" = ");
         valuer.run();
-        return endStmt();
+        endStmt();
+        // 清理栈镜像登记：longjmp 不触发 cleanup，须镜像到运行时异常展开
+        if (fn != null && cleanupStackActive()) {
+            if (v != null) mirroredVars.add(v);
+            emitCleanupEntry(fn, namer);
+        }
+        return this;
     }
 
     /**
@@ -113,7 +133,7 @@ public class StmtWriter extends CWriter<StmtWriter> {
      */
     StmtWriter declareVar(Variable v) {
         var t = v.type().must();
-        return declareVar(t, () -> {
+        return declareVar(t, v, () -> {
             context.exprs.varName(v);
         }, () -> {
             v.value().use(e -> context.exprs.writeValue(e, t), () -> {
@@ -122,6 +142,65 @@ public class StmtWriter extends CWriter<StmtWriter> {
                 else write("{}");
             });
         });
+    }
+
+    /**
+     * 变量是否需要 FENG$DEC / 清理栈镜像：强引用 → strongRefCleanupFn；
+     * 值类型含强引用 → valueCleanupFn；否则 null（无清理）。
+     */
+    private String mirrorCleanupFn(TypeDeclarer t) {
+        var ref = t.maybeRefer();
+        if (ref.has() && ref.get().isKind(ReferKind.STRONG)) {
+            return strongRefCleanupFn(t);
+        }
+        if (ref.none() && needsDestroy(t)) {
+            return valueCleanupFn(t);
+        }
+        return null;
+    }
+
+    /**
+     * 清理栈是否激活：仅普通函数/方法体（enterProc 非 null）。cleanup/copy/destroy
+     * 等合成函数体不登记——析构/清理路径不应再抛异常，避免展开重入。
+     */
+    private boolean cleanupStackActive() {
+        if (context.enterProc != lastProc) {
+            lastProc = context.enterProc;
+            cleanupEntrySeq = 0;
+            mirroredVars.clear();
+        }
+        return context.enterProc != null;
+    }
+
+    /**
+     * 镜像条目：{@code Feng$Cleanup _c<n> FENG$DEC(Feng$cleanup_guard) =
+     * {.prev = Feng$cleanup_top, .fn = <fn>, .slot = &<name>};}
+     * 后接 {@code Feng$cleanup_top = &_c<n>;}。
+     * 正常退出由 guard 出栈（不执行 fn）；异常展开由运行时执行 fn——
+     * 与变量自身 FENG$DEC 同一释放函数，两条路径互补、恰好释放一次。
+     */
+    private void emitCleanupEntry(String fn, Runnable slotNamer) {
+        var n = cleanupEntrySeq++;
+        write("Feng$Cleanup _c").write(n)
+                .write(" FENG$DEC(Feng$cleanup_guard) = {.prev = Feng$cleanup_top, .fn = ")
+                .write(fn).write(", .slot = &");
+        slotNamer.run();
+        write("};").newLine();
+        write("Feng$cleanup_top = &_c").write(n).endStmt();
+    }
+
+    /**
+     * 抛出表达式是否为「已登记清理栈镜像的强引用局部变量」——若是，须在 throw 前
+     * 补一份引用给异常帧（镜像条目展开会释放该局部的引用，帧持有的那份靠 inc 补足）。
+     * 判定依据是 mirroredVars（declareVar 实际发射镜像时才登记），而非仅类型——
+     * catch 变量是手动声明的强引用别名（无镜像），不得 inc，否则引用泄漏。
+     */
+    private Variable thrownLocal(Expression e) {
+        if (context.enterProc == null) return null;
+        if (!(e instanceof VariableExpression ve)) return null;
+        var v = ve.variable();
+        if (v instanceof GlobalVariable) return null;
+        return mirroredVars.contains(v) ? v : null;
     }
 
     private StmtWriter write(AssignmentsStatement as) {
@@ -429,6 +508,12 @@ public class StmtWriter extends CWriter<StmtWriter> {
         write("({ void* _ex = (void*)(");
         context.exprs.write(exExpr);
         write("); ");
+        // 抛出已登记的强引用局部：其镜像条目在展开时会释放该局部的引用，
+        // 必须补一份给异常帧（否则 catch 释放的是已 free 内存）
+        var thrown = thrownLocal(exExpr);
+        if (thrown != null) {
+            write(context.exprs.incFn(thrown.type().must())).write("(_ex); ");
+        }
         if (traceMethod != null) {
             var owner = traceMethod.master() != null
                     ? (ClassDefinition) traceMethod.master() : cd;
@@ -484,9 +569,10 @@ public class StmtWriter extends CWriter<StmtWriter> {
             write("volatile bool _feng_returned").write(depth).write(" = false; ").newLine();
         }
 
-        // 异常帧（volatile：值须在 longjmp 后存活，C11）
+        // 异常帧（volatile：值须在 longjmp 后存活，C11）；
+        // cleanup_mark 记录 setjmp 时刻的清理栈水位——异常展开只清理水位之上的镜像条目
         write("volatile Feng$ExFrame _frame").write(depth);
-        write(" = {.prev = Feng$ex_top}; ");
+        write(" = {.prev = Feng$ex_top, .cleanup_mark = Feng$cleanup_top}; ");
         write("Feng$ex_top = (Feng$ExFrame*)&_frame").write(depth).endStmt();
 
         write("if (setjmp(*(jmp_buf*)&_frame").write(depth).write(".buf) == 0) {").indent();
@@ -505,6 +591,11 @@ public class StmtWriter extends CWriter<StmtWriter> {
 
         if (hasCatches) {
             write("} else {").indent();
+            // 先恢复 ex_top 再进入 catch 分支：catch 体内 throw 应抛给外层帧，
+            // 否则 Feng$throw 重入当前 setjmp 帧 → 无限循环；同时保证 catch
+            // 全部未匹配时的 fallthrough 重抛走外层帧。正常路径的恢复在下方
+            // if-else 之后统一执行（两处赋值幂等）。
+            write("Feng$ex_top = _frame").write(depth).write(".prev;").newLine();
             write("void* _ex = _frame").write(depth).write(".exception;").newLine();
 
             boolean first = true;
@@ -522,15 +613,17 @@ public class StmtWriter extends CWriter<StmtWriter> {
                     firstType = false;
                     if (catchType instanceof DerivedTypeDeclarer dtd
                             && dtd.def() instanceof ClassDefinition ccd) {
-                        // 类 → is_kind（支持父类匹配）
+                        // 类 → is_kind（支持父类匹配）。catch 类型是 *GEx`int`
+                        // 具体化时 meta 常量是 Feng$meta_test$GEx_Int（Mangle.name），
+                        // 不能发射模板 Feng$meta_test$GEx——否则 C 编译未声明标识符。
                         write("Feng$is_kind(Feng$objMeta(_ex), (const Feng$Meta*)&Feng$meta_");
-                        write(ccd.symbol());
+                        write(typeNameOf(dtd));
                         write(")");
                     } else if (catchType instanceof DerivedTypeDeclarer dtd
                             && dtd.def() instanceof InterfaceDefinition ifd) {
                         // 接口 → iface_vtable（支持接口匹配）
                         write("Feng$iface_vtable(Feng$objMeta(_ex), (const Feng$Meta*)&Feng$meta_");
-                        write(ifd.symbol());
+                        write(typeNameOf(dtd));
                         write(") != NULL");
                     } else {
                         ErrorUtil.unreachable();
@@ -547,11 +640,21 @@ public class StmtWriter extends CWriter<StmtWriter> {
                         write("void* ").varName(arg).write(" = _ex;").newLine();
                     } else {
                         var ccd = (ClassDefinition) def;
-                        write(ccd.symbol()).write("* ").varName(arg)
-                                .write(" = (").write(ccd.symbol()).write("*)_ex;").newLine();
+                        var typeName = typeNameOf(ctd);
+                        write(typeName).write("* ").varName(arg)
+                                .write(" = (").write(typeName).write("*)_ex;").newLine();
                     }
                 } else {
                     write("void* ").varName(arg).write(" = _ex;").newLine();
+                }
+                // catch 变量登记清理栈镜像：catch body 内异常逃逸（直接 throw 或
+                // 调用抛异常函数）时 longjmp 跳过本帧的 release_ns(&_ex)，帧持有的
+                // 异常引用靠镜像展开释放；throw e（e=catch 变量）则经 thrownLocal
+                // 补 inc 实现所有权转交。fallthrough 重抛时本镜像已随 catch 分支
+                // 作用域出栈（guard），不影响转交。
+                if (cleanupStackActive()) {
+                    mirroredVars.add(arg);
+                    emitCleanupEntry("Feng$cleanup_sref_ns", () -> varName(arg));
                 }
 
                 write(cc.body());
@@ -588,6 +691,17 @@ public class StmtWriter extends CWriter<StmtWriter> {
 
         dedent().write('}').newLine();
         return this;
+    }
+
+    /**
+     * catch 类型的 C 标识符：非泛型用符号名（write(Symbol) 同款），
+     * 泛型具体化用 {@link Mangle#name}（如 {@code test$GEx_Int}）——
+     * meta 常量名（{@code Feng$meta_<key>}）与结构体名共用同一 key。
+     */
+    private String typeNameOf(DerivedTypeDeclarer dtd) {
+        var dt = dtd.derivedType();
+        if (dt.generic().isEmpty()) return symbolName(dt.symbol());
+        return Mangle.name(dt);
     }
 
     // ===================================================================

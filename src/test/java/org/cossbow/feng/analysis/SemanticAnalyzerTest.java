@@ -4006,6 +4006,29 @@ public class SemanticAnalyzerTest {
         checkFail(d + "func f(){ try{}catch(e *#Mid){}catch(e *#Leaf){} }");
     }
 
+    @Test
+    public void testCatchFunction1() {
+        var d = "func call() {} class MyEx:Exception{}";
+
+        checkSucc(d + "func f()catch{ try{call();}catch(e *#Exception) {} }");
+        checkFail(d + "func f()catch{ try{call();}catch(e *#MyEx) {} }");
+        checkFail(d + "func f()catch{ call(); }");
+
+        // "macro resource free()" will auto catch all exceptions
+        checkSucc(d + "class A { macro resource free() { try{call();}catch(e *#Exception) {} } }");
+        checkSucc(d + "class A { macro resource free() { try{call();}catch(e *#MyEx) {} } }");
+        checkSucc(d + "class A { macro resource free() { call(); } }");
+    }
+
+    @Test
+    public void testCatchFunction2() {
+        var d = "func F1=(); func F2=()catch; ";
+        checkSucc(d + "func f(a F1) { var b F1 = a; }");
+        checkFail(d + "func f(a F1) { var b F2 = a; }");
+        checkSucc(d + "func f(a F2) { var b F1 = a; }");
+        checkSucc(d + "func f(a F2) { var b F2 = a; }");
+    }
+
     // Concurrent check
 
     @Test

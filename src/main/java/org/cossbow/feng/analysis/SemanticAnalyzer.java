@@ -840,6 +840,9 @@ public class SemanticAnalyzer {
     }
 
     private TypeValid compatible(Prototype l, Prototype r, Entity e) {
+        if (l.catchAll() && !r.catchAll()) {
+            error("can't upgrade '%s' to '%s': %s", r, l, e.pos());
+        }
         try {
             typeNest++;
             return checkPrototype(l, r, e);
@@ -1422,11 +1425,54 @@ public class SemanticAnalyzer {
         context.enterScope();
         analyse(proc.prototype(), true);
         analyse(proc.body());
+        checkCatchAll(proc);
         checkAllPathReturn(proc);
         context.exitScope(proc);
         enterProc = null;
         return proc;
     }
+
+    private void checkCatchAll(Procedure proc) {
+        if (!proc.prototype().catchAll()) return;
+
+        var has = proc.body().list().stream().allMatch(this::hasCatchAll);
+        if (has) return;
+
+        if (proc.autoCatchAll()) {
+            var ts = wrapCatchAll(proc.body().list(), proc.body());
+            proc.body().list(List.of(ts));
+            return;
+        }
+
+        error("must catch all Exception: %s",
+                proc.body().pos());
+    }
+
+    private boolean hasCatchAll(Statement s) {
+        if (s instanceof TryStatement ts) {
+            for (var cc : ts.catchClauses()) {
+                var ok = cc.typeSet().stream().anyMatch(td ->
+                        td instanceof DerivedTypeDeclarer dtd &&
+                                ClassDefinition.ExceptionClass.equals(dtd.def()));
+                if (ok) return true;
+            }
+        }
+        return false;
+    }
+
+    private Statement wrapCatchAll(List<Statement> list, Entity e) {
+        var bs = new BlockStatement(e.pos(), list, false);
+        var ev = new Variable(e.pos(), Modifier.empty(),
+                Declare.CONST, CommonUtil.rand("ex_"), Lazy.nil(), Lazy.nil());
+        var td = new DerivedTypeDeclarer(e.pos(),
+                ClassDefinition.ExceptionClass.link(),
+                new Refer(e.pos(), ReferKind.STRONG, true, true));
+        ev.type().set(td);
+        var cc = new CatchClause(e.pos(), ev, List.of(td),
+                new BlockStatement(e.pos(), List.of()));
+        return new TryStatement(e.pos(), bs, List.of(cc), Optional.empty());
+    }
+
 
     // 检查所有路径均有return
     private void checkAllPathReturn(Procedure proc) {
@@ -5156,9 +5202,11 @@ public class SemanticAnalyzer {
         if (mp.result().has())
             semantic("'%s' can't have returns: %s", mf, mf.pos());
 
-        var pt = new Prototype(mf.pos(), new ParameterSet(mf.pos()));
+        var pt = new Prototype(mf.pos(), new ParameterSet(mf.pos()),
+                Optional.empty(), true);
         var body = new BlockStatement(mf.pos(), mp.body(), false);
         var proc = new Procedure(mf.pos(), pt, body, Map.of());
+        proc.autoCatchAll(true);
         var cm = new ClassMethod(mf.pos(), Modifier.empty(), mf.makeId(),
                 TypeParameters.empty(), false, false, proc, false);
         cd.methods().add(cm.name(), cm);

@@ -1,0 +1,35 @@
+import std$error;
+
+// try 块内 mono 物化边界修复验证：
+// Bug 3：try 内泛型调用须触发实例化（test$foo_Int 生成）
+// Bug 2：try 内 SRef 数组局部声明须发射 Feng$ArraySRef_Int typedef
+
+class Box`T` {
+    var v T;
+}
+
+func foo`T`(x T) {
+    var e = new(error$IllegalStateException);
+    throw e;
+}
+
+func main() {
+    // ===== Bug 3：try 内泛型调用 =====
+    var caught = false;
+    try {
+        foo`int`(1);
+    } catch(e *#error$IllegalStateException) {
+        caught = true;
+    }
+    assert(caught);
+
+    // ===== Bug 2：try 内 SRef 数组声明 =====
+    try {
+        var a = new([3]int);
+        a[0] = 42;
+        a[1] = 43;
+        assert(a[1] == 43);
+        throw new(error$IllegalArgumentException);
+    } catch(e *#error$IllegalArgumentException) {
+    }
+}

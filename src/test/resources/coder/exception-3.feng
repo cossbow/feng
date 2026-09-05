@@ -1,0 +1,62 @@
+import std$error;
+
+// 泛型在异常路径上的 mono 物化验证（Bug 2/3 组合场景）：
+// A：try 体内泛型函数调用须实例化（scanStmt TryStatement→body）
+// B：catch 体内泛型调用须实例化（scanStmt TryStatement→catchClauses.body）
+// C：泛型异常类 GEx`int` throw/catch（CatchClause.mono 映射 typeSet）
+// D：catch 泛型变量 throw 所有权转移（CatchClause.mono clone 保留 id）
+
+class GEx`T` : Exception {
+    var v T;
+}
+
+func foo`T`(x T) {
+    throw new(error$IllegalStateException);
+}
+
+func wrap`T`(x T) T {
+    return x;
+}
+
+func main() {
+    // ===== A：try 体内泛型调用（调用点登记实例化）=====
+    var caughtA = false;
+    try {
+        foo`int`(42);
+    } catch(e *#error$IllegalStateException) {
+        caughtA = true;
+    }
+    assert(caughtA);
+
+    // ===== B：catch 体内泛型调用 =====
+    var caughtB = false;
+    try {
+        throw new(error$IllegalArgumentException);
+    } catch(e *#error$IllegalArgumentException) {
+        var y = wrap`int`(100);
+        caughtB = (y == 100);
+    }
+    assert(caughtB);
+
+    // ===== C：泛型异常类实例化 + catch 类型匹配 =====
+    var caughtC = false;
+    try {
+        throw new(GEx`int`, {v=42});
+    } catch(e *#GEx`int`) {
+        caughtC = (e.v == 42);
+    }
+    assert(caughtC);
+
+    // ===== D：catch 泛型变量 throw 所有权转移（id 一致性）=====
+    var caughtD = false;
+    try {
+        try {
+            throw new(GEx`bool`, {v=true});
+        } catch(e *#GEx`bool`) {
+            throw e;
+        }
+    } catch(e2 *#GEx`bool`) {
+        caughtD = true;
+    }
+    assert(caughtD);
+}

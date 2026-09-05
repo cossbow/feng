@@ -227,7 +227,7 @@ procedure
     : prototype blockStatement
     ;
 prototype
-    : '(' parametersSet? ')' returnSet?
+    : '(' parametersSet? ')' CATCH? returnSet?
     ;
 parametersSet
     : parameters (COMMA variadic=DOT_X3?)?

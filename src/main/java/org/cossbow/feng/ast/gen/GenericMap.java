@@ -144,7 +144,7 @@ public class GenericMap {
         }
         var ps = new ParameterSet(prot.parameterSet().pos(), li);
         var rs = prot.returnSet().map(mapper());
-        return new Prototype(prot.pos(), ps, rs);
+        return new Prototype(prot.pos(), ps, rs, prot.catchAll());
     }
 
     public boolean isEmpty() {

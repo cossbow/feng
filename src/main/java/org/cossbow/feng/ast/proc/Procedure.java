@@ -58,6 +58,7 @@ public class Procedure extends Entity implements Scope {
      * Defined variables in this procedure, including parameters
      */
     private volatile List<Variable> stack = List.of();
+    private boolean autoCatchAll;
 
     public List<Variable> stack() {
         return stack;
@@ -67,6 +68,13 @@ public class Procedure extends Entity implements Scope {
         stack = variables;
     }
 
+    public boolean autoCatchAll() {
+        return autoCatchAll;
+    }
+
+    public void autoCatchAll(boolean autoCatchAll) {
+        this.autoCatchAll = autoCatchAll;
+    }
 
     //
     @Override

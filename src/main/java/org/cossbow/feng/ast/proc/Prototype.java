@@ -16,13 +16,22 @@ import org.cossbow.feng.util.Optional;
 public class Prototype extends Entity {
     private final ParameterSet parameterSet;
     private Optional<TypeDeclarer> returnSet;
+    private final boolean catchAll;
+
+    public Prototype(Position pos,
+                     ParameterSet parameterSet,
+                     Optional<TypeDeclarer> returnSet,
+                     boolean catchAll) {
+        super(pos);
+        this.parameterSet = parameterSet;
+        this.returnSet = returnSet;
+        this.catchAll = catchAll;
+    }
 
     public Prototype(Position pos,
                      ParameterSet parameterSet,
                      Optional<TypeDeclarer> returnSet) {
-        super(pos);
-        this.parameterSet = parameterSet;
-        this.returnSet = returnSet;
+        this(pos, parameterSet, returnSet, false);
     }
 
     public Prototype(Position pos,
@@ -42,6 +51,10 @@ public class Prototype extends Entity {
 
     public Optional<TypeDeclarer> returnSet() {
         return returnSet;
+    }
+
+    public boolean catchAll() {
+        return catchAll;
     }
 
     public void returnSet(Optional<TypeDeclarer> returnSet) {
@@ -73,7 +86,8 @@ public class Prototype extends Entity {
     public boolean equals(Object o) {
         if (!(o instanceof Prototype p)) return false;
         return parameterSet.equals(p.parameterSet) &&
-                returnSet.equals(p.returnSet);
+                returnSet.equals(p.returnSet) &&
+                catchAll == p.catchAll;
     }
 
     @Override
@@ -86,8 +100,10 @@ public class Prototype extends Entity {
     //
     @Override
     public String toString() {
+        var c = catchAll ? "catch" : "";
         if (returnSet.none())
-            return "(" + parameterSet + ") ";
-        return "(" + parameterSet + ") " + returnSet.get();
+            return "(" + parameterSet + ") " + c;
+        return "(" + parameterSet + ") " + c + " "
+                + returnSet.get();
     }
 }

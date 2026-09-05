@@ -1,0 +1,81 @@
+import std$error;
+
+// 清理栈（cleanup stack）验证：longjmp 不触发 __attribute__((cleanup))，
+// 强引用局部在异常跨栈时必须靠运行时清理栈展开释放——
+// 以下用例验证零泄漏（memchk 检测）、所有权转移、水位保留与正常路径出栈。
+
+// 强引用参数被抛出：$name_id_own 副本镜像 + throw 补引用（所有权链）
+func rethrow(e *#Exception) {
+    throw e;
+}
+
+// 跨函数抛异常：deepThrow 内的局部镜像在异常传播时须被展开释放
+func deepThrow() {
+    var local = new(int);
+    throw new(error$IllegalStateException);
+}
+
+func main() {
+    // ===== 规范泄漏例：局部强引用存活于 throw 时刻 =====
+    try {
+        var i = new(int);
+        throw new(error$IllegalStateException);
+    } catch(e *#Exception) {
+    }
+
+    // ===== 跨函数：被调用函数内的局部镜像在异常穿过时展开 =====
+    var outer = new(int);
+    var caught = false;
+    try {
+        deepThrow();
+    } catch(e *#Exception) {
+        caught = true;
+    }
+    assert(caught);
+    assert(outer != nil);
+
+    // ===== 多个局部同时存活 =====
+    try {
+        var a = new(int);
+        var b = new(int);
+        var c = new(float);
+        throw new(error$IllegalArgumentException);
+    } catch(e *#Exception) {
+    }
+
+    // ===== 抛出已镜像局部：所有权转移（inc 补足镜像展开释放的引用）=====
+    try {
+        var e = new(error$ParseException);
+        throw e;
+    } catch(e2 *#error$ParseException) {
+    }
+
+    // ===== 水位：try 之前声明的局部在内部异常展开后必须存活 =====
+    var i2 = new(int);
+    var innerCaught = false;
+    var outerCaught = false;
+    try {
+        try {
+            throw new(error$IllegalStateException);
+        } catch(e *#Exception) {
+            innerCaught = true;
+        }
+    } catch(e2 *#Exception) {
+        outerCaught = true;
+    }
+    assert(innerCaught);
+    assert(!outerCaught);
+    assert(i2 != nil);
+
+    // ===== 强引用参数被抛出：$name_id_own 副本镜像 + throw 补引用 =====
+    try {
+        rethrow(new(error$IllegalArgumentException));
+    } catch(e *#error$IllegalArgumentException) {
+    }
+
+    // ===== 正常路径：镜像条目由 guard 出栈，不执行 fn，无泄漏 =====
+    var i3 = new(int);
+    var e3 = new(error$ParseException);
+    assert(i3 != nil);
+    assert(e3 != nil);
+}

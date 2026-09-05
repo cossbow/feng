@@ -453,7 +453,7 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
         write("printf(\"  RUN  %s ... \", Feng$tests[i].name);").newLine();
         write("fflush(stdout);").newLine();
         newLine();
-        write("volatile Feng$ExFrame _frame = {.prev = Feng$ex_top};").newLine();
+        write("volatile Feng$ExFrame _frame = {.prev = Feng$ex_top, .cleanup_mark = Feng$cleanup_top};").newLine();
         write("Feng$ex_top = (Feng$ExFrame*)&_frame;").newLine();
         newLine();
         write("if (setjmp(*(jmp_buf*)&_frame.buf) == 0) {").indent().newLine();

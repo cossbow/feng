@@ -318,9 +318,8 @@ public class AnonFuncNormalizer {
         // Recursively normalize nested function types in the prototype
         var normalized = new Prototype(pt.pos(),
                 pt.parameterSet(),
-                pt.returnSet().has()
-                        ? Optional.of(replaceAnon(pt.returnSet().get()))
-                        : pt.returnSet());
+                pt.returnSet().map(this::replaceAnon),
+                pt.catchAll());
         for (var p : normalized.parameterSet()) {
             if (p instanceof FixedParameter fp) {
                 fp.type(replaceAnon(fp.type()));

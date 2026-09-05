@@ -233,7 +233,7 @@ public class FuncWriter extends CWriter<FuncWriter> {
             var vo = fp.var();
             if (vo.none()) continue;
             var v = vo.get();
-            context.stmts.declareVar(v.type().must(), () -> {
+            context.stmts.declareVar(v.type().must(), v, () -> {
                 write('$').write(v.name().value()).write('_').write(v.id()).write("_own");
             }, () -> {
                 context.exprs.varName(v);

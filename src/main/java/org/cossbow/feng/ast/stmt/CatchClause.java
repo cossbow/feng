@@ -3,7 +3,6 @@ package org.cossbow.feng.ast.stmt;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Scope;
 import org.cossbow.feng.ast.gen.GenericMap;
-import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.dcl.Variable;
 
@@ -58,11 +57,12 @@ public class CatchClause extends Statement implements Scope {
     public CatchClause mono(GenericMap gm) {
         var types = new ArrayList<TypeDeclarer>(typeSet.size());
         for (var t : typeSet) types.add(gm.mapIf(t));
-        Lazy<TypeDeclarer> argType = argument.type().has()
-                ? Lazy.of(gm.mapIf(argument.type().must()))
-                : Lazy.nil();
-        var arg = new Variable(argument.pos(), argument.modifier(), argument.declare(),
-                argument.name(), argType, argument.value());
+        // clone 保留原 variable 的 id（与 DeclarationStatement.mono 约定一致）：
+        // 引用处 VariableExpression.mono 保留原对象，声明/引用编号须一致，
+        // 否则清理栈 mirroredVars 按 id 判定 throw catch 变量时失效。
+        var arg = argument.clone();
+        if (argument.type().has())
+            arg.type().set(gm.mapIf(argument.type().must()));
         return new CatchClause(pos(), arg, types, body.mono(gm));
     }
 }

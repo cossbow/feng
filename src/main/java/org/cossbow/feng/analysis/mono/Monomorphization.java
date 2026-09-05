@@ -264,11 +264,23 @@ public class Monomorphization {
             scanExpr(is.condition(), gm);
             scanStmt(is.yes(), gm);
             is.not().use(s -> scanStmt(s, gm));
-        } else if (stmt instanceof ForStatement fs) {
-            if (fs instanceof ConditionalForStatement cfs) {
-                cfs.initializer().use(s -> scanStmt(s, gm));
-                scanStmt(cfs.body(), gm);
+        } else if (stmt instanceof TryStatement ts) {
+            // try 块内的语句同样可能触发泛型实例化/类型物化，必须递归扫描
+            scanStmt(ts.body(), gm);
+            for (var cc : ts.catchClauses()) {
+                cc.argument().type().use(t -> collect(t, gm));
+                for (var ct : cc.typeSet()) collect(ct, gm);
+                scanStmt(cc.body(), gm);
             }
+            ts.finallyClause().use(b -> scanStmt(b, gm));
+        } else if (stmt instanceof IterableForStatement ifs) {
+            scanExpr(ifs.iterable(), gm);
+            scanStmt(ifs.body(), gm);
+        } else if (stmt instanceof ConditionalForStatement cfs) {
+            cfs.initializer().use(s -> scanStmt(s, gm));
+            scanExpr(cfs.condition(), gm);
+            cfs.updater().use(s -> scanStmt(s, gm));
+            scanStmt(cfs.body(), gm);
         } else if (stmt instanceof SwitchStatement ss) {
             for (var br : ss.branches()) scanStmt(br, gm);
         } else if (stmt instanceof CallStatement cs) {
@@ -276,6 +288,14 @@ public class Monomorphization {
             cs.replace().use(s -> scanStmt(s, gm));
         } else if (stmt instanceof ReturnStatement rs) {
             rs.result().use(e -> scanExpr(e, gm));
+        } else if (stmt instanceof ThrowStatement ts2) {
+            scanExpr(ts2.exception(), gm);
+        } else if (stmt instanceof AssertStatement as2) {
+            scanExpr(as2.condition(), gm);
+        } else if (stmt instanceof LabeledStatement ls) {
+            scanStmt(ls.target(), gm);
+        } else if (stmt instanceof Branch br) {
+            scanStmt(br.body(), gm);
         } else if (stmt instanceof AssignmentsStatement as) {
             for (int i = 0; i < as.list().size(); i++) {
                 scanExpr(as.value(i), gm);

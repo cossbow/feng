@@ -1536,7 +1536,8 @@ final class SourceParseVisitor
         var parameters = parseParameters(posOf(ctx.PAREN_L()),
                 ctx.parametersSet());
         var returnSet = parseReturnSet(ctx.returnSet());
-        return new Prototype(posOf(ctx), parameters, returnSet);
+        var catchAll = ctx.CATCH() != null;
+        return new Prototype(posOf(ctx), parameters, returnSet, catchAll);
     }
 
     private volatile Map<Identifier, LabeledStatement> labels;

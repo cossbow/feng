@@ -1,0 +1,49 @@
+import std$error;
+
+// catch 体内 throw 死循环修复验证：Feng$ex_top 提前到 catch 判定前恢复，
+// catch 内再抛（直接 new / throw catch 变量 / catch 未匹配 fallthrough 重抛）
+// 均应走外层帧而非重入当前 setjmp 帧。
+
+class MyException:Exception {
+}
+
+func main() {
+    // ===== A：catch 内直接抛新异常（重抛模式）=====
+    var caughtA = false;
+    try {
+        try {
+            throw new(MyException);
+        } catch(e *#MyException) {
+            throw new(MyException);
+        }
+    } catch(e2 *#MyException) {
+        caughtA = true;
+    }
+    assert(caughtA);
+
+    // ===== B：catch 内抛 catch 变量（所有权转交，无 inc 无泄漏）=====
+    var caughtB = false;
+    try {
+        try {
+            throw new(MyException);
+        } catch(e *#MyException) {
+            throw e;
+        }
+    } catch(e2 *#MyException) {
+        caughtB = true;
+    }
+    assert(caughtB);
+
+    // ===== C：catch 未匹配 → fallthrough 重抛外层帧 =====
+    var caughtC = false;
+    try {
+        try {
+            throw new(MyException);
+        } catch(e *#error$IllegalStateException) {
+            assert(false);
+        }
+    } catch(e2 *#MyException) {
+        caughtC = true;
+    }
+    assert(caughtC);
+}

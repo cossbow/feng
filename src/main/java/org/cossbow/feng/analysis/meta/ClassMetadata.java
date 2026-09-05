@@ -107,7 +107,7 @@ public final class ClassMetadata {
         var ps = pt.parameterSet();
         var params = CommonUtil.concat(List.of(self), ps.params());
         ps = new ParameterSet(ps.pos(), params);
-        pt = new Prototype(pt.pos(), ps, pt.returnSet());
+        pt = new Prototype(pt.pos(), ps, pt.returnSet(), pt.catchAll());
         pc = new Procedure(pc.pos(), pt, pc.body(), pc.labels());
         return new MethodFunc(cm.name(),
                 ClassMeta.methodSymbol(meta.def(), cm.name()),

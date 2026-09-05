@@ -4,11 +4,18 @@
 // ===== exception handling =====
 _Thread_local Feng$ExFrame* Feng$ex_top = NULL;
 
+// ===== exception-safe cleanup stack（Header.h 声明）=====
+_Thread_local Feng$Cleanup* Feng$cleanup_top = NULL;
+
 _Noreturn void Feng$throw(void* ex) {
     if (!Feng$ex_top) {
+        // 无捕获帧：先展开全部清理（释放局部强引用）再中止
+        Feng$cleanup_unwind(NULL);
         fprintf(stderr, "unhandled exception\n");
         abort();
     }
+    // 展开到捕获帧水位：清理被 longjmp 跳过的局部强引用
+    Feng$cleanup_unwind(Feng$ex_top->cleanup_mark);
     Feng$ex_top->exception = ex;
     Feng$ex_top->state = 2;  // unhandled (catch sets to 1 if matched)
     longjmp(Feng$ex_top->buf, 1);

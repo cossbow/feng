@@ -314,6 +314,38 @@ static inline void* Feng$iface_vtable(const Feng$Meta* meta, const Feng$Meta* if
     return NULL;
 }
 
+// ===== exception-safe cleanup stack =====
+// setjmp/longjmp 不会触发 __attribute__((cleanup))，导致局部强引用在异常跨栈时泄漏。
+// 解决办法：每个需清理的局部变量登记一个镜像条目（线程局部 LIFO），Feng$throw 在
+// longjmp 前按序执行条目 fn（与变量自身 FENG$DEC 挂的是同一个释放函数）。
+// 正常作用域退出（return/break/goto/块结束）由条目自身的 cleanup 属性出栈（guard），
+// 不执行 fn——真正释放仍由变量自身的 FENG$DEC 完成，两条路径互补、恰好释放一次。
+typedef struct Feng$Cleanup {
+    struct Feng$Cleanup* prev;   // 前一个栈顶（LIFO）
+    void (*fn)(void*);           // 释放函数（与变量 FENG$DEC 挂的是同一个）
+    void* slot;                  // 槽位地址（&var）
+} Feng$Cleanup;
+
+extern _Thread_local Feng$Cleanup* Feng$cleanup_top;
+
+// 正常退出时由 __attribute__((cleanup)) 调用：出栈，不执行 fn
+static inline void Feng$cleanup_guard(void* p) {
+    Feng$Cleanup* c = (Feng$Cleanup*)p;
+    Feng$cleanup_top = c->prev;
+    c->prev = NULL;              // 失效，防误用
+}
+
+// 抛异常时展开：自栈顶向下执行 fn，直到 stop（不含 stop）；
+// stop = 捕获帧在 setjmp 时刻的水位（ExFrame.cleanup_mark）
+static inline void Feng$cleanup_unwind(Feng$Cleanup* stop) {
+    while (Feng$cleanup_top != stop) {
+        Feng$Cleanup* c = Feng$cleanup_top;
+        Feng$cleanup_top = c->prev;
+        c->fn(c->slot);
+        c->prev = NULL;
+    }
+}
+
 // ===== exception handling via setjmp/longjmp =====
 #include <setjmp.h>
 
@@ -322,6 +354,7 @@ typedef struct Feng$ExFrame {
     struct Feng$ExFrame*  prev;
     void*                 exception;
     int                   state;       // 0=normal, 1=caught, 2=unhandled
+    struct Feng$Cleanup*  cleanup_mark; // setjmp 时刻的清理栈水位（展开停止点）
 } Feng$ExFrame;
 
 extern _Thread_local Feng$ExFrame* Feng$ex_top;
