@@ -1,0 +1,106 @@
+{
+  "name": "feng-vscode",
+  "displayName": "Fēng Language",
+  "description": "Fēng language support: syntax highlighting, diagnostics, completion, hover, go-to-definition and semantic tokens.",
+  "version": "0.0.1",
+  "publisher": "cossbow",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "feng",
+    "lsp",
+    "language"
+  ],
+  "activationEvents": [
+    "onLanguage:feng"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "feng",
+        "aliases": [
+          "Fēng",
+          "Feng",
+          "feng"
+        ],
+        "extensions": [
+          ".feng"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "feng",
+        "scopeName": "source.feng",
+        "path": "./syntaxes/feng.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Fēng",
+      "properties": {
+        "feng.lsp.javaPath": {
+          "type": "string",
+          "default": "java",
+          "description": "Path to the Java executable used to launch the Fēng language server."
+        },
+        "feng.lsp.jarPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Fēng compiler JAR (e.g. feng-0.0.2.a.jar). Leave empty to auto-download the latest release from GitHub."
+        },
+        "feng.lsp.trace.server": {
+          "type": "string",
+          "default": "off",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "description": "Traces the communication between VS Code and the Fēng language server."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "[feng]": {
+        "editor.semanticTokenColorCustomizations": {
+          "enabled": true,
+          "rules": {
+            "keyword": "#569CD6",
+            "type": "#4EC9B0",
+            "function": "#DCDCAA",
+            "variable": "#9CDCFE",
+            "string": "#CE9178",
+            "number": "#B5CEA8",
+            "comment": "#6A9955",
+            "*.declaration": {
+              "fontStyle": "bold"
+            }
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-jsonrpc": "^8.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "typescript": "^5.3.3"
+  }
+}
