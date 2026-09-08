@@ -32,6 +32,16 @@ public class FengLanguageServer implements LanguageServer, TextDocumentService, 
         caps.setDefinitionProvider(true);
         caps.setDocumentSymbolProvider(true);
 
+        // Semantic tokens (only when the client opts in via client capabilities)
+        if (params.getCapabilities().getTextDocument() != null
+                && params.getCapabilities().getTextDocument().getSemanticTokens() != null) {
+            var legend = new SemanticTokensLegend(
+                    FengAnalyzer.TOKEN_TYPES, FengAnalyzer.TOKEN_MODIFIERS);
+            var full = new SemanticTokensServerFull(false);
+            caps.setSemanticTokensProvider(
+                    new SemanticTokensWithRegistrationOptions(legend, full));
+        }
+
         return CompletableFuture.completedFuture(new InitializeResult(caps));
     }
 
@@ -131,6 +141,15 @@ public class FengLanguageServer implements LanguageServer, TextDocumentService, 
     documentSymbol(DocumentSymbolParams params) {
         return CompletableFuture.completedFuture(
                 analyzer.documentSymbol(params.getTextDocument().getUri()));
+    }
+
+    // ---- Semantic Tokens ----
+
+    @Override
+    public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {
+        return CompletableFuture.completedFuture(
+                new SemanticTokens(analyzer.semanticTokens(
+                        params.getTextDocument().getUri())));
     }
 
     // ---- WorkspaceService ----

@@ -2,6 +2,7 @@ package org.cossbow.feng.lsp;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.Token;
 import org.cossbow.feng.analysis.SemanticAnalyzer;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.Variable;
@@ -18,8 +19,10 @@ import org.eclipse.lsp4j.services.LanguageClient;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -29,6 +32,42 @@ import java.util.concurrent.TimeUnit;
 public class FengAnalyzer {
 
     private static final int DEBOUNCE_MS = 300;
+
+    // ---- Semantic tokens: legend (shared with FengLanguageServer) ----
+
+    public static final List<String> TOKEN_TYPES = List.of(
+            "keyword", "type", "function", "variable",
+            "string", "number", "comment");
+
+    public static final List<String> TOKEN_MODIFIERS = List.of("declaration");
+
+    private static final int T_KEYWORD = 0;
+    private static final int T_TYPE = 1;
+    private static final int T_FUNCTION = 2;
+    private static final int T_VARIABLE = 3;
+    private static final int T_STRING = 4;
+    private static final int T_NUMBER = 5;
+    private static final int T_COMMENT = 6;
+
+    private static final int MOD_DECLARATION = 1;
+
+    private static final Set<Integer> KEYWORD_TOKENS = Set.of(
+            FengLexer.FENG1, FengLexer.FENG2, FengLexer.FENG3,
+            FengLexer.EXPORT, FengLexer.IMPORT,
+            FengLexer.STRUCT, FengLexer.UNION, FengLexer.ENUM,
+            FengLexer.ATTRIBUTE, FengLexer.INTERFACE, FengLexer.CLASS,
+            FengLexer.FUNC, FengLexer.MACRO, FengLexer.CONST,
+            FengLexer.VAR, FengLexer.LET, FengLexer.NEW, FengLexer.SIZEOF,
+            FengLexer.RETURN, FengLexer.IF, FengLexer.ELSE, FengLexer.FOR,
+            FengLexer.CONTINUE, FengLexer.BREAK, FengLexer.SWITCH, FengLexer.CASE,
+            FengLexer.DEFAULT, FengLexer.THROW, FengLexer.TRY, FengLexer.CATCH,
+            FengLexer.FINAL, FengLexer.STATIC, FengLexer.ASSERT,
+            FengLexer.THIS, FengLexer.SUPER,
+            FengLexer.BoolLiteral, FengLexer.NilLiteral);
+
+    private static final Set<Integer> NUMBER_TOKENS = Set.of(
+            FengLexer.FloatLiteral, FengLexer.DecimalInteger,
+            FengLexer.HexInteger, FengLexer.OctalInteger, FengLexer.BinaryInteger);
 
     private final ScheduledExecutorService scheduler =
             Executors.newSingleThreadScheduledExecutor(r -> {
@@ -295,6 +334,98 @@ public class FengAnalyzer {
         }
 
         return new CompletionList(items);
+    }
+
+    // ---- Semantic tokens ----
+
+    /**
+     * Builds the flat integer list for textDocument/semanticTokens (full).
+     * Encoding: [deltaLine, deltaStartChar, length, tokenType, tokenModifiers] per token.
+     */
+    public List<Integer> semanticTokens(String uri) {
+        var doc = documents.get(uri);
+        if (doc == null) return List.of();
+        var text = doc.text();
+
+        // Best-effort symbol classification from the latest parse.
+        ParseSymbolTable table = null;
+        var result = cache.get(uri);
+        if (result != null && result.source() != null) {
+            table = result.source().table();
+        }
+
+        // Declaration positions (for the "declaration" modifier).
+        var decls = new HashSet<String>();
+        if (table != null) {
+            for (var t : table.types.values()) mark(decls, t.symbol().name().pos());
+            for (var f : table.functions.values()) mark(decls, f.symbol().name().pos());
+            for (var v : table.variables.values()) mark(decls, v.symbol().name().pos());
+        }
+
+        var lexer = new FengLexer(CharStreams.fromString(text));
+        lexer.removeErrorListeners();
+        var tokens = lexer.getAllTokens();
+
+        var data = new ArrayList<Integer>();
+        int prevLine = 0, prevChar = 0;
+        for (var token : tokens) {
+            int type = classify(token, table);
+            if (type < 0) continue;
+
+            int modifiers = (token.getType() == FengLexer.Identifier
+                    && decls.contains(token.getLine() + ":" + token.getCharPositionInLine()))
+                    ? MOD_DECLARATION : 0;
+
+            // A token (e.g. a block comment) may span lines; emit one entry per line.
+            var value = token.getText();
+            int line = token.getLine() - 1;
+            int charPos = token.getCharPositionInLine();
+            int from = 0;
+            while (from < value.length()) {
+                int nl = value.indexOf('\n', from);
+                int length = (nl < 0 ? value.length() : nl) - from;
+                if (length > 0 && value.charAt(from + length - 1) == '\r') length--;
+
+                if (length > 0) {
+                    int deltaLine = line - prevLine;
+                    int deltaChar = (deltaLine == 0) ? charPos - prevChar : charPos;
+                    data.add(deltaLine);
+                    data.add(deltaChar);
+                    data.add(length);
+                    data.add(type);
+                    data.add(modifiers);
+                    prevLine = line;
+                    prevChar = charPos;
+                }
+                if (nl < 0) break;
+                from = nl + 1;
+                line++;
+                charPos = 0;
+            }
+        }
+        return data;
+    }
+
+    private static int classify(Token token, ParseSymbolTable table) {
+        int t = token.getType();
+        if (t == FengLexer.StringLiteral) return T_STRING;
+        if (NUMBER_TOKENS.contains(t)) return T_NUMBER;
+        if (t == FengLexer.COMMENT || t == FengLexer.LINE_COMMENT) return T_COMMENT;
+        if (KEYWORD_TOKENS.contains(t)) return T_KEYWORD;
+        if (t == FengLexer.Identifier) {
+            if (table != null) {
+                var id = new Identifier(token.getText());
+                if (table.findType(id).has()) return T_TYPE;
+                if (table.findFunc(id).has()) return T_FUNCTION;
+            }
+            return T_VARIABLE;
+        }
+        return -1; // operators / separators / punctuation: not highlighted via LSP
+    }
+
+    private static void mark(Set<String> decls, org.cossbow.feng.ast.Position pos) {
+        if (pos == null || pos.start() == null) return;
+        decls.add(pos.start().getLine() + ":" + pos.start().getCharPositionInLine());
     }
 
     private static CompletionItem keywordItem(String keyword) {
