@@ -1,0 +1,193 @@
+
+// 表达式计算与判断的正确性
+//
+// 覆盖 C 后端对各类运算符组合的生成正确性：优先级、结合性、短路与一元运算。
+// 全部用 var：const 会被编译期常量折叠，测不到运行期计算。
+// 运算符优先级（自上而下递减）：new/字面量 > is/索引/字段/调用/块 >
+//   一元(+,-,!) > ^(幂) > *,/,% > +,- > <<,>> > & > ~ > | > 关系 > && > ||
+
+// ---- 算术：* / % 高于 + -，左结合 ----
+
+func arith() {
+    var a = 10;
+    var b = 3;
+    var c = 2;
+    assert(a + b * c == 16);      // 10 + 3*2
+    assert(a * b + c == 32);      // 10*3 + 2
+    assert(a - b * c == 4);       // 10 - 3*2
+    assert((a + b) * c == 26);    // 13*2
+    assert(a / b + c == 5);       // 3 + 2
+    assert(a - b - c == 5);       // 左结合 (10-3)-2
+    assert(a / b / c == 1);       // 左结合 (10/3)/2 = 1（整数除法截断）
+    assert(a % b == 1);
+    assert(a * b % c == 0);       // (10*3)%2
+    assert(a % b * c == 2);       // (10%3)*2
+    var d = 5;
+    assert(a + b * c - d == 11);  // 10 + 6 - 5
+    assert(a - b + c * d == 17);  // 10 - 3 + 10
+    assert(a * b / c + d == 20);  // 30/2 + 5
+    assert((a + b) * c - d == 21);// 26 - 5
+}
+
+// ---- 幂运算：^ 生成 pow()，右结合 ----
+
+func pow_test() {
+    var a = 2;
+    var b = 3;
+    assert(a ^ b == 8);
+    assert(b ^ a == 9);
+    assert(a ^ 2 == 4);
+    assert(3 ^ a == 9);
+}
+
+// ---- 移位：<< >> 低于 + -，因此 a << b + c == a << (b+c) ----
+
+func shift() {
+    var a = 1;
+    var b = 4;
+    var c = 2;
+    assert(a << b == 16);
+    assert(a << b + c == 64);     // 1 << (4+2)
+    assert((a << b) + c == 18);   // 16 + 2
+    var n = 64;
+    assert(n >> b == 4);          // 64 >> 4
+    assert(n >> b + c == 1);      // 64 >> 6
+    assert((n >> b) + c == 6);    // 4 + 2
+}
+
+// ---- 位运算：& 高于 ~(异或) 高于 | ----
+
+func bit() {
+    var a = 6;                    // 110
+    var b = 3;                    // 011
+    var c = 1;                    // 001
+    assert((a & b) == 2);
+    assert((a ~ b) == 5);         // 110^011
+    assert((a | b) == 7);
+    assert(a & b | c == 3);       // (6&3)|1
+    assert(a | b & c == 7);       // 6|(3&1)
+    assert(a ~ b & c == 7);       // 6^(3&1)
+    assert(a & b ~ c == 3);       // (6&3)^1
+    assert(a ~ b | c == 5);       // (6^3)|1
+}
+
+// ---- 一元运算：- 与按位取反 !（bool 为逻辑非，整数为 ~） ----
+
+func unary() {
+    var a = 5;
+    assert(-a == -5);
+    assert(-(-a) == 5);
+    assert(-a + 2 == -3);
+    assert(2 - -a == 7);          // 2 - (-5)
+    var n = 5;
+    assert(!n == -6);             // 按位取反 ~5 = -6
+    var t = true;
+    assert(!t == false);
+    var f = false;
+    assert(!f == true);
+}
+
+// ---- 关系与逻辑：&& 高于 ||，关系结果可再参与比较 ----
+
+func logic() {
+    var a = 5;
+    var b = 3;
+    var c = 7;
+    assert(a > b);
+    assert(a < c);
+    assert(a >= 5);
+    assert(b <= 3);
+    assert(a != b);
+    assert(a == 5);
+    assert(a > b && c > a);           // true && true
+    assert(a > b || a > c);           // true || false
+    assert(a < b || c > a);           // false || true
+    assert(a > b && b > c || c > a);  // (true&&false)||true
+    assert(a > b || b > c && c > a);  // true||(false&&true)
+    assert((a > b) == true);
+    assert((a < b) == false);
+    assert((a > b) != (a > c));
+}
+
+// ---- 短路：&& 与 || 的副作用验证 ----
+
+var gCnt int = 0;
+
+func bump() bool {
+    gCnt += 1;
+    return true;
+}
+
+func short() {
+    var f = false;
+    var t = true;
+    var r1 = f && bump();
+    assert(r1 == false);
+    assert(gCnt == 0);            // && 短路，bump 未执行
+    var r2 = t || bump();
+    assert(r2 == true);
+    assert(gCnt == 0);            // || 短路，bump 未执行
+    var r3 = t && bump();
+    assert(r3 == true);
+    assert(gCnt == 1);            // 已执行
+    var r4 = f || bump();
+    assert(r4 == true);
+    assert(gCnt == 2);            // 已执行
+}
+
+// ---- 三元条件 ----
+
+func ternary() {
+    var a = 5;
+    var b = 3;
+    assert((a > b ? a : b) == 5);
+    assert((a > b ? b : a) == 3);
+    assert((a > 0 ? a : -a) == 5);
+    var x = -5;
+    assert((x > 0 ? x : -x) == 5);
+}
+
+// ---- 跨类别混合 ----
+
+func mixed() {
+    var a = 2;
+    var b = 3;
+    var c = 4;
+    var d = 5;
+    assert(a + b * c == 14);
+    assert((a + b) * c == 20);
+    assert(a << b + 1 == 32);         // 2 << 4（移位低于 +）
+    assert(a * b + c - d == 5);       // 6 + 4 - 5
+    assert(a % b + c == 6);           // 2 + 4
+    assert(a * (b + c) - d == 9);     // 2*7 - 5
+    assert(a + b > c);                // 5 > 4（算术高于关系）
+    assert(a * b + c == d * 2);       // 10 == 10
+    assert((a & b) + c == 6);         // 2 + 4
+    assert(a < b && b < c);
+    assert(a * b + c >= d * 2 && c > a);  // 10 >= 10 && 4 > 2
+}
+
+// ---- 浮点 ----
+
+func float_test() {
+    var a = 1.5;
+    var b = 2.0;
+    assert(a + b == 3.5);
+    assert(a * b == 3.0);
+    assert(b / a > 1.0);
+    assert(a < b);
+    assert(a + b * 2.0 == 5.5);
+}
+
+func main(args [&#][*?#]byte) {
+    arith();
+    pow_test();
+    shift();
+    bit();
+    unary();
+    logic();
+    short();
+    ternary();
+    mixed();
+    float_test();
+}

@@ -1183,8 +1183,8 @@ public class ExprWriter extends CWriter<ExprWriter> {
             // 有初始化参数：块表达式
             write("({ Feng$ArraySRef_").write(elemKey)
                     .write(" _a = {(").writeType(t.element())
-                    .write(" *)Feng$alloc(").write(t.length())
-                    .write("*sizeof(").writeType(t.element()).write(")), ")
+                    .write(" *)Feng$alloc((").write(t.length())
+                    .write(")*sizeof(").writeType(t.element()).write(")), ")
                     .write(t.length()).write("}; ");
 
             if (a instanceof ArrayExpression ae) {
@@ -1232,8 +1232,8 @@ public class ExprWriter extends CWriter<ExprWriter> {
         }, () -> {
             // 无参数：简单复合字面量
             write("(Feng$ArraySRef_").write(elemKey).write("){");
-            write('(').writeType(t.element()).write(" *)Feng$alloc(");
-            write(t.length()).write("*sizeof(").writeType(t.element()).write(")), ");
+            write('(').writeType(t.element()).write(" *)Feng$alloc((");
+            write(t.length()).write(")*sizeof(").writeType(t.element()).write(")), ");
             write(t.length()).write('}');
         });
 

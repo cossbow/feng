@@ -1,0 +1,150 @@
+
+// 动态长度数组表达式：new([<复合长度表达式>]T)
+//
+// 回归保护：C 后端曾把 new([n + 1]T) 生成为 Feng$alloc((n) + (1)*sizeof(T))，
+// 运算符优先级使分配大小错误（n + 1*sizeof 而非 (n+1)*sizeof），元素为指针/
+// 结构体（sizeof>1）时堆越界。本用例用 assert 断言长度与元素读写的预期性。
+// 覆盖运算符：+、-（加/减在前时旧实现会算错）、*、/（结合律/左结合恰好正确，作完整性）。
+
+class Node {
+    var id int;
+}
+
+func testAddLen() {
+    // 加号复合长度 + 类元素（sizeof > 1）：旧实现分配 n + 1*sizeof 字节，长度却是 n+1
+    var n = 8;
+    var a [*]Node = new([n + 1]Node);
+    assert(a.length == n + 1);
+    for (var i = 0; i < a.length; i += 1) { a[i].id = i * 10; }
+    for (var i = 0; i < a.length; i += 1) { assert(a[i].id == i * 10); }
+    assert(a[n].id == n * 10);
+}
+
+func testSubLen() {
+    // 减号复合长度 + 可空引用元素：对应 Stream 流表 new([id + 1]*?Stream) 的场景
+    var m = 6;
+    var a [*]*?Node = new([m - 1]*?Node);
+    assert(a.length == m - 1);
+    for (var i = 0; i < a.length; i += 1) { assert(a[i] == nil); }   // 分配清零
+    for (var i = 0; i < a.length; i += 1) { a[i] = new(Node, {id=i}); }
+    for (var i = 0; i < a.length; i += 1) {
+        var nd = a[i];
+        if (nd == nil) { assert(false); }
+        else { assert(nd.id == i); }
+    }
+}
+
+func testMulLen() {
+    // 乘号复合长度（append 增长模式 new([len * 2]T)）：旧实现因结合律恰好正确
+    var len = 5;
+    var buf [*]int = new([len]int);
+    for (var i = 0; i < len; i += 1) { buf[i] = i; }
+    var nb [*]int = new([len * 2]int);
+    assert(nb.length == len * 2);
+    for (var i = 0; i < len; i += 1) { nb[i] = buf[i]; }
+    for (var i = 0; i < len; i += 1) { assert(nb[i] == i); }   // 旧内容保留
+    nb[len] = 100;
+    assert(nb[len] == 100);
+}
+
+func testDivLen() {
+    // 除号复合长度：旧实现从左到右恰好正确
+    var n = 8;
+    var half [*]int = new([n / 2]int);
+    assert(half.length == n / 2);
+    for (var i = 0; i < half.length; i += 1) { half[i] = i; }
+    for (var i = 0; i < half.length; i += 1) { assert(half[i] == i); }
+}
+
+func testZeroLen() {
+    var z [*]int = new([0]int);
+    assert(z.length == 0);
+    var c [*]*?Node = new([0]*?Node);
+    assert(c.length == 0);
+}
+
+func testNestedLen() {
+    // 外层动态复合长度 + 内层定长数组元素
+    var n = 3;
+    var a [*][4]int = new([n + 1][4]int);
+    assert(a.length == n + 1);
+    for (var i = 0; i < a.length; i += 1) {
+        for (var j = 0; j < 4; j += 1) { a[i][j] = i * 4 + j; }
+    }
+    assert(a[3][3] == 15);
+}
+
+func testMixedExpr() {
+    // 两三种运算符混合的长度表达式（全部用 var：const 会被编译期折叠，测不到拼接 bug）
+    var a = 2;
+    var b = 3;
+    var c = 4;
+    var d = 5;
+
+    // 加乘：a + b*c = 2 + 12 = 14
+    var m1 [*]int = new([a + b * c]int);
+    assert(m1.length == 14);
+    // 乘加：a*b + c = 6 + 4 = 10
+    var m2 [*]int = new([a * b + c]int);
+    assert(m2.length == 10);
+    // 括号优先：(a + b) * c = 5 * 4 = 20
+    var m3 [*]int = new([(a + b) * c]int);
+    assert(m3.length == 20);
+    // 乘减：a*b - c = 6 - 4 = 2
+    var m4 [*]int = new([a * b - c]int);
+    assert(m4.length == 2);
+    // 除加（整数除法）：a/b + c = 0 + 4 = 4
+    var m5 [*]int = new([a / b + c]int);
+    assert(m5.length == 4);
+    // 三运算符：a + b*c - d = 2 + 12 - 5 = 9
+    var m6 [*]int = new([a + b * c - d]int);
+    assert(m6.length == 9);
+    // 括号 + 三运算符：a * (b + c) - d = 2*7 - 5 = 9
+    var m7 [*]int = new([a * (b + c) - d]int);
+    assert(m7.length == 9);
+    // 乘模：a*b % c = 6 % 4 = 2
+    var m8 [*]int = new([a * b % c]int);
+    assert(m8.length == 2);
+    // 模加：a%b + c = 2 + 4 = 6
+    var m9 [*]int = new([a % b + c]int);
+    assert(m9.length == 6);
+    // 移位优先级低于加法：a << (b+1) = 2 << 4 = 32
+    var m10 [*]int = new([a << b + 1]int);
+    assert(m10.length == 32);
+
+    // 混合长度 + 元素写读（sizeof > 1 的类元素，越界更容易暴露）
+    var nm [*]Node = new([a + b * c]Node);
+    assert(nm.length == 14);
+    for (var i = 0; i < nm.length; i += 1) { nm[i].id = i * 10; }
+    for (var i = 0; i < nm.length; i += 1) { assert(nm[i].id == i * 10); }
+    assert(nm[13].id == 130);
+
+    // 仅断言 length 不够（$length 字段恒正确，旧实现错在分配大小）：
+    // 对代表性混合数组做元素写读，分配不足时写尾部元素即越界。
+    // m2（乘加：旧分配 a*b + c*sizeof = 22 < 需要 40）、
+    // m4（乘减：旧分配 a*b - c*sizeof = -10，负值直接崩）、
+    // m8（乘模：旧分配 a*b % c*sizeof = 6 < 需要 8）、
+    // m9（模加：旧分配 a%b + c*sizeof = 18 < 需要 24）
+    for (var i = 0; i < m2.length; i += 1) { m2[i] = i; }
+    for (var i = 0; i < m2.length; i += 1) { assert(m2[i] == i); }
+    for (var i = 0; i < m4.length; i += 1) { m4[i] = i + 1; }
+    for (var i = 0; i < m4.length; i += 1) { assert(m4[i] == i + 1); }
+    for (var i = 0; i < m8.length; i += 1) { m8[i] = i * 2; }
+    for (var i = 0; i < m8.length; i += 1) { assert(m8[i] == i * 2); }
+    for (var i = 0; i < m9.length; i += 1) { m9[i] = i * 3; }
+    for (var i = 0; i < m9.length; i += 1) { assert(m9[i] == i * 3); }
+
+    // 混合长度 + 元素写读（int 元素）
+    for (var i = 0; i < m6.length; i += 1) { m6[i] = i * 100; }
+    for (var i = 0; i < m6.length; i += 1) { assert(m6[i] == i * 100); }
+}
+
+func main(args [&#][*?#]byte) {
+    testAddLen();
+    testSubLen();
+    testMulLen();
+    testDivLen();
+    testZeroLen();
+    testNestedLen();
+    testMixedExpr();
+}
