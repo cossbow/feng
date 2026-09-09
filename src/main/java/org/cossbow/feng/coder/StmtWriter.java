@@ -775,7 +775,9 @@ public class StmtWriter extends CWriter<StmtWriter> {
      */
     String strongRefCleanupFn(TypeDeclarer t) {
         if (t instanceof ArrayTypeDeclarer atd) {
-            return "Feng$cleanup_arr_" + Mangle.typeKey(atd.element());
+            // SRef 数组（[N]#T）→ cleanup_arr_<ek>；元素强引用数组（[N]*?T）
+            // → cleanup_<typeKey>[_ns]。Mangle.cleanupName 两者都正确命名。
+            return Mangle.cleanupName(t);
         }
         var cleanup = context.table.cleanups.get(t);
         if (cleanup != null) {

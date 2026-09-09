@@ -169,7 +169,8 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
                         || context.stmts.needsDestroy(t)) {
                     // 释放全局强引用（SRef 数组走 cleanup_arr；final 类/接口/boxed 走槽位清理）
                     if (t instanceof ArrayTypeDeclarer atd) {
-                        write("Feng$cleanup_arr_").write(Mangle.typeKey(atd.element()))
+                        // 元素强引用数组（[N]*?T）走 cleanup_<typeKey>[_ns]（与声明一致）
+                        write(context.stmts.strongRefCleanupFn(t))
                                 .write("(&").varName(v).write(')').endStmt();
                     } else if (t.maybeRefer().match(r -> r.isKind(ReferKind.STRONG))) {
                         // 按类型路由：final 类 → Feng$cleanup_<key>（静态 destroy）；
