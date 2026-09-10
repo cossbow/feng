@@ -1,0 +1,83 @@
+// ===== 数值微积分模块 =====
+// 纯函数式数值方法:差分求导、梯形/Simpson/自适应积分。
+
+import std$error;
+
+// ===== 微分 =====
+
+// 中心差分一阶导 (二阶精度, h 为步长)
+export func derivative(f func(float) float, x float, h float) float {
+    return (f(x + h) - f(x - h)) / (2.0 * h);
+}
+
+// 五阶中心差分一阶导
+export func derivative5(f func(float) float, x float, h float) float {
+    var f2 = f(x + 2.0 * h) - f(x - 2.0 * h);
+    var f1 = f(x + h) - f(x - h);
+    return (f2 * (-1.0) + f1 * 8.0) / (12.0 * h);
+}
+
+// 中心差分二阶导 (二阶精度)
+export func secondDerivative(f func(float) float, x float, h float) float {
+    return (f(x + h) - 2.0 * f(x) + f(x - h)) / (h * h);
+}
+
+// ===== 数值积分 =====
+
+// 梯形法则
+export func integrateTrapezoid(f func(float) float, a, b float, n int) float {
+    if (n < 1) { throw new(error$IllegalArgumentException); }
+    var h = (b - a) / float(n);
+    var s = (f(a) + f(b)) / 2.0;
+    for (var i = 1; i < n; i += 1) {
+        s = s + f(a + h * float(i));
+    }
+    return s * h;
+}
+
+// Simpson 法则 (n 必须为偶数)
+export func integrateSimpson(f func(float) float, a, b float, n int) float {
+    if (n < 2 || n % 2 == 1) { throw new(error$IllegalArgumentException); }
+    var h = (b - a) / float(n);
+    var s = f(a) + f(b);
+    for (var i = 1; i < n; i += 1) {
+        var x = a + h * float(i);
+        if (i % 2 == 1) { s = s + 4.0 * f(x); }
+        else            { s = s + 2.0 * f(x); }
+    }
+    return s * h / 3.0;
+}
+
+// Simpson 单段三点值 (内部)
+func simpsonOne(f func(float) float, a, b float) float {
+    var m = (a + b) / 2.0;
+    return (b - a) * (f(a) + 4.0 * f(m) + f(b)) / 6.0;
+}
+
+// 自适应 Simpson 递归
+export func integrateAdaptive(f func(float) float, a, b float, tol float) float {
+    var whole = simpsonOne(f, a, b);
+    var m = (a + b) / 2.0;
+    var left = simpsonOne(f, a, m);
+    var right = simpsonOne(f, m, b);
+    if (abs(left + right - whole) < 15.0 * tol) {
+        return left + right + (left + right - whole) / 15.0;
+    }
+    return integrateAdaptive(f, a, m, tol / 2.0) +
+           integrateAdaptive(f, m, b, tol / 2.0);
+}
+
+// 高斯-勒让德 4 点积分
+export func integrateGaussLegendre4(f func(float) float, a, b float) float {
+    // 4 点节点与权重 (映射到 [-1,1] 后)
+    var x1 = 0.3399810435848563;
+    var x2 = 0.8611363115940526;
+    var w1 = 0.6521451548625461;
+    var w2 = 0.3478548451374538;
+    var scale = (b - a) / 2.0;
+    var mid = (a + b) / 2.0;
+    var s = 0.0;
+    s = s + w1 * (f(mid + scale * (-x1)) + f(mid + scale * x1));
+    s = s + w2 * (f(mid + scale * (-x2)) + f(mid + scale * x2));
+    return s * scale;
+}

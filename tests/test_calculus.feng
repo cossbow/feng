@@ -1,0 +1,56 @@
+// 数值微积分测试
+import std$testing;
+import std$math;
+
+// f(x) = x², f'(x) = 2x, ∫f = x³/3
+func sq(x float) float { return x * x; }
+// f(x) = x³, ∫₀¹ = 1/4
+func cube(x float) float { return x * x * x; }
+// f(x) = sin(x), ∫₀^π = 2
+func sf(x float) float { return math$sin(x); }
+
+@Test
+func testDerivative() {
+    // d/dx x² at 3 = 6
+    var d = math$derivative(sq, 3.0, 0.001);
+    testing$assertTrue(d > 5.999 && d < 6.001);
+    var d5 = math$derivative5(sq, 3.0, 0.01);
+    testing$assertTrue(d5 > 5.9999 && d5 < 6.0001);
+    // d²/dx² x² = 2
+    var d2 = math$secondDerivative(sq, 2.0, 0.001);
+    testing$assertTrue(d2 > 1.999 && d2 < 2.001);
+}
+
+@Test
+func testIntegrateTrapezoid() {
+    // ∫₀¹ x² dx = 1/3 ≈ 0.3333
+    var t = math$integrateTrapezoid(sq, 0.0, 1.0, 100);
+    testing$assertTrue(t > 0.3332 && t < 0.3334);
+}
+
+@Test
+func testIntegrateSimpson() {
+    // ∫₀¹ x² dx = 1/3, Simpson 精度高
+    var s = math$integrateSimpson(sq, 0.0, 1.0, 10);
+    testing$assertTrue(s > 0.3333 && s < 0.3334);
+    // ∫₀^π sin(x) = 2
+    var ss = math$integrateSimpson(sf, 0.0, math$PI, 20);
+    testing$assertTrue(ss > 1.9999 && ss < 2.0001);
+}
+
+@Test
+func testIntegrateAdaptive() {
+    // ∫₀¹ x³ dx = 1/4
+    var a = math$integrateAdaptive(cube, 0.0, 1.0, 0.000001);
+    testing$assertTrue(a > 0.249999 && a < 0.250001);
+    // ∫₀^π sin(x) = 2
+    var as = math$integrateAdaptive(sf, 0.0, math$PI, 0.000001);
+    testing$assertTrue(as > 1.999999 && as < 2.000001);
+}
+
+@Test
+func testIntegrateGauss() {
+    // ∫₀¹ x² dx = 1/3
+    var g = math$integrateGaussLegendre4(sq, 0.0, 1.0);
+    testing$assertTrue(g > 0.33333 && g < 0.33334);
+}

@@ -1,0 +1,212 @@
+// ===== 统计模块 =====
+// 基于 float 数组的常用统计量。
+// 约定:输入 [&#]float 只读;需要修改时才复制(如排序用副本)。
+
+import std$error;
+import std$sort;
+
+// 升序比较器
+func cmpAsc(a, b float) int {
+    if (a < b) { return -1; }
+    if (a > b) { return 1; }
+    return 0;
+}
+
+// 复制数组(用于排序等就地修改的场合)
+func copyArr(src [&#]float) [*]float {
+    var n = src.length;
+    var r = new([n]float);
+    for (var i = 0; i < n; i += 1) { r[i] = src[i]; }
+    return r;
+}
+
+// ===== 基本统计量 =====
+
+// 求和
+export func sum(values [&#]float) float {
+    var s = 0.0;
+    for (var i = 0; i < values.length; i += 1) { s = s + values[i]; }
+    return s;
+}
+
+// 平均值
+export func mean(values [&#]float) float {
+    if (values.length == 0) { throw new(error$IllegalArgumentException); }
+    return sum(values) / float(values.length);
+}
+
+// 最小值
+export func statMin(values [&#]float) float {
+    if (values.length == 0) { throw new(error$IllegalArgumentException); }
+    var m = values[0];
+    for (var i = 1; i < values.length; i += 1) {
+        if (values[i] < m) { m = values[i]; }
+    }
+    return m;
+}
+
+// 最大值
+export func statMax(values [&#]float) float {
+    if (values.length == 0) { throw new(error$IllegalArgumentException); }
+    var m = values[0];
+    for (var i = 1; i < values.length; i += 1) {
+        if (values[i] > m) { m = values[i]; }
+    }
+    return m;
+}
+
+// ===== 离散度 =====
+
+// 总体方差 (除以 n)
+export func variance(values [&#]float) float {
+    if (values.length == 0) { throw new(error$IllegalArgumentException); }
+    var m = mean(values);
+    var s = 0.0;
+    for (var i = 0; i < values.length; i += 1) {
+        var d = values[i] - m;
+        s = s + d * d;
+    }
+    return s / float(values.length);
+}
+
+// 样本方差 (除以 n-1)
+export func sampleVariance(values [&#]float) float {
+    if (values.length < 2) { throw new(error$IllegalArgumentException); }
+    var m = mean(values);
+    var s = 0.0;
+    for (var i = 0; i < values.length; i += 1) {
+        var d = values[i] - m;
+        s = s + d * d;
+    }
+    return s / float(values.length - 1);
+}
+
+// 总体标准差
+export func stddev(values [&#]float) float {
+    return sqrt(variance(values));
+}
+
+// 样本标准差
+export func sampleStddev(values [&#]float) float {
+    return sqrt(sampleVariance(values));
+}
+
+// ===== 顺序统计量 =====
+
+// 中位数
+export func median(values [&#]float) float {
+    var n = values.length;
+    if (n == 0) { throw new(error$IllegalArgumentException); }
+    var s = copyArr(values);
+    sort$sort`float`(s, cmpAsc);
+    var mid = n / 2;
+    if (n % 2 == 1) { return s[mid]; }
+    return (s[mid - 1] + s[mid]) / 2.0;
+}
+
+// 分位数 (线性插值, p 在 [0,1])
+export func quantile(values [&#]float, p float) float {
+    if (values.length == 0) { throw new(error$IllegalArgumentException); }
+    if (p < 0.0 || p > 1.0) { throw new(error$IllegalArgumentException); }
+    var s = copyArr(values);
+    sort$sort`float`(s, cmpAsc);
+    if (p == 1.0) { return s[s.length - 1]; }
+    var idx = p * float(s.length - 1);
+    var lo = int(idx);
+    var frac = idx - float(lo);
+    return s[lo] * (1.0 - frac) + s[lo + 1] * frac;
+}
+
+// 众数(返回最小的最大频数值)
+export func mode(values [&#]float) float {
+    if (values.length == 0) { throw new(error$IllegalArgumentException); }
+    var s = copyArr(values);
+    sort$sort`float`(s, cmpAsc);
+    var best = s[0];
+    var bestCount = 1;
+    var cur = s[0];
+    var curCount = 1;
+    for (var i = 1; i < s.length; i += 1) {
+        if (s[i] == cur) {
+            curCount += 1;
+        } else {
+            if (curCount > bestCount) { best = cur; bestCount = curCount; }
+            cur = s[i];
+            curCount = 1;
+        }
+    }
+    if (curCount > bestCount) { best = cur; }
+    return best;
+}
+
+// ===== 双变量统计 =====
+
+// 协方差 (总体)
+export func covariance(x, y [&#]float) float {
+    var n = x.length;
+    if (n != y.length || n == 0) { throw new(error$IllegalArgumentException); }
+    var mx = mean(x);
+    var my = mean(y);
+    var s = 0.0;
+    for (var i = 0; i < n; i += 1) { s = s + (x[i] - mx) * (y[i] - my); }
+    return s / float(n);
+}
+
+// 样本协方差 (除以 n-1)
+export func sampleCovariance(x, y [&#]float) float {
+    var n = x.length;
+    if (n != y.length || n < 2) { throw new(error$IllegalArgumentException); }
+    var mx = mean(x);
+    var my = mean(y);
+    var s = 0.0;
+    for (var i = 0; i < n; i += 1) { s = s + (x[i] - mx) * (y[i] - my); }
+    return s / float(n - 1);
+}
+
+// 皮尔逊相关系数
+export func correlation(x, y [&#]float) float {
+    var n = x.length;
+    if (n != y.length || n < 2) { throw new(error$IllegalArgumentException); }
+    var mx = mean(x);
+    var my = mean(y);
+    var sx = 0.0;
+    var sy = 0.0;
+    var sxy = 0.0;
+    for (var i = 0; i < n; i += 1) {
+        var dx = x[i] - mx;
+        var dy = y[i] - my;
+        sx = sx + dx * dx;
+        sy = sy + dy * dy;
+        sxy = sxy + dx * dy;
+    }
+    var denom = sqrt(sx * sy);
+    if (denom == 0.0) { return 0.0; }
+    return sxy / denom;
+}
+
+// 简单线性回归 y = slope * x + intercept
+// 返回 (slope, intercept, r²)
+export func linearRegression(x, y [&#]float) (float, float, float) {
+    var n = x.length;
+    if (n != y.length || n < 2) { throw new(error$IllegalArgumentException); }
+    var mx = mean(x);
+    var my = mean(y);
+    var sx2 = 0.0;
+    var sxy = 0.0;
+    var sy2 = 0.0;
+    for (var i = 0; i < n; i += 1) {
+        var dx = x[i] - mx;
+        var dy = y[i] - my;
+        sx2 = sx2 + dx * dx;
+        sxy = sxy + dx * dy;
+        sy2 = sy2 + dy * dy;
+    }
+    if (sx2 == 0.0) { return (0.0, my, 0.0); }
+    var slope = sxy / sx2;
+    var intercept = my - slope * mx;
+    if (sy2 == 0.0) {
+        return (slope, intercept, 1.0);
+    }
+    var r2 = (sxy * sxy) / (sx2 * sy2);
+    return (slope, intercept, r2);
+}
