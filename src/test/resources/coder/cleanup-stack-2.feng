@@ -1,0 +1,41 @@
+import std$error;
+
+// 单态化 id 共享验证：同一个泛型函数多个具体化实例的局部变量共享模板 id。
+// throwLocal`int` / throwLocal`string` 各自的局部 e 是同一模板变量 clone（同 id），
+// 若清理栈 mirroredVars 按 id 判等跨过程误判，会泄漏或 double-free。
+
+func throwLocal`T`(x T) {
+    var e = new(error$IllegalStateException);
+    throw e;
+}
+
+// 泛型 catch 变量：两个实例化共享 catch 变量 id，且 catch 内 throw 该变量
+func rethrowGeneric`T`(x T) {
+    try {
+        throw new(error$IllegalArgumentException);
+    } catch(e *#error$IllegalArgumentException) {
+        throw e;
+    }
+}
+
+func main() {
+    // ===== 多实例化 throw 局部强引用 =====
+    var a = false;
+    var b = false;
+    try { throwLocal`int`(1); } catch(e *#Exception) { a = true; }
+    try { throwLocal`bool`(true); } catch(e *#Exception) { b = true; }
+    assert(a);
+    assert(b);
+
+    // ===== 多实例化 catch 变量 rethrow =====
+    var c = false;
+    var d = false;
+    try { rethrowGeneric`int`(1); } catch(e *#Exception) { c = true; }
+    try { rethrowGeneric`bool`(true); } catch(e *#Exception) { d = true; }
+    assert(c);
+    assert(d);
+
+    // ===== 正常路径回归 =====
+    var i = new(int);
+    assert(i != nil);
+}
