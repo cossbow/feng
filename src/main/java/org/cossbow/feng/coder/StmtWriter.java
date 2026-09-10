@@ -99,12 +99,6 @@ public class StmtWriter extends CWriter<StmtWriter> {
     }
 
     StmtWriter declareVar(TypeDeclarer t,
-                          Runnable namer,
-                          Runnable valuer) {
-        return declareVar(t, null, namer, valuer);
-    }
-
-    StmtWriter declareVar(TypeDeclarer t,
                           Variable v,
                           Runnable namer,
                           Runnable valuer) {
