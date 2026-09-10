@@ -1,0 +1,171 @@
+// Matrix — 不可变值类型矩阵(行主序)
+// data 不对外暴露,外部不可修改。运算方法返回新 Matrix。
+// 自定义运算符: + - * / == != 和 [] 索引访问。
+
+import std$error;
+
+export
+class Matrix final {
+    const data [*]float64;     // 行主序,data[r*cols + c],不对外暴露
+    const rows int;
+    const cols int;
+
+    // ---- 内部边界检查 ----
+    func checkIndex#(r, c int) {
+        if (r < 0 || r >= rows || c < 0 || c >= cols) {
+            throw new(error$IllegalArgumentException);
+        }
+    }
+
+    // ---- [] 索引访问 ----
+    macro index get(i int) float64 {
+        if (i < 0 || i >= rows * cols) { throw new(error$IllegalArgumentException); }
+        data[i]
+    }
+    macro index set(i int, v float64) {
+        if (i < 0 || i >= rows * cols) { throw new(error$IllegalArgumentException); }
+        data[i] = v;
+    }
+
+    // ---- 算术运算符(返回新 Matrix) ----
+    macro operator add(other) {
+        var n = rows * cols;
+        if (n != other.rows * other.cols) {
+            throw new(error$IllegalArgumentException);
+        }
+        var r = new([n]float64);
+        for (var i = 0; i < n; i += 1) { r[i] = data[i] + other.data[i]; }
+        {
+            data = r,
+            rows = rows,
+            cols = cols
+        }
+    }
+
+    macro operator sub(other) {
+        var n = rows * cols;
+        if (n != other.rows * other.cols) {
+            throw new(error$IllegalArgumentException);
+        }
+        var r = new([n]float64);
+        for (var i = 0; i < n; i += 1) { r[i] = data[i] - other.data[i]; }
+        {
+            data = r,
+            rows = rows,
+            cols = cols
+        }
+    }
+
+    macro operator mul(other) {
+        if (cols != other.rows) {
+            throw new(error$IllegalArgumentException);
+        }
+        var n = rows * other.cols;
+        var r = new([n]float64);
+        for (var i = 0; i < rows; i += 1) {
+            for (var k = 0; k < cols; k += 1) {
+                var aik = data[i * cols + k];
+                if (aik == 0.0) { continue; }
+                for (var j = 0; j < other.cols; j += 1) {
+                    r[i * other.cols + j] += aik * other.data[k * other.cols + j];
+                }
+            }
+        }
+        {
+            data = r,
+            rows = rows,
+            cols = other.cols
+        }
+    }
+
+    // ---- 比较运算符 ----
+    macro operator eq(other) {
+        var same = rows == other.rows && cols == other.cols;
+        var done = 0;
+        for (var i = 0; same && i < rows * cols; i += 1) {
+            if (data[i] != other.data[i]) { done = 1; break; }
+        }
+        same && done == 0
+    }
+
+    macro operator ne(other) { !(this == other) }
+
+    // ---- 方法(返回新 Matrix) ----
+
+    // 标量乘法
+    export func scale#(k float64) Matrix {
+        var n = rows * cols;
+        var r = new([n]float64);
+        for (var i = 0; i < n; i += 1) { r[i] = data[i] * k; }
+        return Matrix{data = r, rows = rows, cols = cols};
+    }
+
+    // 转置
+    export func transpose#() Matrix {
+        var r = new([rows * cols]float64);
+        for (var i = 0; i < rows; i += 1) {
+            for (var j = 0; j < cols; j += 1) {
+                r[j * rows + i] = data[i * cols + j];
+            }
+        }
+        return Matrix{data = r, rows = cols, cols = rows};
+    }
+
+    // 取行向量(返回 1×cols 矩阵)
+    export func row#(r int) Matrix {
+        checkIndex(r, 0);
+        var rv = new([cols]float64);
+        for (var j = 0; j < cols; j += 1) { rv[j] = data[r * cols + j]; }
+        return Matrix{data = rv, rows = 1, cols = cols};
+    }
+
+    // 取列向量(返回 rows×1 矩阵)
+    export func col#(c int) Matrix {
+        checkIndex(0, c);
+        var cv = new([rows]float64);
+        for (var i = 0; i < rows; i += 1) { cv[i] = data[i * cols + c]; }
+        return Matrix{data = cv, rows = rows, cols = 1};
+    }
+
+    // 形状信息
+    export func rowCount#() int { return rows; }
+    export func colCount#() int { return cols; }
+    export func size#() (int, int) { return (rows, cols); }
+    export func elementCount#() int { return rows * cols; }
+
+    // 所有元素求和(用途:检查收敛、求迹等)
+    export func sum#() float64 {
+        var s = data[0];
+        for (var i = 1; i < rows * cols; i += 1) { s = s + data[i]; }
+        return s;
+    }
+}
+
+
+// ---- 工厂函数 ----
+
+export func newMatrix(rows, cols int) Matrix {
+    return Matrix{data = new([rows * cols]float64), rows = rows, cols = cols};
+}
+
+export func newMatrixFrom(rows, cols int, values [&#]float64) Matrix {
+    if (rows * cols != values.length) {
+        throw new(error$IllegalArgumentException);
+    }
+    var r = new([rows * cols]float64);
+    for (var i = 0; i < rows * cols; i += 1) { r[i] = values[i]; }
+    return Matrix{data = r, rows = rows, cols = cols};
+}
+
+export func identity(n int) Matrix {
+    var r = new([n * n]float64);
+    for (var i = 0; i < n; i += 1) { r[i * n + i] = 1.0; }
+    return Matrix{data = r, rows = n, cols = n};
+}
+
+export func diag(elems [&#]float64) Matrix {
+    var n = elems.length;
+    var r = new([n * n]float64);
+    for (var i = 0; i < n; i += 1) { r[i * n + i] = elems[i]; }
+    return Matrix{data = r, rows = n, cols = n};
+}

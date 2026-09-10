@@ -1,0 +1,121 @@
+import std$testing;
+import std$math;
+
+func eq(a, b math$Matrix) bool {
+    var r = a.rowCount() == b.rowCount() && a.colCount() == b.colCount();
+    for (var i = 0; r && i < a.elementCount(); i += 1) {
+        r = a[i] == b[i];
+    }
+    return r;
+}
+
+@Test
+func testMatrixCreate() {
+    var m = math$newMatrix(2, 3);
+    testing$assertTrue(m.rowCount() == 2);
+    testing$assertTrue(m.colCount() == 3);
+    testing$assertTrue(m.elementCount() == 6);
+    testing$assertTrue(m[0] == 0.0);
+    testing$assertTrue(m[5] == 0.0);
+}
+
+@Test
+func testMatrixSetGet() {
+    var m = math$newMatrix(2, 2);
+    m[0] = 1.0;
+    m[1] = 2.0;
+    m[2] = 3.0;
+    m[3] = 4.0;
+    testing$assertTrue(m[0] == 1.0);
+    testing$assertTrue(m[1] == 2.0);
+    testing$assertTrue(m[2] == 3.0);
+    testing$assertTrue(m[3] == 4.0);
+}
+
+@Test
+func testMatrixAdd() {
+    var a = math$newMatrixFrom(2, 2, [4]float64[1.0, 2.0, 3.0, 4.0]);
+    var b = math$newMatrixFrom(2, 2, [4]float64[10.0, 20.0, 30.0, 40.0]);
+    var c = a + b;
+    testing$assertTrue(eq(c, math$newMatrixFrom(2, 2, [4]float64[11.0, 22.0, 33.0, 44.0])));
+    testing$assertTrue(eq(a, math$newMatrixFrom(2, 2, [4]float64[1.0, 2.0, 3.0, 4.0])));
+}
+
+@Test
+func testMatrixSub() {
+    var a = math$newMatrixFrom(2, 2, [4]float64[10.0, 20.0, 30.0, 40.0]);
+    var b = math$newMatrixFrom(2, 2, [4]float64[1.0, 2.0, 3.0, 4.0]);
+    var c = a - b;
+    testing$assertTrue(eq(c, math$newMatrixFrom(2, 2, [4]float64[9.0, 18.0, 27.0, 36.0])));
+}
+
+@Test
+func testMatrixMul() {
+    var a = math$newMatrixFrom(2, 2, [4]float64[1.0, 2.0, 3.0, 4.0]);
+    var b = math$newMatrixFrom(2, 2, [4]float64[5.0, 6.0, 7.0, 8.0]);
+    var c = a * b;
+    testing$assertTrue(eq(c, math$newMatrixFrom(2, 2, [4]float64[19.0, 22.0, 43.0, 50.0])));
+}
+
+@Test
+func testMatrixMulRect() {
+    var a = math$newMatrixFrom(3, 2, [6]float64[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+    var b = math$newMatrixFrom(2, 1, [2]float64[5.0, 6.0]);
+    var c = a * b;
+    testing$assertTrue(eq(c, math$newMatrixFrom(3, 1, [3]float64[17.0, 39.0, 61.0])));
+}
+
+@Test
+func testMatrixScale() {
+    var a = math$newMatrixFrom(2, 2, [4]float64[1.0, 2.0, 3.0, 4.0]);
+    var c = a.scale(2.5);
+    testing$assertTrue(eq(c, math$newMatrixFrom(2, 2, [4]float64[2.5, 5.0, 7.5, 10.0])));
+}
+
+@Test
+func testMatrixTranspose() {
+    var a = math$newMatrixFrom(2, 3, [6]float64[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+    var t = a.transpose();
+    testing$assertTrue(t.rowCount() == 3);
+    testing$assertTrue(t.colCount() == 2);
+    testing$assertTrue(eq(t, math$newMatrixFrom(3, 2, [6]float64[1.0, 4.0, 2.0, 5.0, 3.0, 6.0])));
+}
+
+@Test
+func testMatrixIdentity() {
+    var i = math$identity(3);
+    var e = math$newMatrixFrom(3, 3, [9]float64[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]);
+    testing$assertTrue(eq(i, e));
+    var a = math$newMatrixFrom(3, 3, [9]float64[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]);
+    testing$assertTrue(eq(a * i, a));
+    testing$assertTrue(eq(i * a, a));
+}
+
+@Test
+func testMatrixRowCol() {
+    var a = math$newMatrixFrom(2, 3, [6]float64[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+    var r = a.row(1);
+    testing$assertTrue(eq(r, math$newMatrixFrom(1, 3, [3]float64[4.0, 5.0, 6.0])));
+    var c = a.col(2);
+    testing$assertTrue(eq(c, math$newMatrixFrom(2, 1, [2]float64[3.0, 6.0])));
+}
+
+@Test
+func testMatrixDiag() {
+    var d = math$diag([3]float64[1.0, 2.0, 3.0]);
+    var e = math$newMatrixFrom(3, 3, [9]float64[1.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 3.0]);
+    testing$assertTrue(eq(d, e));
+}
+
+@Test
+func testMatrixNe() {
+    var a = math$newMatrixFrom(2, 2, [4]float64[1.0, 2.0, 3.0, 4.0]);
+    var b = math$newMatrixFrom(2, 2, [4]float64[1.0, 2.0, 3.0, 5.0]);
+    testing$assertTrue(!(a == b));
+}
+
+@Test
+func testMatrixSum() {
+    var a = math$newMatrixFrom(2, 2, [4]float64[1.0, 2.0, 3.0, 4.0]);
+    testing$assertTrue(a.sum() == 10.0);
+}
