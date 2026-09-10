@@ -314,23 +314,30 @@ public class JsonAstParser {
             return;
 
         for (var child : inner.elements()) {
-            if (child.isObject()
-                    && "ElaboratedType".equals(child.get("kind").asText())) {
-                var owned = child.get("ownedTagDecl");
-                if (owned == null || !owned.isObject()) {
-                    continue;
-                }
-                var recordId = owned.get("id");
-                if (recordId != null && !recordId.isNull()) {
-                    var tagName = switch (underlying) {
-                        case CStructType s -> s.tagName();
-                        case CUnionType u -> u.tagName();
-                        default -> null;
-                    };
-                    if (tagName != null && !tagName.isEmpty()) {
-                        emptyRecordTags.put(recordId.asText(), tagName);
-                    }
-                }
+            if (!child.isObject()) continue;
+            var kind = child.get("kind");
+            if (kind == null || kind.isNull()) continue;
+
+            // Older clang: ElaboratedType → ownedTagDecl
+            // Newer clang: RecordType → decl
+            JsonNode ref = null;
+            if ("ElaboratedType".equals(kind.asText())) {
+                ref = child.get("ownedTagDecl");
+            } else if ("RecordType".equals(kind.asText())) {
+                ref = child.get("decl");
+            }
+            if (ref == null || !ref.isObject()) continue;
+
+            var recordId = ref.get("id");
+            if (recordId == null || recordId.isNull()) continue;
+
+            var tagName = switch (underlying) {
+                case CStructType s -> s.tagName();
+                case CUnionType u -> u.tagName();
+                default -> null;
+            };
+            if (tagName != null && !tagName.isEmpty()) {
+                emptyRecordTags.put(recordId.asText(), tagName);
             }
         }
     }
