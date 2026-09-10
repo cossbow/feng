@@ -3693,7 +3693,8 @@ public class SemanticAnalyzer {
         return false;
     }
 
-    private Optional<Expression> derivedTypeBinOp(
+    private Optional<Groups.G2<Expression, TypeDeclarer>>
+    derivedTypeBinOp(
             DerivedTypeDeclarer lt, DerivedTypeDeclarer rt,
             Expression le, Expression re,
             BinaryExpression e) {
@@ -3713,7 +3714,8 @@ public class SemanticAnalyzer {
                 m.prototype()));
         var ce = new CallExpression(e.pos(), me, List.of(re),
                 m.prototype());
-        return Optional.of(ce);
+        return Optional.of(Groups.g2(ce,
+                m.prototype().returnSet().must()));
     }
 
     private Groups.G2<Expression, TypeDeclarer> derivedTypeBinOp(
@@ -3724,9 +3726,7 @@ public class SemanticAnalyzer {
         if (l.b() instanceof DerivedTypeDeclarer ltd &&
                 r.b() instanceof DerivedTypeDeclarer rtd) {
             var oe = derivedTypeBinOp(ltd, rtd, l.a(), r.a(), e);
-            if (oe.has()) {
-                return Groups.g2(oe.get(), l.b());
-            }
+            if (oe.has()) return oe.get();
         }
 
         var op = e.operator();

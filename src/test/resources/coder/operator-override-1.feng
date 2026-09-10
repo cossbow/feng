@@ -38,6 +38,9 @@ class Complex final {
         }
     }
 
+    macro operator eq(rhs) {
+        real==rhs.real && imag==rhs.imag
+    }
 }
 
 
@@ -51,6 +54,10 @@ func test(n int) {
     c = a + -b;
     c = -b;
     c = !b;
+
+    var d = a;
+    assert(a == d);
+    assert(a != b);
 }
 
 func main() {
