@@ -121,9 +121,13 @@ public class JsonAstParser {
         var nameNode = node.get("name");
         var name = nameNode != null ? nameNode.asText() : null;
         boolean anonymous;
+        boolean tagged;
         if (name != null && !name.isEmpty()) {
             // Named struct/union — not anonymous
             anonymous = false;
+            // Real C tag exists (e.g. `struct Bar {...}`): references may
+            // be spelled `struct Bar`, so the bridge keeps the tag prefix.
+            tagged = true;
         } else {
             // Anonymous struct/union: try typedef mapping first (e.g.
             // `typedef struct { ... } lldiv_t`), then fall back to
@@ -132,12 +136,21 @@ public class JsonAstParser {
             if (id != null && !id.isNull()) {
                 name = emptyRecordTags.get(id.asText());
             }
-            if (name == null || name.isEmpty()) {
+            if (name != null && !name.isEmpty()) {
+                // Recovered the real tag name from its owning typedef
+                // (e.g. `typedef struct { ... } lldiv_t;`) — this is a
+                // named struct, NOT an anonymous one. But the name is only
+                // the typedef: C has no `struct lldiv_t` tag, so the bridge
+                // must reference the typedef name without the tag prefix.
+                anonymous = false;
+                tagged = false;
+            } else {
                 var tag = isStruct ? "struct" : "union";
                 name = locToAnonName(node, tag);
+                if (name == null || name.isEmpty()) return;
+                anonymous = true;
+                tagged = false;
             }
-            if (name == null || name.isEmpty()) return;
-            anonymous = true;
         }
 
         var fields = new ArrayList<CField>();
@@ -163,9 +176,9 @@ public class JsonAstParser {
         }
 
         if (isStruct) {
-            converter.addStruct(new CStructType(name, fields, true, anonymous));
+            converter.addStruct(new CStructType(name, fields, true, anonymous, tagged));
         } else {
-            converter.addUnion(new CUnionType(name, fields, true, anonymous));
+            converter.addUnion(new CUnionType(name, fields, true, anonymous, tagged));
         }
     }
 

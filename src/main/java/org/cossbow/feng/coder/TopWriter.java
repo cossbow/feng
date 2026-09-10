@@ -142,7 +142,7 @@ public class TopWriter extends CWriter<TopWriter> {
             if (!sd.cType() || sd.anonymous()) continue;
             // only named C-imported structs
             write("typedef ");
-            write(sd.domain().name).write(' ');
+            if (sd.cTagged()) write(sd.domain().name).write(' ');
             write(sd.symbol().name().value()).write(' ');
             write(fm.path().toString()).write('$');
             write(sd.symbol().name().value());

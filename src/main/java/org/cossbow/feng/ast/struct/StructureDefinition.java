@@ -1,15 +1,16 @@
 package org.cossbow.feng.ast.struct;
 
+import org.cossbow.feng.analysis.layout.StructureLayout;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.TypeParameters;
-import org.cossbow.feng.analysis.layout.StructureLayout;
 import org.cossbow.feng.util.Lazy;
 
 public class StructureDefinition extends TypeDefinition {
     private IdentifierMap<StructureField> fields;
     private boolean anonymous;
     private boolean cType;
+    private boolean cTagged;    // C type has tag
 
     public StructureDefinition(Position pos,
                                Modifier modifier,
@@ -18,11 +19,13 @@ public class StructureDefinition extends TypeDefinition {
                                TypeDomain domain,
                                IdentifierMap<StructureField> fields,
                                boolean anonymous,
-                               boolean cType) {
+                               boolean cType,
+                               boolean cTagged) {
         super(pos, modifier, symbol, generic, domain);
         this.fields = fields;
         this.anonymous = anonymous;
         this.cType = cType;
+        this.cTagged = cTagged;
     }
 
     public StructureDefinition(Position pos,
@@ -33,7 +36,7 @@ public class StructureDefinition extends TypeDefinition {
                                IdentifierMap<StructureField> fields,
                                boolean anonymous) {
         this(pos, modifier, symbol, generic, domain, fields,
-                anonymous, false);
+                anonymous, false, true);
     }
 
     public IdentifierMap<StructureField> fields() {
@@ -46,6 +49,10 @@ public class StructureDefinition extends TypeDefinition {
 
     public boolean anonymous() {
         return anonymous;
+    }
+
+    public boolean cTagged() {
+        return cTagged;
     }
 
     public boolean newable() {

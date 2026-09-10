@@ -17,7 +17,6 @@ import org.cossbow.feng.c2feng.model.*;
 import org.cossbow.feng.mod.MetaDataExtractor;
 import org.cossbow.feng.parser.ParseSymbolTable;
 import org.cossbow.feng.util.DedupCache;
-import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
@@ -70,7 +69,7 @@ public class C2FengConverter {
                 symbol(new Identifier(struct.tagName())),
                 TypeParameters.empty(),
                 TypeDomain.STRUCT,
-                fields, struct.anonymous(), true));
+                fields, struct.anonymous(), true, struct.tagged()));
     }
 
     // ========== Union ==========
@@ -92,7 +91,7 @@ public class C2FengConverter {
                 symbol(new Identifier(union.tagName())),
                 TypeParameters.empty(),
                 TypeDomain.UNION,
-                fields, union.anonymous(), true));
+                fields, union.anonymous(), true, union.tagged()));
     }
 
     // ========== Enum → const int constants ==========
