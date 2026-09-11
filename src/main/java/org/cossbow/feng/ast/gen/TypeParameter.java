@@ -37,6 +37,10 @@ public class TypeParameter extends Entity {
         return constraint;
     }
 
+    public void constraint(TypeConstraint c) {
+        this.constraint = Optional.of(c);
+    }
+
     public boolean initable() {
         return initable;
     }

@@ -25,13 +25,14 @@ import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.ast.type.*;
 import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.util.*;
-import org.cossbow.feng.util.Optional;
-import org.cossbow.feng.util.Stack;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
@@ -536,6 +537,17 @@ final class SourceParseVisitor
         return generic;
     }
 
+    @Override
+    public Entity visitConcept(FengParser.ConceptContext ctx) {
+        var export = ctx.EXPORT() != null;
+        var name = identifier(ctx.name);
+        var expr = (TypeConstraint) visit(ctx.expr);
+        var c = new Concept(posOf(ctx), export,
+                defineSymbol(name), expr);
+        checkGlobalName(name, c);
+        table.concepts.add(name, c);
+        return c;
+    }
 
     //
     // generic: end

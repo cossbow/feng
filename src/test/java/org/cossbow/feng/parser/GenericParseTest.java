@@ -5,10 +5,7 @@ import org.cossbow.feng.ast.TypeDomain;
 import org.cossbow.feng.ast.gen.*;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
-import org.cossbow.feng.ast.type.BinaryTypeConstraint;
-import org.cossbow.feng.ast.type.DefinedTypeConstraint;
-import org.cossbow.feng.ast.type.DomainTypeConstraint;
-import org.cossbow.feng.ast.type.TypeConstraint;
+import org.cossbow.feng.ast.type.*;
 import org.cossbow.feng.util.Groups;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -87,7 +84,7 @@ public class GenericParseTest extends BaseParseTest {
     public void testTypeConstraint2() {
         for (var g2 : simpleGlobalDefineFmt) {
             for (var d : TypeDomain.values()) {
-                if (!d.keyword) continue;
+                if (!d.using) continue;
                 var type = randTypeName(2);
                 var param = doParse(g2, type + " " + d.name)
                         .params().get(type);
@@ -100,7 +97,7 @@ public class GenericParseTest extends BaseParseTest {
     }
 
     @Test
-    public void testTypeConstraintExpr() {
+    public void testTypeConstraintExpr1() {
         for (var op : typeOperatorSymbol.entrySet()) {
             for (var g2 : simpleGlobalDefineFmt) {
                 var type = randTypeName(2);
@@ -114,6 +111,99 @@ public class GenericParseTest extends BaseParseTest {
                 Assertions.assertEquals(a, getSimpleTypeParam(expr.left()));
                 Assertions.assertEquals(b, getSimpleTypeParam(expr.right()));
             }
+        }
+    }
+
+    @Test
+    public void testTypeConstraintExclude() {
+        for (var g2 : simpleGlobalDefineFmt) {
+            var type = randTypeName(2);
+            var c = symbol(randTypeName(8));
+            var param = doParse(g2, type + " !" + c)
+                    .params().get(type);
+            Assertions.assertEquals(type, param.name());
+            var expr = (ExcludeTypeConstraint) param.constraint().must();
+            Assertions.assertEquals(c, getSimpleTypeParam(expr.operand()));
+        }
+    }
+
+    @Test
+    public void testTypeConstraintRefer() {
+        for (var g2 : simpleGlobalDefineFmt) {
+            var type = randTypeName(2);
+            var param = doParse(g2, type + " *")
+                    .params().get(type);
+            Assertions.assertEquals(type, param.name());
+            var expr = param.constraint().must();
+            Assertions.assertTrue(expr instanceof ReferTypeConstraint);
+        }
+    }
+
+    @Test
+    public void testTypeConstraintOptional() {
+        for (var g2 : simpleGlobalDefineFmt) {
+            var type = randTypeName(2);
+            var param = doParse(g2, type + " ?")
+                    .params().get(type);
+            Assertions.assertEquals(type, param.name());
+            var expr = param.constraint().must();
+            Assertions.assertTrue(expr instanceof OptionalTypeConstraint);
+        }
+    }
+
+    @Test
+    public void testTypeConstraintUnmodifiable() {
+        for (var g2 : simpleGlobalDefineFmt) {
+            var type = randTypeName(2);
+            var param = doParse(g2, type + " #")
+                    .params().get(type);
+            Assertions.assertEquals(type, param.name());
+            var expr = param.constraint().must();
+            Assertions.assertTrue(expr instanceof UnmodifiableTypeConstraint);
+        }
+    }
+
+    @Test
+    public void testTypeConstraintDomain() {
+        for (var d : TypeDomain.values()) {
+            for (var g2 : simpleGlobalDefineFmt) {
+                var type = randTypeName(2);
+                var param = doParse(g2, type + " " + d)
+                        .params().get(type);
+                Assertions.assertEquals(type, param.name());
+                var expr = (DomainTypeConstraint) param.constraint().must();
+                Assertions.assertSame(d, expr.domain());
+            }
+        }
+    }
+
+    @Test
+    public void testTypeConstraintAttribute() {
+        for (var g2 : simpleGlobalDefineFmt) {
+            var type = randTypeName(2);
+            var a = symbol(randTypeName(8));
+            var param = doParse(g2, type + " @" + a)
+                    .params().get(type);
+            Assertions.assertEquals(type, param.name());
+            var expr = (AttributeTypeConstraint) param.constraint().must();
+            Assertions.assertEquals(a, expr.attribute().type());
+        }
+    }
+
+    @Test
+    public void testConstraintPriority0() {
+        for (var g2 : simpleGlobalDefineFmt) {
+            var type = randTypeName(2);
+            var a = symbol(randTypeName(8));
+            var b = symbol(randTypeName(8));
+            var p = "%s %s & !%s".formatted(type, a, b);
+            var param = doParse(g2, p).params().get(type);
+            Assertions.assertEquals(type, param.name());
+            var expr = (BinaryTypeConstraint) param.constraint().must();
+            Assertions.assertEquals(a, getSimpleTypeParam(expr.left()));
+            Assertions.assertSame(TypeOperator.AND, expr.operator());
+            var left = (ExcludeTypeConstraint) expr.right();
+            Assertions.assertEquals(b, getSimpleTypeParam(left.operand()));
         }
     }
 
@@ -159,6 +249,39 @@ public class GenericParseTest extends BaseParseTest {
         var dt = (DerivedType) ((DefinedTypeConstraint) e).definedType();
         Assertions.assertTrue(dt.generic().isEmpty());
         return dt.symbol();
+    }
+
+    @Test
+    public void testInitDefault0() {
+        var a = symbol(randTypeName(8));
+        var tp = doParse(simpleGlobalDefineFmt.getFirst(),
+                "T " + a)
+                .get(0);
+        Assertions.assertFalse(tp.initable());
+    }
+
+    @Test
+    public void testInitDefault1() {
+        var a = symbol(randTypeName(8));
+        var tp = doParse(simpleGlobalDefineFmt.getFirst(),
+                "T default " + a)
+                .get(0);
+        Assertions.assertTrue(tp.initable());
+    }
+
+    @Test
+    public void testConcept() {
+        var name = symbol(randTypeName(12));
+        var a = symbol(randTypeName(4));
+        var b = symbol(randTypeName(4));
+        var c = symbol(randTypeName(4));
+        var expr = a + " | " + b + " & " + c;
+        var d = "concept " + name + " = " + expr + ";";
+        var concept = doParseFile(d).table().concepts.getValue(0);
+        Assertions.assertEquals(name, concept.symbol());
+        var tc = doParse(simpleGlobalDefineFmt.getFirst(), "T " + expr)
+                .get(0).constraint().must();
+        Assertions.assertEquals(tc, concept.expr());
     }
 
 }

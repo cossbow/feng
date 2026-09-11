@@ -380,6 +380,10 @@ public class SemanticAnalyzer {
         // on all types and functions. Therefore, we should
         // first analyze the declaration part
         result.dagClasses = visitClasses(table.types);
+        // check generic constraints
+        analyse(table.concepts);
+        checkConstraint(table.types.values());
+        checkConstraint(table.functions.values());
         // A function may also depend on all types, so its
         // prototype should also be analyzed first
         var functions = table.functions.stream()
@@ -437,37 +441,76 @@ public class SemanticAnalyzer {
         semantic("here can't use type arguments '%s': %s", ta, ta.pos());
     }
 
+    private void analyse(IdentifierMap<Concept> concepts) {
+        if (concepts.isEmpty()) return;
+        for (var c : concepts) {
+            c.expr(analyse(c.expr()));
+        }
+        var edges = new ArrayList<Groups.G2<Concept, Concept>>();
+        for (var c : concepts) {
+            var s = new HashSet<Concept>();
+            conceptDeps(c.expr(), s);
+            for (Concept d : s) {
+                edges.add(Groups.g2(d, c));
+            }
+        }
+        makeDAG(concepts.values(), edges);
+    }
+
+    private void conceptDeps(TypeConstraint c, Set<Concept> s) {
+        switch (c) {
+            case ConceptTypeConstraint dtc -> {
+                s.add(dtc.concept());
+            }
+            case BinaryTypeConstraint bc -> {
+                conceptDeps(bc.left(), s);
+                conceptDeps(bc.right(), s);
+            }
+            case ExcludeTypeConstraint ec -> conceptDeps(ec.operand(), s);
+            case ParenTypeConstraint pc -> conceptDeps(pc.child(), s);
+            default -> {
+            }
+        }
+        ;
+
+    }
+
     private void analyse(TypeParameters tps) {
         for (var tp : tps) {
             if (tp.initable() && tp.constraint().none()) {
                 error("'default' requires a constraint: %s", tp.pos());
             }
             if (tp.constraint().none()) continue;
-            var c = tp.constraint().get();
-            analyse(c);
-            tp.constraint().use(this::analyse);
+            tp.constraint(analyse(tp.constraint().get()));
         }
     }
 
-    /**
-     * Recursively resolve DefiedTypeConstraint in a constraint tree.
-     */
-    private void analyse(TypeConstraint c) {
-        switch (c) {
+    private TypeConstraint analyse(TypeConstraint c) {
+        return switch (c) {
             case DefinedTypeConstraint dtc -> {
-                if (dtc.definedType() instanceof DerivedType d) {
-                    findDef(d);
+                if (!(dtc.definedType() instanceof DerivedType dt)) {
+                    yield c;
                 }
+                var s = dt.symbol();
+                var oc = context.findConcept(s);
+                if (oc.has())
+                    yield new ConceptTypeConstraint(c.pos(), oc.get());
+
+                analyse(dt);
+                yield c;
             }
-            case AttributeTypeConstraint atc -> analyse(atc.attribute());
-            case BinaryTypeConstraint bc -> {
-                analyse(bc.left());
-                analyse(bc.right());
+            case AttributeTypeConstraint atc -> {
+                analyse(atc.attribute());
+                yield atc;
             }
-            case ExcludeTypeConstraint ec -> analyse(ec.operand());
+            case BinaryTypeConstraint bc -> new BinaryTypeConstraint(
+                    c.pos(), bc.operator(),
+                    analyse(bc.left()), analyse(bc.right()));
+            case ExcludeTypeConstraint ec -> new ExcludeTypeConstraint(
+                    c.pos(), analyse(ec.operand()));
             case ParenTypeConstraint pc -> analyse(pc.child());
-            default -> { /* 叶子约束无需解析 */ }
-        }
+            default -> c;
+        };
     }
 
     private void invalid(TypeParameters tp) {
@@ -478,7 +521,7 @@ public class SemanticAnalyzer {
     private GenericMap checkConstraint(GenericMap gm) {
         gm.foreach((c, t) -> {
             if (!c.match(t)) {
-                error("type '%s' doesn't satisfy constraint '%s': %s",
+                error("type '%s' doesn't satisfy constraint of '%s': %s",
                         t, c, t.pos());
                 return;
             }
@@ -488,6 +531,22 @@ public class SemanticAnalyzer {
             }
         });
         return gm;
+    }
+
+    private void checkConstraint(TypeConstraint c) {
+        switch (c) {
+            case DefinedTypeConstraint dtc -> {
+                if (dtc.definedType() instanceof DerivedType dt)
+                    checkConstraint(dt.gm());
+            }
+            case BinaryTypeConstraint bc -> {
+                checkConstraint(bc.left());
+                checkConstraint(bc.right());
+            }
+            case ExcludeTypeConstraint ec -> checkConstraint(ec.operand());
+            case ParenTypeConstraint pc -> checkConstraint(pc.child());
+            default -> { /* cover branch */}
+        }
     }
 
     /**
@@ -529,23 +588,31 @@ public class SemanticAnalyzer {
         return true;
     }
 
-    private TypeDefinition findDef(DerivedType dt) {
-        if (dt.analyzed()) return dt.def();
+    private DerivedType analyse(DerivedType dt) {
+        if (dt.analyzed()) return dt;
         var s = dt.symbol();
         var o = context.findType(s);
         if (o.has()) {
             dt.def(o.get());
             analyse(dt.generic());
-            if (dt.generic().isEmpty()) return o.get();
-            if (dt.def().generic().isEmpty()) return
-                    semantic("'%s' is not generic type: %s", dt.def(), dt.pos());
+            if (dt.generic().isEmpty()) return dt;
+            if (dt.def().generic().isEmpty()) {
+                return semantic("'%s' is not generic type: %s",
+                        dt.def(), dt.pos());
+            }
             var gm = GenericMap.make(dt, o.get().generic(), dt.generic());
-            dt.gm(checkConstraint(gm));
-            return o.get();
+            dt.gm(gm);
+            return dt;
         }
 
         return semantic("type %s not defined: %s",
                 s, dt.pos());
+    }
+
+    private TypeDefinition findDef(DerivedType dt) {
+        analyse(dt);
+        checkConstraint(dt.gm());
+        return dt.def();
     }
 
     private TypeDefinition findDef(DerivedTypeDeclarer dtd) {
@@ -737,10 +804,11 @@ public class SemanticAnalyzer {
         }
 
         if (td instanceof DerivedTypeDeclarer dtd) {
-            if (!dtd.derivedType().generic().isEmpty())
+            var dt = dtd.derivedType();
+            if (!dt.generic().isEmpty())
                 return unsupported("generic");
 
-            var def = findDef(dtd);
+            var def = analyse(dt).def();
             if (def instanceof StructureDefinition sd)
                 return Stream.of(sd);
 
@@ -1031,7 +1099,7 @@ public class SemanticAnalyzer {
     }
 
     private ClassDefinition findParentClass(DerivedType t) {
-        var def = findDef(t);
+        var def = analyse(t).def();
         if (def instanceof ClassDefinition pcd) {
             return pcd;
         }
@@ -1044,7 +1112,7 @@ public class SemanticAnalyzer {
         if (cd.impl().isEmpty()) return;
 
         for (var t : cd.impl()) {
-            var def = findDef(t);
+            var def = analyse(t).def();
             if (def instanceof InterfaceDefinition)
                 continue;
             semantic("require interface but actual '%s':  %s",
@@ -1115,40 +1183,16 @@ public class SemanticAnalyzer {
         var fields = cd.fields().stream().map(ClassField::type)
                 .flatMap(this::getClassTypeField);
 
-        // 泛型参数约束中引用的类也是依赖——约束如 Cat<Moon> 中的 Cat
-        // 必须在本类之前 visit，以确保 Cat 的约束树已解析。
-        var constraintDeps = cd.generic().params().values().stream()
-                .flatMap(tp -> collectConstraintTypeDeps(tp.constraint()));
-
-        return Stream.concat(Stream.concat(inherit, fields), constraintDeps)
+        return Stream.concat(inherit, fields)
                 .filter(d -> !d.builtin()).toList();
     }
 
-    private Stream<ClassDefinition> collectConstraintTypeDeps(Optional<TypeConstraint> oc) {
-        if (oc.none()) return Stream.empty();
-        var c = oc.get();
-        return switch (c) {
-            case DefinedTypeConstraint dtc -> {
-                if (dtc.definedType() instanceof GenericType) {
-                    // 同胞类型参数引用（GenericType），不产生对其他类的依赖
-                    yield Stream.empty();
-                }
-                if (dtc.definedType() instanceof DerivedType dt) {
-                    var s = dt.symbol();
-                    var o = context.findType(s);
-                    if (o.has() && o.get() instanceof ClassDefinition cd)
-                        yield Stream.of(cd);
-                    else
-                        yield Stream.empty();
-                }
-                yield Stream.empty();
+    private void checkConstraint(List<? extends Definition> ds) {
+        for (var d : ds) {
+            for (var tp : d.generic()) {
+                tp.constraint().use(this::checkConstraint);
             }
-            case BinaryTypeConstraint bc -> Stream.concat(collectConstraintTypeDeps(Optional.of(bc.left())),
-                    collectConstraintTypeDeps(Optional.of(bc.right())));
-            case ExcludeTypeConstraint ec -> collectConstraintTypeDeps(Optional.of(ec.operand()));
-            case ParenTypeConstraint pc -> collectConstraintTypeDeps(Optional.of(pc.child()));
-            default -> Stream.empty(); // 叶子约束无类型引用
-        };
+        }
     }
 
     private DAGGraph<ClassDefinition>
@@ -1370,6 +1414,7 @@ public class SemanticAnalyzer {
                       BiConsumer<ObjectDefinition, GenericMap> walk,
                       Entity e) {
         for (var st : od.supers()) {
+            checkConstraint(st.gm());
             var gm = st.gm().overlay(next);
             var sd = (ObjectDefinition) st.def();
             var other = gm.mapAll(sd.generic());
@@ -1400,7 +1445,7 @@ public class SemanticAnalyzer {
     private List<InterfaceDefinition>
     findParts(InterfaceDefinition def) {
         return def.parts().stream().map(p -> {
-            var t = findDef(p);
+            var t = analyse(p).def();
             if (t instanceof InterfaceDefinition id) return id;
             return semantic("component must be interface: %s", p.pos());
         }).toList();

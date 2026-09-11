@@ -6,6 +6,7 @@ import org.cossbow.feng.ast.TypeDefinition;
 import org.cossbow.feng.ast.VariadicArgument;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.ast.type.Concept;
 import org.cossbow.feng.util.Lazy;
 import org.cossbow.feng.util.Optional;
 
@@ -30,6 +31,11 @@ public class LocalSymbolContext implements SymbolContext {
     @Override
     public boolean isLocal(Symbol s) {
         return s.module().none() || parent.isLocal(s);
+    }
+
+    @Override
+    public Optional<Concept> findConcept(Symbol symbol) {
+        return parent.findConcept(symbol);
     }
 
     @Override

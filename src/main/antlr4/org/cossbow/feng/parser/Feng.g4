@@ -39,6 +39,7 @@ global
     : def=typeDefinition            # GlobalTypeDefinition
     | def=functionDefinition        # GlobalFunctionDefinition
     | exportable declaration SEMI   # GlobalDeclaration
+    | concept                       # DefineConcept
     | macro                         # GlobalMacro
     ;
 
@@ -386,6 +387,9 @@ typeDomain
     : CLASS | INTERFACE | ENUM | STRUCT | UNION | ATTRIBUTE | FUNC | PRIMITIVE
     ;
 
+concept
+    : EXPORT? CONCEPT name=Identifier ASSIGN expr=typeConstraint SEMI
+    ;
 
 
 
@@ -781,6 +785,7 @@ ATTRIBUTE       : 'attribute' ;
 INTERFACE       : 'interface' ;
 CLASS           : 'class' ;
 FUNC            : 'func' ;
+CONCEPT         : 'concept' ;
 MACRO           : 'macro' ;
 CONST           : 'const' ;
 VAR             : 'var' ;

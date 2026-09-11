@@ -5028,4 +5028,20 @@ public class SemanticAnalyzerTest {
                 "func f(b Box`A`){ b.t(); }");
     }
 
+    @Test
+    public void testGenericConcept1() {
+        var d = "class A {} class B {} concept Ct = A | !B ; ";
+        d += "class Box`T Ct` { var v T; } ";
+        checkSucc(d + "func f() { var h Box`A`; }");
+        checkFail(d + "func f() { var h Box`B`; }");
+    }
+
+    @Test
+    public void testGenericConcept2() {
+        var d = "class A {} class B {} concept Ct = A ; ";
+        d += "concept Cr = Ct | !B; class Box`T Ct` {} ";
+        checkSucc(d + "func f() { var h Box`A`; }");
+        checkFail(d + "func f() { var h Box`B`; }");
+    }
+
 }

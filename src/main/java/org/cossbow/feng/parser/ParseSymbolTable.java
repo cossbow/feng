@@ -13,6 +13,7 @@ import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
 import org.cossbow.feng.ast.proc.FunctionDefinition;
+import org.cossbow.feng.ast.type.Concept;
 import org.cossbow.feng.util.DedupCache;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Lazy;
@@ -32,6 +33,10 @@ public class ParseSymbolTable {
         this.stringCache = stringCache;
     }
 
+    /**
+     * Collection of custom concepts
+     */
+    public final IdentifierMap<Concept> concepts = new IdentifierMap<>();
     /**
      * Collection of custom types
      */
@@ -86,6 +91,11 @@ public class ParseSymbolTable {
             if (o.has()) return o;
         }
         return Optional.empty();
+    }
+
+    @SuppressWarnings("unchecked")
+    public Optional<Concept> findConcept(Identifier name) {
+        return find(name, BUILTIN.concepts, concepts);
     }
 
     @SuppressWarnings("unchecked")

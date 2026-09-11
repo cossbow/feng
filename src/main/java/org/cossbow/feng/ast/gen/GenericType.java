@@ -8,7 +8,7 @@ import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.util.Optional;
 
 /**
- * Type Variance: reference the type-paratemer in the generic-type
+ * Type Variance: reference the type-parameter in the generic-type
  */
 final
 public class GenericType extends DefinedType {
