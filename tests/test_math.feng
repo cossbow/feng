@@ -1,6 +1,23 @@
 import std$testing;
 import std$math;
 
+const z = 0.0;
+const nan = z / z;          // 0.0/0.0 → NaN (常量折叠)
+const pos_inf = 1.0 / z;    // 1.0/0.0 → +Infinity
+const neg_inf = -1.0 / z;   // -1.0/0.0 → -Infinity
+
+@Test
+func testNan() {
+    testing$assertTrue(nan != nan);       // IEEE-754:NaN != NaN → true
+
+    testing$assertTrue(math$isNaN(nan));
+    testing$assertFalse(math$isNaN(1.0));
+
+    testing$assertTrue(math$isInf(pos_inf));
+    testing$assertTrue(math$isInf(neg_inf));
+    testing$assertFalse(math$isInf(1.0));
+}
+
 @Test
 func testConstants() {
     testing$assertTrue(math$PI > 3.14);

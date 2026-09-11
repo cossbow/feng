@@ -24,7 +24,7 @@ func isNaN(x float) bool {
 
 export
 func isInf(x float) bool {
-    return x != x && x - x != 0.0;
+    return isNaN(x * 0.0) && !isNaN(x);
 }
 
 export
@@ -107,8 +107,7 @@ export
 func sqrt(x float) float {
     if (x < 0.0) {
         // Return NaN via self-subtraction
-        var zero = 0.0;
-        return zero / zero;
+        return 0.0 / 0.0;
     }
     if (x == 0.0) { return 0.0; }
     var z = x;
@@ -125,8 +124,7 @@ func exp(x float) float {
     if (x == 0.0) { return 1.0; }
     if (isNaN(x)) { return x; }
     if (x > 709.0) {
-        var zero = 0.0;
-        return 1.0 / zero;  // +Inf
+        return 1.0 / 0.0;  // +Inf
     }
     if (x < -709.0) { return 0.0; }
 
@@ -149,8 +147,7 @@ func exp(x float) float {
 export
 func log(x float) float {
     if (x <= 0.0 || isNaN(x)) {
-        var zero = 0.0;
-        return zero / zero;  // NaN
+        return 0.0 / 0.0;  // NaN
     }
     if (x == 1.0) { return 0.0; }
     if (isInf(x)) { return x; }
@@ -184,17 +181,14 @@ func pow(x, y float) float {
     if (y == 0.0) { return 1.0; }
     if (x == 1.0) { return 1.0; }
     if (isNaN(x) || isNaN(y)) {
-        var zero = 0.0;
-        return zero / zero;
+        return 0.0 / 0.0;
     }
     if (x < 0.0 && y != trunc(y)) {
-        var zero = 0.0;
-        return zero / zero;
+        return 0.0 / 0.0;
     }
     if (x == 0.0) {
         if (y > 0.0) { return 0.0; }
-        var zero = 0.0;
-        return 1.0 / zero;
+        return 1.0 / 0.0;
     }
     var neg = x < 0.0;
     var base = neg ? -x : x;
@@ -249,8 +243,7 @@ func cosSeries(x float) float {
 export
 func sin(x float) float {
     if (isNaN(x) || isInf(x)) {
-        var zero = 0.0;
-        return zero / zero;
+        return 0.0 / 0.0;
     }
     return sinSeries(reduceAngle(x));
 }
@@ -258,8 +251,7 @@ func sin(x float) float {
 export
 func cos(x float) float {
     if (isNaN(x) || isInf(x)) {
-        var zero = 0.0;
-        return zero / zero;
+        return 0.0 / 0.0;
     }
     return cosSeries(reduceAngle(x));
 }
@@ -268,8 +260,7 @@ export
 func tan(x float) float {
     var c = cos(x);
     if (c == 0.0) {
-        var zero = 0.0;
-        return 1.0 / zero;
+        return 1.0 / 0.0;
     }
     return sin(x) / c;
 }
@@ -277,8 +268,7 @@ func tan(x float) float {
 export
 func asin(x float) float {
     if (x < -1.0 || x > 1.0) {
-        var zero = 0.0;
-        return zero / zero;
+        return 0.0 / 0.0;
     }
     if (x == 0.0) { return 0.0; }
     if (x == 1.0) { return PI / 2.0; }

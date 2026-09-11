@@ -7,6 +7,7 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
+import org.cossbow.feng.ast.lit.FloatLiteral;
 import org.cossbow.feng.ast.lit.IntegerLiteral;
 import org.cossbow.feng.ast.lit.Literal;
 import org.cossbow.feng.ast.lit.NilLiteral;
@@ -442,6 +443,14 @@ public class ExprWriter extends CWriter<ExprWriter> {
             return write(nl);
         }
         if (lit instanceof StringLiteral sl) return write(sl);
+        // FloatLiteral 特殊值:NaN / ±Infinity 输出 C 的 NAN / INFINITY 宏
+        if (lit instanceof FloatLiteral fl && fl.isSpecial()) {
+            return write(switch (fl.special()) {
+                case NAN -> "NAN";
+                case POSITIVE_INFINITY -> "INFINITY";
+                case NEGATIVE_INFINITY -> "(-INFINITY)";
+            });
+        }
         return write(lit.toString());
     }
 
