@@ -668,6 +668,27 @@ func test() {
 
 Entering the block creates a new scope; variables are automatically cleaned up upon exit.
 
+#### Slice Expression
+
+This expression returns a slice of an array, but the result is a [phantom reference](#phantom-reference-type) to an [array](#variable-length-array), so the sliced array must be phantom-referenceable.
+
+The expression syntax is: array `[` start position `:` end position `]`.
+The slice contains the elements from the start position up to (but not including) the end position, so its length is: end position - start position.
+Obviously the start position is in [0, length), while the end position is in [0, length].
+
+For example:
+
+```feng
+func test() {
+    var a [8]int;
+    const x [&]int = a[2:4];
+    var b = new([8]int);
+    const y [&]int = b[2:4];
+    const z = b[2:4];           // type declaration can be omitted
+    const w [&#]int = b[2:4];   // or converted to an unmodifiable type
+}
+```
+
 ### Custom Operations
 
 [Classes](#classes) do not support operators by default, but some operations can be custom-implemented.

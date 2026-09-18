@@ -1,0 +1,49 @@
+
+func sumSlice(s [&]int) int {
+    var r = 0;
+    for (var i = 0; i < s.length; i += 1) {
+        r += s[i];
+    }
+    return r;
+}
+
+func main() {
+    var a [6]int = [6]int[10, 20, 30, 40, 50, 60];
+
+    // 基本切片：a[1:3] == [20, 30]
+    const s1 = a[1:3];
+    assert s1.length == 2;
+    assert s1[0] == 20;
+    assert s1[1] == 30;
+
+    // end == len 合法（排他边界）
+    const s2 = a[0:6];
+    assert s2.length == 6;
+    assert s2[5] == 60;
+
+    // 空切片
+    const s3 = a[2:2];
+    assert s3.length == 0;
+
+    // 表达式边界
+    var i = 1;
+    var j = 4;
+    const s4 = a[i:j];
+    assert s4.length == 3;
+    assert s4[0] == 20;
+    assert s4[2] == 40;
+
+    // 切片结果可继续索引
+    const s5 = a[2:5];
+    assert s5[1] == 40;
+
+    // 切片可作为实参传给 [&]T 形参
+    assert sumSlice(a[0:3]) == 60;
+
+    // 只读切片（[&]int）与可写切片（[&]int）
+    const ro [&]int = a[0:3];
+    assert ro[0] == 10;
+    const rw [&]int = a[0:3];
+    rw[0] = 100;
+    assert a[0] == 100;
+}

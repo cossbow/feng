@@ -563,6 +563,7 @@ primaryExpr
     : operandExpr                                       # OperandExpression_
     | primaryExpr is                                    # IsExpression
     | primaryExpr indexOf                               # IndexOfExpression
+    | primaryExpr sliceOf                               # SliceOfExpression
     | primaryExpr memberOf typeArguments?               # MemberOfExpression
     | primaryExpr TupleIndex                            # TupleIndexExpression
     | primaryExpr argumentSet                           # CallExpression
@@ -636,6 +637,9 @@ pair
 // index: default for array
 indexOf
     : '[' expression ']'
+    ;
+sliceOf
+    : '[' start=expression COLON end=expression ']'
     ;
 
 memberOf

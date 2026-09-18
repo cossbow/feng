@@ -1049,9 +1049,9 @@ public class SemanticAnalyzerTest {
     @Test
     public void testIsExpression6() {
         var d = "class A{} ";
-        checkSucc(d + "func f(o *Object){ var a = o?(*?A); }");
-        checkSucc(d + "func f(o &Object){ var a = o?(&?A); }");
-        checkSucc(d + "func f(o *Object){ var a = o?(&?A); }");
+        checkSucc(d + "func f(o *Object){ const a = o?(*?A); }");
+        checkSucc(d + "func f(o &Object){ const a = o?(&?A); }");
+        checkSucc(d + "func f(o *Object){ const a = o?(&?A); }");
         checkFail(d + "func f(o &Object){ var a = o?(*?A); }");
     }
 
@@ -1415,6 +1415,57 @@ public class SemanticAnalyzerTest {
         checkFail("class A{var v1 int; var v2 bool;} func f() { var a A; var v = a.0; }");
     }
 
+    @Test
+    public void testSliceExpression1() {
+        // 正例：切片结果类型为虚引用数组（phantom-refer），必须 const 绑定
+        checkSucc("func f(){ var a [4]int; const s = a[0:4]; }");
+        checkSucc("func f(){ var a [4]int; const s = a[1:3]; }");
+        checkSucc("func f(i int, j int){ var a [4]int; const s = a[i:j]; }");
+        checkSucc("func f(){ var a [4]int; const s = a[1:1]; }");
+        checkSucc("func f(){ var b [4]int = [4]int[1,2,3,4]; const s = b[0:3]; }");
+    }
+
+    @Test
+    public void testSliceExpression2() {
+        // 正例：subject 为数组（元素类型不受限，含引用/对象元素也可切）
+        checkSucc("func f(a [&]int){ const s = a[1:2]; }");
+        checkSucc("class B{} func f(a [4]B){ const s = a[1:2]; }");
+    }
+
+    @Test
+    public void testSliceExpression3() {
+        // 反例：切片结果为虚引用（phantom-refer），必须 const，不可 var 绑定
+        checkFail("func f(){ var a [4]int; var s = a[1:2]; }");
+        checkFail("func f(){ var a [4]int; var s = a[0:4]; }");
+        checkFail("func f(a [&]int){ var s = a[1:2]; }");
+
+        // 反例：切片要求 subject 为数组
+        checkFail("func f(){ var v int = 5; var s = v[1:2]; }");
+        checkFail("class A{} func f(){ var a A; var s = a[1:2]; }");
+    }
+
+    @Test
+    public void testSliceExpression4() {
+        // 反例：索引必须是非负整数
+        checkFail("func f(){ var a [4]int; var s = a[true:2]; }");
+        checkFail("func f(){ var a [4]int; var s = a[1:false]; }");
+        checkFail("func f(){ var a [4]int; var s = a[-1:2]; }");
+    }
+
+    @Test
+    public void testSliceExpression5() {
+        // 反例：下标越界（end 排他可 == len，但不可 > len；start 不可 >= len）
+        checkFail("func f(){ var a [4]int; var s = a[1:5]; }");
+        checkFail("func f(){ var a [4]int; var s = a[4:2]; }");
+        checkFail("func f(){ var a [4]int; var s = a[5:5]; }");
+    }
+
+    @Test
+    public void testSliceExpression6() {
+        // 反例：临时数组不能作为切片 subject（unbound 悬垂虚引用）
+        checkFail("func f(){ var s = [4]int[1,2,3,4][1:2]; }");
+        checkFail("func g() [4]int { return [4]int[1,2,3,4]; } func f(){ var s = g()[1:2]; }");
+    }
 
     //
 
@@ -2210,6 +2261,9 @@ public class SemanticAnalyzerTest {
         checkFail(d + "func f(a &A){ var r &A = a; }");
         checkFail(d + "func f(a &A){ var r *A = a; }");
         checkFail(d + "func f(a &A){ var r A = a; }");
+
+        checkSucc(d + "func f(a &A){ const r = a; }");
+        checkFail(d + "func f(a &A){ var r = a; }");
     }
 
     @Test

@@ -1020,6 +1020,15 @@ final class SourceParseVisitor
         return new IndexOfExpression(posOf(ctx), subject, index);
     }
 
+    @Override
+    public Entity visitSliceOfExpression(FengParser.SliceOfExpressionContext ctx) {
+        var subject = (PrimaryExpression) visit(ctx.primaryExpr());
+        var sc = ctx.sliceOf();
+        var start = (Expression) visit(sc.start);
+        var end = (Expression) visit(sc.end);
+        return new SliceOfExpression(posOf(ctx), subject, start, end);
+    }
+
 
     @Override
     public Entity visitCallExpression(FengParser.CallExpressionContext ctx) {

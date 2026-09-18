@@ -7,11 +7,7 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
-import org.cossbow.feng.ast.lit.FloatLiteral;
-import org.cossbow.feng.ast.lit.IntegerLiteral;
-import org.cossbow.feng.ast.lit.Literal;
-import org.cossbow.feng.ast.lit.NilLiteral;
-import org.cossbow.feng.ast.lit.StringLiteral;
+import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
@@ -492,6 +488,7 @@ public class ExprWriter extends CWriter<ExprWriter> {
             case ObjectExpression ee -> write(ee);
             case MemberOfExpression ee -> write(ee);
             case IndexOfExpression ee -> write(ee);
+            case SliceOfExpression ee -> write(ee);
             case ConvertExpression ee -> write(ee);
             case CheckNilExpression ee -> write(ee);
             case ReferEqualExpression ee -> write(ee);
@@ -804,6 +801,38 @@ public class ExprWriter extends CWriter<ExprWriter> {
         write(", (Uint64)(uintptr_t)&&_feng_fn_label, ");
         write(e.pos().start() != null ? e.pos().start().getLine() : 0);
         return write(")]");
+    }
+
+    private ExprWriter write(SliceOfExpression e) {
+        write('(').writeType(e.resultType.must());
+        write("){");
+        // start：与单元素索引相同（0 <= start < bound）
+        write(e.subject()).write(".$values + Feng$checkIndex(")
+                .write(e.start()).write(',');
+        writeSliceBound(e.subject());
+        write(", (Uint64)(uintptr_t)&&_feng_fn_label, ");
+        write(e.pos().start() != null ? e.pos().start().getLine() : 0);
+        // end：排他语义，允许 end == bound（Feng$checkIndex 是 i < bound，
+        // 不能用于 end；end 必须 < bound 时由语义层 start < end 与 start 检查保证）
+        write("), (");
+        write(e.subject()).write(".$values + ");
+        write(e.end()).write(") - (");
+        write(e.subject()).write(".$values + ");
+        write(e.start()).write(")");
+        return write('}');
+    }
+
+    // slice 的 subject 可以是固定长度数组（编译期 len）或
+    // 虚引用数组视图（运行时 $length）
+    private ExprWriter writeSliceBound(Expression subject) {
+        var stOpt = subject.resultType.get();
+        if (stOpt.has() && stOpt.get() instanceof ArrayTypeDeclarer atd
+                && atd.refer().none()) {
+            write(atd.len());
+        } else {
+            write(subject).write(".$length");
+        }
+        return this;
     }
 
     // ---- 转换 / 判空 / 引用比较 ----

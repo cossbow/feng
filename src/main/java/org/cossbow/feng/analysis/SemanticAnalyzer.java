@@ -217,6 +217,11 @@ public class SemanticAnalyzer {
                 case ParenExpression e -> q.add(e.child());
                 case MemberOfExpression e -> q.add(e.subject());
                 case IndexOfExpression e -> q.add(e.subject());
+                case SliceOfExpression e -> {
+                    q.add(e.subject());
+                    if (e.start() != null) q.add(e.start());
+                    if (e.end() != null) q.add(e.end());
+                }
                 case TupleIndexExpression e -> q.add(e.subject());
                 case LiteralExpression e -> {
                 }
@@ -1556,6 +1561,7 @@ public class SemanticAnalyzer {
             case ConditionalExpression ee -> enablePhantom(lr, ee);
             case VariableExpression ee -> enablePhantom(lr, ee.variable());
             case SymbolExpression ee -> enablePhantom(lr, ee);
+            case SliceOfExpression ee -> true;
             case CurrentExpression ee -> true;
             case LiteralExpression ee -> passingParameters;
             case ObjectExpression ee -> passingParameters;
@@ -2322,10 +2328,6 @@ public class SemanticAnalyzer {
     private void analyse(Variable v) {
         analyse(v.modifier());
         v.type().update(t -> {
-            if (t.checkRefer(PHANTOM) && !v.isConst()) {
-                return semantic("phantom reference must be const: %s",
-                        t.pos());
-            }
             enablePhantom = true;
             return markSync(v.modifier(), analyse(t));
         });
@@ -2339,6 +2341,11 @@ public class SemanticAnalyzer {
             }
         } else {
             initVar(v);
+        }
+        var t = v.type().must();
+        if (t.checkRefer(PHANTOM) && !v.isConst()) {
+            semantic("phantom reference must be const: %s",
+                    t.pos());
         }
     }
 
@@ -3243,6 +3250,13 @@ public class SemanticAnalyzer {
         return unmodifiable(e.subject(), left);
     }
 
+    private boolean unmodifiable(SliceOfExpression e, boolean left) {
+        var t = e.resultType.must();
+        var r = t.maybeRefer();
+        if (r.has()) return r.get().unmodifiable();
+        return unmodifiable(e.subject(), left);
+    }
+
     private boolean unmodifiable(MemberOfExpression e, boolean left) {
         var r = e.resultType.must().maybeRefer();
         if (r.has()) return r.get().unmodifiable();
@@ -3297,6 +3311,7 @@ public class SemanticAnalyzer {
         return switch (e) {
             case CallExpression ee -> unmodifiable(ee, left);
             case IndexOfExpression ee -> unmodifiable(ee, left);
+            case SliceOfExpression ee -> unmodifiable(ee, left);
             case MemberOfExpression ee -> unmodifiable(ee, left);
             case TupleIndexExpression ee -> unmodifiable(ee, left);
             case ParenExpression ee -> unmodifiable(ee.child(), left);
@@ -3492,6 +3507,7 @@ public class SemanticAnalyzer {
             case ConvertExpression ee -> optimize(ee);
             case CurrentExpression ee -> optimize(ee);
             case IndexOfExpression ee -> optimize(ee);
+            case SliceOfExpression ee -> optimize(ee);
             case LambdaExpression ee -> optimize(ee);
             case LiteralExpression ee -> optimize(ee);
             case MemberOfExpression ee -> optimize(ee);
@@ -4334,6 +4350,42 @@ public class SemanticAnalyzer {
 
         return semantic("'%s' not implement index: %s",
                 sg.b(), e.index().pos());
+    }
+
+    private Groups.G2<Expression, TypeDeclarer> optimize(SliceOfExpression e) {
+        var g = optimize(e.subject());
+        if (!(g.b() instanceof ArrayTypeDeclarer atd))
+            return semantic("slice expect an array: %s", g.a().pos());
+
+        var sg = optimize(e.start());
+        var si = optimizeIndex(sg);
+
+        var eg = optimize(e.end());
+        var ei = optimizeIndex(eg);
+
+        if (atd.length().has()) {
+            if (si.has() && si.get().compareTo(atd.len()) >= 0) {
+                return semantic("index out of bounds: %s", e.pos());
+            }
+            if (ei.has() && ei.get().compareTo(atd.len()) > 0) {
+                return semantic("index out of bounds: %s", e.pos());
+            }
+        }
+
+        var umod = unmodifiable(g.a(), false);
+        var pr = new Refer(e.pos(), PHANTOM, true, umod);
+        if (!enablePhantom(pr, g.a())) {
+            return semantic("Sliced arrays cannot be phantom-refer: %s",
+                    g.a().pos());
+        }
+
+        var t = ArrayTypeDeclarer.make(atd.element(),
+                Optional.of(pr), e.pos());
+        checkRequired(t, g.b(), Optional.of(g.a()), e);
+
+        var n = new SliceOfExpression(e.pos(), (PrimaryExpression) g.a(),
+                sg.a(), eg.a());
+        return Groups.g2(n, t);
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(LambdaExpression e) {

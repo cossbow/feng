@@ -460,6 +460,10 @@ public final class ReleaserBuilder {
         } else if (e instanceof IndexOfExpression ie) {
             preScanExpr(out, ie.subject());
             preScanExpr(out, ie.index());
+        } else if (e instanceof SliceOfExpression se) {
+            preScanExpr(out, se.subject());
+            if (se.start() != null) preScanExpr(out, se.start());
+            if (se.end() != null) preScanExpr(out, se.end());
         } else if (e instanceof MethodExpression me) {
             preScanExpr(out, me.subject());
         }
@@ -739,6 +743,12 @@ public final class ReleaserBuilder {
         if (e instanceof IndexOfExpression ie) {
             scanExpr(ie.subject());
             scanExpr(ie.index());
+            return;
+        }
+        if (e instanceof SliceOfExpression se) {
+            scanExpr(se.subject());
+            if (se.start() != null) scanExpr(se.start());
+            if (se.end() != null) scanExpr(se.end());
             return;
         }
         if (e instanceof MethodExpression me) {

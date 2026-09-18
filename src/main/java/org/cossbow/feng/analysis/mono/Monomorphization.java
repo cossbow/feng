@@ -342,6 +342,10 @@ public class Monomorphization {
             scanExpr(be.right(), gm);
         } else if (e instanceof UnaryExpression ue) {
             scanExpr(ue.operand(), gm);
+        } else if (e instanceof SliceOfExpression se) {
+            scanExpr(se.subject(), gm);
+            if (se.start() != null) scanExpr(se.start(), gm);
+            if (se.end() != null) scanExpr(se.end(), gm);
         } else if (e instanceof BlockExpression be) {
             for (var s : be.block()) scanStmt(s, gm);
             scanExpr(be.result(), gm);
@@ -1006,6 +1010,12 @@ public class Monomorphization {
         if (e instanceof CallExpression ce) {
             retargetExpr(nproc, ce.callee());
             for (var a : ce.arguments()) retargetExpr(nproc, a);
+            return;
+        }
+        if (e instanceof SliceOfExpression se) {
+            retargetExpr(nproc, se.subject());
+            if (se.start() != null) retargetExpr(nproc, se.start());
+            if (se.end() != null) retargetExpr(nproc, se.end());
         }
     }
 

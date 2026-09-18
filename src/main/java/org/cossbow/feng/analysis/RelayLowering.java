@@ -415,6 +415,7 @@ public class RelayLowering {
             }
             case MemberOfExpression me -> lowerMemberOf(me);
             case IndexOfExpression ie -> lowerIndexOf(ie);
+            case SliceOfExpression se -> lowerSliceOf(se);
             case DereferExpression de -> lowerDerefer(de);
             case BlockExpression be -> {
                 var newBlock = new ArrayList<Statement>(be.block().size());
@@ -558,6 +559,39 @@ public class RelayLowering {
             result = inner;
         }
         var be = new BlockExpression(ie.pos(), preStmts, result);
+        be.resultType.set(rt);
+        return be;
+    }
+
+    private Expression lowerSliceOf(SliceOfExpression se) {
+        var preStmts = new ArrayList<Statement>();
+        var subject = lowerSubject(se.subject(), preStmts);
+        var rt = se.resultType.must();
+
+        var base = new SliceOfExpression(se.pos(), (PrimaryExpression) subject,
+                se.start(), se.end());
+        base.resultType.set(rt);
+
+        Expression result;
+        if (needPinOperandSubject(subject)) {
+            result = makePin(subject, rt, pinned -> {
+                var n = new SliceOfExpression(se.pos(), (PrimaryExpression) pinned,
+                        se.start(), se.end());
+                n.resultType.set(rt);
+                return n;
+            });
+        } else {
+            result = base;
+        }
+
+        if (preStmts.isEmpty()) return result;
+        if (result instanceof BlockExpression be) {
+            preStmts.addAll(be.block());
+            var inner = be.result();
+            be.resultType.use(inner.resultType::set);
+            result = inner;
+        }
+        var be = new BlockExpression(se.pos(), preStmts, result);
         be.resultType.set(rt);
         return be;
     }

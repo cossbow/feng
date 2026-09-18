@@ -263,6 +263,11 @@ public class AnonFuncNormalizer {
             case IsExpression ie -> walkExpr(ie.subject());  // only class/interface, no func types
             case MemberOfExpression moe -> walkExpr(moe.subject());
             case IndexOfExpression ioe -> walkExpr(ioe.subject());
+            case SliceOfExpression soe -> {
+                walkExpr(soe.subject());
+                if (soe.start() != null) walkExpr(soe.start());
+                if (soe.end() != null) walkExpr(soe.end());
+            }
             case TupleExpression te -> {
                 for (var item : te.elements()) walkExpr(item);
             }
