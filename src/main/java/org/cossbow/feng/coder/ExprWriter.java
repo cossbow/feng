@@ -1087,7 +1087,7 @@ public class ExprWriter extends CWriter<ExprWriter> {
                         // Vector$feng$macro$index$get 而定义是 Vector_A$...。
                         var macroOwner = vtableOf(dtd.derivedType())
                                 .map(VTable::def).getOrElse(cd);
-                        write(methodSymbolOf(macroOwner, mName));
+                        write(methodSymbolOf(macroOwner, dtd.derivedType(), mName));
                         write('(').write(me.subject());
                         if (!e.arguments().isEmpty()) {
                             write(COMMA);
@@ -1102,7 +1102,7 @@ public class ExprWriter extends CWriter<ExprWriter> {
                     // 直调（final 类 / 值类型 subject）：owner 必须用具体化类
                     // （def 可能是模板类，如 Box`T`），否则拼出 Box$get 而非
                     // Box_Int$get；符号唯一权威 ClassMeta.methods()。
-                    org.cossbow.feng.ast.oop.ClassDefinition owner = null;
+                    ClassDefinition owner = null;
                     if (def instanceof ClassDefinition c2) {
                         owner = vtableOf(dtd.derivedType())
                                 .map(VTable::def).getOrElse(c2);
@@ -1112,7 +1112,8 @@ public class ExprWriter extends CWriter<ExprWriter> {
                         owner = cmm.master();
                     }
                     if (owner != null) {
-                        write(methodSymbolOf(owner, me.method().name()));
+                        write(methodSymbolOf(owner, dtd.derivedType()
+                                , me.method().name()));
                     } else {
                         write(me.method().name());
                     }
@@ -1376,13 +1377,15 @@ public class ExprWriter extends CWriter<ExprWriter> {
      * 实例化），查不到（跨模块类）退回 {@code ClassMeta.methodSymbol} 公式——
      * 与 FuncWriter 函数定义符号一致。
      */
-    private String methodSymbolOf(ClassDefinition owner, Identifier name) {
-        var meta = context.table.classMetas.tryGet(owner.symbol());
+    private String methodSymbolOf(ClassDefinition owner,
+                                  DerivedType dt, Identifier name) {
+        var concrete = (ClassDefinition) concreteClassDef(dt, owner);
+        var meta = context.table.classMetas.tryGet(concrete.symbol());
         if (meta.has()) {
             var mf = meta.get().methods().tryGet(name);
             if (mf.has()) return mf.get().symbol();
         }
-        return ClassMeta.methodSymbol(owner, name);
+        return ClassMeta.methodSymbol(concrete, name);
     }
 
     /**

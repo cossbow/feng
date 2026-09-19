@@ -1,0 +1,23 @@
+
+class A`E` final {
+    var e E;
+    func run() {}
+}
+
+class B`R` final {
+    var a A`R`;
+    func get() {
+        var a A`R`;
+        a.run();
+    }
+}
+
+func foo`T`() {
+    var a A`T`;
+    a.run();
+}
+
+func main() {
+    var b B`A`int``;
+    b.get();
+}
