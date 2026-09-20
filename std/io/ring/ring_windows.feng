@@ -1,0 +1,162 @@
+// ===== std$io$ring — Windows ioring 实现（占位） =====
+//
+// 本文件与 ring_linux.feng 构成 ring 模块的平台二选一：
+// 两者导出同名类 Uring 与相同方法签名（submit/pollOnce、
+// newUring、sqeNop、OP_*），由 feng.cfg 白名单按平台编译其中一个，
+// 公共层（std$io 的 proactor 等）无需感知平台差异。
+//
+// 当前为接口占位：方法签名与 ring_linux.feng 完全一致，保证平台间
+// 编译契约对齐；实现尚未接入（Windows 底层可选 IoRing / IOCP，待写）。
+// newUring 直接抛异常，运行时不可用。
+
+import std$error;
+import std$io$handle handle;
+import std$io$mm mm;
+
+// —— 操作码（与 ring_linux.feng 值对齐，作为跨平台操作码抽象）——
+export const OP_NOP int32 = 0;
+export const OP_TIMEOUT int32 = 11;
+export const OP_ACCEPT int32 = 13;
+export const OP_CONNECT int32 = 16;
+export const OP_READ int32 = 22;
+export const OP_WRITE int32 = 23;
+
+// ===== Uring =====
+
+@Sync
+export
+class Uring {
+    const h *handle$Handle;   // 与 ring_linux.feng 成员对齐：fd 由 Handle 管理，纯自动关闭
+    const sqRing *mm$MMap;    // 占位：与 ring_linux.feng 成员对齐（mm 模块类型）
+    const cqRing *mm$MMap;
+    const sqes *mm$MMap;
+    const sqTailOff uint64;
+    const sqMaskOff uint64;
+    const sqArrayOff uint64;
+    const sqEntries int;
+    const cqHeadOff uint64;
+    const cqTailOff uint64;
+    const cqMaskOff uint64;
+    const cqCqesOff uint64;
+    const cqEntries int;
+
+    // TODO(windows): 解析 SQE 并翻译成 IoRing / IOCP 操作；当前未实现
+    export
+    func submit(sqe [64]byte) int {
+        return -1;
+    }
+
+    // TODO(windows): 从完成队列收割事件；当前未实现
+    export
+    func pollOnce(timeoutMs int) (bool, uint64, int) {
+        return (false, 0, 0);
+    }
+}
+
+// ===== 工厂与 SQE 组装 =====
+
+// TODO(windows): 创建 ring 实例；当前未实现
+export
+func newUring(n int) *Uring {
+    throw new(error$IllegalStateException);
+}
+
+// 组装一个 NOP SQE（opcode=0，纯数据构造，与平台无关）
+export
+func sqeNop(userData uint64) [64]byte {
+    var sqe [64]byte;
+    sqe[0] = 0;                    // opcode = NOP
+    var b [8]byte;                 // user_data u64@32（小端）
+    b[0] = byte(userData & 0xFF);
+    b[1] = byte((userData >> 8) & 0xFF);
+    b[2] = byte((userData >> 16) & 0xFF);
+    b[3] = byte((userData >> 24) & 0xFF);
+    b[4] = byte((userData >> 32) & 0xFF);
+    b[5] = byte((userData >> 40) & 0xFF);
+    b[6] = byte((userData >> 48) & 0xFF);
+    b[7] = byte((userData >> 56) & 0xFF);
+    var i = 0;
+    for (i < 8) {
+        sqe[32 + i] = b[i];
+        i += 1;
+    }
+    return sqe;
+}
+
+// ===== SQE 组装（与 ring_linux.feng 同签名；占位：纯数据构造，接口对齐） =====
+
+func _w32(b [&]byte, off int, v uint32) {
+    b[off] = byte(v & 0xFF);
+    b[off+1] = byte((v >> 8) & 0xFF);
+    b[off+2] = byte((v >> 16) & 0xFF);
+    b[off+3] = byte((v >> 24) & 0xFF);
+}
+
+func _w64(b [&]byte, off int, v uint64) {
+    b[off] = byte(v & 0xFF);
+    b[off+1] = byte((v >> 8) & 0xFF);
+    b[off+2] = byte((v >> 16) & 0xFF);
+    b[off+3] = byte((v >> 24) & 0xFF);
+    b[off+4] = byte((v >> 32) & 0xFF);
+    b[off+5] = byte((v >> 40) & 0xFF);
+    b[off+6] = byte((v >> 48) & 0xFF);
+    b[off+7] = byte((v >> 56) & 0xFF);
+}
+
+export
+func sqeRead(fd int, addr uint64, len uint32, off uint64, userData uint64) [64]byte {
+    var sqe [64]byte;
+    sqe[0] = byte(OP_READ);
+    _w32(sqe, 4, uint32(fd));
+    _w64(sqe, 8, off);
+    _w64(sqe, 16, addr);
+    _w32(sqe, 24, len);
+    _w64(sqe, 32, userData);
+    return sqe;
+}
+
+export
+func sqeWrite(fd int, addr uint64, len uint32, off uint64, userData uint64) [64]byte {
+    var sqe [64]byte;
+    sqe[0] = byte(OP_WRITE);
+    _w32(sqe, 4, uint32(fd));
+    _w64(sqe, 8, off);
+    _w64(sqe, 16, addr);
+    _w32(sqe, 24, len);
+    _w64(sqe, 32, userData);
+    return sqe;
+}
+
+export
+func sqeAccept(fd int, addr uint64, addrLen uint64, flags uint32, userData uint64) [64]byte {
+    var sqe [64]byte;
+    sqe[0] = byte(OP_ACCEPT);
+    _w32(sqe, 4, uint32(fd));
+    _w64(sqe, 8, addrLen);
+    _w64(sqe, 16, addr);
+    _w32(sqe, 28, flags);
+    _w64(sqe, 32, userData);
+    return sqe;
+}
+
+export
+func sqeConnect(fd int, addr uint64, addrLen uint32, userData uint64) [64]byte {
+    var sqe [64]byte;
+    sqe[0] = byte(OP_CONNECT);
+    _w32(sqe, 4, uint32(fd));
+    _w64(sqe, 16, addr);
+    _w32(sqe, 24, addrLen);
+    _w64(sqe, 32, userData);
+    return sqe;
+}
+
+export
+func sqeTimeout(tsAddr uint64, userData uint64) [64]byte {
+    var sqe [64]byte;
+    sqe[0] = byte(OP_TIMEOUT);
+    _w32(sqe, 4, uint32(-1));
+    _w64(sqe, 16, tsAddr);
+    _w32(sqe, 24, 1);   // len = 1（内核强制）
+    _w64(sqe, 32, userData);
+    return sqe;
+}

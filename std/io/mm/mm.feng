@@ -1,0 +1,86 @@
+// ===== std$io$mm — memory mapping & memory primitives =====
+//
+// MMap 封装操作系统内存映射：
+//   mmapAnon(len)        —— 匿名私有映射（内存池 / 大 buffer）
+//   mmapFd(fd, len, off) —— 文件/设备共享映射 MAP_SHARED（io_uring ring 等）
+//
+// MMap 是 @resource：引用计数归零时自动 munmap，底层内存由语言
+// 自动管理，无需手动释放。
+
+import std$error;
+// 加载平台实现（mm_platform.c 提供 io_* 符号），模块本身只含注释头
+import std$io$mm$platform;
+
+export
+class MMap {
+    const ptr uint64;   // 映射基址（进程地址空间）
+    const len uint64;   // 映射长度（字节）
+
+    macro resource free() {
+        platform$io_munmap(ptr, len);
+    }
+
+    // 拷贝映射区 [offset, offset+n) 到 dst，返回实际拷贝字节数
+    export
+    func read(dst [&]byte, offset uint64) int {
+        var n = _remaining(offset);
+        if (n <= 0) { return 0; }
+        if (uint64(dst.length) < uint64(n)) { n = dst.length; }
+        platform$io_memcpy(dst.values, ptr + offset, uint64(n));
+        return n;
+    }
+
+    // 从 src 拷贝到映射区 [offset, offset+n)，返回实际拷贝字节数
+    export
+    func write(src [&#]byte, offset uint64) int {
+        var n = _remaining(offset);
+        if (n <= 0) { return 0; }
+        if (uint64(src.length) < uint64(n)) { n = src.length; }
+        platform$io_memcpy(ptr + offset, src.values, uint64(n));
+        return n;
+    }
+
+    // 映射区内从 offset 起剩余可访问字节数（offset 越界返回 0）
+    func _remaining(offset uint64) int {
+        if (offset >= len) { return 0; }
+        return int(len - offset);
+    }
+
+    export
+    func address() uint64 {
+        return ptr;
+    }
+
+    export
+    func size() uint64 {
+        return len;
+    }
+}
+
+// 匿名私有映射（失败抛 IllegalStateException）
+export
+func mmapAnon(len uint64) *MMap {
+    var p = platform$io_mmap_anon(len);
+    if (p == 0) { throw new(error$IllegalStateException); }
+    return new(MMap, {ptr=p, len=len});
+}
+
+// 文件/设备共享映射 MAP_SHARED（失败抛 IllegalStateException）
+export
+func mmapFd(fd int, len uint64, offset uint64) *MMap {
+    var p = platform$io_mmap_fd(int32(fd), len, offset);
+    if (p == 0) { throw new(error$IllegalStateException); }
+    return new(MMap, {ptr=p, len=len});
+}
+
+// 系统页面大小（字节）
+export
+func pageSize() uint64 {
+    return platform$io_page_size();
+}
+
+// 通用内存拷贝（调用方保证 dst/src 可访问长度 ≥ n）
+export
+func memCopy(dst [&]byte, src [&#]byte, n uint64) {
+    platform$io_memcpy(dst.values, src.values, n);
+}

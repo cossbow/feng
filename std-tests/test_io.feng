@@ -1,0 +1,268 @@
+import std$testing;
+import std$io$mm;
+import std$io$ring;
+import std$io$handle handle;
+import std$io;
+
+// ===== std$io$mm: pageSize =====
+
+@Test
+func testPageSize() {
+    var ps = mm$pageSize();
+    testing$assertTrue(ps >= 4096);
+    testing$assertTrue(ps % 4096 == 0);
+}
+
+// ===== MMap: anonymous mapping =====
+
+@Test
+func testMmapAnon() {
+    var m = mm$mmapAnon(4096);
+    testing$assertTrue(m != nil);
+    testing$assertTrue(m.address() != 0);
+    testing$assertTrue(m.size() == 4096);
+
+    // write then read back
+    var data [8]byte = [65, 66, 67, 68, 69, 70, 71, 72];
+    var n = m.write(data, 0);
+    testing$assertTrue(n == 8);
+
+    var buf [8]byte;
+    n = m.read(buf, 0);
+    testing$assertTrue(n == 8);
+    testing$assertTrue(buf[0] == 65);
+    testing$assertTrue(buf[7] == 72);
+}
+
+@Test
+func testMmapAnonOffset() {
+    var m = mm$mmapAnon(4096);
+
+    // write at offset
+    var data [4]byte = [1, 2, 3, 4];
+    var n = m.write(data, 100);
+    testing$assertTrue(n == 4);
+
+    // read back at same offset
+    var buf [4]byte;
+    n = m.read(buf, 100);
+    testing$assertTrue(n == 4);
+    testing$assertTrue(buf[0] == 1);
+    testing$assertTrue(buf[3] == 4);
+
+    // untouched area stays zero
+    var z [1]byte;
+    n = m.read(z, 0);
+    testing$assertTrue(n == 1);
+    testing$assertTrue(z[0] == 0);
+}
+
+@Test
+func testMmapAnonBoundary() {
+    var m = mm$mmapAnon(4096);
+
+    // read that spans the end of the mapping is truncated
+    var buf [10]byte;
+    var n = m.read(buf, 4090);
+    testing$assertTrue(n == 6);
+
+    // offset at/past end returns 0
+    n = m.read(buf, 4096);
+    testing$assertTrue(n == 0);
+    n = m.read(buf, 5000);
+    testing$assertTrue(n == 0);
+
+    // write past end is truncated too
+    var data [10]byte;
+    n = m.write(data, 4090);
+    testing$assertTrue(n == 6);
+}
+
+@Test
+func testMmapAnonBig() {
+    // 1 MiB mapping, exercise a page boundary far from offset 0
+    var m = mm$mmapAnon(uint64(1 << 20));
+    testing$assertTrue(m.size() == 1048576);
+
+    var data [64]byte;
+    for (var i = 0; i < 64; i += 1) { data[i] = byte(i); }
+    var n = m.write(data, uint64(4096 * 100));
+    testing$assertTrue(n == 64);
+
+    var buf [64]byte;
+    n = m.read(buf, uint64(4096 * 100));
+    testing$assertTrue(n == 64);
+    testing$assertTrue(buf[63] == 63);
+}
+
+// ===== memCopy =====
+
+@Test
+func testMemCopy() {
+    var src [4]byte = [9, 8, 7, 6];
+    var dst [4]byte;
+    mm$memCopy(dst, src, 4);
+    testing$assertTrue(dst[0] == 9);
+    testing$assertTrue(dst[3] == 6);
+}
+
+// ===== io_uring: Uring NOP round-trip =====
+
+@Test
+func testUringNop() {
+    var ring = ring$newUring(8);
+    testing$assertTrue(ring != nil);
+
+    var sqe = ring$sqeNop(0x12345678);
+    var r = ring.submit(sqe);
+    testing$assertTrue(r == 0);
+
+    var pr = ring.pollOnce(1000);
+    var ok = pr.0;
+    var userData = pr.1;
+    var res = pr.2;
+    testing$assertTrue(ok);
+    testing$assertTrue(userData == 0x12345678);
+    testing$assertTrue(res == 0);
+}
+
+// ===== Handle: fd 封装 =====
+
+@Test
+func testHandlePipe() {
+    var pr = handle$newPipe();
+    var rd = pr.0;
+    var wr = pr.1;
+    if (rd == nil || wr == nil) {
+        testing$assertTrue(false);
+        return;
+    }
+    testing$assertTrue(rd.fd() != wr.fd());
+    rd.close();
+    wr.close();
+    // close 幂等：重复关闭不报错、不误杀后续 fd
+    rd.close();
+    wr.close();
+}
+
+@Test
+func testHandleSocketpair() {
+    var pr = handle$newSocketpair();
+    var a = pr.0;
+    var b = pr.1;
+    if (a == nil || b == nil) {
+        testing$assertTrue(false);
+        return;
+    }
+    testing$assertTrue(a.fd() != b.fd());
+    a.close();
+    b.close();
+}
+
+// ===== Proactor: 超时 =====
+
+@Test
+func testProactorTimeout() {
+    var ring = ring$newUring(8);
+    var pro = io$newProactor(ring);
+    testing$assertTrue(pro != nil);
+
+    var token = pro.submitTimeout(int32(80));   // 80ms 后触发
+
+    var events [1]io$Completion;
+    var nReady = pro.poll(events, int32(2000)); // 至多等 2s
+    testing$assertTrue(nReady == 1);
+    testing$assertTrue(events[0].op == io$PRO_TIMEOUT);
+    testing$assertTrue(events[0].token == token);
+}
+
+// ===== Proactor: 管道异步读写往返 =====
+
+@Test
+func testProactorPipe() {
+    var pr = handle$newPipe();
+    var rd = pr.0;
+    var wr = pr.1;
+    if (rd == nil || wr == nil) {
+        testing$assertTrue(false);
+        return;
+    }
+
+    var ring = ring$newUring(8);
+    var pro = io$newProactor(ring);
+    testing$assertTrue(pro != nil);
+
+    var events [4]io$Completion;
+
+    // 写端异步写 8 字节
+    var data [8]byte = [72, 73, 74, 75, 76, 77, 78, 79];
+    var wToken = pro.submitWrite(wr, data.values, 8);
+    testing$assertTrue(wToken != 0);
+    var n = pro.poll(events, int32(2000));
+    testing$assertTrue(n >= 1);
+    testing$assertTrue(events[0].op == io$PRO_WRITE);
+    testing$assertTrue(events[0].token == wToken);
+    testing$assertTrue(events[0].result == 8);
+
+    // 读端异步读回
+    var rbuf [8]byte;
+    var rToken = pro.submitRead(rd, rbuf.values, 8);
+    testing$assertTrue(rToken != 0);
+    n = pro.poll(events, int32(2000));
+    testing$assertTrue(n >= 1);
+    testing$assertTrue(events[0].op == io$PRO_READ);
+    testing$assertTrue(events[0].token == rToken);
+    testing$assertTrue(events[0].result == 8);
+    testing$assertTrue(rbuf[0] == 72 && rbuf[7] == 79);
+
+    rd.close();
+    wr.close();
+}
+
+// ===== Proactor: socketpair echo（并发提交写+读，验证 token 分发） =====
+
+@Test
+func testProactorSocketpairEcho() {
+    var pr = handle$newSocketpair();
+    var a = pr.0;
+    var b = pr.1;
+    if (a == nil || b == nil) {
+        testing$assertTrue(false);
+        return;
+    }
+
+    var ring = ring$newUring(8);
+    var pro = io$newProactor(ring);
+    testing$assertTrue(pro != nil);
+
+    var msg [5]byte = [87, 111, 114, 108, 100];   // "World"
+    var rbuf [8]byte;
+
+    // 并发提交：a 写 + b 读（两个 SQE 同批入队）
+    var wToken = pro.submitWrite(a, msg.values, 5);
+    var rToken = pro.submitRead(b, rbuf.values, 8);
+    testing$assertTrue(wToken != 0);
+    testing$assertTrue(rToken != 0);
+
+    var events [4]io$Completion;
+    var gotWrite = false;
+    var gotRead = false;
+    for (var i = 0; i < 4; i += 1) {
+        var n = pro.poll(events, int32(2000));
+        if (n == 0) { break; }
+        for (var j = 0; j < n; j += 1) {
+            var ev = events[j];
+            if (ev.token == wToken && ev.op == io$PRO_WRITE) { gotWrite = true; }
+            if (ev.token == rToken && ev.op == io$PRO_READ && ev.result == 5) {
+                gotRead = true;
+            }
+        }
+        if (gotWrite && gotRead) { break; }
+    }
+    testing$assertTrue(gotWrite);
+    testing$assertTrue(gotRead);
+    testing$assertTrue(rbuf[0] == 87 && rbuf[4] == 100);
+
+    a.close();
+    b.close();
+}

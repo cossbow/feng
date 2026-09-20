@@ -1,0 +1,293 @@
+// ===== std$io$ring — Linux io_uring 实现 =====
+//
+// 本文件与 ring_windows.feng 构成 ring 模块的平台二选一：
+// 两者导出同名类 Uring 与相同方法签名（submit/pollOnce、
+// newUring、sqeNop、OP_*），由 feng.cfg 白名单按平台编译其中一个，
+// 公共层（std$io 的 proactor 等）无需感知平台差异。
+//
+// Linux 实现：Uring 封装 io_uring 实例 = setup + mmap 三个 ring 区域
+// + SQE 提交 + CQE 收割。内核 UAPI 布局（io_uring_params 120B /
+// SQE 64B / CQE 16B）按字节复刻，ring 内存通过 std$io$mm 的 mmapFd
+// （MAP_SHARED）映射；C 层只保留 syscall shim（见 linux/io_platform.c）。
+
+import std$error;
+import std$io$ring$linux;
+import std$io$mm mm;
+import std$io$handle handle;
+
+// —— io_uring opcode（UAPI 常量，见内核 io_uring.h）——
+export const OP_NOP int32 = 0;
+export const OP_TIMEOUT int32 = 11;
+export const OP_ACCEPT int32 = 13;
+export const OP_CONNECT int32 = 16;
+export const OP_READ int32 = 22;
+export const OP_WRITE int32 = 23;
+
+// —— ring mmap 偏移（IORING_OFF_*）——
+const OFF_SQ_RING uint64 = 0;
+const OFF_CQ_RING uint64 = 0x8000000;
+const OFF_SQES uint64 = 0x10000000;
+
+// —— io_uring_enter flags ——
+const ENTER_GETEVENTS uint32 = 1;
+const ENTER_EXT_ARG uint32 = 8;
+
+// ===== 小端字节序辅助 =====
+
+func _bytes32At(b [&#]byte, off int) uint32 {
+    return uint32(b[off]) | (uint32(b[off+1]) << 8) |
+           (uint32(b[off+2]) << 16) | (uint32(b[off+3]) << 24);
+}
+
+func _toBytes32(v uint32) [4]byte {
+    var b [4]byte;
+    b[0] = byte(v & 0xFF);
+    b[1] = byte((v >> 8) & 0xFF);
+    b[2] = byte((v >> 16) & 0xFF);
+    b[3] = byte((v >> 24) & 0xFF);
+    return b;
+}
+
+func _write32(b [&]byte, off int, v uint32) {
+    b[off] = byte(v & 0xFF);
+    b[off+1] = byte((v >> 8) & 0xFF);
+    b[off+2] = byte((v >> 16) & 0xFF);
+    b[off+3] = byte((v >> 24) & 0xFF);
+}
+
+func _bytes64At(b [&#]byte, off int) uint64 {
+    return uint64(b[off]) | (uint64(b[off+1]) << 8) |
+           (uint64(b[off+2]) << 16) | (uint64(b[off+3]) << 24) |
+           (uint64(b[off+4]) << 32) | (uint64(b[off+5]) << 40) |
+           (uint64(b[off+6]) << 48) | (uint64(b[off+7]) << 56);
+}
+
+func _write64(b [&]byte, off int, v uint64) {
+    b[off] = byte(v & 0xFF);
+    b[off+1] = byte((v >> 8) & 0xFF);
+    b[off+2] = byte((v >> 16) & 0xFF);
+    b[off+3] = byte((v >> 24) & 0xFF);
+    b[off+4] = byte((v >> 32) & 0xFF);
+    b[off+5] = byte((v >> 40) & 0xFF);
+    b[off+6] = byte((v >> 48) & 0xFF);
+    b[off+7] = byte((v >> 56) & 0xFF);
+}
+
+// 从 MMap 映射区读 uint32（小端）
+func _rd32(m *mm$MMap, off uint64) uint32 {
+    var b [4]byte;
+    var n = m.read(b, off);
+    if (n < 4) { return 0; }
+    return _bytes32At(b, 0);
+}
+
+// ===== Uring =====
+
+@Sync
+export
+class Uring {
+    const h *handle$Handle;   // fd 由 Handle 管理：RC 归零自动 close，生命周期与 fd 一致
+    const sqRing *mm$MMap;    // SQ ring（head/tail/ring_mask/array）
+    const cqRing *mm$MMap;    // CQ ring（head/tail/ring_mask/cqes）
+    const sqes *mm$MMap;      // SQE 数组
+    const sqTailOff uint64;
+    const sqMaskOff uint64;
+    const sqArrayOff uint64;
+    const sqEntries int;
+    const cqHeadOff uint64;
+    const cqTailOff uint64;
+    const cqMaskOff uint64;
+    const cqCqesOff uint64;
+    const cqEntries int;
+
+    // 提交一个 SQE 到内核（不等待完成）；成功返回 0，失败返回 -1
+    export
+    func submit(sqe [64]byte) int {
+        var tail = _rd32(sqRing, sqTailOff);
+        var mask = _rd32(sqRing, sqMaskOff);
+        var index = int(tail & mask);
+        // 1) 写 SQE → sqes[index*64]
+        var n = sqes.write(sqe, uint64(index) * 64);
+        if (n < 64) { return -1; }
+        // 2) 写 sq_array[index] = index
+        var idx [4]byte = _toBytes32(uint32(index));
+        n = sqRing.write(idx, sqArrayOff + uint64(index) * 4);
+        if (n < 4) { return -1; }
+        // 3) 更新 sq_tail（先写 SQE/array 再更新 tail；enter 的 syscall 自带全屏障）
+        var nt [4]byte = _toBytes32(tail + 1);
+        n = sqRing.write(nt, sqTailOff);
+        if (n < 4) { return -1; }
+        // 4) 通知内核提交 1 个 SQE
+        var r = linux$io_uring_enter(int32(h.fd()), uint32(1), uint32(0), uint32(0),
+                               uint64(0), uint64(0));
+        if (r < 0) { return -1; }
+        return 0;
+    }
+
+    // 收割一个完成事件。timeoutMs: <0 阻塞等待；=0 非阻塞；>0 带超时（ms）。
+    // 返回 (完成?, userData, res)
+    export
+    func pollOnce(timeoutMs int) (bool, uint64, int) {
+        var head = _rd32(cqRing, cqHeadOff);
+        var tail = _rd32(cqRing, cqTailOff);
+        if (head == tail) {
+            if (timeoutMs == 0) { return (false, 0, 0); }  // 非阻塞：无事件立即返回
+            // 无就绪事件 → enter 等待
+            var flags uint32 = ENTER_GETEVENTS;
+            var argp uint64 = uint64(0);
+            var argsz uint64 = uint64(0);
+            if (timeoutMs > 0) {
+                flags = uint32(ENTER_GETEVENTS | ENTER_EXT_ARG);
+                var ts [16]byte;      // struct timespec { time_t tv_sec; long tv_nsec; }
+                _write64(ts, 0, uint64(timeoutMs / 1000));
+                _write64(ts, 8, uint64(timeoutMs % 1000) * 1000000);
+                var arg [24]byte;     // struct io_uring_getevents_arg
+                _write64(arg, 16, ts.values);   // .ts 指向 timespec
+                argp = arg.values;
+                argsz = 24;
+            }
+            var r = linux$io_uring_enter(int32(h.fd()), uint32(0), uint32(1),
+                                   flags, argp, argsz);
+            if (r < 0) { return (false, 0, 0); }
+            tail = _rd32(cqRing, cqTailOff);
+        }
+        if (head == tail) { return (false, 0, 0); }  // 超时未就绪
+        var mask = _rd32(cqRing, cqMaskOff);
+        var index = int(head & mask);
+        var cqe [16]byte;
+        var n = cqRing.read(cqe, cqCqesOff + uint64(index) * 16);
+        if (n < 16) { return (false, 0, 0); }
+        var userData = _bytes64At(cqe, 0);      // CQE.user_data u64@0
+        var res = int(_bytes32At(cqe, 8));      // CQE.res i32@8
+        // 消费：更新 cq_head
+        var nh [4]byte = _toBytes32(head + 1);
+        cqRing.write(nh, cqHeadOff);
+        return (true, userData, res);
+    }
+}
+
+// ===== 工厂与 SQE 组装 =====
+
+export
+func newUring(n int) *Uring {
+    var entries = n;
+    if (entries <= 0) { entries = 8; }
+    var params [120]byte;
+    var fd = linux$io_uring_setup(uint32(entries), params.values);
+    if (fd < 0) { throw new(error$IllegalStateException); }
+    var h = handle$handleFromFd(int(fd));
+
+    // 解析 io_uring_params：sq_entries@0, cq_entries@4, sq_off@40, cq_off@80
+    var sqEntries = int(_bytes32At(params, 0));
+    var cqEntries = int(_bytes32At(params, 4));
+    var sqTailOff = uint64(_bytes32At(params, 44));
+    var sqMaskOff = uint64(_bytes32At(params, 48));
+    var sqArrayOff = uint64(_bytes32At(params, 64));
+    var cqHeadOff = uint64(_bytes32At(params, 80));
+    var cqTailOff = uint64(_bytes32At(params, 84));
+    var cqMaskOff = uint64(_bytes32At(params, 88));
+    var cqCqesOff = uint64(_bytes32At(params, 100));
+
+    // ring 内存大小（liburing 算法）+ 页对齐
+    var ps = mm$pageSize();
+    var sqSize = sqArrayOff + uint64(sqEntries) * 4;
+    var cqSize = cqCqesOff + uint64(cqEntries) * 16;
+    var ringSize = (sqSize + cqSize + ps - 1) / ps * ps;
+    var sqesSize = uint64(sqEntries) * 64;
+
+    var sqRing = mm$mmapFd(int(fd), ringSize, OFF_SQ_RING);
+    var cqRing = mm$mmapFd(int(fd), ringSize, OFF_CQ_RING);
+    var sqes = mm$mmapFd(int(fd), sqesSize, OFF_SQES);
+
+    return new(Uring, {h=h, sqRing=sqRing, cqRing=cqRing, sqes=sqes,
+        sqTailOff=sqTailOff, sqMaskOff=sqMaskOff, sqArrayOff=sqArrayOff,
+        sqEntries=sqEntries, cqHeadOff=cqHeadOff, cqTailOff=cqTailOff,
+        cqMaskOff=cqMaskOff, cqCqesOff=cqCqesOff, cqEntries=cqEntries});
+}
+
+// 组装一个 NOP SQE（opcode=0，仅测试/探活用）
+export
+func sqeNop(userData uint64) [64]byte {
+    var sqe [64]byte;
+    sqe[0] = 0;                    // opcode = NOP
+    _write64(sqe, 32, userData);   // user_data u64@32
+    return sqe;
+}
+
+// ===== SQE 组装：READ / WRITE / ACCEPT / CONNECT / TIMEOUT =====
+//
+// 公共布局（64 字节）：opcode@0, fd@4, off@8, addr@16, len@24,
+// op_flags@28（accept=accept_flags / timeout=timeout_flags）, user_data@32。
+// 各 op 特殊约定：
+//   ACCEPT : off@8(addr2) 放 socklen_t* 指针，len=0，flags 放 @28
+//   CONNECT: len 放 sockaddr 长度值（非指针）
+//   TIMEOUT: addr 指向稳定 struct __kernel_timespec（须存活到 CQE 返回），
+//            len 恒 1（内核强制），off=0（纯超时，到期 res=-ETIME）
+
+// READ：addr = 缓冲区指针，off = 文件偏移（socket/pipe 填 0）
+export
+func sqeRead(fd int, addr uint64, len uint32, off uint64, userData uint64) [64]byte {
+    var sqe [64]byte;
+    sqe[0] = byte(OP_READ);
+    _write32(sqe, 4, uint32(fd));
+    _write64(sqe, 8, off);
+    _write64(sqe, 16, addr);
+    _write32(sqe, 24, len);
+    _write64(sqe, 32, userData);
+    return sqe;
+}
+
+// WRITE：addr = 缓冲区指针，off = 文件偏移（socket/pipe 填 0）
+export
+func sqeWrite(fd int, addr uint64, len uint32, off uint64, userData uint64) [64]byte {
+    var sqe [64]byte;
+    sqe[0] = byte(OP_WRITE);
+    _write32(sqe, 4, uint32(fd));
+    _write64(sqe, 8, off);
+    _write64(sqe, 16, addr);
+    _write32(sqe, 24, len);
+    _write64(sqe, 32, userData);
+    return sqe;
+}
+
+// ACCEPT：fd = 监听 fd，addr = sockaddr 缓冲区指针，addrLen = socklen_t* 指针，
+// flags = accept flags（SOCK_CLOEXEC 等，通常 0）
+export
+func sqeAccept(fd int, addr uint64, addrLen uint64, flags uint32, userData uint64) [64]byte {
+    var sqe [64]byte;
+    sqe[0] = byte(OP_ACCEPT);
+    _write32(sqe, 4, uint32(fd));
+    _write64(sqe, 8, addrLen);     // off/addr2 = socklen_t* 指针
+    _write64(sqe, 16, addr);       // addr = sockaddr*
+    _write32(sqe, 24, 0);          // len = 0
+    _write32(sqe, 28, flags);      // accept_flags
+    _write64(sqe, 32, userData);
+    return sqe;
+}
+
+// CONNECT：fd = 未连接 socket，addr = sockaddr_in 缓冲区指针，addrLen = 长度值
+export
+func sqeConnect(fd int, addr uint64, addrLen uint32, userData uint64) [64]byte {
+    var sqe [64]byte;
+    sqe[0] = byte(OP_CONNECT);
+    _write32(sqe, 4, uint32(fd));
+    _write64(sqe, 16, addr);       // addr = sockaddr*
+    _write32(sqe, 24, addrLen);    // len = sockaddr 长度值
+    _write64(sqe, 32, userData);
+    return sqe;
+}
+
+// TIMEOUT：tsAddr 指向稳定 timespec（sec@0 / nsec@8，小端）。
+// 内核语义（io_uring.c）：sqe->len 必须为 1（否则 -EINVAL）；sqe->off=0 为
+// 纯超时（不随完成事件提前触发，仅按 timespec 到期）；到期完成结果 res=-ETIME(-110)。
+export
+func sqeTimeout(tsAddr uint64, userData uint64) [64]byte {
+    var sqe [64]byte;
+    sqe[0] = byte(OP_TIMEOUT);
+    _write32(sqe, 4, uint32(-1));  // fd = -1
+    _write64(sqe, 16, tsAddr);     // addr = timespec*
+    _write32(sqe, 24, 1);          // len = 1（内核强制）
+    _write32(sqe, 28, 0);          // timeout_flags = 0（相对超时）
+    _write64(sqe, 32, userData);
+    return sqe;
+}

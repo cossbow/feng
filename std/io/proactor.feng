@@ -1,0 +1,228 @@
+// ===== std$io$proactor — 完成通知模型（构建于 ring + handle） =====
+//
+// 完成导向（Completion-Based）：submit* 立即返回 token（0=提交失败），
+// 结果经 poll() 的完成事件异步通知——不阻塞、无事件线程（调用者驱动，
+// 只有 poll() 才推进事件循环）、核心路径零运行时分配。
+//
+// 设计：
+//   - Proactor 持 ring 强引用，纯 RC 生命周期（无 close）：
+//     pro → ring → handle → fd，引用归零自动关闭。
+//   - 每个 submit* 登记 token → (op, fd) 到 in-flight 表（_tok/_opc/_fd
+//     并行标量数组）；poll 收割 CQE 后按 token 回填 op/fd 并释放槽位。
+//   - token 单调递增（从 1 起），作为 user_data 与 CQE 关联，全局唯一。
+//   - 平台需要的临时内核结构（timespec / sockaddr / socklen_t）放在
+//     scratch 匿名映射池（mm$MMap，每 in-flight 槽位一块，地址稳定），
+//     零运行时分配、不依赖调用方缓冲区存活。
+//   - 超时用 IORING_OP_TIMEOUT（内核调度）：到期完成 res=-110（-ETIME），
+//     无需事件循环自建定时器。
+//
+// 缓冲区约定：submitRead/Write/Connect 的 addr 由调用方提供（byte 数组
+// .values 或 mm$MMap.address()），须存活到对应完成事件被 poll 收割。
+
+import std$io$ring ring;
+import std$io$mm mm;
+import std$io$handle handle;
+
+// ===== 完成事件 =====
+
+// 操作码（跨平台抽象，与具体平台 opcode 无关）
+export const PRO_READ int32 = 1;
+export const PRO_WRITE int32 = 2;
+export const PRO_ACCEPT int32 = 3;
+export const PRO_CONNECT int32 = 4;
+export const PRO_TIMEOUT int32 = 5;
+
+// 完成事件：poll 批量回填，按 token 与提交的操作关联
+export
+struct Completion {
+    token uint64;    // 与 submit* 返回值一致
+    result int32;    // >=0 成功（read/write 字节数、accept 新 fd）；<0 负 errno
+    op int32;        // PRO_* 操作码
+    fd int32;        // 操作目标 fd（timeout 为 -1）
+}
+
+// ===== 内部常量 =====
+
+const MAX_INFLIGHT int = 32;   // in-flight 槽位数（超出则 submit 返回 0）
+const SLOT_SIZE uint64 = 160;  // 每槽 scratch 大小：sockaddr[128] + socklen[4] + 余量
+
+// ===== Proactor =====
+
+@Sync
+export
+class Proactor {
+    const ring *ring$Uring;      // 强引用：RC 归零 → ring → handle → fd 自动关闭
+    const scratch *mm$MMap;      // scratch 池：每槽 160B，地址稳定，零运行时分配
+
+    var _tok [MAX_INFLIGHT]uint64;   // in-flight 表：token（0=空槽）
+    var _opc [MAX_INFLIGHT]int32;    // 对应 op（PRO_*）
+    var _fd [MAX_INFLIGHT]int32;     // 对应 fd
+    var _next uint64;                // 下一个 token（从 1 起，单调递增）
+
+    // 分配一个 in-flight 槽位并登记 (op, fd)；返回 (槽位, token)，满则 (-1, 0)
+    func _alloc(op int32, fd int) (int, uint64) {
+        for (var i = 0; i < MAX_INFLIGHT; i += 1) {
+            if (_tok[i] == 0) {
+                _next += 1;
+                var t = _next;
+                _tok[i] = t;
+                _opc[i] = op;
+                _fd[i] = int32(fd);
+                return (i, t);
+            }
+        }
+        return (-1, 0);
+    }
+
+    // 释放槽位（提交失败回滚用）
+    func _free(slot int) {
+        if (slot >= 0 && slot < MAX_INFLIGHT) {
+            _tok[slot] = 0;
+        }
+    }
+
+    // 按 token 取出并清空登记，返回 (op, fd)；未知 token 返回 (0, 0)
+    func _take(token uint64) (int32, int32) {
+        for (var i = 0; i < MAX_INFLIGHT; i += 1) {
+            if (_tok[i] == token) {
+                var op = _opc[i];
+                var fd = _fd[i];
+                _tok[i] = 0;
+                return (op, fd);
+            }
+        }
+        return (0, 0);
+    }
+
+    // 提交：组装 SQE → ring.submit；提交失败回滚槽位返回 0
+    func _submit(sqe [64]byte, slot int, token uint64) uint64 {
+        var r = ring.submit(sqe);
+        if (r != 0) {
+            _free(slot);
+            return 0;
+        }
+        return token;
+    }
+
+    // 收割完成事件（批量）。timeoutMs: <0 阻塞直到有事件；=0 非阻塞；
+    // >0 至多等 timeoutMs 毫秒收第一个，随后把已就绪的后续事件一起收割。
+    // 返回写入 out 的事件数（out 满则剩余事件留在 ring，下次 poll 再取）。
+    export
+    func poll(out [&]Completion, timeoutMs int32) int {
+        var count = 0;
+        var pr = ring.pollOnce(int(timeoutMs));
+        for (pr.0) {
+            if (count < out.length) {
+                var take = _take(pr.1);
+                out[count].token = pr.1;
+                out[count].result = int32(pr.2);
+                out[count].op = take.0;
+                out[count].fd = take.1;
+                count += 1;
+                if (count >= out.length) { break; }
+            } else {
+                _take(pr.1);   // 无空间：释放槽位，剩余事件留待下次 poll
+                break;
+            }
+            pr = ring.pollOnce(0);
+        }
+        return count;
+    }
+
+    // ===== 提交操作 =====
+
+    // 异步读：addr = 缓冲区指针（调用方保证存活），len = 字节数。
+    // 完成 result = 读到的字节数。
+    export
+    func submitRead(h *handle$Handle, addr uint64, len int) uint64 {
+        if (len < 0) { return 0; }
+        var a = _alloc(PRO_READ, h.fd());
+        if (a.0 < 0) { return 0; }
+        var sqe = ring$sqeRead(h.fd(), addr, uint32(len), 0, a.1);
+        return _submit(sqe, a.0, a.1);
+    }
+
+    // 异步写：addr = 缓冲区指针（调用方保证存活），len = 字节数。
+    // 完成 result = 写入的字节数。
+    export
+    func submitWrite(h *handle$Handle, addr uint64, len int) uint64 {
+        if (len < 0) { return 0; }
+        var a = _alloc(PRO_WRITE, h.fd());
+        if (a.0 < 0) { return 0; }
+        var sqe = ring$sqeWrite(h.fd(), addr, uint32(len), 0, a.1);
+        return _submit(sqe, a.0, a.1);
+    }
+
+    // 异步接受连接（只收 *SocketHandle）。sockaddr/socklen 缓冲由本层
+    // scratch 池提供。完成 result = 新连接 fd（<0 为负 errno）。
+    export
+    func submitAccept(h *handle$SocketHandle) uint64 {
+        var a = _alloc(PRO_ACCEPT, h.fd());
+        if (a.0 < 0) { return 0; }
+        var off = uint64(a.0) * SLOT_SIZE;
+        // 预置 socklen_t = sizeof(sockaddr_storage) = 128
+        var ln [4]byte;
+        _w32(ln, 0, 128);
+        var n = scratch.write(ln, off + 128);
+        if (n < 4) { _free(a.0); return 0; }
+        var sqe = ring$sqeAccept(h.fd(), scratch.address() + off,
+                                 scratch.address() + off + 128, 0, a.1);
+        return _submit(sqe, a.0, a.1);
+    }
+
+    // 异步连接（只收 *SocketHandle）：addr = sockaddr 缓冲区指针（调用方
+    // 保证存活），addrLen = sockaddr 长度值。完成 result = 0 表示已连接。
+    export
+    func submitConnect(h *handle$SocketHandle, addr uint64, addrLen int) uint64 {
+        if (addrLen < 0) { return 0; }
+        var a = _alloc(PRO_CONNECT, h.fd());
+        if (a.0 < 0) { return 0; }
+        var sqe = ring$sqeConnect(h.fd(), addr, uint32(addrLen), a.1);
+        return _submit(sqe, a.0, a.1);
+    }
+
+    // 异步超时（内核调度，IORING_OP_TIMEOUT）：ms 毫秒后触发
+    // PRO_TIMEOUT 完成事件（result=-110/-ETIME）。timespec 放在 scratch 池。
+    export
+    func submitTimeout(ms int32) uint64 {
+        if (ms < 0) { return 0; }
+        var a = _alloc(PRO_TIMEOUT, -1);
+        if (a.0 < 0) { return 0; }
+        var ts [16]byte;                    // struct __kernel_timespec
+        _w64(ts, 0, uint64(ms) / 1000);               // tv_sec
+        _w64(ts, 8, uint64(ms) % 1000 * 1000000);     // tv_nsec
+        var off = uint64(a.0) * SLOT_SIZE;
+        var n = scratch.write(ts, off);
+        if (n < 16) { _free(a.0); return 0; }
+        var sqe = ring$sqeTimeout(scratch.address() + off, a.1);
+        return _submit(sqe, a.0, a.1);
+    }
+}
+
+// ===== 工厂 =====
+
+export
+func newProactor(ring *ring$Uring) *Proactor {
+    var scratch = mm$mmapAnon(uint64(MAX_INFLIGHT) * SLOT_SIZE);
+    return new(Proactor, {ring = ring, scratch = scratch});
+}
+
+// ===== 小端字节序辅助 =====
+
+func _w32(b [&]byte, off int, v uint32) {
+    b[off] = byte(v & 0xFF);
+    b[off+1] = byte((v >> 8) & 0xFF);
+    b[off+2] = byte((v >> 16) & 0xFF);
+    b[off+3] = byte((v >> 24) & 0xFF);
+}
+
+func _w64(b [&]byte, off int, v uint64) {
+    b[off] = byte(v & 0xFF);
+    b[off+1] = byte((v >> 8) & 0xFF);
+    b[off+2] = byte((v >> 16) & 0xFF);
+    b[off+3] = byte((v >> 24) & 0xFF);
+    b[off+4] = byte((v >> 32) & 0xFF);
+    b[off+5] = byte((v >> 40) & 0xFF);
+    b[off+6] = byte((v >> 48) & 0xFF);
+    b[off+7] = byte((v >> 56) & 0xFF);
+}

@@ -1,0 +1,116 @@
+// ===== std$io$handle — fd 资源封装（proactor / file / socket 公共底层） =====
+//
+// Handle 只管理 fd 资源及其生命周期（@resource：RC 归零自动 close）。
+// 以子类区分 fd 类型（类型即区分，编译期防错）：
+//   FileHandle    —— 文件 fd（openFile / fileFromFd）
+//   SocketHandle  —— socket fd（newSocket / newSocketpair / socketFromFd）
+//   Handle        —— 通用 fd（pipe、io_uring ring 等既非文件也非 socket 的 fd）
+// 协变：FileHandle / SocketHandle 可作 *Handle 传给任何按 fd 通用操作的函数
+// （如 proactor 的 submitRead/Write）；而 accept/connect 只收 *SocketHandle。
+// file / socket 的阻塞读写类在此之上实现（暂缓）；
+// proactor 直接以 Handle 提交异步操作。libc 函数由同目录 handle.h 声明（真实名）。
+
+import std$error;
+
+export
+class Handle {                       // fd 资源：生命周期管理（手动 close 幂等）
+    const fd int;
+    var _closed bool;    // close 幂等标志：手动 close 与 resource free 共享
+
+    macro resource free() {
+        _closeOnce();
+    }
+
+    func _closeOnce() {
+        if (!_closed) {
+            _closed = true;
+            _closeFd(fd);
+        }
+    }
+
+    export
+    func fd() int {
+        return fd;
+    }
+
+    export
+    func close() {
+        _closeOnce();
+    }
+}
+
+// 文件 fd（openFile / fileFromFd）。与 Handle 仅类型不同：编译期区分，
+// 防止把文件 fd 传给 socket 专属操作（accept/connect 等）。
+export
+class FileHandle : Handle {
+}
+
+// socket fd（newSocket / newSocketpair / socketFromFd，accept 结果等）。
+// submitAccept / submitConnect 只收 *SocketHandle。
+export
+class SocketHandle : Handle {
+}
+
+// ===== 内部 =====
+
+func _closeFd(fd int) {
+    close(int32(fd));
+}
+
+// ===== 工厂 =====
+
+// 由已获得的 fd 包装成通用 Handle（io_uring fd / pipe 端 / 外部传入的 fd）
+export
+func handleFromFd(fd int) *Handle {
+    return new(Handle, {fd = fd});
+}
+
+// 由已获得的 socket fd 包装成 SocketHandle（accept 结果 / 外部传入的 socket fd）
+export
+func socketFromFd(fd int) *SocketHandle {
+    return new(SocketHandle, {fd = fd});
+}
+
+// 由已获得的文件 fd 包装成 FileHandle（外部传入的文件 fd）
+export
+func fileFromFd(fd int) *FileHandle {
+    return new(FileHandle, {fd = fd});
+}
+
+// 打开文件；失败返回 nil。阻塞读写类见后续（暂缓）
+export
+func openFile(path [&#]byte, flags int) *?FileHandle {
+    var buf = new([path.length + 1]byte);
+    for (var i = 0; i < path.length; i += 1) { buf[i] = path[i]; }
+    buf[path.length] = 0;
+    var fd = int(open(buf.values, int32(flags)));
+    if (fd < 0) { return nil; }
+    return new(FileHandle, {fd = fd});
+}
+
+// 创建 TCP socket；失败返回 nil
+export
+func newSocket() *?SocketHandle {
+    var fd = int(socket(2, 1, 0));   // AF_INET, SOCK_STREAM
+    if (fd < 0) { return nil; }
+    return new(SocketHandle, {fd = fd});
+}
+
+// 创建管道，返回 (读端, 写端)；失败返回 (nil, nil)
+// 注：pipe 以 int32 对写回 pipefd[2]，故用 [2]int32 承接（C int 为 32 位）
+export
+func newPipe() (*?Handle, *?Handle) {
+    var fds [2]int32;
+    var r = int(pipe(fds.values));
+    if (r < 0) { return (nil, nil); }
+    return (new(Handle, {fd = int(fds[0])}), new(Handle, {fd = int(fds[1])}));
+}
+
+// 创建已连接的 socket 对，返回 (a, b)；失败返回 (nil, nil)
+export
+func newSocketpair() (*?SocketHandle, *?SocketHandle) {
+    var fds [2]int32;
+    var r = int(socketpair(1, 1, 0, fds.values));   // AF_UNIX, SOCK_STREAM
+    if (r < 0) { return (nil, nil); }
+    return (new(SocketHandle, {fd = int(fds[0])}), new(SocketHandle, {fd = int(fds[1])}));
+}
