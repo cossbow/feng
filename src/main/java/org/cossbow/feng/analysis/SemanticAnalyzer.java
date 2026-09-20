@@ -2252,13 +2252,14 @@ public class SemanticAnalyzer {
         return as;
     }
 
-    private TypeDeclarer fromLiteral(TypeDeclarer td) {
+    private TypeDeclarer fromLiteral(TypeDeclarer td,
+                                     boolean enablePhantom) {
         if (td instanceof LiteralTypeDeclarer ltd) {
             var p = ltd.literal().compatible();
             if (p.has())
                 return p.must().declarer(td.pos());
             if (ltd.literal() instanceof StringLiteral sl) {
-                return sl.array(Optional.of(PHANTOM));
+                return sl.array(Optional.of(enablePhantom ? PHANTOM : STRONG));
             }
             if (ltd.literal() instanceof NilLiteral) {
                 return new VoidTypeDeclarer(td.pos());
@@ -2290,7 +2291,7 @@ public class SemanticAnalyzer {
             // check type
             assignable(l, t, Optional.of(g.a()), v).valid();
         } else {
-            var vt = fromLiteral(t);
+            var vt = fromLiteral(t, v.isConst());
             if (vt instanceof VoidTypeDeclarer) {
                 semantic("can't infer type from '%s': %s",
                         t, t.pos());
@@ -3997,7 +3998,7 @@ public class SemanticAnalyzer {
             List<TypeDeclarer> tArgs) {
         if (p instanceof GenericTypeDeclarer gtd) {
             tParams.add(gtd.param());
-            tArgs.add(fromLiteral(a));
+            tArgs.add(fromLiteral(a, false));
             return;
         }
         if (p instanceof TupleTypeDeclarer ptd &&
@@ -5104,7 +5105,7 @@ public class SemanticAnalyzer {
         context.enterScope();
         for (var s : e.block()) analyse(s);
         var r = optimize(e.result());
-        var t = fromLiteral(r.b());
+        var t = fromLiteral(r.b(), false);
         r.a().resultType.set(t);
         e.result(r.a());
         context.exitScope(e);
