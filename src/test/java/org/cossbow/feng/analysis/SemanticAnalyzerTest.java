@@ -5849,4 +5849,134 @@ public class SemanticAnalyzerTest {
                 "func f(){ var v = min`A`({x=1},{x=2}); }");
     }
 
+    // ===== static-if 分支收窄：分支内类型变量按条件约束代替现有约束 =====
+
+    // 收窄前提：未收窄的裸 T 无法访问成员——反例基线，证明收窄是必需的
+    @Test
+    public void testStaticIfNarrow0() {
+        var d = "class Point { export var x int; } ";
+        // 反例基线：裸 T 无成员 x，即使写 static if (T==Point) 但不访问也报错
+        checkFail(d + "func f`T`(t T) int { var q T = t; return q.x; }");
+        // 注：接口约束 T 访问接口成员是合法的（interface 域裸 T 派生 STRONG 引用），
+        // 非收窄场景，此处不作反例；收窄的成员访问反例见 testStaticIfNarrow1。
+    }
+
+    // T == Point：真分支收窄后可访问 Point 成员；假分支（T 非 Point）不可
+    @Test
+    public void testStaticIfNarrow1() {
+        var d = "class Point { export var x int; } ";
+        // 正例：真分支访问 q.x（收窄后 T:=Point）
+        checkSucc(d + "func eqMember`T`(x T) int { " +
+                "static if (T == Point) { var q T = x; return q.x; } else { return 0; } }");
+        // 反例：T 无约束时访问成员（即使分支内）——未收窄报错
+        checkFail(d + "func bad`T`(x T) int { " +
+                "static if (T == Point) { var q T = x; return q.x; } }");
+        // 反例：真分支内成员访问但条件恒 false 的 T（T:=int 时 x 不存在）
+        checkFail(d + "class Point { export var x int; } " +
+                "func bad2`T`(x T) int { " +
+                "static if (T == int) { var q T = x; return q.x; } else { return 0; } }");
+    }
+
+    // T == int：真分支收窄为原始类型（无成员可访问，仅值语义）
+    @Test
+    public void testStaticIfNarrow2() {
+        // 正例：T==int 真分支（值操作）
+        checkSucc("func eqPrim`T`(x T) int { " +
+                "static if (T == int) { var q T = x; return 1; } else { return 0; } }");
+        // 正例：T==Point 真分支访问成员（经局部变量收窄替换）+ 假分支 return 0
+        checkSucc("class Point { export var x int; } " +
+                "func eq`T`(x T) int { static if (T == Point) { var q T = x; return q.x; } else { return 0; } }");
+        // 反例：T==int 假分支访问成员（float64 无 x）
+        checkFail("class Point { export var x int; } " +
+                "func bad`T`(x T) int { static if (T == int) { return 0; } else { return x.x; } }");
+    }
+
+    // 泛型实例精确相等：T == A`int` 只收 A`int`，不收 A`float64`/B`int`/子类
+    @Test
+    public void testStaticIfNarrow3() {
+        var d = "class A`T` { export var x T; } ";
+        // 正例：T==A`int` 真分支访问 q.x（x:int）
+        checkSucc(d + "func which`T`(x T) int { " +
+                "static if (T == A`int`) { var q T = x; var r = q.x; return 1; } else { return 2; } }");
+        // 反例：T==A`float64` 真分支访问 q.x（x:float64，但此处 T 约束无 x）——
+        // 实际收窄后 x:float64 可访问，故正例；反例是 T 无约束裸访问
+        checkFail(d + "func bad`T`(x T) int { " +
+                "static if (T == A`int`) { var q T = x; var r = q.x; return 1; } }");
+    }
+
+    // T == A`S`：右侧含模板参数（同胞参数）
+    @Test
+    public void testStaticIfNarrow4() {
+        var d = "class A`T` { export var x T; } ";
+        // 正例：T==A`S` 真分支访问 q.x（x:S）
+        checkSucc(d + "func pick`T, S`(x T) int { " +
+                "static if (T == A`S`) { var q T = x; var r = q.x; return 1; } else { return 2; } }");
+    }
+
+    // T <: Point：子类型包含收窄
+    @Test
+    public void testStaticIfNarrow5() {
+        var d = "class Point { export var x int; } class Sub : Point { export var z int; } ";
+        // 正例：T<:Point 真分支访问 q.x
+        checkSucc(d + "func incl`T`(x T) int { " +
+                "static if (T <: Point) { var q T = x; return q.x; } else { return 0; } }");
+        // 反例：T<:Point 假分支访问 q.x（T:=int 无 x）
+        checkFail(d + "class Point { export var x int; } " +
+                "func bad`T`(x T) int { static if (T <: Point) { return 0; } else { var q T = x; return q.x; } }");
+    }
+
+    // 组合：! / && / || 真/假分支
+    @Test
+    public void testStaticIfNarrow6() {
+        var d = "class Point { export var x int; } ";
+        // 正例：! 取反——else 分支（T==Point）收窄访问成员
+        checkSucc(d + "func not`T`(x T) int { " +
+                "static if (!T == Point) { return 0; } else { var q T = x; return q.x; } }");
+        // 正例：&& 合取
+        checkSucc(d + "func and`T`(x T) int { " +
+                "static if (T <: Point && T == Point) { var q T = x; return q.x; } else { return 0; } }");
+        // 正例：|| 析取
+        checkSucc(d + "func or`T`(x T) int { " +
+                "static if (T == int || T == float64) { var q T = x; return 1; } else { return 2; } }");
+    }
+
+    // else 分支收窄：T:=C0&!C1
+    @Test
+    public void testStaticIfNarrow7() {
+        // 正例：T==int 假分支（T 非 int）可返回
+        checkSucc("func pick`T`(x T) int { " +
+                "static if (T == int) { return 1; } else { return 2; } }");
+        // 正例：无约束顶类型真分支直接取条件约束
+        checkSucc("class Point { export var x int; } " +
+                "func top`T`(x T) int { static if (T == Point) { var q T = x; return q.x; } else { return 0; } }");
+    }
+
+    // new(T) 收窄分支：T==C 分支内 new(T) 分配 C 实例
+    @Test
+    public void testStaticIfNarrow8() {
+        var d = "class Pt2 { export var x int; } ";
+        // 正例：T==Pt2 真分支 new(T)
+        checkSucc(d + "func mk`T`() int { " +
+                "static if (T == Pt2) { var p = new(T); p.x = 42; return p.x; } else { return 0; } }");
+        // 反例：无约束 T 直接 new(T)（约束 none → can't support new）
+        checkFail("func bad`T`() int { var p = new(T); return 0; }");
+    }
+
+    // 有约束 T（接口约束 C0）参与收窄：真分支约束 = C0 & C1，假分支 = C0 & !C1
+    @Test
+    public void testStaticIfNarrow9() {
+        var d = "interface I { run(); } ";
+        d += "class A { export var x int; func run() {} } ";
+        d += "class B { export var y int; func run() {} } ";
+        // 正例：T 带接口约束 I，真分支收窄到 A 后访问 A 成员 x
+        checkSucc(d + "func eq`T (I)`(t T) int { " +
+                "static if (T == A) { var q T = t; return q.x; } else { return 0; } }");
+        // 正例：假分支保持接口约束 I 的派生引用（t.run() 仍可调）
+        checkSucc(d + "func not`T (I)`(t T) int { " +
+                "static if (T == A) { return 1; } else { t.run(); return 2; } }");
+        // 反例：有约束 T 假分支访问 B 成员 y——T 可能非 B（还可能是其他 I 实现）
+        checkFail(d + "func bad`T (I)`(t T) int { " +
+                "static if (T == A) { return 1; } else { var q T = t; return q.y; } }");
+    }
+
 }

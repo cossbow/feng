@@ -10,6 +10,7 @@ import org.cossbow.feng.ast.attr.Attribute;
 import org.cossbow.feng.ast.attr.AttributeDefinition;
 import org.cossbow.feng.ast.attr.AttributeField;
 import org.cossbow.feng.ast.attr.Modifier;
+import org.cossbow.feng.ast.cmp.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
@@ -1419,6 +1420,62 @@ final class SourceParseVisitor
             return new BlockStatement(s.pos(), List.of(s));
         });
         return new IfStatement(posOf(ctx), init, condition, yes, not);
+    }
+
+    // static if statement
+
+    @Override
+    public Entity visitStaticStatement(FengParser.StaticStatementContext ctx) {
+        if (ctx.ifStaticStmt() != null) return visit(ctx.ifStaticStmt());
+        return visit(ctx.forStaticStmt());
+    }
+
+    @Override
+    public Entity visitIfStaticStmt(FengParser.IfStaticStmtContext ctx) {
+        var condition = (StaticExpr) visit(ctx.staticExpr());
+        var yes = (BlockStatement) visit(ctx.blockStatement(0));
+        Optional<Statement> not = Optional.empty();
+        if (ctx.ELSE() != null) {
+            not = Optional.of((Statement) (ctx.ifStaticStmt() != null
+                    ? visit(ctx.ifStaticStmt())
+                    : visit(ctx.blockStatement(1))));
+        }
+        return new StaticIfStatement(posOf(ctx), condition, yes, not);
+    }
+
+    @Override
+    public Entity visitStaticExpr(FengParser.StaticExprContext ctx) {
+        if (ctx.NOT() != null) {
+            return new NotStaticExpr(posOf(ctx),
+                    (StaticExpr) visit(ctx.staticExpr(0)));
+        }
+        if (ctx.AND() != null) {
+            return new AndStaticExpr(posOf(ctx),
+                    (StaticExpr) visit(ctx.staticExpr(0)),
+                    (StaticExpr) visit(ctx.staticExpr(1)));
+        }
+        if (ctx.OR() != null) {
+            return new OrStaticExpr(posOf(ctx),
+                    (StaticExpr) visit(ctx.staticExpr(0)),
+                    (StaticExpr) visit(ctx.staticExpr(1)));
+        }
+        return visit(ctx.typeStaticExpr());
+    }
+
+    @Override
+    public Entity visitTypeStaticExpr(FengParser.TypeStaticExprContext ctx) {
+        var l = (TypeDeclarer) visit(ctx.typeDeclarer(0));
+        if (ctx.INCLUDED() != null) {
+            return new TypeIncludedExpr(posOf(ctx), l,
+                    (TypeConstraint) visit(ctx.typeConstraint()));
+        }
+        return new TypeEqualsExpr(posOf(ctx), l,
+                (TypeDeclarer) visit(ctx.typeDeclarer(1)));
+    }
+
+    @Override
+    public Entity visitForStaticStmt(FengParser.ForStaticStmtContext ctx) {
+        return semantic("static for not support yet: %s", posOf(ctx));
     }
 
     // for statement

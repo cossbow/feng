@@ -3,6 +3,7 @@ package org.cossbow.feng.analysis.mono;
 import org.cossbow.feng.analysis.AnalyseSymbolTable;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.attr.Modifier;
+import org.cossbow.feng.ast.cmp.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.DerivedType;
@@ -102,12 +103,19 @@ public class Monomorphization {
         return owner(symbol).concreteBySymbol.containsKey(symbol);
     }
 
-    /** {@code concretized} 的取定义版本（依赖解析用）。 */
+    /**
+     * {@code concretized} 的取定义版本（依赖解析用）。
+     */
     private TypeDefinition concreteDef(Symbol symbol) {
         return owner(symbol).concreteBySymbol.get(symbol);
     }
 
     public void run() {
+        // 分析期只优化 static if 条件、保留节点；此处对非泛型函数体/类方法体/
+        // 全局变量初始化器统一裁决（mono(EMPTY) 折叠）。必须放在 discover() 之前：
+        // discover 扫描选中分支即可（与旧设计「分析期折叠后扫描」行为一致），
+        // 且后续 RelayLowering / ReleaserBuilder 等 pass 看到的都是折叠后的树。
+        foldStaticIfs();
         discover();
         discoverFuncInsts();
         concretizeTypes();
@@ -119,6 +127,226 @@ public class Monomorphization {
         // 追加进 pending——必须再排空一次，否则 Feng$Proto_<key> typedef 缺失
         // （tuple.feng 报 unknown type name 'Feng$Proto_Complex_Int'）。
         drainPending();
+    }
+
+    /**
+     * 对非泛型函数体 / main / 非泛型类方法体 / 全局变量初始化器裁决 static if
+     * （常量与泛型条件的裁决全部下放到 mono 期，分析期只优化条件）。泛型函数/类
+     * 方法体由 {@link #concretizeFuncs} / {@link #concretizeClass} 按实例裁决，
+     * 不在此列（非泛型体内无类型变量，分析期已把条件折叠成 ConstStaticExpr）。
+     * <p>
+     * 采用<b>定向就地折叠</b>：只替换 {@link StaticIfStatement} 节点（选中分支 /
+     * 移除），其余节点保持对象身份。相比整树 {@code mono(GenericMap.EMPTY)} 重建，
+     * 不丢分析期挂载的元数据——最直接的例子是 {@code IterableForStatement.replace}
+     * （RelayLowering 消费它展开 for 循环，重建即丢 → 崩溃）；且 replace 内共享
+     * 同一个 body 对象，就地折叠自动同步到 replace 语句。
+     */
+    private void foldStaticIfs() {
+        for (var fd : table.functionList) {
+            if (fd.builtin()) continue;
+            if (fd.generic().isEmpty())
+                fd.procedure().use(p -> foldBlock(p.body()));
+        }
+        table.main.use(fd -> {
+            if (fd.generic().isEmpty())
+                fd.procedure().use(p -> foldBlock(p.body()));
+        });
+        for (var cd : table.dagClasses) {
+            if (cd.generic().isEmpty()) {
+                for (var cm : cd.methods()) {
+                    cm.procedure().use(p -> foldBlock(p.body()));
+                }
+            }
+        }
+        for (var gv : table.constVars) {
+            gv.value().use(this::foldExpr);
+        }
+        for (var gv : table.dagVars) {
+            gv.value().use(this::foldExpr);
+        }
+    }
+
+    /**
+     * 就地折叠块语句列表：BlockStatement 对象身份不变，只替换 list。
+     */
+    private void foldBlock(BlockStatement bs) {
+        var nl = foldList(bs.list());
+        if (nl != bs.list()) bs.list(nl);
+    }
+
+    /**
+     * 折叠语句列表：{@code static if} 折叠成选中分支 / 移除（返回 null），
+     * 其余语句就地折叠子节点后保持身份。返回新列表（未变时返回原列表）。
+     */
+    private List<Statement> foldList(List<Statement> src) {
+        var dst = src;
+        boolean changed = false;
+        int idx = 0;
+        for (var s : src) {
+            var n = foldStmt(s);
+            if (n == s) {
+                idx++;
+                continue;
+            }
+            if (!changed) {
+                dst = new ArrayList<>(src);
+                changed = true;
+            }
+            if (n == null) {
+                dst.remove(idx);
+            } else {
+                dst.set(idx, n);
+                idx++;
+            }
+        }
+        return changed ? dst : src;
+    }
+
+    /**
+     * 定向折叠单条语句：static if 裁决（非泛型体条件必为 ConstStaticExpr），
+     * 其余语句就地折叠子节点、自身身份不变。
+     */
+    private Statement foldStmt(Statement s) {
+        if (s instanceof StaticIfStatement sis) {
+            boolean c = sis.condition().check();
+            if (c) {
+                var yes = sis.yes();
+                foldBlock(yes);
+                return yes;
+            }
+            if (sis.not().none()) return null;
+            return foldStmt(sis.not().get());
+        }
+        if (s instanceof BlockStatement bs) {
+            foldBlock(bs);
+        } else if (s instanceof IfStatement is) {
+            is.init().use(this::foldStmt);
+            foldExpr(is.condition());
+            foldBlock(is.yes());
+            is.not().use(n -> {
+                var nn = foldStmt(n);
+                if (nn != n) {
+                    is.not(nn == null ? Optional.empty() : Optional.of(nn));
+                }
+            });
+        } else if (s instanceof ForStatement fs) {
+            // 各 for 语句体都由 wrapInScope 包成 BlockStatement（就地折叠）
+            if (fs.body() instanceof BlockStatement bsb) foldBlock(bsb);
+            if (s instanceof ConditionalForStatement cfs) {
+                cfs.initializer().use(this::foldStmt);
+                foldExpr(cfs.condition());
+                cfs.updater().use(this::foldStmt);
+            } else if (s instanceof IterableForStatement ifs) {
+                foldExpr(ifs.iterable());
+            }
+        } else if (s instanceof SwitchStatement ss) {
+            ss.init().use(this::foldStmt);
+            foldExpr(ss.value());
+            for (var br : ss.branches()) {
+                for (var c : br.constants()) foldExpr(c);
+                foldBlock(br.body());
+            }
+            ss.defaultBranch().use(b -> foldBlock(b.body()));
+        } else if (s instanceof TryStatement ts) {
+            foldBlock(ts.body());
+            for (var cc : ts.catchClauses()) foldBlock(cc.body());
+            ts.finallyClause().use(this::foldBlock);
+        } else if (s instanceof CallStatement cs) {
+            foldExpr(cs.call());
+            cs.replace().use(r -> {
+                if (r instanceof BlockStatement rb) foldBlock(rb);
+                else foldStmt(r);
+            });
+        } else if (s instanceof ReturnStatement rs) {
+            rs.result().use(this::foldExpr);
+        } else if (s instanceof ThrowStatement th) {
+            foldExpr(th.exception());
+        } else if (s instanceof AssertStatement as) {
+            foldExpr(as.condition());
+        } else if (s instanceof LabeledStatement ls) {
+            var t = foldStmt(ls.target());
+            if (t != ls.target()) {
+                if (t == null) return null;
+                return new LabeledStatement(ls.pos(), ls.label(), t);
+            }
+        } else if (s instanceof Branch br) {
+            foldBlock(br.body());
+        } else if (s instanceof AssignmentsStatement as) {
+            for (int i = 0; i < as.list().size(); i++) {
+                foldExpr(as.value(i));
+            }
+        } else if (s instanceof DeclarationStatement ds) {
+            for (var v : ds.variables()) {
+                v.value().use(this::foldExpr);
+            }
+        } else if (s instanceof CatchClause cc) {
+            foldBlock(cc.body());
+        }
+        return s;
+    }
+
+    /**
+     * 就地折叠表达式中的语句容器：唯一含语句的表达式是 {@link BlockExpression}
+     * （其 block 列表折叠），其余表达式递归下沉找嵌套 BlockExpression。
+     */
+    private void foldExpr(Expression e) {
+        if (e instanceof BlockExpression be) {
+            be.block(foldList(be.block()));
+            foldExpr(be.result());
+        } else if (e instanceof CallExpression ce) {
+            foldExpr(ce.callee());
+            for (var a : ce.arguments()) foldExpr(a);
+        } else if (e instanceof NewExpression ne) {
+            ne.arg().use(this::foldExpr);
+        } else if (e instanceof MethodExpression me) {
+            foldExpr(me.subject());
+        } else if (e instanceof ObjectExpression oe) {
+            for (var val : oe.entries().values()) foldExpr(val);
+        } else if (e instanceof MemberOfExpression moe) {
+            foldExpr(moe.subject());
+        } else if (e instanceof ArrayExpression ae) {
+            for (var elem : ae.elements()) foldExpr(elem);
+        } else if (e instanceof BinaryExpression be2) {
+            foldExpr(be2.left());
+            foldExpr(be2.right());
+        } else if (e instanceof UnaryExpression ue) {
+            foldExpr(ue.operand());
+        } else if (e instanceof SliceOfExpression se) {
+            foldExpr(se.subject());
+            if (se.start() != null) foldExpr(se.start());
+            if (se.end() != null) foldExpr(se.end());
+        } else if (e instanceof ConditionalExpression cnd) {
+            foldExpr(cnd.condition());
+            foldExpr(cnd.yes());
+            foldExpr(cnd.not());
+        } else if (e instanceof ConvertExpression cvt) {
+            foldExpr(cvt.operand());
+        } else if (e instanceof DereferExpression de) {
+            foldExpr(de.subject());
+        } else if (e instanceof IndexOfExpression ioe) {
+            foldExpr(ioe.subject());
+            foldExpr(ioe.index());
+        } else if (e instanceof IsExpression ise) {
+            foldExpr(ise.subject());
+        } else if (e instanceof ParenExpression pe) {
+            foldExpr(pe.child());
+        } else if (e instanceof ReferEqualExpression ree) {
+            foldExpr(ree.left());
+            foldExpr(ree.right());
+        } else if (e instanceof TupleIndexExpression tie) {
+            foldExpr(tie.subject());
+        } else if (e instanceof TupleExpression te) {
+            for (var el : te.elements()) foldExpr(el);
+        } else if (e instanceof CheckNilExpression cne) {
+            foldExpr(cne.subject());
+        } else if (e instanceof PairsExpression pse) {
+            for (var p : pse.pairs()) {
+                foldExpr(p.key());
+                foldExpr(p.value());
+            }
+        } else if (e instanceof EnumIdExpression eie) {
+            foldExpr(eie.index());
+        }
     }
 
     /**
@@ -300,6 +528,36 @@ public class Monomorphization {
             for (int i = 0; i < as.list().size(); i++) {
                 scanExpr(as.value(i), gm);
             }
+        } else if (stmt instanceof StaticIfStatement sis) {
+            // 条件两侧类型也可能触发具体化（如 A`T` <: C）；两个分支都必须扫——
+            // 死分支对其它实例化点是活的，漏扫会缺具体化实例
+            collectStaticExpr(sis.condition(), gm);
+            scanStmt(sis.yes(), gm);
+            sis.not().use(s -> scanStmt(s, gm));
+        }
+    }
+
+    /**
+     * 收集 static if 条件里引用的类型（如 {@code A`T` <: C} 的 {@code A`T`}）——
+     * 它们可能触发具体化，漏扫会缺具体化实例。只收类型侧：约束侧（如
+     * {@code R <: Entry`K,V`} 的 {@code Entry`K,V`}）求值是模板级/结构化的
+     * （{@link org.cossbow.feng.ast.type.DefinedTypeConstraint#contains}），
+     * 不需要具体化实例；约束侧类型若被选中分支真正使用，由分支扫描收集。
+     */
+    private void collectStaticExpr(StaticExpr e, GenericMap gm) {
+        if (e instanceof TypeEqualsExpr ee) {
+            collect(ee.left(), gm);
+            collect(ee.right(), gm);
+        } else if (e instanceof TypeIncludedExpr ie) {
+            collect(ie.type(), gm);
+        } else if (e instanceof NotStaticExpr ne) {
+            collectStaticExpr(ne.expr(), gm);
+        } else if (e instanceof AndStaticExpr ae) {
+            collectStaticExpr(ae.left(), gm);
+            collectStaticExpr(ae.right(), gm);
+        } else if (e instanceof OrStaticExpr oe) {
+            collectStaticExpr(oe.left(), gm);
+            collectStaticExpr(oe.right(), gm);
         }
     }
 
@@ -439,7 +697,9 @@ public class Monomorphization {
         manager.ensureSynthetic(mods, user);
     }
 
-    /** 递归登记类型实参里涉及的跨模块泛型/元组合成模块。 */
+    /**
+     * 递归登记类型实参里涉及的跨模块泛型/元组合成模块。
+     */
     private void ensureArgModule(TypeDeclarer td) {
         if (td instanceof DerivedTypeDeclarer dtd) {
             if (!dtd.derivedType().generic().isEmpty()) {
@@ -801,7 +1061,9 @@ public class Monomorphization {
         }
     }
 
-    /** 函数类型（匿名/命名）具体化后的 PrototypeDefinition。 */
+    /**
+     * 函数类型（匿名/命名）具体化后的 PrototypeDefinition。
+     */
     private TypeDefinition funcProtoDef(FuncTypeDeclarer ftd) {
         if (ftd instanceof NamedFuncTypeDeclarer nftd) {
             var def = nftd.def().must();
@@ -1175,13 +1437,19 @@ public class Monomorphization {
             if (dep == m) continue;
             var oi = orderIndex.get(dep);
             if (oi != null) {
-                if (oi > bestPos) { bestPos = oi; best = dep; }
+                if (oi > bestPos) {
+                    bestPos = oi;
+                    best = dep;
+                }
             } else if (monos.contains(dep)) {
                 resolveAnchor(dep, orderIndex, monos, anchor, visiting);
                 var a = anchor.get(dep);
                 if (a != null) {
                     var p = orderIndex.get(a);
-                    if (p > bestPos) { bestPos = p; best = a; }
+                    if (p > bestPos) {
+                        bestPos = p;
+                        best = a;
+                    }
                 }
             }
             // 跨模块依赖 / primitive：不在本模块生成，忽略

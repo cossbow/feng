@@ -1,0 +1,212 @@
+
+// static-if 分支收窄：分支内类型变量按条件约束代替现有约束。
+//
+// 机制：条件含类型变量时，T 克隆为新 TypeParameter（保 id），收窄约束
+// （C0 & C1 真分支 / C0 & !C1 假分支）写入克隆；分支树 mono(narrowGm)
+// 重建后写回槽位，另一分支与模板声明持各自克隆互不影响。
+// 约束语义：
+//   T == X  → TypeEqualsConstraint（精确结构化相等，含泛型实例）
+//   T <: C  → DefinedTypeConstraint（子类型包含）
+//   组合    → ! / && / || 按真/假分支 De Morgan 展开
+// 本文件覆盖：成员访问、原始类型、泛型实例精确相等、同胞参数、
+// 子类型包含、new(T) 分配、else 分支、无约束顶类型。
+
+class Point {
+    export var x int;
+    export var y int;
+}
+
+// ---- 1. T == Point：真分支可访问 Point 成员 ----
+
+func eqMember`T`(x T) int {
+    static if (T == Point) {
+        var q T = x;
+        return q.x;
+    } else {
+        return 0;
+    }
+}
+
+// ---- 2. T == int：真分支收窄为原始类型 ----
+
+func eqPrim`T`(x T) int {
+    static if (T == int) {
+        var q T = x;
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+// ---- 3. 泛型实例精确相等：只收 A`int`（有成员 x），不收 A`float64`/B`int` ----
+
+class A`T` {
+    export var x T;
+}
+
+class B`T` {
+    export var y T;
+}
+
+func which`T`(x T) int {
+    static if (T == A`int`) {
+        var q T = x;
+        var r = q.x;      // 收窄后 T:=A`int`，成员 x:int 可访问
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+// ---- 4. T == A`S`：右侧含模板参数（同胞参数） ----
+
+func pickSibling`T, S`(x T) int {
+    static if (T == A`S`) {
+        var q T = x;
+        var r = q.x;      // 收窄后 T:=A`S`，成员 x:S 可访问
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+// ---- 5. T <: Point：子类型包含收窄 ----
+
+class Sub : Point {
+    export var z int;
+}
+
+func inclMember`T`(x T) int {
+    static if (T <: Point) {
+        var q T = x;
+        return q.x;
+    } else {
+        return 0;
+    }
+}
+
+// ---- 6. 组合：! / && / || ----
+
+func pickNot`T`(x T) int {
+    static if (!T == int) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+func pickAnd`T`(x T) int {
+    static if (T <: Point && T == Point) {
+        var q T = x;
+        return q.x;
+    } else {
+        return 0;
+    }
+}
+
+func pickOr`T`(x T) int {
+    static if (T == int || T == float64) {
+        var q T = x;
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+// ---- 7. else 分支收窄：T:=C0&!C1 ----
+
+func pickElse`T`(x T) int {
+    static if (T == int) {
+        return 1;
+    } else {
+        // T != int：可判定的非 int 具体类型
+        return 2;
+    }
+}
+
+// ---- 8. new(T) 收窄分支：T==Point 分支内 new(T) 分配 Point 实例 ----
+
+class Pt2 {
+    export var x int;
+    export var y int;
+}
+
+func mk`T`() int {
+    static if (T == Pt2) {
+        var p = new(T);
+        p.x = 42;
+        return p.x;
+    } else {
+        return 0;
+    }
+}
+
+// ---- 9. 无约束 T（顶约束）：真分支直接取条件约束 ----
+
+func topNarrow`T`(x T) int {
+    static if (T == Point) {
+        var q T = x;
+        return q.x;
+    } else {
+        return 0;
+    }
+}
+
+func main(args [&#][*?#]byte) {
+    // 1. T == Point
+    var p Point;
+    p.x = 7;
+    assert(eqMember`Point`(p) == 7);
+    assert(eqMember`int`(0) == 0);
+
+    // 2. T == int
+    assert(eqPrim`int`(41) == 1);
+    assert(eqPrim`float64`(1.5) == 0);
+
+    // 3. 泛型实例精确相等
+    var a A`int`;
+    a.x = 3;
+    var b A`float64`;
+    b.x = 3.5;
+    var c B`int`;
+    c.y = 9;
+    assert(which`A`int``(a) == 1);
+    assert(which`A`float64``(b) == 2);
+    assert(which`B`int``(c) == 2);
+
+    // 4. 同胞参数
+    assert(pickSibling`A`int`, int`(a) == 1);
+    assert(pickSibling`A`int`, float64`(a) == 2);
+
+    // 5. 子类型包含
+    var s Sub;
+    s.x = 9;
+    assert(inclMember`Sub`(s) == 9);
+    var pp Point;
+    pp.x = 5;
+    assert(inclMember`Point`(pp) == 5);
+
+    // 6. 组合
+    assert(pickNot`int`(3) == 2);        // !(int==int)=false → else
+    assert(pickNot`float64`(1.5) == 1);  // !(float==int)=true → yes
+    var p2 Point;
+    p2.x = 7;
+    assert(pickAnd`Point`(p2) == 7);
+    assert(pickOr`int`(3) == 1);
+    assert(pickOr`float64`(1.5) == 1);
+    assert(pickOr`Point`(p2) == 2);
+
+    // 7. else 分支
+    assert(pickElse`int`(3) == 1);
+    assert(pickElse`float64`(1.5) == 2);
+
+    // 8. new(T) 收窄
+    assert(mk`Pt2`() == 42);
+    assert(mk`int`() == 0);
+
+    // 9. 无约束顶类型
+    var tp Point;
+    tp.x = 7;
+    assert(topNarrow`Point`(tp) == 7);
+    assert(topNarrow`int`(0) == 0);
+}

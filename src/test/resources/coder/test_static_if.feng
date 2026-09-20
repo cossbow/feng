@@ -1,0 +1,214 @@
+import std$testing;
+
+// static if：编译期类型判断
+// 可判定（条件无类型变量）→ 分析期立即裁决；含类型变量 → mono 期裁决
+
+// 1. 可判定为真：选中 yes 分支
+@Test
+func testDecidableTrue() {
+    var r int = 0;
+    static if (int == int) {
+        r = 1;
+    }
+    assert(r == 1);
+}
+
+// 2. 可判定为假 + else：选中 else 分支
+@Test
+func testDecidableFalse() {
+    var r int = 0;
+    static if (int == int64) {
+        r = 1;
+    } else {
+        r = 2;
+    }
+    assert(r == 2);
+}
+
+// 3. 可判定为假无 else：整条移除
+@Test
+func testDecidableFalseNoElse() {
+    var r int = 5;
+    static if (int == int64) {
+        r = 1;
+    }
+    assert(r == 5);
+}
+
+// 4. 可判定 <: 形式
+@Test
+func testDecidableIncluded() {
+    var r int = 0;
+    static if (int <: int) {
+        r = 7;
+    } else {
+        r = 8;
+    }
+    assert(r == 7);
+    var s int = 0;
+    static if (float64 <: int) {
+        s = 7;
+    } else {
+        s = 8;
+    }
+    assert(s == 8);
+}
+
+// 5. else-if 链（可判定）
+@Test
+func testElseIfChain() {
+    var r int = 0;
+    static if (int == int64) {
+        r = 1;
+    } else if (int == float64) {
+        r = 2;
+    } else {
+        r = 3;
+    }
+    assert(r == 3);
+}
+
+// 6. 可判定死分支也必须分析：选中 else 分支，yes 分支语句不生效
+@Test
+func testDeadBranchAnalyzed() {
+    var r int = 0;
+    static if (int == int64) {
+        r = 999;
+    } else {
+        r = 5;
+    }
+    assert(r == 5);
+}
+
+// 7. 布尔组合：! / && / ||（与普通表达式同款运算符）
+@Test
+func testBoolCombos() {
+    var r int = 0;
+    static if (!int == int64 && int <: int) {
+        r = 1;
+    }
+    assert(r == 1);
+    static if (int == int64 || int == int) {
+        r = 2;
+    }
+    assert(r == 2);
+    // 假组合：!(int==int) 为假，r 保持 2
+    static if (!int == int && int == int64) {
+        r = 3;
+    }
+    assert(r == 2);
+}
+
+// 8. 泛型不可判定：mono 期裁决（T == int）
+func pick`T`(x T) int {
+    static if (T == int) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+@Test
+func testGenericEquals() {
+    assert(pick(3) == 1);        // T=int
+    assert(pick(3.5) == 2);      // T=float64
+}
+
+// 9. 泛型不可判定：mono 期裁决（T <: int）
+func kind`T`(x T) int {
+    static if (T <: int) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+@Test
+func testGenericIncluded() {
+    assert(kind(1) == 1);        // T=int
+    assert(kind(1.5) == 2);      // T=float64
+}
+
+// 10. 泛型 else-if 链
+func tier`T`(x T) int {
+    static if (T == int) {
+        return 1;
+    } else if (T <: int) {
+        return 2;
+    } else {
+        return 3;
+    }
+}
+
+@Test
+func testGenericElseIfChain() {
+    assert(tier(1) == 1);        // T=int
+    assert(tier(1.5) == 3);      // T=float64
+}
+
+// 11. 嵌套常量 static if：分析期多层折叠
+@Test
+func testNestedFold() {
+    var r int = 0;
+    static if (int == int) {
+        static if (int == int64) {
+            r = 1;
+        } else {
+            r = 2;
+        }
+    }
+    assert(r == 2);
+}
+
+// 12. 常量 static if 内嵌块表达式（fold 后分支语句仍生效）
+@Test
+func testFoldInBlockExpr() {
+    var i int = 0;
+    var j int = { static if (int == int) { i = 7; } 5 };
+    assert(i == 7);
+    assert(j == 5);
+}
+
+// 13. 常量 static if 在普通 if 的 else 槽位（非块槽位，mono 兜底裁决）
+@Test
+func testFoldInIfElseSlot() {
+    var r int = 0;
+    var x int = 1;
+    if (x == 1) {
+        r = 1;
+    } else static if (int == int64) {
+        r = 2;
+    }
+    assert(r == 1);
+}
+
+// 14. 泛型外层 + 常量内层 else-if 链（外层留 mono 期裁决）
+func pick2`T`(x T) int {
+    static if (T == int) {
+        return 1;
+    } else if (int == int64) {
+        return 2;
+    } else {
+        return 3;
+    }
+}
+
+@Test
+func testGenericOuterConstantInner() {
+    assert(pick2(1) == 1);        // T=int → 外层真
+    assert(pick2(1.5) == 3);      // T=float64 → 外层假，内层链全常量 → 3
+}
+
+// 15. 循环体内常量 static if 折叠（与 loopBroken/terminated 交互）
+@Test
+func testFoldInLoopBody() {
+    var s int = 0;
+    for (var i int = 0; i < 5; i += 1) {
+        static if (int == int) {
+            s += i;
+        } else {
+            s -= 100;
+        }
+    }
+    assert(s == 10);
+}

@@ -24,6 +24,18 @@ public class GenericType extends DefinedType {
         return param;
     }
 
+    /**
+     * 克隆并把类型参数替换为 {@code np}（同 id 克隆）。
+     * <p>
+     * 分支收窄用：{@code T} 克隆出新 {@link TypeParameter}（保 id）并写入
+     * 收窄约束，{@code replaceParam} 让类型引用点（声明/调用/返回类型）
+     * 指向克隆——{@code equals} 仍与模板 T 相等，mono 期
+     * {@link GenericMap#make} 以原 T 为键靠 HashMap equals 冲突命中替换。
+     */
+    public GenericType replaceParam(TypeParameter np) {
+        return new GenericType(pos(), np);
+    }
+
     public Identifier name() {
         return param.name();
     }

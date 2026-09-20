@@ -9,6 +9,7 @@ import org.cossbow.feng.ast.attr.Attribute;
 import org.cossbow.feng.ast.attr.AttributeDefinition;
 import org.cossbow.feng.ast.attr.AttributeField;
 import org.cossbow.feng.ast.attr.Modifier;
+import org.cossbow.feng.ast.cmp.*;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
 import org.cossbow.feng.ast.gen.*;
@@ -1896,6 +1897,7 @@ public class SemanticAnalyzer {
             case TryStatement ss -> analyse(ss);
             case AssertStatement ss -> analyse(ss);
             case CatchClause ss -> analyse(ss);
+            case StaticIfStatement ss -> analyse(ss);
             case null, default -> unreachable();
         };
         return s;
@@ -1912,10 +1914,244 @@ public class SemanticAnalyzer {
 
     private Statement analyse(BlockStatement bs) {
         if (bs.newScope()) context.enterScope();
-        for (var s : bs.list())
-            analyse(s);
+        var src = bs.list();
+        var dst = analyseStatements(src);
+        if (dst != src) bs.list(dst);
         if (bs.newScope()) context.exitScope(bs);
         return bs;
+    }
+
+    /**
+     * 分析并重建语句列表：{@link StaticIfStatement} 不再折叠（返回原节点），
+     * 其余语句原样保留。无变化时返回原列表（保持身份，避免多余分配）。
+     */
+    private List<Statement> analyseStatements(List<Statement> src) {
+        List<Statement> dst = null;
+        for (var i = 0; i < src.size(); i++) {
+            var ns = analyse(src.get(i));
+            if (ns == src.get(i)) {
+                if (dst != null) dst.add(ns);
+                continue;
+            }
+            if (dst == null) {
+                dst = new ArrayList<>(src.size());
+                dst.addAll(src.subList(0, i));
+            }
+            if (ns != null) dst.add(ns);
+        }
+        return dst == null ? src : dst;
+    }
+
+    private Statement analyse(StaticIfStatement e) {
+        // 分析期只优化条件（可判定 → ConstStaticExpr），不折叠：
+        // static if 统一由 mono 期裁决，常量与泛型条件一视同仁。
+        // 两个分支仍必须全部分析检查（死分支同样报错）。
+        e.condition(analyse(e.condition()));
+        if (e.condition().hasTypeVar()) {
+            // 分支收窄：条件含类型变量 → 分支内类型变量按条件约束收窄。
+            // 机制：T 克隆出新 TypeParameter（保 id），收窄约束写入克隆；
+            // 分支树 mono(narrowGm) 重建（T→克隆T），写回槽位后再分析；
+            // 另一分支与模板声明持各自克隆互不影响，无需 scope 还原。
+            // 仅单类型变量收窄（首版边界），多个不同变量时走常量原路径。
+            narrow(e);
+        }
+        analyse(e.yes());
+        e.not().use(this::analyse);
+        return e;
+    }
+
+    /**
+     * 单类型变量收窄：条件 {@code cond}（已分析）只涉及一个类型变量 {@code T}
+     * 时，真分支约束 = 模板约束 {@code C0} ∩ 条件约束 {@code C1}，
+     * 假分支 = {@code C0} ∩ {@code !C1}。条件约束由条件结构提取：
+     * <ul>
+     *   <li>{@code T <: C}（{@link TypeIncludedExpr}）→ {@code C}（子类型包含）；</li>
+     *   <li>{@code T == X}（{@link TypeEqualsExpr}）→ 新建 {@link TypeEqualsConstraint}
+     *       （精确结构化相等，覆盖 {@code T==int} / {@code T==List`int`} / {@code T==List`S`}）；</li>
+     *   <li>{@code !A} → {@code !C1}；{@code A && B} → {@code C1a & C1b}；
+     *       {@code A || B} → {@code C1a | C1b}。</li>
+     * </ul>
+     * 仅当条件两侧类型变量同一（且恰好一个）才收窄；其余（{@code T==S}、
+     * 裸参数恒 false 等）保持原约束、由常量原路径分析。
+     */
+    private void narrow(StaticIfStatement e) {
+        var tp = conditionParam(e.condition());
+        if (tp == null) return;
+        var p = tp.param();
+        // 无约束 = 顶约束（全集）：收窄仍生效，真分支直接取条件约束。
+        var c0 = p.constraint();
+
+        var yes = yesGm(tp, c0, e.condition());
+        e.yes(e.yes().mono(yes));
+        var not = notGm(tp, c0, e.condition());
+        if (e.not().none()) {
+            e.not(Optional.of(new BlockStatement(e.yes().pos(), List.of())));
+        } else {
+            e.not(e.not().map(s -> s.mono(not)));
+        }
+    }
+
+    /**
+     * 条件涉及的唯一类型参数；条件为常量或涉及多个/零个时返回 {@code null}。
+     * 条件两侧必须是同一类型变量（如 {@code T==T}、{@code T<:C}）才收窄；
+     * 右侧为带模板参数的实例（{@code T==List`S`}）不受影响——收窄 gm 只含
+     * {@code T}，{@code S} 经映射原样保留。
+     */
+    private GenericTypeDeclarer conditionParam(StaticExpr c) {
+        GenericTypeDeclarer p = null;
+        if (c instanceof TypeIncludedExpr ie) {
+            p = paramOf(ie.type());
+        } else if (c instanceof TypeEqualsExpr ee) {
+            // T == X：收窄左侧类型变量；X 可为具体类型或含模板参数的实例
+            // （T == List`S`）。仅当两侧都是不同的类型变量（T == S）才歧义不收窄。
+            var l = paramOf(ee.left());
+            var r = paramOf(ee.right());
+            if (l == null && r == null) return null;
+            if (l != null && r != null && !l.equals(r)) return null;
+            p = l != null ? l : r;
+        } else if (c instanceof NotStaticExpr ne) {
+            return conditionParam(ne.expr());
+        } else if (c instanceof AndStaticExpr ae) {
+            var l = conditionParam(ae.left());
+            var r = conditionParam(ae.right());
+            if (l == null || !l.equals(r)) return null;
+            p = l;
+        } else if (c instanceof OrStaticExpr oe) {
+            var l = conditionParam(oe.left());
+            var r = conditionParam(oe.right());
+            if (l == null || !l.equals(r)) return null;
+            p = l;
+        }
+        return p;
+    }
+
+    private GenericTypeDeclarer paramOf(TypeDeclarer t) {
+        return t instanceof GenericTypeDeclarer gtd ? gtd : null;
+    }
+
+    /**
+     * 提取条件的约束谓词：真/假分支下条件成立所蕴含的类型约束。
+     * 叶子为 {@code T<:C} → {@code C}，{@code T==X} → {@code ==X}。
+     * 按收窄参数挑选 {@code T == X} 的非参数侧：{@code T == X} 约束
+     * {@code == X}，{@code X == T}（参数在右）约束 {@code == X} 同样成立。
+     */
+    private TypeConstraint conditionConstraint(
+            StaticExpr c, GenericTypeDeclarer tp, boolean yes) {
+        if (c instanceof NotStaticExpr ne)
+            return conditionConstraint(ne.expr(), tp, !yes);
+        if (c instanceof AndStaticExpr ae)
+            return yes
+                    ? new BinaryTypeConstraint(c.pos(), TypeOperator.AND,
+                    conditionConstraint(ae.left(), tp, true),
+                    conditionConstraint(ae.right(), tp, true))
+                    : new BinaryTypeConstraint(c.pos(), TypeOperator.OR,
+                    conditionConstraint(ae.left(), tp, false),
+                    conditionConstraint(ae.right(), tp, false));
+        if (c instanceof OrStaticExpr oe)
+            return yes
+                    ? new BinaryTypeConstraint(c.pos(), TypeOperator.OR,
+                    conditionConstraint(oe.left(), tp, true),
+                    conditionConstraint(oe.right(), tp, true))
+                    : new BinaryTypeConstraint(c.pos(), TypeOperator.AND,
+                    conditionConstraint(oe.left(), tp, false),
+                    conditionConstraint(oe.right(), tp, false));
+        if (c instanceof TypeIncludedExpr ie)
+            return yes ? ie.constraint() : new ExcludeTypeConstraint(c.pos(), ie.constraint());
+        if (c instanceof TypeEqualsExpr ee) {
+            // 约束 = 非收窄参数侧的具体类型：T == X / X == T 都约束为 == X。
+            var l = paramOf(ee.left());
+            var t = (l != null && l.equals(tp)) ? ee.right() : ee.left();
+            var eq = new TypeEqualsConstraint(c.pos(), t);
+            return yes ? eq : new ExcludeTypeConstraint(c.pos(), eq);
+        }
+        return null;
+    }
+
+    /**
+     * 收窄 gm：{@code T} → 克隆（保 id）并写入收窄约束
+     * {@code C0 & C1}（真）/ {@code C0 & !C1}（假）。克隆 T id 与原 T 相同，
+     * mono 期 {@link GenericMap#make} 以原 T 为键靠 HashMap equals 冲突命中
+     * 替换为具体类型；收窄 gm 为单层、不 merge/overlay，不泄漏出分支。
+     */
+    private GenericMap yesGm(GenericTypeDeclarer tp,
+                             Optional<TypeConstraint> c0, StaticExpr cond) {
+        var c1 = conditionConstraint(cond, tp, true);
+        var np = (TypeParameter) tp.param().clone();
+        // 无约束 = 顶约束（全集）：真分支直接取条件约束，否则 C0 & C1。
+        np.constraint(c0.has()
+                ? new BinaryTypeConstraint(tp.pos(), TypeOperator.AND,
+                c0.get(), c1)
+                : c1);
+        return new GenericMap(Map.of(tp.param(),
+                tp.type().replaceParam(np).declarer(Optional.empty())));
+    }
+
+    private GenericMap notGm(GenericTypeDeclarer tp,
+                             Optional<TypeConstraint> c0, StaticExpr cond) {
+        // 假分支约束 = 条件为假时蕴含的约束：conditionConstraint(cond, tp, false)
+        // 对 ! / && / || 递归做 De Morgan，等价于 !C1 且不会产生 !!C 双重取反
+        // （双重取反会让 Exclude.members() 恒空坍缩，丢失成员集）。
+        var n1 = conditionConstraint(cond, tp, false);
+        var np = (TypeParameter) tp.param().clone();
+        // 无约束 = 顶约束（全集）：假分支直接取 !C1，否则 C0 & !C1。
+        np.constraint(c0.has()
+                ? new BinaryTypeConstraint(tp.pos(), TypeOperator.AND,
+                c0.get(), n1)
+                : n1);
+        return new GenericMap(Map.of(tp.param(),
+                tp.type().replaceParam(np).declarer(Optional.empty())));
+    }
+
+    /**
+     * 优化 {@link StaticExpr}：分析操作数后，可判定（无类型变量）的表达式
+     * 折叠为 {@link ConstStaticExpr}，含类型变量的保留并重建（写回已分析的操作数）。
+     * <p>
+     * 注意：约束侧可以含类型变量（如 {@code R <: T} 的 {@code T}）——
+     * {@code contains} 按模板级声明约束求值，与实例化无关；决定是否可判定的
+     * 只看类型侧（{@link TypeIncludedExpr#hasTypeVar()}）。
+     */
+    private StaticExpr analyse(StaticExpr c) {
+        return switch (c) {
+            case TypeEqualsExpr ee -> {
+                var l = analyse(ee.left());
+                var r = analyse(ee.right());
+                ee.left(l);
+                ee.right(r);
+                yield ee.hasTypeVar() ? ee
+                        : new ConstStaticExpr(c.pos(), l.equals(r));
+            }
+            case TypeIncludedExpr ie -> {
+                var t = analyse(ie.type());
+                var cc = analyse(ie.constraint());
+                ie.type(t);
+                ie.constraint(cc);
+                yield ie.hasTypeVar()
+                        ? ie
+                        : new ConstStaticExpr(c.pos(), cc.contains(t));
+            }
+            case NotStaticExpr ne -> {
+                var x = analyse(ne.expr());
+                yield x.hasTypeVar()
+                        ? new NotStaticExpr(c.pos(), x)
+                        : new ConstStaticExpr(c.pos(), !x.check());
+            }
+            case AndStaticExpr ae -> {
+                // 两侧都必须分析（不做短路，死侧同样报错）
+                var l = analyse(ae.left());
+                var r = analyse(ae.right());
+                yield (l.hasTypeVar() || r.hasTypeVar())
+                        ? new AndStaticExpr(c.pos(), l, r)
+                        : new ConstStaticExpr(c.pos(), l.check() && r.check());
+            }
+            case OrStaticExpr oe -> {
+                var l = analyse(oe.left());
+                var r = analyse(oe.right());
+                yield (l.hasTypeVar() || r.hasTypeVar())
+                        ? new OrStaticExpr(c.pos(), l, r)
+                        : new ConstStaticExpr(c.pos(), l.check() || r.check());
+            }
+            case null, default -> unreachable();
+        };
     }
 
     private boolean assignable(
@@ -3239,6 +3475,7 @@ public class SemanticAnalyzer {
             case BlockStatement ee -> terminated(ee);
             case ConditionalForStatement fs -> terminated(fs);
             case IfStatement ee -> terminated(ee);
+            case StaticIfStatement ee -> terminated(ee);
             case LabeledStatement ee -> terminated(ee.target());
             case SwitchStatement ee -> terminated(ee);
             case TryStatement ee -> terminated(ee);
@@ -3295,6 +3532,11 @@ public class SemanticAnalyzer {
         }
     }
 
+    private boolean terminated(StaticIfStatement s) {
+        // 条件由 mono 期裁决，两分支都可能被选中，两分支都终止才算终止
+        return terminated(s.yes()) && terminated(s.not());
+    }
+
     private boolean terminated(SwitchStatement s) {
         // Need to check all branches:
         var found = true;
@@ -3327,6 +3569,7 @@ public class SemanticAnalyzer {
         return switch (s) {
             case BlockStatement ee -> loopBroken(ee.list());
             case IfStatement ee -> loopBroken(ee);
+            case StaticIfStatement ee -> loopBroken(ee);
             case LabeledStatement ee -> loopBroken(ee.target());
             case SwitchStatement ee -> loopBroken(ee);
             case Branch ee -> loopBroken(ee.body());
@@ -3369,6 +3612,10 @@ public class SemanticAnalyzer {
         }
     }
 
+    private boolean loopBroken(StaticIfStatement s) {
+        return loopBroken(s.yes()) && loopBroken(s.not());
+    }
+
     private boolean loopBroken(SwitchStatement s) {
         // All branches must have a break:
         var allBroken = true;
@@ -3401,6 +3648,7 @@ public class SemanticAnalyzer {
         return switch (s) {
             case BlockStatement ee -> mayBreak(ee.list());
             case IfStatement ee -> mayBreak(ee);
+            case StaticIfStatement ee -> mayBreak(ee);
             case LabeledStatement ee -> mayBreak(ee.target());
             case SwitchStatement ee -> mayBreak(ee);
             case Branch ee -> mayBreak(ee.body());
@@ -3431,6 +3679,10 @@ public class SemanticAnalyzer {
         } else {
             return mayBreak(s.not());
         }
+    }
+
+    private boolean mayBreak(StaticIfStatement s) {
+        return mayBreak(s.yes()) || mayBreak(s.not());
     }
 
     private boolean mayBreak(SwitchStatement s) {

@@ -53,6 +53,10 @@ public class IfStatement extends Statement implements Scope {
         return not;
     }
 
+    public void not(Optional<Statement> not) {
+        this.not = not;
+    }
+
 
     private final Lazy<BoolLiteral> cond = Lazy.nil();
 

@@ -23,7 +23,7 @@ public class Procedure extends Entity implements Scope {
     /**
      * The executable body
      */
-    private final BlockStatement body;
+    private BlockStatement body;
     /**
      * The labels defined in body of procedure
      */
@@ -45,6 +45,13 @@ public class Procedure extends Entity implements Scope {
 
     public BlockStatement body() {
         return body;
+    }
+
+    /**
+     * 写回解析后的函数体（mono 期对非泛型函数体裁决 static if 后替换）。
+     */
+    public void body(BlockStatement body) {
+        this.body = body;
     }
 
     public Map<Identifier, LabeledStatement> labels() {

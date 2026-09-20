@@ -73,9 +73,36 @@ public class GenericMap {
         var t = find(gtd.param());
         if (t == null) return gtd;
         t = (TypeDeclarer) t.clone(); // clone：防止后续修改状态
-        if (next == null) return t;
-        if (!t.hasTypeVar()) return t;
+        if (next == null || !t.hasTypeVar()) {
+            // 具体替换：保留使用点的引用形态（*T / &T / 裸 T）。
+            // 引用是使用点属性而非类型变量属性：*T 在 T:=Point 后应为 *Point，
+            // 否则结果丢失 STRONG/PHANTOM 引用（pre-existing bug）。
+            return applyRefer(gtd, t);
+        }
         return next.mapIf(t);
+    }
+
+    /**
+     * 把使用点 {@code gtd} 的引用形态（{@code *} / {@code &} / 无）叠加到替换结果
+     * {@code t} 上。替换结果是具体类型时按使用点引用重建；仍是类型参数
+     * （收窄克隆）时把引用形态写回克隆参数。
+     * <p>
+     * 只叠加语法引用（{@code kind()} 有值）：裸 {@code T} 的派生引用（约束投影）
+     * 是类型参数自身的属性，不能叠加到具体替换结果——否则接口约束的裸
+     * {@code T} 在 {@code T:=Int} 时被改写成 {@code *Int}，破坏值/引用语义。
+     */
+    private static TypeDeclarer applyRefer(GenericTypeDeclarer gtd, TypeDeclarer t) {
+        if (gtd.kind().none()) return t;
+        var refer = gtd.maybeRefer();
+        if (refer.none()) return t;
+        if (t instanceof DerivedTypeDeclarer dtd)
+            return new DerivedTypeDeclarer(t.pos(), dtd.derivedType(), refer);
+        if (t instanceof PrimitiveTypeDeclarer ptd)
+            return ptd.primitive().declarer(t.pos(), refer);
+        if (t instanceof GenericTypeDeclarer gtd2)
+            return new GenericTypeDeclarer(t.pos(), gtd2.type(),
+                    gtd.kind(), gtd.required(), gtd.unmodifiable());
+        return t;
     }
 
     public DerivedType mapIf(DerivedType dt) {

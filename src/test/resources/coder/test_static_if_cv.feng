@@ -1,0 +1,46 @@
+import std$testing;
+
+// 约束侧含类型变量（R <: T 的 T）：模板级语义，mono 期裁决。
+// T 只出现在 R 的约束中（不在参数签名里），无法从实参推断，
+// 调用时必须显式给出类型实参。
+func pick`T int, R T`(x R) int {
+    static if (R <: T) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+@Test
+func testConstraintSideTypeVar() {
+    assert(pick`int, int`(3) == 1);       // T=int, R=int → R <: T 真
+}
+
+// 用户原始场景：无参数泛型函数，同样必须显式类型实参
+func foo`T int, R T`() int {
+    static if (R <: T) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+@Test
+func testConstraintSideNoParams() {
+    assert(foo`int, int`() == 1);
+}
+
+// 类型侧含类型变量：mono 期映射后裁决
+func probe`T`(x T) int {
+    static if (T == int) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+@Test
+func testTypeSideTypeVar() {
+    assert(probe(1) == 1);
+    assert(probe(1.5) == 2);
+}

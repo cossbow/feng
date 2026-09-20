@@ -43,7 +43,11 @@ public class FunctionExpression extends PrimaryExpression {
     @Override
     public PrimaryExpression mono(GenericMap gm) {
         var mapped = gm.mapAll(generic);
-        if (!mapped.isEmpty() && !mapped.hasTypeVar()) {
+        // EMPTY 恒等映射（非泛型函数体裁决 static if 时）：泛型调用保持
+        // FunctionExpression，mono 后的 discover 仍能按其 generic 注册具体化；
+        // 真实 gm（泛型实例化）才转换成 mangle 符号（ExprWriter 输出一致）。
+        if (gm != GenericMap.EMPTY
+                && !mapped.isEmpty() && !mapped.hasTypeVar()) {
             return monoCopy(new SymbolExpression(pos(),
                     Mangle.symbol(func.symbol(), mapped), TypeArguments.EMPTY), gm);
         }

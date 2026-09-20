@@ -1,11 +1,17 @@
 package org.cossbow.feng.ast.expr;
 
+import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.gen.DerivedType;
+import org.cossbow.feng.ast.gen.GenericType;
+import org.cossbow.feng.ast.gen.PrimitiveType;
 import org.cossbow.feng.util.Optional;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.GenericTypeDeclarer;
 import org.cossbow.feng.ast.dcl.NewArrayType;
 import org.cossbow.feng.ast.dcl.NewDefinedType;
 import org.cossbow.feng.ast.dcl.NewType;
+import org.cossbow.feng.ast.dcl.PrimitiveTypeDeclarer;
 import org.cossbow.feng.ast.gen.GenericMap;
 
 /**
@@ -70,11 +76,29 @@ public class NewExpression extends PrimaryExpression {
     private static NewType monoType(NewType type, GenericMap gm) {
         if (type instanceof NewDefinedType ndt) {
             var dt = ndt.type();
-            // PrimitiveType / GenericType 不变
-            if (!(dt instanceof DerivedType d))
+            // PrimitiveType 不变；DerivedType（含泛型实参）与 GenericType（类型变量）
+            // 需按 gm 替换——后者对 static-if 分支收窄必要：new(T) 在收窄分支
+            // 中应映射为收窄后的克隆参数（约束含 ==X，newable 才成立）。
+            if (dt instanceof PrimitiveType)
                 return type;
-            // DerivedType（含泛型实参）需按 gm 替换
-            return new NewDefinedType(type.pos(), gm.mapIf(d));
+            if (dt instanceof DerivedType d)
+                return new NewDefinedType(type.pos(), gm.mapIf(d));
+            // GenericType：按 gm 替换。gm 无 T → 原样（mapIf(GenericTypeDeclarer)
+            // 找不到时返回原 gtd）；T→克隆参数（收窄）→ replaceParam；
+            // T→具体类型（实例化）→ 转成 DefinedType 重建 new 目标。
+            var gtd0 = ((GenericType) dt).declarer(Optional.empty());
+            var t = gm.mapIf(gtd0);
+            if (t == gtd0) return type;
+            if (t instanceof GenericTypeDeclarer gtd)
+                return new NewDefinedType(type.pos(),
+                        ((GenericType) dt).replaceParam(gtd.param()));
+            if (t instanceof DerivedTypeDeclarer dtd)
+                return new NewDefinedType(type.pos(), dtd.derivedType());
+            if (t instanceof PrimitiveTypeDeclarer ptd)
+                return new NewDefinedType(type.pos(),
+                        new PrimitiveType(type.pos(), new Identifier(ptd.primitive().code),
+                                ptd.primitive()));
+            return type;
         }
         if (type instanceof NewArrayType nat) {
             return new NewArrayType(type.pos(),

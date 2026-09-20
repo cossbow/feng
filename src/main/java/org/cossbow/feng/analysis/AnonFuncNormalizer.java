@@ -217,6 +217,12 @@ public class AnonFuncNormalizer {
                 }
                 ts.finallyClause().use(this::walkStmt);
             }
+            case StaticIfStatement sis -> {
+                // 分析期不再折叠 static if：两分支都含可执行语句，必须遍历
+                //（分支内的匿名函数同样要归一化，否则缺具名原型）
+                walkStmt(sis.yes());
+                sis.not().use(this::walkStmt);
+            }
             default -> {
             }
         }

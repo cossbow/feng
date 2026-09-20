@@ -412,6 +412,7 @@ statement
     | continueStatement
     | breakStatement
     | labeledStatement
+    | staticStatement
     ;
 // statement: block, usefull
 blockStatement
@@ -532,6 +533,34 @@ labeledStatement
     ;
 
 
+// compile-time execution statement
+staticStatement
+    : STATIC (ifStaticStmt|forStaticStmt)
+    ;
+ifStaticStmt
+    : IF '(' staticExpr ')' blockStatement
+        (ELSE (ifStaticStmt | blockStatement))?
+    ;
+staticExpr
+    : typeStaticExpr
+    | '(' typeStaticExpr ')'
+    | NOT staticExpr
+    | staticExpr AND staticExpr
+    | staticExpr OR staticExpr
+    ;
+typeStaticExpr
+    : typeDeclarer INCLUDED typeConstraint
+    | typeDeclarer EQ typeDeclarer
+    ;
+forStaticStmt
+    : FOR (staticNames COLON definedType) blockStatement
+    ;
+staticNames
+    : staticName (COMMA staticName)*
+    ;
+staticName
+    : DOLLAR Identifier
+    ;
 
 
 
@@ -882,6 +911,8 @@ BITOR       : '|' ;
 BITXOR      : '~' ;
 LSHIFT      : '<<' ;
 RSHIFT      : '>>' ;
+// type
+INCLUDED    : '<:' ;
 
 
 
