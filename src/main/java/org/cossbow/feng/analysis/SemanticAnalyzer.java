@@ -1041,7 +1041,7 @@ public class SemanticAnalyzer {
         // 最后分析实现接口
         dag.bfs(this::checkImplements);
         // check sync
-        dag.bfs(this::analyzeSync);
+        dag.bfs(this::analyzeSyncMark);
         return dag;
     }
 
@@ -1049,74 +1049,16 @@ public class SemanticAnalyzer {
 
     private boolean enterAsync;
 
-    private final Set<ClassDefinition> visited = new HashSet<>();
-
-    private boolean analyzeSync(TypeDeclarer td) {
-        if (td instanceof DerivedTypeDeclarer dtd) {
-            var def = dtd.def();
-            if (def instanceof ClassDefinition fcd)
-                analyzeSync(fcd);   // trigger checking class
-            return def.syncable();
-        }
-        if (td instanceof ArrayTypeDeclarer atd) {
-            // Check arrays on nested paths
-            return atd.refer().none() &&
-                    analyzeSync(atd.element());
-        }
-        if (td instanceof TupleTypeDeclarer ttd) {
-            // Check tuples on nested paths,
-            // this is multi-branch checking
-            for (var etd : ttd.elements()) {
-                if (!analyzeSync(etd))
-                    return false;
-            }
-            return true;
-        }
-        return true;
-    }
-
     /**
-     * Only analyze the class, as the interface just needs
-     * checking for @Sync.
-     * Each ClassDefinition is analyzed once, so we just need
-     * to check if the current one can sync.
-     * We only update the {@link ClassDefinition#syncable} here,
-     * then the {@link TypeDeclarer} can call sync() for the
-     * sync state.
+     * Check @Sync of class
      */
-    private void analyzeSync(ClassDefinition cd) {
-        if (!visited.add(cd)) return;
-
-        // check the class's @Sync mark
-        boolean classSync = cd.modifier().sync().has();
-        boolean sync = true;
+    private void analyzeSyncMark(ClassDefinition cd) {
+        cd.markSync(cd.modifier().sync().has());
         for (var cf : cd.allFields()) {
             var ct = cf.type();
-            // fieldSync: indicate this field will sync
-            boolean fieldSync;
-            // check reference field's @Sync mark
             var mark = cf.modifier().sync();
-            if (ct.maybeRefer().none()) {
-                if (mark.has()) {
-                    semantic("value-type should not set @Sync: %s",
-                            mark.get().pos());
-                }
-                // value-type will auto sync
-                fieldSync = true;
-            } else {
-                // marked reference-type field will sync
-                ct.markSync(mark.has());
-                fieldSync = ct.markSync();
-            }
-            // class or field sync will trigger checking TypeDefinition
-            if (classSync || fieldSync) {
-                analyzeSync(ct);
-                // check field type syncable
-                if (ct.syncable()) continue;
-            }
-            sync = false;
+            ct.markSync(mark.has());
         }
-        cd.syncable(sync);
     }
 
     private ClassDefinition enterClass;
@@ -1522,15 +1464,78 @@ public class SemanticAnalyzer {
             fp.type(analyse(fp.type()));
             if (enterAsync) {
                 markSync(fp.type());
-                if (!fp.type().sync()) {
-                    semantic("parameter of async procedure must be sync '%s': %s",
-                            fp.type(), fp.type().pos());
-                }
             } else {
                 markSync(fp.modifier(), fp.type());
             }
             if (addVar) fp.var().use(context::putVar);
         }
+    }
+
+    private boolean checkSyncable(
+            ClassDefinition cd,
+            Map<Symbol, Boolean> cache) {
+        for (var cf : cd.allFields()) {
+            var t = cf.type();
+            if (!cd.markSync() && (t.maybeRefer().has()
+                    && !t.markSync()))
+                return false;
+            if (!checkSyncable(t, cache))
+                return false;
+        }
+        return true;
+    }
+
+    private boolean checkSyncable(
+            TypeDeclarer td,
+            Map<Symbol, Boolean> cache) {
+        if (td instanceof ArrayTypeDeclarer atd) {
+            if (atd.refer().has())
+                return false; // 不支持数组引用
+            return checkSync(atd.element(), cache);
+        }
+        if (td instanceof TupleTypeDeclarer ttd) {
+            for (var et : ttd.elements()) {
+                if (!checkSync(et, cache))
+                    return false;
+            }
+            return true;
+        }
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            var def = dtd.def();
+            if (def instanceof InterfaceDefinition id)
+                return id.markSync(); // 接口只检查类标注
+
+            if (def instanceof ClassDefinition cd) {
+                var sync = cache.get(cd.symbol());
+                if (sync == null) {
+                    sync = checkSyncable(cd, cache);
+                    cache.put(cd.symbol(), sync);
+                }
+                return sync;
+            }
+        }
+        if (td instanceof GenericTypeDeclarer) {
+            // 不支持泛型
+            return false;
+        }
+        return true;
+    }
+
+    private boolean checkSync(
+            TypeDeclarer td,
+            Map<Symbol, Boolean> cache) {
+        var r = td.maybeRefer();
+        if (r.has()) {
+            if (!td.markSync())
+                return false; // 未标记@Sync
+            if (r.get().isKind(PHANTOM))
+                return false; // 补充检查虚引用
+        }
+        return checkSyncable(td, cache);
+    }
+
+    private boolean checkSync(TypeDeclarer td) {
+        return checkSync(td, new HashMap<>());
     }
 
     private void assignableSync(
@@ -1544,7 +1549,7 @@ public class SemanticAnalyzer {
             return;
 
         // requires same sync state
-        if (l.sync() == r.sync()) return;
+        if (checkSync(l) == checkSync(r)) return;
 
         semantic("can't convert between sync '%s' and non-sync '%s': %s",
                 l, r, e.pos());
@@ -2321,7 +2326,7 @@ public class SemanticAnalyzer {
                     t.pos());
         }
         t.markSync(true);
-        if (t.sync()) return t;
+        if (checkSync(t)) return t;
 
         return semantic("'%s' don't support sync: %s", t, t.pos());
     }
@@ -4500,7 +4505,7 @@ public class SemanticAnalyzer {
 
     void checkEnterAsync(TypeDeclarer t, Method m, Entity e) {
         if (m.modifier().async().none()) return;
-        if (!t.sync())
+        if (!checkSync(t))
             semantic("non-sync '%s' can't enter async-method '%s': %s",
                     t, m, e.pos());
         if (t.maybeRefer().none())

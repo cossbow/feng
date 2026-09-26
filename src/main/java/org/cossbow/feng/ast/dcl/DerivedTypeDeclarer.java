@@ -74,12 +74,6 @@ public class DerivedTypeDeclarer extends TypeDeclarer
 
     //
 
-    public boolean syncable() {
-        return def().syncable();
-    }
-
-    //
-
     public boolean baseTypeSame(TypeDeclarer td) {
         if (!(td instanceof DerivedTypeDeclarer t))
             return false;

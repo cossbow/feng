@@ -134,13 +134,6 @@ public class TypeDeclarer extends Entity {
      */
     private boolean markSync;
 
-    /**
-     * Is the type synchronized.
-     */
-    public boolean sync() {
-        return (markSync || maybeRefer().none()) && syncable();
-    }
-
     public boolean markSync() {
         return markSync;
     }
@@ -149,10 +142,4 @@ public class TypeDeclarer extends Entity {
         this.markSync = sync;
     }
 
-    /**
-     * Is the instance synchronizable
-     */
-    public boolean syncable() {
-        return true;
-    }
 }

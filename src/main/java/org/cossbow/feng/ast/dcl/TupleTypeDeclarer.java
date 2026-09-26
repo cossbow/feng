@@ -37,16 +37,6 @@ public class TupleTypeDeclarer extends TypeDeclarer {
         return elements.stream().anyMatch(TypeDeclarer::hasTypeVar);
     }
 
-    /**
-     * Requires all elements:
-     * 1. non reference
-     * 2. is sync
-     */
-    public boolean syncable() {
-        return elements.stream().allMatch(et ->
-                et.maybeRefer().none() && et.syncable());
-    }
-
     //
 
     @Override

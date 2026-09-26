@@ -26,12 +26,6 @@ public class TypeDefinition extends Definition {
 
     //
 
-    public boolean syncable() {
-        return true;
-    }
-
-    //
-
     @Override
     public String toString() {
         return domain.name + ' ' + symbol() + generic();

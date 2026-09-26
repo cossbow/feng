@@ -38,6 +38,11 @@ public class ObjectDefinition extends TypeDefinition
         return methods().tryGet(name);
     }
 
+    abstract
+    public boolean markSync();
+
+    //
+
     public DerivedType link(Position pos, TypeArguments tArgs) {
         var dt = new DerivedType(pos, symbol(), tArgs);
         dt.def(this);

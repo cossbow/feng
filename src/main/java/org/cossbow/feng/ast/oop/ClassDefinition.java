@@ -176,9 +176,9 @@ public class ClassDefinition extends ObjectDefinition {
      */
     private final Lazy<IndexOperator> indexOperator = Lazy.nil();
     /**
-     * Cache the result of check Sync
+     * Cache the result of checking @Sync
      */
-    private boolean syncable;
+    private boolean markSync;
 
     public List<DerivedType> supers() {
         if (parent.match(p -> p == ClassDefinition.ObjectClass))
@@ -252,12 +252,12 @@ public class ClassDefinition extends ObjectDefinition {
         return indexOperator;
     }
 
-    public boolean syncable() {
-        return syncable;
+    public boolean markSync() {
+        return markSync;
     }
 
-    public void syncable(boolean sync) {
-        this.syncable = sync;
+    public void markSync(boolean sync) {
+        this.markSync = sync;
     }
 
     //
