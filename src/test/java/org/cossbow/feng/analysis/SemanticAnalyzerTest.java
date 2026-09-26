@@ -4152,11 +4152,11 @@ public class SemanticAnalyzerTest {
     @Test
     public void testAsyncFunction4() {
         checkSucc("@Async func t(a [2]int) {}");
-        checkFail("@Async func t(a [*]int) {}");
+        checkSucc("@Async func t(a [*]int) {}");
         checkFail("@Async func t(a [2]*int) {}");
 
         checkSucc("class A { var i int; } @Async func t(a [2]A) {}");
-        checkFail("class A { var i int; } @Async func t(a [*]A) {}");
+        checkSucc("class A { var i int; } @Async func t(a [*]A) {}");
         checkFail("class A { var i int; } @Async func t(a [2]*A) {}");
 
         checkFail("class A { var i *int; } @Async func t(a [2]A) {}");

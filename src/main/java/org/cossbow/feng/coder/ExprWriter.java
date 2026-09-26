@@ -56,6 +56,12 @@ public class ExprWriter extends CWriter<ExprWriter> {
      */
     public boolean cleanupSlotPtr;
 
+    /**
+     * sync var 数组字段锁读的临时变量序号：{@code ({ Int64 _al<n>; void* _ap<n> = ... })}
+     * 是语句表达式，嵌套时靠序号避免遮蔽（同 StmtWriter.cleanupEntrySeq 的用法）。
+     */
+    private int syncSlotSeq;
+
     // ===================================================================
     //  类型名发射（统一走 TypeWriter）
     // ===================================================================
@@ -736,6 +742,20 @@ public class ExprWriter extends CWriter<ExprWriter> {
             }
             // sync var 字段 → Feng$load_sl（锁读 + inc）
             if (isSyncVarField(e)) {
+                // 数组胖指针：锁位在 $values（首字），$length 须同临界区取出，故用
+                // 语句表达式绑定槽位与临时长度，避免主题表达式被求值两次。
+                if (e.resultType.must() instanceof ArrayTypeDeclarer atd) {
+                    var n = syncSlotSeq++;
+                    write("({ Int64 _al").write(n).write("; void* _ap").write(n)
+                            .write(" = Feng$load_sl_array(&(");
+                    ofMember(e.subject());
+                    write(e.member());
+                    write("), &_al").write(n).write("); (")
+                            .write("Feng$ArraySRef_").write(Mangle.typeKey(atd.element()))
+                            .write("){(").writeType(atd.element()).write(" *)_ap").write(n)
+                            .write(", _al").write(n).write("}; })");
+                    return this;
+                }
                 write("((").baseTypeSymbol(e.resultType.must())
                         .write(" *)Feng$load_sl((void**)&");
                 ofMember(e.subject());
@@ -1535,8 +1555,12 @@ public class ExprWriter extends CWriter<ExprWriter> {
     private void writeValueDestroy(TypeDeclarer ft, String lv, int depth, boolean syncVarField) {
         if (isLeafValue(ft)) return;
         if (isArraySRef(ft)) {
-            var ek = Mangle.typeKey(((ArrayTypeDeclarer) ft).element());
-            write("Feng$cleanup_arr_").write(ek).write("(&").write(lv).write(")").endStmt();
+            // 分型 cleanup 名（含 sync 区分的 _ns）；sync var 字段的 $values 可能带
+            // 自旋锁位 bit 0，须先掩码再交 cleanup_arr_<ek> 释放。
+            if (syncVarField) {
+                write("Feng$unmask_sfield_array(&").write(lv).write(")").endStmt();
+            }
+            write(Mangle.cleanupName(ft)).write("(&").write(lv).write(")").endStmt();
             return;
         }
         if (ft instanceof ArrayTypeDeclarer atd && atd.refer().none()) {

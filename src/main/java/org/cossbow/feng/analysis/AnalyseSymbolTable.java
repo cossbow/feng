@@ -102,9 +102,18 @@ public class AnalyseSymbolTable {
 
     /**
      * 强引用类型的 cleanup 函数（FunctionDefinition AST）。由 ReleaserBuilder 填充。
-     * key = 需要 cleanup 的强引用 TypeDeclarer（refer = STRONG）。
+     * key = {@link Mangle#cleanupName}（符号名，含 sync 区分的 {@code _ns} 后缀）。
+     * <p>按符号名而非 TypeDeclarer 去重：同一类型的 sync / 非 sync 实例 equals 相等
+     * （markSync 不参与 equals），若按类型去重会少生成一个变体，导致另一处引用
+     * {@code Feng$cleanup_X_ns} 未定义。
      */
-    public Map<TypeDeclarer, FunctionDefinition> cleanups = new LinkedHashMap<>();
+    public Map<String, Cleanup> cleanups = new LinkedHashMap<>();
+
+    /**
+     * cleanup 收集条目：类型 + 其 cleanup 函数（ReleaserWriter 发射签名需要类型）。
+     */
+    public record Cleanup(TypeDeclarer type, FunctionDefinition func) {
+    }
 
     /**
      * 值类型（refer = none）含强引用内容的 copy 函数（FunctionDefinition AST）。

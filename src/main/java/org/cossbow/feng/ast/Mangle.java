@@ -343,7 +343,7 @@ public class Mangle {
         return name(dt);
     }
 
-    /** cleanup 函数名：Feng$cleanup_arr_<elem> 或 Feng$cleanup_<typeKey>[_ns]。 */
+    /** cleanup 函数名：Feng$cleanup_arr_<elem>[_ns] 或 Feng$cleanup_<typeKey>[_ns]。 */
     public static String cleanupName(TypeDeclarer td) {
         return "Feng$" + cleanupIdentifier(td);
     }
@@ -356,10 +356,12 @@ public class Mangle {
 
     private static String cleanupIdentifier(TypeDeclarer td) {
         // 仅 SRef 数组（refer STRONG）用 cleanup_arr_<ek>；定长数组是值类型，
-        // 走 cleanup_<typeKey>（与 SRef 数组区分，避免同名冲突）
+        // 走 cleanup_<typeKey>（与 SRef 数组区分，避免同名冲突）。
+        // [_ns] 后缀按 markSync 区分：sync 数组的 $values 必须原子 dec。
         if (td instanceof ArrayTypeDeclarer atd
                 && atd.refer().match(r -> r.isKind(ReferKind.STRONG))) {
-            return "cleanup_arr_" + typeKey(atd.element());
+            return "cleanup_arr_" + typeKey(atd.element())
+                    + (td.markSync() ? "" : "_ns");
         }
         return "cleanup_" + typeKey(td) + (td.markSync() ? "" : "_ns");
     }

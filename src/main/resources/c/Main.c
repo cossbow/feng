@@ -3,12 +3,14 @@
 #define FENG_TYPEDEF_ArraySRef_ArraySRef_Byte
 typedef struct { Feng$ArraySRef_Byte* $values; Int64 $length; } Feng$ArraySRef_ArraySRef_Byte;
 #endif
+// 元素类型是普通（非 @Sync）的 [*]byte，其分型 cleanup 带 _ns 后缀（见 Mangle.cleanupIdentifier）；
+// 外层 list 的 cleanup 由本文件就地提供，名字不带 _ns（用户侧 [*][*]byte 不可同步，不会同名）。
 #ifndef FENG_FUNC_cleanup_arr_ArraySRef_Byte
 #define FENG_FUNC_cleanup_arr_ArraySRef_Byte
 static inline void Feng$cleanup_arr_ArraySRef_Byte(Feng$ArraySRef_ArraySRef_Byte *p) {
 	if (p->$values && Feng$dec(p->$values)) {
 		for (Int64 i0 = 0; i0 < p->$length; i0++) {
-			Feng$cleanup_arr_Byte(&p->$values[i0]);
+			Feng$cleanup_arr_Byte_ns(&p->$values[i0]);
 		}
 		Feng$free(p->$values);
 	}

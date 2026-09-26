@@ -1489,8 +1489,6 @@ public class SemanticAnalyzer {
             TypeDeclarer td,
             Map<Symbol, Boolean> cache) {
         if (td instanceof ArrayTypeDeclarer atd) {
-            if (atd.refer().has())
-                return false; // 不支持数组引用
             return checkSync(atd.element(), cache);
         }
         if (td instanceof TupleTypeDeclarer ttd) {

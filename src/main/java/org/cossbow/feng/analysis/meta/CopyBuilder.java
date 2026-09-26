@@ -40,8 +40,9 @@ public final class CopyBuilder {
 
     public static void build(AnalyseSymbolTable ast) {
         // ReleaserBuilder.buildCleanups 已收集所有「需释放」类型；needsCopy ⊆ needsDestroy，
-        // 直接在其键集上过滤「值类型 + 含强引用内容」。
-        for (var td : ast.cleanups.keySet()) {
+        // 直接在其收集结果上过滤「值类型 + 含强引用内容」。
+        for (var cleanup : ast.cleanups.values()) {
+            var td = cleanup.type();
             if (td.maybeRefer().none() && needsCopy(td)
                     && !ast.copies.containsKey(td)) {
                 ast.copies.put(td, Lazy.of(copyFunc(td)));

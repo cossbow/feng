@@ -133,6 +133,12 @@ public final class ReleaserBuilder {
         if (isLeafValue(td)) return; // 无强引用内容：no-op
         if (td instanceof ArrayTypeDeclarer atd) {
             if (ref.match(r -> r.isKind(ReferKind.STRONG))) {
+                // sync var 数组字段：$values 可能带自旋锁位 bit 0，先掩码再走统一
+                // 释放（dec + 元素级联 + free），与标量 sync 字段的 cleanup_sfield 同理。
+                if (syncVarField) {
+                    out.add(callStmt(rt("unmask_sfield_array"),
+                            List.of(new AddressOfException(lv))));
+                }
                 releaseSRefArray(atd, lv, out, depth);
             } else {
                 releaseFixedArray(atd, lv, out, depth);
@@ -355,7 +361,9 @@ public final class ReleaserBuilder {
     // ---- cleanup ----
 
     private static void buildCleanups(AnalyseSymbolTable ast) {
-        var types = new LinkedHashSet<TypeDeclarer>();
+        // key = cleanup 符号名（Mangle.cleanupName）：同一类型的 sync / 非 sync 实例
+        // equals 相等，按类型去重会漏生成一个变体（_ns 后缀不同名）。
+        var types = new LinkedHashMap<String, TypeDeclarer>();
         for (var meta : ast.classMetas.values()) {
             for (var cf : meta.def().allFields().values()) {
                 collect(types, cf.type(), new LinkedHashSet<>());
@@ -391,9 +399,10 @@ public final class ReleaserBuilder {
             }
         }
 
-        for (var td : types) {
-            if (!ast.cleanups.containsKey(td)) {
-                ast.cleanups.put(td, cleanupFunc(td));
+        for (var e : types.entrySet()) {
+            if (!ast.cleanups.containsKey(e.getKey())) {
+                ast.cleanups.put(e.getKey(), new AnalyseSymbolTable.Cleanup(
+                        e.getValue(), cleanupFunc(e.getValue())));
             }
         }
     }
@@ -403,7 +412,7 @@ public final class ReleaserBuilder {
      * BlockExpression）里出现的类型——旧 CGenerator preScanCleanupStmts/
      * preScanCleanupExpr 的等价移植。
      */
-    private static void preScanBody(Set<TypeDeclarer> out, Statement stmt) {
+    private static void preScanBody(Map<String, TypeDeclarer> out, Statement stmt) {
         if (stmt instanceof DeclarationStatement ds) {
             for (var v : ds.variables()) {
                 collect(out, v.type().must(), new LinkedHashSet<>());
@@ -438,7 +447,7 @@ public final class ReleaserBuilder {
         }
     }
 
-    private static void preScanExpr(Set<TypeDeclarer> out, Expression e) {
+    private static void preScanExpr(Map<String, TypeDeclarer> out, Expression e) {
         if (e instanceof BlockExpression be) {
             for (var v : be.stack()) {
                 if (v.type().has()) collect(out, v.type().must(), new LinkedHashSet<>());
@@ -469,28 +478,28 @@ public final class ReleaserBuilder {
         }
     }
 
-    private static void collectProto(Set<TypeDeclarer> out, Prototype pt) {
+    private static void collectProto(Map<String, TypeDeclarer> out, Prototype pt) {
         pt.returnSet().use(t -> collect(out, t, new LinkedHashSet<>()));
         for (var p : pt.parameterSet()) {
             if (p instanceof FixedParameter fp) collect(out, fp.type(), new LinkedHashSet<>());
         }
     }
 
-    private static void collect(Set<TypeDeclarer> out, TypeDeclarer td, Set<TypeDeclarer> seen) {
+    private static void collect(Map<String, TypeDeclarer> out, TypeDeclarer td, Set<TypeDeclarer> seen) {
         if (td == null || !seen.add(td)) return;
         // 含类型变量的类型是 mono2 未具体化的残留（模板函数/类字段），
         // 不生成 per-type cleanup（后端没有对应 C 类型定义）。
         if (td.hasTypeVar()) return;
         var ref = td.maybeRefer();
         if (ref.has() && ref.get().isKind(ReferKind.STRONG)) {
-            if (needsCleanup(td)) out.add(td);
+            if (needsCleanup(td)) out.putIfAbsent(Mangle.cleanupName(td), td);
             if (td instanceof ArrayTypeDeclarer atd) collect(out, atd.element(), seen);
             return;
         }
         // 值类型含强引用内容（定长数组/元组/内嵌类值）→ cleanup_val_<key>
         // （declareVar 的 valueCleanupFn 引用，旧 CGenerator registerValueCleanup 语义）
         if (ref.none() && !isLeafValue(td) && needsDestroy(td)) {
-            out.add(td);
+            out.putIfAbsent(Mangle.cleanupName(td), td);
         }
         if (td instanceof ArrayTypeDeclarer atd) {
             collect(out, atd.element(), seen);

@@ -1,0 +1,72 @@
+// @Sync 数组引用（SRef 数组是 {.$values, .$length} 胖指针）后端支持验证。
+//
+// 规则：数组元素不能标注属性，$values 按普通引用处理——
+//   * 未标注 @Sync          → 非原子计数器（Feng$inc_ns / cleanup_arr_<ek>_ns）
+//   * @Sync 变量 / const 字段 → 原子计数器（Feng$inc / cleanup_arr_<ek>）
+//   * @Sync var 字段         → 自旋锁（锁位借用 $values 的 bit 0；
+//                             读 Feng$load_sl_array、写 Feng$swap_sl_array、
+//                             析构先 Feng$unmask_sfield_array 再统一释放）
+// $length 与 $values 必须在同一临界区内成对读写，否则会读到不匹配的 (指针, 长度)。
+
+class ConstArr {
+    @Sync const c [*]int;
+}
+
+class VarArr {
+    @Sync var v [*]int;
+}
+
+class PlainArr {
+    var p [*]int;
+}
+
+// 局部 @Sync 变量：$values 原子计数（FENG$DEC(Feng$cleanup_arr_Int)）
+func testLocal() {
+    @Sync var a [*]int = new([4]int);
+    assert(a != nil);
+    assert(a.length == 4);
+    a[0] = 42;
+    assert(a[0] == 42);
+}
+
+func testFields() {
+    var c = new(ConstArr, {c = new([4]int)});
+    var v = new(VarArr, {v = new([4]int)});
+    var p = new(PlainArr, {p = new([4]int)});
+
+    c.c[0] = 1;
+    v.v[0] = 2;
+    p.p[0] = 3;
+    assert(c.c[0] == 1);
+    assert(v.v[0] == 2);
+    assert(p.p[0] == 3);
+
+    // const 字段读：普通成员访问 + 原子 inc（构造后不再写，无需锁）
+    @Sync var x [*]int = c.c;
+    x[0] = 11;
+    assert(c.c[0] == 11);
+
+    // var 字段读：锁读（返回值已 +1），与字段共享同一块 $values
+    @Sync var y [*]int = v.v;
+    y[0] = 22;
+    assert(v.v[0] == 22);
+
+    // var 字段写：锁写；旧值连同旧长度在锁内成对取出后交分型 cleanup 释放
+    v.v = new([8]int);
+    assert(v.v.length == 8);
+    v.v[7] = 77;
+
+    @Sync var z [*]int = v.v;
+    assert(z.length == 8);
+    assert(z[7] == 77);
+
+    // 连续两次写入：旧值必须按各自的旧长度级联释放
+    v.v = new([2]int);
+    assert(v.v.length == 2);
+    assert(v.v[0] == 0);
+}
+
+func main() {
+    testLocal();
+    testFields();
+}

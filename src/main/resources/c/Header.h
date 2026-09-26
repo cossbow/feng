@@ -277,6 +277,69 @@ typedef struct {
     Int64 $length;
 } Feng$ArrayPRef;
 
+// ===== sync var array-field spinlock (fat pointer {.$values, .$length}) =====
+// SRef 数组字段是胖指针结构，$values 复用标量 sync 字段同款 bit-0 自旋锁；
+// $length 与 $values 在同一临界区内读写，保证读到成对的 (values, length)。
+// 旧值的元素级联析构是 per-element-type 的，仍由生成的 cleanup_arr_<ek> 负责。
+//
+// 胖指针布局与 Feng$ArraySRef_<ek> / Feng$ArrayPRef_<ek> 一致：首字 $values，
+// 次字 $length（见 TypeWriter.writeArray）。
+
+// 锁读：返回已 +1 的 $values，长度写回 *outLength。
+static inline void* Feng$load_sl_array(void* slot, Int64* outLength) {
+    void** f = (void**)slot;                                  // $values 是首字
+    Int64* len = (Int64*)((char*)slot + sizeof(void*));
+    uintptr_t raw, locked;
+    do {
+        raw = atomic_load((atomic_uintptr_t*)f);
+        while (raw & 1) {
+            raw = atomic_load((atomic_uintptr_t*)f);
+        }
+        locked = raw | 1;
+    } while (!atomic_compare_exchange_weak((atomic_uintptr_t*)f, &raw, locked));
+    // lock acquired; read ptr & inc refcnt
+    void* p = (void*)(raw & ~(uintptr_t)1);
+    if (p && !Feng$headerOf(p)->global) {
+        int* prc = &Feng$headerOf(p)->refcnt;
+        atomic_fetch_add((atomic_int*)prc, 1);
+    }
+    *outLength = *len;
+    // unlock — restore original raw value (bit 0 clear again)
+    atomic_store((atomic_uintptr_t*)f, raw);
+    return p;
+}
+
+// 锁写：newValues 的所有权转移给槽位（调用方已持有一份引用，内部不再 +1）；
+// 旧值连同其长度写入 *outOld，由调用方交 cleanup_arr_<ek> 释放
+// （旧指针与旧长度必须成对取，故在锁内一并取出）。
+static inline void Feng$swap_sl_array(void* slot, void* newValues, Int64 newLength,
+                                      Feng$ArrayPRef* outOld) {
+    void** f = (void**)slot;
+    Int64* len = (Int64*)((char*)slot + sizeof(void*));
+    uintptr_t raw, locked;
+    do {
+        raw = atomic_load((atomic_uintptr_t*)f);
+        while (raw & 1) {
+            raw = atomic_load((atomic_uintptr_t*)f);
+        }
+        locked = raw | 1;
+    } while (!atomic_compare_exchange_weak((atomic_uintptr_t*)f, &raw, locked));
+    // lock acquired; snapshot old (values, length) pair
+    outOld->$values = (void*)(raw & ~(uintptr_t)1);
+    outOld->$length = *len;
+    *len = newLength;
+    // store & unlock in one atomic write (bit 0 always 0 for stored values)
+    atomic_store((atomic_uintptr_t*)f, (uintptr_t)newValues);
+}
+
+// 析构用（独占访问，refcnt 已归零）：掩码并发 load/store 可能残留的锁位 bit 0，
+// 使槽位可直接交给 cleanup_arr_<ek> 统一释放（dec + 元素级联 + free）。
+static inline void Feng$unmask_sfield_array(void* slot) {
+    void** f = (void**)slot;
+    uintptr_t raw = atomic_load((atomic_uintptr_t*)f);
+    *f = (void*)(raw & ~(uintptr_t)1);
+}
+
 // ===== enum meta =====
 typedef struct {
     Int $value;

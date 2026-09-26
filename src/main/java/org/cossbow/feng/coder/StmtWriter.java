@@ -222,13 +222,26 @@ public class StmtWriter extends CWriter<StmtWriter> {
             }
             // 强引用：先求值新值（castRef），cleanup 旧槽位，再写入
             if (t instanceof ArrayTypeDeclarer atd) {
-                // 数组 SRef：类型化临时变量 + 数组 cleanup
+                // 数组 SRef：类型化临时变量 + 数组 cleanup（分型名，含 sync 的 _ns 区分）。
+                // 两种槽位都是「_t 取得新引用、释放旧槽位、再把 _t 交给槽位」的模式，
+                // 差别仅在于 sync var 字段的 $values 必须锁写。
                 var ek = Mangle.typeKey(atd.element());
                 write(o).write(" = ({ Feng$ArraySRef_").write(ek).write(" _t = ");
                 castRef(v, t);
-                write("; Feng$cleanup_arr_").write(ek).write("(&");
-                write(o);
-                write("); _t; })");
+                if (isSyncVarField(o)) {
+                    // sync var 字段：锁位在 $values（首字）；旧指针与旧长度必须在同一
+                    // 临界区内成对取出，故经 swap_sl_array 写回，旧值交分型 cleanup
+                    // （dec + 元素级联 + free）。
+                    write("; Feng$ArrayPRef _old; Feng$swap_sl_array(&(");
+                    write(o);
+                    write("), (void*)_t.$values, _t.$length, &_old); ")
+                            .write(Mangle.cleanupName(t))
+                            .write("((Feng$ArraySRef_").write(ek).write("*)&_old); _t; })");
+                } else {
+                    write("; ").write(Mangle.cleanupName(t)).write("(&");
+                    write(o);
+                    write("); _t; })");
+                }
             } else {
                 // 简单指针：void* 临时变量 + 槽位 cleanup
                 write(o).write(" = ({ void* _t = (void*)(");
@@ -265,6 +278,21 @@ public class StmtWriter extends CWriter<StmtWriter> {
     private StmtWriter castRef(Expression v, TypeDeclarer t) {
         context.exprs.castRef(v, t);
         return this;
+    }
+
+    /**
+     * sync var 字段判别（与 {@code ExprWriter.isSyncVarField} 同规则）：类型 {@code markSync}
+     * 且字段非 immutable 的类实例字段——读取走 {@code Feng$load_sl}、写入走锁写
+     * （数组为 {@code Feng$swap_sl_array}）、释放走锁位清理（掩码后再 dec/free）。
+     */
+    private boolean isSyncVarField(Operand o) {
+        if (o.type.none() || !o.type.must().markSync()) return false;
+        if (!(o instanceof FieldOperand fo)) return false;
+        var st = fo.subject().resultType.get();
+        if (st.none() || !(st.get() instanceof DerivedTypeDeclarer dtd)
+                || !(dtd.def() instanceof ClassDefinition cd)) return false;
+        var cf = cd.allFields().tryGet(fo.field());
+        return cf.has() && !cf.get().immutable();
     }
 
     /**
@@ -779,8 +807,8 @@ public class StmtWriter extends CWriter<StmtWriter> {
             // → cleanup_<typeKey>[_ns]。Mangle.cleanupName 两者都正确命名。
             return Mangle.cleanupName(t);
         }
-        var cleanup = context.table.cleanups.get(t);
-        if (cleanup != null) {
+        var cleanup = context.table.cleanups.containsKey(Mangle.cleanupName(t));
+        if (cleanup) {
             return Mangle.cleanupName(t);
         }
         if (isClassLikeStrongRef(t)) {

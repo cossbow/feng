@@ -3657,7 +3657,7 @@ types, they can be divided into two categories:
     2. Interfaces cannot be instantiated; their references can only point to instances of a class. Therefore, the
        way to achieve sync is to annotate the interface with `@Sync`, indicating that it can only point to a
        syncable class.
-    3. First, [variable-length arrays](#arrays) are not syncable (array elements cannot be annotated with attributes).
+    3. First, arrays with reference-type elements are not syncable (elements can't be annotated with attributes).
        Since arrays can be nested, for an array to be syncable, the nesting path must contain no references. That is,
        all levels on the nesting path must be [fixed-length arrays](#arrays), and the innermost element must be syncable.
         1. Example 1: `[2][*]int`, `[2][*][4]int`, `[*][3][*]int`, etc.—all have variable-length arrays on the path
@@ -3665,7 +3665,13 @@ types, they can be divided into two categories:
         2. Example 2: `[2]*A`, `[2][4]*B`, etc.—the innermost element is a reference and is not syncable.
         3. Example 3: `[2]A`, `[2][4]B`, etc.—the innermost element is a value type, but the innermost element's
            type must be syncable.
-    4. Tuples are value types and, like arrays, support nesting. The previous discussion covered arrays alone, but
+        4. Example 4: `[*]A`, `[*][4]B`, etc.—variable-length arrays; the inner element's type must be syncable.
+        5. Example 5: `[*]*A`, `[*][4]*B`, etc.—variable-length arrays whose innermost element is a reference
+           and are not syncable.
+        6. Example 6: `[*][*]int`, `[*][2][*]int`, etc.—variable-length arrays with a variable-length array
+           (that is, an array reference) on the nesting path, and are therefore not syncable.
+    4. Tuples are value types, but tuples with reference-type elements are not syncable (elements can't be annotated
+       with attributes). Like arrays, they support nesting. The previous discussion covered arrays alone, but
        tuples and arrays can be nested within each other, making the situation slightly more complex: arrays are
        linear nesting, while tuples are tree-shaped nesting. Types composed of nested tuples and arrays are also
        tree-shaped, and each branch is a nesting path. During checking, each branch must satisfy the requirement
@@ -3718,11 +3724,14 @@ class B {
     var i *?int;             // Note: field i is not marked sync, so B is not syncable
 }
 class C {
-    var a1 [2]A;
-    // var a2 [*]A;         // ✖：First nesting level is a variable-length array, making C not syncable
-    // var a3 [2][*]A;      // ✖：Second nesting level is a variable-length array, making C not syncable
-    // var a4 [2][4]*A;     // ✖：Same as above
-    // var b1 [2]B;         // ✖：Type B is not syncable, making C not syncable
+    var a1 [2]A;              // ✔
+    // var a2 [*]A;           // ✖：Reference-type field without @Sync, making C not syncable
+    // var a3 [2][*]A;        // ✖：Second nesting level is a variable-length array, making C not syncable
+    // var a4 [2][4]*?A;      // ✖：The innermost level is a reference, making C not syncable
+    // var a5 [*][4]A;        // ✖：Reference-type field without @Sync, making C not syncable
+    // var a6 [*][4][*?][5]A; // ✖：An inner level contains a reference, making C not syncable
+    // var a7 [*][4]*?A;      // ✖：The innermost level is a reference, making C not syncable
+    // var b1 [2]B;           // ✖：Type B is not syncable, making C not syncable
 }
 func test() {
     @Sync var r *C = new(C);    // ✔：Type C has implemented sync

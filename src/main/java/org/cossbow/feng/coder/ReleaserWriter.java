@@ -193,18 +193,14 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
     /**
      * cleanup 前置声明：{@code static inline void Feng$cleanup_<key>(<td>* p);}
      * （source 内 FENG$DEC 引用需先声明后定义）。
-     * 按符号名去重：refer 变体（如 {@code [*?#]byte} 与 {@code [*#]byte}）cleanup 名
-     * 相同（Mangle.cleanupName 只依赖元素类型），避免重复声明。
+     * {@code cleanups} 已按符号名（{@link Mangle#cleanupName}）去重，无需再判重。
      */
     public void declareCleanups() {
         if (context.table.cleanups.isEmpty()) return;
         writeComment("cleanup declarations");
-        var emitted = new java.util.HashSet<String>();
-        for (var e : context.table.cleanups.entrySet()) {
-            var sym = symbolName(e.getValue().symbol());
-            if (!emitted.add(sym)) continue;
-            write("static inline void ").write(sym);
-            write('(').writeCleanupParam(e.getKey()).write(')').endStmt();
+        for (var c : context.table.cleanups.values()) {
+            write("static inline void ").write(symbolName(c.func().symbol()));
+            write('(').writeCleanupParam(c.type()).write(')').endStmt();
         }
         newLine();
     }
@@ -212,7 +208,6 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
     /**
      * cleanup 函数体：{@code static inline void Feng$cleanup_<key>(<td>* p) { body }}。
      * body 是 ReleaserBuilder 生成的 AST（引用参数变量 {@code p_<id>}）。
-     * 按符号名去重（与 declareCleanups 一致）。
      */
     public void writeCleanups() {
         if (context.table.cleanups.isEmpty()) return;
@@ -220,14 +215,11 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
         // cleanup 参数 p 是 C 层槽位指针：成员访问用 ->（AST 类型是结构体值）
         context.exprs.cleanupSlotPtr = true;
         try {
-            var emitted = new java.util.HashSet<String>();
-            for (var e : context.table.cleanups.entrySet()) {
-                var sym = symbolName(e.getValue().symbol());
-                if (!emitted.add(sym)) continue;
-                write("static inline void ").write(sym);
-                write('(').writeCleanupParam(e.getKey()).write(')');
+            for (var c : context.table.cleanups.values()) {
+                write("static inline void ").write(symbolName(c.func().symbol()));
+                write('(').writeCleanupParam(c.type()).write(')');
                 write(' ');
-                context.stmts.write(e.getValue().procedure().must().body());
+                context.stmts.write(c.func().procedure().must().body());
             }
         } finally {
             context.exprs.cleanupSlotPtr = false;
