@@ -23,14 +23,11 @@ trap cleanup EXIT
 
 function test_all() {
   i=1
-  ls tests | while read t; do
-      if [ "${t##*.}" != "feng" ]; then
-          continue
-      fi
+  find std-tests -name "*.feng" | while read t; do
       td="${out}/tmp-${i}"
       echo "=== testing ${t} ==="
       mkdir -p ${td}
-      $cmd $args -i tests/${t} -o ${td}
+      $cmd $args -i ${t} -o ${td}
       ${td}/test
       i=$((i+1))
   done
@@ -48,7 +45,7 @@ function test_one() {
     fi
     td="${out}/tmp-${n}"
     mkdir -p ${td}
-    $cmd $args ${c} -i tests/${f} -o ${td}
+    $cmd $args ${c} -i std-tests/${f} -o ${td}
     ${td}/test
 }
 
