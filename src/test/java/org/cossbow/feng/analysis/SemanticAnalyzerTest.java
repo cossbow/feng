@@ -3645,6 +3645,9 @@ public class SemanticAnalyzerTest {
         checkSucc("class A`T,S`{} class B`R,E`:A`E,R`{}");
         checkSucc("class A`T,S`{} class B`R,E`:A`int,R`{}");
         checkSucc("class A`T,S`{} class B`R,E`:A`bool,int`{}");
+
+        checkSucc("class A`T`{} func f(a *A`int`) {}");
+        checkFail("class A`T`{} func f(a *A) {}");
     }
 
     @Test

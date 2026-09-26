@@ -491,6 +491,8 @@ public class SemanticAnalyzer {
     private TypeDeclarer analyse(DerivedTypeDeclarer td) {
         analyse(td.generic());
         var def = findDef(td.derivedType());
+        if (td.generic().size() != def.generic().size())
+            return semantic("miss type arguments: %s", td.pos());
 
         var r = td.refer();
         r.use(this::analyse);
