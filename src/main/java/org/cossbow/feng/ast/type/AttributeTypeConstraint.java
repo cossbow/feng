@@ -71,6 +71,11 @@ public class AttributeTypeConstraint extends TypeConstraint {
         return attribute.type().equals(attr) ? Tri.YES : Tri.BOTH;
     }
 
+    @Override
+    public Tri has(Concept c) {
+        return Tri.BOTH;
+    }
+
     //
 
 

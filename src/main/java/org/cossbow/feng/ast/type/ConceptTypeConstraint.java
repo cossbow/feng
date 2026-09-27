@@ -60,6 +60,11 @@ public class ConceptTypeConstraint extends TypeConstraint {
         return concept.expr().hasAttr(attr);
     }
 
+    @Override
+    public Tri has(Concept c) {
+        return concept.expr().has(c);
+    }
+
     //
 
     @Override
@@ -75,6 +80,6 @@ public class ConceptTypeConstraint extends TypeConstraint {
 
     @Override
     public String toString() {
-        return concept.expr().toString();
+        return concept.toString();
     }
 }

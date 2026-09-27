@@ -480,7 +480,17 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitDefinedTypeConstraint(FengParser.DefinedTypeConstraintContext ctx) {
-        var definedType = (DefinedType) visit(ctx.definedType());
+        var dt = ctx.definedType();
+        // 优先解析概念约束（如内置的 Syncable）
+        if (dt.typeArguments() == null) {
+            var symbol = parseSymbol(dt.symbol());
+            if (symbol.module().none()) {
+                var concept = table.findConcept(symbol.name());
+                if (concept.has())
+                    return new ConceptTypeConstraint(posOf(ctx), concept.get());
+            }
+        }
+        var definedType = (DefinedType) visit(dt);
         return new DefinedTypeConstraint(posOf(ctx), definedType);
     }
 

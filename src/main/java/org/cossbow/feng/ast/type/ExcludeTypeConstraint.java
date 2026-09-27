@@ -72,6 +72,11 @@ public class ExcludeTypeConstraint extends TypeConstraint {
         return Tri.not(operand.hasAttr(attr));
     }
 
+    @Override
+    public Tri has(Concept c) {
+        return Tri.not(operand.has(c));
+    }
+
     //
 
     @Override

@@ -42,36 +42,43 @@ public class BinaryTypeConstraint extends TypeConstraint {
         return right;
     }
 
+    private boolean calc(boolean l, boolean r) {
+        return switch (operator) {
+            // 子集 ⊆ 交 ⟺ 分别 ⊆ 两侧
+            case AND -> l && r;
+            // 子集 ⊆ 并：⊆ 任一侧即可（不完整但不失 sound）
+            case OR -> l || r;
+        };
+    }
+
+    private Tri calc(Tri l, Tri r) {
+        return switch (operator) {
+            case AND -> Tri.meet(l, r);
+            case OR -> Tri.join(l, r);
+        };
+    }
+
+    //
+
     @Override
     public boolean contains(TypeDeclarer t) {
         if (t instanceof GenericTypeDeclarer gtd) {
             // 类型变量分支（§3.4）：委托 include 做集合包含
             return containsByConstraint(gtd);
         }
-        return switch (operator) {
-            case AND -> left.contains(t) && right.contains(t);
-            case OR -> left.contains(t) || right.contains(t);
-        };
+        return calc(left.contains(t), right.contains(t));
     }
 
     @Override
     public boolean include(TypeConstraint tc) {
         var x = normalize(tc);
         if (equals(x)) return true;
-        return switch (operator) {
-            // 子集 ⊆ 交 ⟺ 分别 ⊆ 两侧
-            case AND -> left.include(x) && right.include(x);
-            // 子集 ⊆ 并：⊆ 任一侧即可（不完整但不失 sound）
-            case OR -> left.include(x) || right.include(x);
-        };
+        return calc(left.include(x), right.include(x));
     }
 
     @Override
     public Tri referenced() {
-        return switch (operator) {
-            case AND -> Tri.meet(left.referenced(), right.referenced());
-            case OR -> Tri.join(left.referenced(), right.referenced());
-        };
+        return calc(left.referenced(), right.referenced());
     }
 
     @Override
@@ -84,10 +91,7 @@ public class BinaryTypeConstraint extends TypeConstraint {
 
     @Override
     public Tri newable() {
-        return switch (operator) {
-            case AND -> Tri.meet(left.newable(), right.newable());
-            case OR -> Tri.join(left.newable(), right.newable());
-        };
+        return calc(left.newable(), right.newable());
     }
 
     @Override
@@ -110,10 +114,14 @@ public class BinaryTypeConstraint extends TypeConstraint {
     public Tri hasAttr(Symbol attr) {
         var l = left.hasAttr(attr);
         var r = right.hasAttr(attr);
-        return switch (operator) {
-            case AND -> Tri.meet(l, r);
-            case OR -> Tri.join(l, r);
-        };
+        return calc(l, r);
+    }
+
+    @Override
+    public Tri has(Concept c) {
+        var l = left.has(c);
+        var r = right.has(c);
+        return calc(l, r);
     }
 
     //

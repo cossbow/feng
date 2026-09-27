@@ -1,9 +1,6 @@
 package org.cossbow.feng.ast.type;
 
-import org.cossbow.feng.ast.Entity;
-import org.cossbow.feng.ast.Exportable;
-import org.cossbow.feng.ast.Position;
-import org.cossbow.feng.ast.Symbol;
+import org.cossbow.feng.ast.*;
 
 final
 public class Concept extends Entity implements Exportable {
@@ -35,6 +32,17 @@ public class Concept extends Entity implements Exportable {
 
     public void expr(TypeConstraint expr) {
         this.expr = expr;
+    }
+
+    //
+
+    public static final Concept Syncable;
+
+    static {
+        Syncable = new Concept(
+                Position.ZERO, true,
+                new Symbol(new Identifier("Syncable")),
+                new SyncableTypeConstraint());
     }
 
     //

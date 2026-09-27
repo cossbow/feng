@@ -3,40 +3,32 @@ package org.cossbow.feng.ast.type;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDomain;
-import org.cossbow.feng.ast.dcl.GenericTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
 import java.util.EnumSet;
 
 /**
- * Constraint that matches reference types ({@code *any}).
- * <p>
- * A type satisfies this constraint if it is a reference type
- * ({@link TypeDeclarer#maybeRefer()} returns present).
+ * Builtin TypeConstraint: for check syncable
  */
-public class ReferTypeConstraint extends TypeConstraint {
-    public ReferTypeConstraint(Position pos) {
-        super(pos);
+public class SyncableTypeConstraint extends TypeConstraint {
+    public SyncableTypeConstraint() {
+        super(Position.ZERO);
     }
 
     @Override
     public boolean contains(TypeDeclarer t) {
-        if (t.maybeRefer().has()) return true;
-        return t instanceof GenericTypeDeclarer gtd
-                && containsByConstraint(gtd);
+        return TypeTool.checkSyncable(t);
     }
 
     @Override
     public boolean include(TypeConstraint tc) {
-        var x = normalize(tc);
-        if (equals(x)) return true;
-        // referenced() == YES ⟹ 集合中每个元素都是引用 → 全部命中 *any
-        return x.referenced() == Tri.YES;
+        // tc ⊆ Syncable ⟺ tc 必含 Syncable（sound，允许不完全）
+        return tc.has(Concept.Syncable) == Tri.YES;
     }
 
     @Override
     public Tri referenced() {
-        return Tri.YES;
+        return Tri.BOTH;
     }
 
     @Override
@@ -61,24 +53,23 @@ public class ReferTypeConstraint extends TypeConstraint {
 
     @Override
     public Tri has(Concept c) {
-        return Tri.BOTH;
+        return Concept.Syncable.equals(c) ?
+                Tri.YES : Tri.BOTH;
     }
 
-    //
-
     @Override
-    public boolean equals(Object c) {
-        return c instanceof ReferTypeConstraint;
+    public boolean equals(Object obj) {
+        return false;
     }
 
     @Override
     public int hashCode() {
-        return 1000;
+        return 0;
     }
 
     //
     @Override
     public String toString() {
-        return "*";
+        return "Syncable";
     }
 }

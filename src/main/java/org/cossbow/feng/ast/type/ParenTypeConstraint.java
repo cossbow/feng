@@ -62,6 +62,11 @@ public class ParenTypeConstraint extends TypeConstraint {
         return child.hasAttr(attr);
     }
 
+    @Override
+    public Tri has(Concept c) {
+        return child.has(c);
+    }
+
     //
 
 

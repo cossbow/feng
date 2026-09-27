@@ -77,6 +77,10 @@ public class ParseSymbolTable {
         }
     }
 
+    public void add(Concept c) {
+        concepts.add(c.symbol().name(), c);
+    }
+
     public void add(TypeDefinition def) {
         types.add(def.symbol().name(), def);
     }
@@ -119,7 +123,8 @@ public class ParseSymbolTable {
     public static boolean isBuiltin(Identifier name) {
         return BUILTIN.types.exists(name) ||
                 BUILTIN.functions.exists(name) ||
-                BUILTIN.variables.exists(name);
+                BUILTIN.variables.exists(name) ||
+                BUILTIN.concepts.exists(name);
     }
 
     /**
@@ -131,6 +136,7 @@ public class ParseSymbolTable {
     static {
         PrimitiveDefinition.types.forEach((k, v) ->
                 BUILTIN.types.add(new Identifier(k.code), v));
+        BUILTIN.add(Concept.Syncable);
         BUILTIN.add(AttributeDefinition.InheritDef);
         BUILTIN.add(AttributeDefinition.PackDef);
         BUILTIN.add(AttributeDefinition.AlignDef);

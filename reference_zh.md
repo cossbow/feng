@@ -3445,6 +3445,8 @@ concept objects = * & (class | interface);
 
 _由于是具名的，因此不可与定义的类型和全局变量同名。_
 
+目前内置的concept仅有`Syncable`，作用为[可同步](#可同步实例)的约束。
+
 ## 异常
 
 能被抛出的异常类型必须是内置异常`Exception`类或者它的子类，这个`Exception`的定义如下（内置）：
@@ -3679,6 +3681,9 @@ func test() {
         1. 例1：`([2][*]int, [2]int)`，元组的第一个元素是数组，其嵌套路径上有引用`[*]int`，不可同步。
         2. 例2：`[3](int, *A)`，数组的元素是元组，元组的第二个元素是引用，不可同步。
         3. 例3：`[3](int, A)`、`([2]int, [3]A)`，路径上无引用，是否可同步取决于类型`A`（因为`int`是可同步的）。
+3. 泛型必须要在[约束条件](#泛型约束)中带上内置的concept `Syncable`才能支持同步：
+   1. 泛型形参必须有`Syncable`约束条件才能被判定为可同步的，且泛型字段必须加`@Sync`标注。
+   2. 当约束条件有`Syncable`时，泛型实参必须是可同步的类型。
 
 例如下面的类`A`和`B`都是可同步的：
 
@@ -3759,16 +3764,34 @@ func test() {
 }
 ```
 
-目前此标记不支持泛型，包括类型和函数。
+泛型形参必须要有`Syncable`这个约束：
 
 ```feng
-// @Sync    // ✖：泛型类不能标注
-class Box`T` {
-    // @Sync    // ✖：泛型类中都不能标注
-    var t T;
+class A`T` {
+   @Sync var t T;    // 字段有@Sync，但类型T并没有Syncable约束，所以类A是不可同步的
 }
-// @Async    // ✖：泛型类不能标注
-class startThread`R`() {}
+class B`T Syncable` {
+   var t T;          // 类型T有Syncable约束，但字段没有@Sync，所以类B是不可同步的
+}
+class C`T Syncable` {
+   @Sync var t T;    // 类型T有Syncable约束，且字段有@Sync，所以类C是可同步的
+}
+// @Async func start1`E`(e E) {}          // 泛型形参E没有Syncable约束，自然不可同步
+@Async func start2`E Syncable`(e E) {}    // 泛型形参有Syncable约束，是可同步的
+```
+
+内置约束`Syncable`即要求类型实参是可同步的，下面就举个例子演示这个[约束](#泛型约束)：
+
+```feng
+class Box`E Syncable` {    // 参数E有约束Syncable
+   var el E;
+}
+class A { var i int; }
+class B { var i *?int; }
+func f() {
+   var b1 Box`A`;        // ✔：由于A是可同步的，可以被接受
+   //var b2 Box`B`;      // ✖：由于B是不可同步的，不能接受
+}
 ```
 
 ### 并发边界

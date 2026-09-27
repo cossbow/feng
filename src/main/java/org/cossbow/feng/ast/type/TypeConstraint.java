@@ -107,6 +107,12 @@ public class TypeConstraint extends Entity {
      */
     abstract public Tri hasAttr(Symbol attr);
 
+
+    /**
+     * 该约束在「是否包含特定concept」维度上的投影
+     */
+    abstract public Tri has(Concept c);
+
     //
 
     abstract public boolean equals(Object obj);

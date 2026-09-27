@@ -72,6 +72,7 @@ public class GenericMap {
     public TypeDeclarer mapIf(GenericTypeDeclarer gtd) {
         var t = find(gtd.param());
         if (t == null) return gtd;
+        t = (TypeDeclarer) t.clone(); // clone：防止后续修改状态
         if (next == null) return t;
         if (!t.hasTypeVar()) return t;
         return next.mapIf(t);
@@ -110,7 +111,7 @@ public class GenericMap {
     public TypeDeclarer mapIf(TypeDeclarer td) {
         if (isEmpty() || !td.hasTypeVar()) return td;
 
-        return switch (td) {
+        var nt = switch (td) {
             case GenericTypeDeclarer gt -> mapIf(gt);
             case DerivedTypeDeclarer dt -> mapIf(dt);
             case ArrayTypeDeclarer atd -> mapIf(atd);
@@ -118,6 +119,8 @@ public class GenericMap {
             case FuncTypeDeclarer otd -> mapIf(otd);
             default -> td;
         };
+        nt.markSync(td.markSync());
+        return nt;
     }
 
     public TypeArguments mapAll(TypeArguments tas) {

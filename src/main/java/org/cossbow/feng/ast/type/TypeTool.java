@@ -10,6 +10,10 @@ import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.ast.struct.StructureField;
 import org.cossbow.feng.util.Optional;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.cossbow.feng.ast.dcl.ReferKind.PHANTOM;
 import static org.cossbow.feng.util.ErrorUtil.semantic;
 import static org.cossbow.feng.util.ErrorUtil.unreachable;
 
@@ -172,5 +176,114 @@ public class TypeTool {
                     im.unmodifiable(), prot, im.returnThis());
         }
         return m;
+    }
+
+    //
+
+    private static boolean checkSyncable(
+            ClassDefinition cd,
+            GenericMap gm,
+            Map<DerivedType, Boolean> cache) {
+        for (var cf : cd.allFields()) {
+            var t = cf.type();
+            if (t.hasTypeVar()) t = gm.mapIf(t);
+            if (t instanceof GenericTypeDeclarer gtd) {
+                if (!(cd.markSync() || cf.type().markSync()))
+                    return false;
+                if (!checkSyncable(gtd))
+                    return false;
+                continue;
+            }
+            t.markSync(cf.type().markSync());
+            if (!cd.markSync() && (t.maybeRefer().has()
+                    && !t.markSync()))
+                return false;
+            if (!checkSyncable(t, cache))
+                return false;
+        }
+        return true;
+    }
+
+    private static boolean checkSyncable(
+            TupleTypeDeclarer ttd,
+            Map<DerivedType, Boolean> cache) {
+        for (var et : ttd.elements()) {
+            if (!checkSync(et, cache))
+                return false;
+        }
+        return true;
+    }
+
+    private static boolean checkSyncable(
+            DerivedTypeDeclarer dtd, GenericMap gm,
+            Map<DerivedType, Boolean> cache) {
+        var dt = dtd.derivedType();
+        var def = dt.def();
+        if (def instanceof InterfaceDefinition id)
+            return id.markSync(); // 接口只检查类标注
+
+        if (def instanceof ClassDefinition cd) {
+            var sync = cache.get(dt);
+            if (sync == null) {
+                gm = GenericMap.make(dtd, gm,
+                        cd.generic(), dt.generic());
+                sync = checkSyncable(cd, gm, cache);
+                cache.put(dt, sync);
+            }
+            return sync;
+        }
+        return true;
+    }
+
+    private static boolean checkSyncable(
+            GenericTypeDeclarer gtd) {
+        var c = gtd.param().constraint();
+        if (c.has()) {
+            var t = c.get().has(Concept.Syncable);
+            if (t != Tri.BOTH) {
+                return t == Tri.YES;
+            }
+        }
+        // 约束中没有 Syncable 承诺 → 不可同步
+        return false;
+    }
+
+    private static boolean checkSyncable(
+            TypeDeclarer td,
+            Map<DerivedType, Boolean> cache) {
+        if (td instanceof ArrayTypeDeclarer atd) {
+            return checkSync(atd.element(), cache);
+        }
+        if (td instanceof TupleTypeDeclarer ttd) {
+            return checkSyncable(ttd, cache);
+        }
+        if (td instanceof DerivedTypeDeclarer dtd) {
+            return checkSyncable(dtd, GenericMap.EMPTY, cache);
+        }
+        if (td instanceof GenericTypeDeclarer gtd) {
+            return checkSyncable(gtd);
+        }
+        return true;
+    }
+
+    public static boolean checkSyncable(TypeDeclarer td) {
+        return checkSyncable(td, new HashMap<>());
+    }
+
+    private static boolean checkSync(
+            TypeDeclarer td,
+            Map<DerivedType, Boolean> cache) {
+        var r = td.maybeRefer();
+        if (r.has()) {
+            if (!td.markSync())
+                return false; // 未标记@Sync
+            if (r.get().isKind(PHANTOM))
+                return false; // 补充检查虚引用
+        }
+        return checkSyncable(td, cache);
+    }
+
+    public static boolean checkSync(TypeDeclarer td) {
+        return checkSync(td, new HashMap<>());
     }
 }

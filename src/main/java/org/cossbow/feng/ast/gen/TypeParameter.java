@@ -2,6 +2,7 @@ package org.cossbow.feng.ast.gen;
 
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
+import org.cossbow.feng.ast.type.Concept;
 import org.cossbow.feng.ast.type.MemberSet;
 import org.cossbow.feng.ast.type.Tri;
 import org.cossbow.feng.ast.type.TypeConstraint;
@@ -95,6 +96,11 @@ public class TypeParameter extends Entity {
     public Tri hasAttr(Symbol attr) {
         if (constraint.none()) return Tri.BOTH;
         return constraint.get().hasAttr(attr);
+    }
+
+    public Tri has(Concept c) {
+        if (constraint.none()) return Tri.BOTH;
+        return constraint.get().has(c);
     }
 
     //

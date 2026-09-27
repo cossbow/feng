@@ -190,7 +190,7 @@ public class DefinedTypeConstraint extends TypeConstraint {
     @Override
     public Tri hasAttr(Symbol attr) {
         if (definedType instanceof PrimitiveType) {
-            return Tri.NO;     // 原始类型可 new
+            return Tri.NO;
         }
         if (definedType instanceof GenericType gt) {
             var oc = gt.param().constraint();
@@ -201,6 +201,15 @@ public class DefinedTypeConstraint extends TypeConstraint {
                     ? Tri.YES : Tri.NO;
         }
         return Tri.BOTH;
+    }
+
+    @Override
+    public Tri has(Concept c) {
+        if (definedType instanceof GenericType gt) {
+            var oc = gt.param().constraint();
+            return oc.none() ? Tri.BOTH : oc.get().has(c);
+        }
+        return Tri.NO;
     }
 
     //

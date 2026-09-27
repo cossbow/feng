@@ -4089,6 +4089,18 @@ public class SemanticAnalyzerTest {
     // Concurrent check
 
     @Test
+    public void testSyncType1() {
+        checkSucc("func f() { var r *int = new(int); }");
+        checkSucc("func f() { @Sync var r *int = new(int); }");
+        checkSucc("func f(r *int) { }");
+        checkSucc("func f(@Sync r *int) { }");
+
+        var d = "class A { var i *?int; } ";
+        checkSucc(d + "func f() { var a *?A; }");
+        checkSucc(d + "func f() { @Sync var a *?A; }");
+    }
+
+    @Test
     public void testAsyncFunction1() {
         checkSucc("@Async func t() {}");
 
@@ -4239,6 +4251,32 @@ public class SemanticAnalyzerTest {
     }
 
     @Test
+    public void testAsyncFunction9() {
+        checkSucc("@Async func t`E Syncable`(e E) {}");
+        checkFail("@Async func t`E`(e E){}");
+        checkSucc("@Async func t`E Syncable&class`(e E) {}");
+        checkFail("@Async func t`E Syncable|class`(e E) {}");
+    }
+
+    @Test
+    public void testAsyncFunction10() {
+        var d = "class A`T`{ @Sync var t T; } ";
+        checkSucc(d + "@Async func t`E Syncable`(e A`E`){}");
+        checkFail(d + "@Async func t`E`(e A`E`){}");
+
+        d = "@Sync class A`T`{ var t T; } ";
+        checkSucc(d + "@Async func t`E Syncable`(e A`E`){}");
+        checkFail(d + "@Async func t`E`(e A`E`){}");
+
+        d += " @Async func t`E Syncable`(a *A`E`) {} ";
+        checkSucc(d + "func f() { t`int`(new(A)); }");
+        checkSucc(d + "func f() { t`*?int`(new(A)); }");
+        d += "func f() { t`R`(new(A)); } ";
+        checkSucc(d + "class R { @Sync var i *?int; } ");
+        checkFail(d + "class R { var i *?int; } ");
+    }
+
+    @Test
     public void testAsyncMethod1() {
         var d = "class A {@Async func r(){}} ";
         checkSucc(d + "func t() {@Sync var a = new(A); a.r();}");
@@ -4253,11 +4291,41 @@ public class SemanticAnalyzerTest {
     }
 
     @Test
+    public void testAsyncMethod2() {
+        // 泛型方法：类与方法形参都需 Syncable，字段需 @Sync
+        var d = "class A`T Syncable` { @Sync var i T; } " +
+                "@Sync class T`E Syncable` { @Async func t(a *A`E`) {} } ";
+        checkSucc(d + "func f(@Sync a *T`*?int`) { a.t(new(A)); }");
+
+        d = "class A`T Syncable` { @Sync var i T; } class R { var i *?int; } " +
+                "@Sync class T`E Syncable` { @Async func t(a *A`E`) {} } ";
+        checkFail(d + "func f(@Sync a *T`R`) { a.t(new(A)); }");
+    }
+
+    @Test
+    public void testAsyncMethod3() {
+        var d = "class A`T Syncable` { @Sync var i T; } " +
+                "@Sync class T`E Syncable` { @Async func r(a *A`E`) {} } ";
+        checkSucc(d + "func f(@Sync t *T`*?int`) { t.r(new(A)); }");
+
+        d = "class A`T Syncable` { @Sync var i T; } class R { var i *?int; } " +
+                "@Sync class T`E Syncable` { @Async func r(a *A`E`) {} } ";
+        checkFail(d + "func f(@Sync t *T`R`) { t.r(new(A)); }");
+    }
+
+    @Test
     public void testAsyncAssign1() {
         var d = "class A{} class B:A{} ";
         checkSucc(d + "func f() { var v = new(A); var r = v; }");
         checkSucc(d + "func f() { @Sync var v = new(A); var r = v; }");
         checkSucc(d + "func f() { var v = new(A); var r = v; }");
+    }
+
+    @Test
+    public void testAsyncAssign2() {
+        checkSucc("@Async func t(a int) { var b = a; }");
+        var d = "class C{} ";
+        checkSucc(d + "@Async func f(a C) { var b = a; }");
     }
 
     @Test
@@ -4275,6 +4343,20 @@ public class SemanticAnalyzerTest {
         checkFail("func f(a *int) { @Sync var i *int = a; }");
         checkFail("func f(@Sync a *int) { var i *int = a; }");
         checkSucc("func f(@Sync a *int) { @Sync var i *int = a; }");
+    }
+
+    @Test
+    public void testAsyncSyncable1() {
+        // Syncable 概念：直接类型变量形参，只有带 Syncable 约束才可同步
+        checkFail("@Async func start1`E`(e E) {}");
+        checkSucc("@Async func start2`E Syncable`(e E) {}");
+
+        // 规则3.1 反例：泛型形参 E 无 Syncable 约束，即使字段 @Sync，A`E` 仍不可同步
+        checkFail("class A`T` { @Sync var v T; } @Async func t`E`(a *A`E`) {} " +
+                "func f() { t`int`(new(A)); }");
+        // 规则3.1 反例：泛型字段未 @Sync
+        checkFail("class A`T Syncable` { var v T; } @Async func t`E Syncable`(a *A`E`) {} " +
+                "func f() { t`int`(new(A)); }");
     }
 
     // TypeConstraint

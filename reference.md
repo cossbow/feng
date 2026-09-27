@@ -3582,6 +3582,8 @@ concept objects = * & (class | interface);
 
 _Since it is named, it cannot have the same name as a defined type or a global variable._
 
+Currently, the only built-in concept is `Syncable`, used for [syncable types](#syncable-instances).
+
 ## Exceptions
 
 The exception type that can be thrown must be the built-in `Exception` class or one of its subclasses. The definition of `Exception` is as follows
@@ -3856,6 +3858,10 @@ types, they can be divided into two categories:
            not syncable.
         3. Example 3: `[3](int, A)`, `([2]int, [3]A)` — no references on the path; whether they are syncable depends
            on type `A` (since `int` is syncable).
+3. Generics must carry the built-in concept `Syncable` in the [constraint](#generic-constraints) to support sync:
+   1. A generic type parameter must have the `Syncable` constraint to be judged syncable, and the generic field
+      must have the `@Sync` annotation.
+   2. When the constraint has `Syncable`, the generic type argument must be a syncable type.
 
 For example, both classes `A` and `B` below are syncable:
 
@@ -3937,16 +3943,35 @@ func test() {
 }
 ```
 
-Currently, this annotation does not support generics, including both types and functions.
+A generic type parameter must carry the `Syncable` constraint:
 
 ```feng
-// @Sync    // ✖：Generic class cannot be annotated
-class Box`T` {
-    // @Sync    // ✖：Cannot annotate within a generic class
-    var t T;
+class A`T` {
+   @Sync var t T;    // The field has @Sync, but type T has no Syncable constraint, so class A is not syncable
 }
-// @Async    // ✖：Generic class cannot be annotated
-class startThread`R`() {}
+class B`T Syncable` {
+   var t T;          // Type T has the Syncable constraint, but the field has no @Sync, so class B is not syncable
+}
+class C`T Syncable` {
+   @Sync var t T;    // Type T has the Syncable constraint and the field has @Sync, so class C is syncable
+}
+// @Async func start1`E`(e E) {}          // Generic type parameter E has no Syncable constraint, so it is not syncable
+@Async func start2`E Syncable`(e E) {}    // Generic type parameter has the Syncable constraint, so it is syncable
+```
+
+The built-in constraint `Syncable` requires the type argument to be syncable. Here is an example demonstrating this
+[constraint](#generic-constraints):
+
+```feng
+class Box`E Syncable` {    // Parameter E has the constraint Syncable
+   var el E;
+}
+class A { var i int; }
+class B { var i *?int; }
+func f() {
+   var b1 Box`A`;        // ✔：Since A is syncable, it is accepted
+   //var b2 Box`B`;      // ✖：Since B is not syncable, it is rejected
+}
 ```
 
 ### Concurrency Boundary

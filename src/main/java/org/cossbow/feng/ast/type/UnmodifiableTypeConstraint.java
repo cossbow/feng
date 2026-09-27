@@ -57,6 +57,11 @@ public class UnmodifiableTypeConstraint extends TypeConstraint {
         return Tri.BOTH;
     }
 
+    @Override
+    public Tri has(Concept c) {
+        return Tri.BOTH;
+    }
+
     //
 
     @Override

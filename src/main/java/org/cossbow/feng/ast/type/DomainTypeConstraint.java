@@ -36,8 +36,8 @@ public class DomainTypeConstraint extends TypeConstraint {
     }
 
     private static TypeDomain domainOf(TypeDeclarer t) {
-        if (t instanceof PrimitiveTypeDeclarer p) {
-            return p.primitive().type().domain();
+        if (t instanceof PrimitiveTypeDeclarer) {
+            return TypeDomain.PRIMITIVE;
         }
         if (t instanceof DerivedTypeDeclarer d) {
             return d.def().domain();
@@ -76,6 +76,11 @@ public class DomainTypeConstraint extends TypeConstraint {
 
     @Override
     public Tri hasAttr(Symbol attr) {
+        return Tri.BOTH;
+    }
+
+    @Override
+    public Tri has(Concept c) {
         return Tri.BOTH;
     }
 
