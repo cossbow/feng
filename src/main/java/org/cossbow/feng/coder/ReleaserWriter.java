@@ -413,9 +413,11 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
         dedent().write("}").newLine();
         newLine();
         // 优先级 101：晚于 globals_cleanup(102)，此时全局强引用已释放；
-        // 若有泄漏块，直接 _Exit(1) 让测试进程非零退出（_Exit 不重入清理）。
+        // 若有泄漏块，直接 _Exit(1) 让测试进程非零退出（_Exit 不重入清理，
+        // 且不冲刷 stdio，故先 fflush 保证统计可见）。
         write("__attribute__((destructor(101))) static void Feng$debug_fini(void) {").indent().newLine();
-        write("if (feng$debug(false) > 0) _Exit(1);").newLine();
+        write("int leaked = feng$debug(false);").newLine();
+        write("if (leaked > 0) { fflush(stdout); _Exit(1); }").newLine();
         dedent().write("}").newLine();
         write("#endif").newLine();
         newLine();
