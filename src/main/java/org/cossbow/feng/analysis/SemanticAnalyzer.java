@@ -3735,6 +3735,7 @@ public class SemanticAnalyzer {
                     ee.variable().type().must());
             case DereferExpression ee -> optimize(ee);
             case FunctionExpression ee -> optimize(ee);
+            case MethodExpression ee -> optimize(ee);
             case null, default -> unreachable();
         };
         g.a().resultType.set(g.b());
@@ -5412,6 +5413,10 @@ public class SemanticAnalyzer {
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(FunctionExpression e) {
+        return Groups.g2(e, e.resultType.must());
+    }
+
+    private Groups.G2<Expression, TypeDeclarer> optimize(MethodExpression e) {
         return Groups.g2(e, e.resultType.must());
     }
 
