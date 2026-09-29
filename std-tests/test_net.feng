@@ -76,11 +76,6 @@ func testTCPListenAndDial() {
     var rr = conn.read(rbuf);
     testing$assertTrue(rr == 2);
     testing$assertTrue(rbuf[0] == 79);
-
-    // Cleanup
-    accepted.close();
-    conn.close();
-    listener.close();
 }
 
 // ===== Socket: close / RAII =====
