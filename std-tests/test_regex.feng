@@ -1,0 +1,329 @@
+import std$testing;
+import std$regex;
+import std$string;
+
+@Test
+func testLiteral() {
+    var re = regex$compile("hello");
+    testing$assertTrue(re.matches("hello"));
+    testing$assertFalse(re.matches("hell"));
+    testing$assertFalse(re.matches("hello world"));
+    testing$assertTrue(re.find("hello world"));
+    testing$assertFalse(re.find("world"));
+}
+
+@Test
+func testAny() {
+    var re = regex$compile("a.c");
+    testing$assertTrue(re.matches("abc"));
+    testing$assertTrue(re.matches("a.c"));
+    testing$assertFalse(re.matches("ac"));
+    testing$assertFalse(re.matches("abbc"));
+}
+
+@Test
+func testAnchors() {
+    var re = regex$compile("^abc$");
+    testing$assertTrue(re.matches("abc"));
+    testing$assertFalse(re.matches("xabc"));
+    testing$assertFalse(re.matches("abcx"));
+    var re2 = regex$compile("^a");
+    testing$assertTrue(re2.find("abc"));
+    testing$assertFalse(re2.find("cba"));
+    var re3 = regex$compile("c$");
+    testing$assertTrue(re3.find("abc"));
+    testing$assertFalse(re3.find("cba"));
+}
+
+@Test
+func testClass() {
+    var re = regex$compile("[abc]+");
+    testing$assertTrue(re.matches("abca"));
+    testing$assertFalse(re.matches("abd"));
+    var re2 = regex$compile("[^abc]+");
+    testing$assertTrue(re2.matches("xyz"));
+    testing$assertFalse(re2.matches("abx"));
+    var re3 = regex$compile("[a-z]+");
+    testing$assertTrue(re3.matches("hello"));
+    testing$assertFalse(re3.matches("HELLO"));
+    var re4 = regex$compile("[a-z0-9]+");
+    testing$assertTrue(re4.matches("abc123"));
+    testing$assertFalse(re4.matches("ABC"));
+}
+
+@Test
+func testClassEdges() {
+    // ']' as first character is a literal; '-' literal at the end.
+    var re = regex$compile("[]a]+");
+    testing$assertTrue(re.matches("]]a"));
+    testing$assertFalse(re.matches("b"));
+    var re2 = regex$compile("[a-]+");
+    testing$assertTrue(re2.matches("a--"));
+    testing$assertFalse(re2.matches("b"));
+    var re3 = regex$compile("[-a]+");
+    testing$assertTrue(re3.matches("--a"));
+}
+
+@Test
+func testPreset() {
+    var re = regex$compile("\\d+");
+    testing$assertTrue(re.matches("12345"));
+    testing$assertFalse(re.matches("abc"));
+    var re2 = regex$compile("\\w+");
+    testing$assertTrue(re2.matches("abc_123"));
+    testing$assertFalse(re2.matches("a-b"));
+    var re3 = regex$compile("\\s+");
+    testing$assertTrue(re3.matches(" \t\n"));
+    testing$assertFalse(re3.matches("ab"));
+    var re4 = regex$compile("\\D+");
+    testing$assertTrue(re4.matches("abc"));
+    testing$assertFalse(re4.matches("a1"));
+    var re5 = regex$compile("[\\d]+");
+    testing$assertTrue(re5.matches("123"));
+    testing$assertFalse(re5.matches("abc"));
+}
+
+@Test
+func testQuantifiers() {
+    var re = regex$compile("a*");
+    testing$assertTrue(re.matches(""));
+    testing$assertTrue(re.matches("aaa"));
+    var re2 = regex$compile("a+");
+    testing$assertTrue(re2.matches("a"));
+    testing$assertFalse(re2.matches(""));
+    var re3 = regex$compile("ab?c");
+    testing$assertTrue(re3.matches("ac"));
+    testing$assertTrue(re3.matches("abc"));
+    testing$assertFalse(re3.matches("abbc"));
+}
+
+@Test
+func testBrace() {
+    var re = regex$compile("a{2,3}");
+    testing$assertTrue(re.matches("aa"));
+    testing$assertTrue(re.matches("aaa"));
+    testing$assertFalse(re.matches("a"));
+    testing$assertFalse(re.matches("aaaa"));
+    var re2 = regex$compile("a{2}");
+    testing$assertTrue(re2.matches("aa"));
+    testing$assertFalse(re2.matches("a"));
+    var re3 = regex$compile("a{2,}");
+    testing$assertTrue(re3.matches("aaaa"));
+    testing$assertFalse(re3.matches("a"));
+    var re4 = regex$compile("a{0,2}");
+    testing$assertTrue(re4.matches(""));
+    testing$assertTrue(re4.matches("aa"));
+    testing$assertFalse(re4.matches("aaa"));
+}
+
+@Test
+func testAlternation() {
+    var re = regex$compile("cat|dog");
+    testing$assertTrue(re.matches("cat"));
+    testing$assertTrue(re.matches("dog"));
+    testing$assertFalse(re.matches("bird"));
+    var re2 = regex$compile("a|ab");
+    // Leftmost-first: "a" wins over "ab".
+    var idx = re2.findIndex("ab");
+    testing$assertTrue(idx.0 == 0);
+    testing$assertTrue(idx.1 == 1);
+}
+
+@Test
+func testGroups() {
+    var re = regex$compile("(a+)(b+)");
+    var r = re.groups("aaabbb");
+    testing$assertTrue(r.0);
+    var gs = r.1;
+    testing$assertTrue(gs.length == 2);
+    testing$assertTrue(gs[0].byteLength() == 3);
+    testing$assertTrue(gs[1].byteLength() == 3);
+    testing$assertTrue(re.groupCount() == 2);
+}
+
+@Test
+func testNonCapturing() {
+    var re = regex$compile("(?:ab)+");
+    testing$assertTrue(re.matches("abab"));
+    var r = re.groups("abab");
+    testing$assertTrue(r.0);
+    var gs = r.1;
+    testing$assertTrue(gs.length == 0);
+}
+
+@Test
+func testGroupNotFound() {
+    var re = regex$compile("(a)|(b)");
+    var r = re.groups("b");
+    testing$assertTrue(r.0);
+    var gs = r.1;
+    // Group 1 did not participate.
+    testing$assertTrue(gs[0].isEmpty());
+    testing$assertTrue(gs[1].byteLength() == 1);
+}
+
+@Test
+func testFindIndex() {
+    var re = regex$compile("world");
+    var idx = re.findIndex("hello world!");
+    testing$assertTrue(idx.0 == 6);
+    testing$assertTrue(idx.1 == 11);
+    var re2 = regex$compile("z");
+    var idx2 = re2.findIndex("abc");
+    testing$assertTrue(idx2.0 == -1);
+    testing$assertTrue(idx2.1 == -1);
+}
+
+@Test
+func testEmptyMatch() {
+    var re = regex$compile("x*");
+    var idx = re.findIndex("aaa");
+    testing$assertTrue(idx.0 == 0);
+    testing$assertTrue(idx.1 == 0);
+}
+
+@Test
+func testWordBoundary() {
+    var re = regex$compile("\\bword\\b");
+    testing$assertTrue(re.find("a word here"));
+    testing$assertFalse(re.find("sword"));
+    testing$assertFalse(re.find("words"));
+    var re2 = regex$compile("\\Bword");
+    testing$assertTrue(re2.find("sword"));
+}
+
+@Test
+func testEscape() {
+    var re = regex$compile("a\\.b");
+    testing$assertTrue(re.matches("a.b"));
+    testing$assertFalse(re.matches("axb"));
+    var re2 = regex$compile("\\(\\)");
+    testing$assertTrue(re2.matches("()"));
+    var re3 = regex$compile("\\\\");
+    testing$assertTrue(re3.matches("\\"));
+    var re4 = regex$compile("a\\*b");
+    testing$assertTrue(re4.matches("a*b"));
+}
+
+@Test
+func testHexEscape() {
+    var re = regex$compile("\\x41");
+    testing$assertTrue(re.matches("A"));
+    var re2 = regex$compile("\\u0041");
+    testing$assertTrue(re2.matches("A"));
+    var re3 = regex$compile("\\n");
+    testing$assertTrue(re3.matches("\n"));
+    var re4 = regex$compile("\\t");
+    testing$assertTrue(re4.matches("\t"));
+}
+
+@Test
+func testReplaceAll() {
+    var re = regex$compile("o");
+    var s = re.replaceAll("hello", "0");
+    testing$assertTrue(s.byteLength() == 5);
+    testing$assertTrue(s.indexOfStr(string$utf8("hell0")) == 0);
+    var re2 = regex$compile("\\d+");
+    var s2 = re2.replaceAll("a1b22c", "#");
+    testing$assertTrue(s2.byteLength() == 5);
+    testing$assertTrue(s2.indexOfStr(string$utf8("a#b#c")) == 0);
+}
+
+@Test
+func testSplit() {
+    var re = regex$compile(",");
+    var parts = re.split("a,b,c");
+    testing$assertTrue(parts.length == 3);
+    testing$assertTrue(parts[0].byteLength() == 1);
+    testing$assertTrue(parts[1].byteLength() == 1);
+    testing$assertTrue(parts[2].byteLength() == 1);
+    var re2 = regex$compile("\\s+");
+    var parts2 = re2.split("a  b\tc");
+    testing$assertTrue(parts2.length == 3);
+    var re3 = regex$compile(",");
+    var parts3 = re3.split("abc");
+    testing$assertTrue(parts3.length == 1);
+}
+
+@Test
+func testTopLevel() {
+    testing$assertTrue(regex$matches("a+", "aaa"));
+    testing$assertFalse(regex$matches("a+", "b"));
+    testing$assertTrue(regex$find("[0-9]+", "abc123"));
+    var idx = regex$findIndex("\\d+", "ab12cd");
+    testing$assertTrue(idx.0 == 2);
+    var s = regex$replaceAll("l", "hello", "L");
+    testing$assertTrue(s.byteLength() == 5);
+    var parts = regex$split(",", "x,y");
+    testing$assertTrue(parts.length == 2);
+}
+
+@Test
+func testSyntaxErrors() {
+    try {
+        regex$compile("(a");
+        testing$fail(string$utf8("should have thrown"));
+    } catch(e *#regex$PatternSyntaxException) {
+        // expected
+    }
+    try {
+        regex$compile("[abc");
+        testing$fail(string$utf8("should have thrown"));
+    } catch(e *#regex$PatternSyntaxException) {
+        // expected
+    }
+    try {
+        regex$compile("a{2,1}");
+        testing$fail(string$utf8("should have thrown"));
+    } catch(e *#regex$PatternSyntaxException) {
+        // expected
+    }
+    try {
+        regex$compile("\\");
+        testing$fail(string$utf8("should have thrown"));
+    } catch(e *#regex$PatternSyntaxException) {
+        // expected
+    }
+}
+
+@Test
+func testNullableError() {
+    try {
+        regex$compile("(a*)*");
+        testing$fail(string$utf8("should have thrown"));
+    } catch(e *#regex$PatternSyntaxException) {
+        // expected
+    }
+    try {
+        regex$compile("(a?)+");
+        testing$fail(string$utf8("should have thrown"));
+    } catch(e *#regex$PatternSyntaxException) {
+        // expected
+    }
+}
+
+@Test
+func testNegatedClassInside() {
+    try {
+        regex$compile("[\\D]");
+        testing$fail(string$utf8("should have thrown"));
+    } catch(e *#regex$PatternSyntaxException) {
+        // expected
+    }
+}
+
+@Test
+func testEmail() {
+    var re = regex$compile("\\w+@\\w+\\.com");
+    testing$assertTrue(re.matches("user@example.com"));
+    testing$assertFalse(re.matches("user@example.org"));
+}
+
+@Test
+func testDollarBeforeNewline() {
+    // '$' matches before a trailing newline: "c" at (2,3) on "abc\n".
+    var re = regex$compile("c$");
+    var idx = re.findIndex("abc\n");
+    testing$assertTrue(idx.0 == 2);
+    testing$assertTrue(idx.1 == 3);
+}

@@ -1,6 +1,6 @@
 # Fēng Standard Library Reference
 
-> Last updated: 2026-08-12  
+> Last updated: 2026-09-28  
 > Covers all modules under `std/`, grouped by domain.
 
 ---
@@ -736,6 +736,45 @@ import std$util;
 
 ---
 
+## 15. Regular Expressions
+
+### `std$regex` — Regular Expression Engine
+
+```feng
+import std$regex;
+```
+
+Bytecode VM engine with an explicit backtracking stack (no recursion). A pattern is compiled to a bytecode program, then matched against byte sequences.
+
+**Supported syntax** (subset of PCRE / Go regexp):
+
+```
+.  ^  $  |  ( )  (?: )
+*  +  ?  {n}  {n,}  {n,m}
+[abc]  [^abc]  [a-z]  \d \w \s \D \W \S \b \B
+\n \t \r \f \v \0 \\ \xNN \uNNNN  and escaped metacharacters
+```
+
+| Symbol | Type | Signature / Description |
+|------|------|------------------------|
+| `PatternSyntaxException` | class : Exception | Thrown on invalid pattern (field `message String`) |
+| `Regex` | class | Compiled pattern |
+| `Regex.matches(s [&#]byte)` | method | `bool` the whole input must match |
+| `Regex.find(s [&#]byte)` | method | `bool` any substring may match |
+| `Regex.findIndex(s [&#]byte)` | method | `(int, int)` (start, end) of first match, (-1, -1) if none |
+| `Regex.groups(s [&#]byte)` | method | `(bool, [*]String)` capture groups of first match; unmatched group is EMPTY |
+| `Regex.groupCount()` | method | `int` number of capturing groups |
+| `Regex.replaceAll(s, rep [&#]byte)` | method | `String` replace every non-empty match with rep |
+| `Regex.split(s [&#]byte)` | method | `[*]String` split by non-empty matches |
+| `compile(pattern [&#]byte)` | func | `*Regex` compile, throws `PatternSyntaxException` |
+| `matches(pattern, s [&#]byte)` | func | `bool` one-shot convenience |
+| `find(pattern, s [&#]byte)` | func | `bool` one-shot convenience |
+| `findIndex(pattern, s [&#]byte)` | func | `(int, int)` one-shot convenience |
+| `replaceAll(pattern, s, rep [&#]byte)` | func | `String` one-shot convenience |
+| `split(pattern, s [&#]byte)` | func | `[*]String` one-shot convenience |
+
+---
+
 ## Module Dependency Graph
 
 ```
@@ -762,6 +801,7 @@ std$hash$sha256    ← SHA-256 (depends on std$encoding)
 std$os             ← file I/O (depends on std$string)
 std$path           ← paths (depends on std$string)
 std$net            ← networking (depends on std$string, std$error, std$net$platform)
+std$regex          ← regular expressions (depends on std$string)
 std$testing        ← testing (depends on std$string)
 ```
 
@@ -793,5 +833,6 @@ std$testing        ← testing (depends on std$string)
 | File I/O | `import std$os;` |
 | Path | `import std$path;` |
 | Networking | `import std$net;` |
+| Regular Expressions | `import std$regex;` |
 | Testing | `import std$testing;` |
 | Array Utils | `import std$util;` |

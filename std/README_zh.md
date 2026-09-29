@@ -1,6 +1,6 @@
 # Fēng 标准库参考手册
 
-> 最后更新：2026-08-12  
+> 最后更新：2026-09-28  
 > 涵盖所有 `std/` 下的模块，按功能域分组。
 
 ---
@@ -736,6 +736,45 @@ import std$util;
 
 ---
 
+## 15. 正则表达式
+
+### `std$regex` — 正则表达式引擎
+
+```feng
+import std$regex;
+```
+
+基于字节码 VM 的正则引擎，使用显式回溯栈（无递归）。模式先编译为字节码程序，再对字节序列执行匹配。
+
+**支持的语法**（PCRE / Go regexp 子集）：
+
+```
+.  ^  $  |  ( )  (?: )
+*  +  ?  {n}  {n,}  {n,m}
+[abc]  [^abc]  [a-z]  \d \w \s \D \W \S \b \B
+\n \t \r \f \v \0 \\ \xNN \uNNNN  以及转义元字符
+```
+
+| 符号 | 类型 | 签名 / 说明 |
+|------|------|------------|
+| `PatternSyntaxException` | class : Exception | 模式非法时抛出（字段 `message String`） |
+| `Regex` | class | 编译后的模式 |
+| `Regex.matches(s [&#]byte)` | method | `bool` 整个输入必须匹配 |
+| `Regex.find(s [&#]byte)` | method | `bool` 任一子串匹配即可 |
+| `Regex.findIndex(s [&#]byte)` | method | `(int, int)` 首次匹配的 (start, end)，无匹配返回 (-1, -1) |
+| `Regex.groups(s [&#]byte)` | method | `(bool, [*]String)` 首次匹配的捕获组；未匹配的组为 EMPTY |
+| `Regex.groupCount()` | method | `int` 捕获组个数 |
+| `Regex.replaceAll(s, rep [&#]byte)` | method | `String` 将所有非空匹配替换为 rep |
+| `Regex.split(s [&#]byte)` | method | `[*]String` 按非空匹配切割 |
+| `compile(pattern [&#]byte)` | func | `*Regex` 编译，非法模式抛 `PatternSyntaxException` |
+| `matches(pattern, s [&#]byte)` | func | `bool` 一次性便捷调用 |
+| `find(pattern, s [&#]byte)` | func | `bool` 一次性便捷调用 |
+| `findIndex(pattern, s [&#]byte)` | func | `(int, int)` 一次性便捷调用 |
+| `replaceAll(pattern, s, rep [&#]byte)` | func | `String` 一次性便捷调用 |
+| `split(pattern, s [&#]byte)` | func | `[*]String` 一次性便捷调用 |
+
+---
+
 ## 模块依赖关系
 
 ```
@@ -762,6 +801,7 @@ std$hash$sha256    ← SHA-256（依赖 std$encoding）
 std$os             ← 文件 I/O（依赖 std$string）
 std$path           ← 路径（依赖 std$string）
 std$net            ← 网络（依赖 std$string, std$error, std$net$platform）
+std$regex          ← 正则表达式（依赖 std$string）
 std$testing        ← 测试（依赖 std$string）
 ```
 
@@ -793,5 +833,6 @@ std$testing        ← 测试（依赖 std$string）
 | 文件 I/O | `import std$os;` |
 | 路径 | `import std$path;` |
 | 网络 | `import std$net;` |
+| 正则表达式 | `import std$regex;` |
 | 测试 | `import std$testing;` |
 | 数组工具 | `import std$util;` |
