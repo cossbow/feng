@@ -133,7 +133,7 @@ public class StmtWriter extends CWriter<StmtWriter> {
             v.value().use(e -> context.exprs.writeValue(e, t), () -> {
                 if (t instanceof ArrayTypeDeclarer) write("{}");
                 else if (t.maybeRefer().has()) write("NULL");
-                else write("{}");
+                else context.exprs.writeZeroValue(t);
             });
         });
     }

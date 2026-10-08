@@ -1,0 +1,25 @@
+// 嵌套值类型字段零值缺 $meta：b.a.far() 经引用虚派发读 $b.a.$meta
+
+class A {
+    var id int;
+    func boo() { this.id += 10; }
+    func far() { boo(); }
+}
+class B {
+    var a A;
+}
+
+func test() {
+    var b B;
+    b.a.far();
+    assert(b.a.id == 10);
+
+    // 显式空对象字面量同路径
+    var b2 B = {};
+    b2.a.far();
+    assert(b2.a.id == 10);
+}
+
+func main(args [&#][*?#]byte) {
+    test();
+}

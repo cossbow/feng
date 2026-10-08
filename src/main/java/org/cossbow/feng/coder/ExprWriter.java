@@ -689,12 +689,23 @@ public class ExprWriter extends CWriter<ExprWriter> {
             writeMetaBaseRef(cd, dt.derivedType());
         }
         var data = new ArrayList<org.cossbow.feng.util.Groups.G2<Identifier, Expression>>();
+        var zeros = new ArrayList<org.cossbow.feng.ast.Field>();
         for (var f : allFields) {
             var o = oe.entries().tryGet(f.name());
             if (o.has()) data.add(org.cossbow.feng.util.Groups.g2(f.name(), o.get()));
+            // 未指定字段：非 final 类值类型补递归零值（嵌套 $meta），
+            // 其他字段 C 零值（全 0 / NULL）即可
+            else if (needsZeroMeta(f.type())) zeros.add(f);
         }
-        if (cd != null && !cd.isFinal() && !data.isEmpty())
+        if (cd != null && !cd.isFinal() && (!zeros.isEmpty() || !data.isEmpty()))
             write(COMMA);
+        for (int i = 0; i < zeros.size(); i++) {
+            if (i > 0) write(COMMA);
+            var f = zeros.get(i);
+            write('.').write(f.name()).write('=');
+            writeZeroValue(f.type());
+        }
+        if (!zeros.isEmpty() && !data.isEmpty()) write(COMMA);
         joinByComma(data, g -> {
             write('.');
             if (sd != null && sd.cType()) write(g.a().value());
@@ -720,6 +731,50 @@ public class ExprWriter extends CWriter<ExprWriter> {
             user.accept(data.get(i));
         }
         return this;
+    }
+
+    /**
+     * 值类型零值发射：非 final 类值类型显式置 $meta 并递归其值类型字段。
+     * 嵌套字段（如 {@code class B { var a A; }} 的 {@code b.a}）零初始化缺
+     * $meta 时，经引用虚派发读 {@code $self->$meta} 解引用 NULL 段错误——
+     * 变量零值（StmtWriter.declareVar）与对象字面量字段零值
+     * （write(ObjectExpression)）统一走此方法。
+     */
+    ExprWriter writeZeroValue(TypeDeclarer t) {
+        // 引用类型零值 NULL（declareVar 前置处理，字段递归须排除）
+        if (t.maybeRefer().has()) {
+            write("NULL");
+            return this;
+        }
+        if (t instanceof DerivedTypeDeclarer dtd
+                && concreteClassDef(dtd.derivedType(), dtd.def())
+                    instanceof ClassDefinition cd
+                && !cd.isFinal()) {
+            write('(').writeType(t).write("){.$meta = ");
+            writeMetaBaseRef(cd, dtd.derivedType());
+            // $meta 已写，每个零值字段前需逗号
+            for (var f : cd.allFields().values()) {
+                if (!needsZeroMeta(f.type())) continue;
+                write(COMMA);
+                write('.').write(f.name()).write('=');
+                writeZeroValue(f.type());
+            }
+            write('}');
+        } else {
+            write("{}");
+        }
+        return this;
+    }
+
+    /**
+     * 零值须补 $meta 的字段类型：非 final 类值类型（final 类无 $meta，静态析构）。
+     */
+    private boolean needsZeroMeta(TypeDeclarer t) {
+        // 引用类型字段零值 NULL，无 $meta（*?Node 也是 DerivedTypeDeclarer）
+        if (t.maybeRefer().has()) return false;
+        if (!(t instanceof DerivedTypeDeclarer dtd)) return false;
+        var def = concreteClassDef(dtd.derivedType(), dtd.def());
+        return def instanceof ClassDefinition cd && !cd.isFinal();
     }
 
     // ---- 成员访问 / 索引 ----
