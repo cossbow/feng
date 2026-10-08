@@ -253,6 +253,11 @@ public class ArrayTypeDeclarer extends TypeDeclarer
         public boolean unmodifiable() {
             return unmodifiable;
         }
+
+        @Override
+        public boolean returnThis() {
+            return false;
+        }
     }
 
     public static final IdentifierMap<ArrayMethod> Methods = new IdentifierMap<>();

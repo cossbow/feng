@@ -848,6 +848,50 @@ func sample2() {
 }
 ```
 
+#### this返回类型
+
+方法的返回类型可以用`this`关键字代替，该方法将自动返回调用的实例本身，但在方法体内不能显示的写`return this;`，
+而是和无返回值一样：如果是提前返回则应该写`return;`，最后不用写`return;`语句。
+
+这个特性的作用是实现链式调用，例如：
+
+```feng
+class A {
+   var id int;
+   func far() this { this.id += 1; }
+   func empty() this {}
+   func ret() this {
+      if (id > 0) return;
+      id = 100;
+   }
+}
+func use1() {
+   var a A;
+   var id = a.far().far().id;   // 链式调用
+   assert(id == 2);
+}
+func use2(a *A) {
+   var id = a.far().far().id;   // 链式调用
+   assert(id == 2);
+}
+func use3(a &A) {
+   var id = a.far().far().id;   // 链式调用
+   assert(id == 2);
+}
+```
+
+由于是直接返回调用者本身，所以调用者支持的操作也可以直接操作，比如上面的A类可以这样：
+
+```feng
+func use4(a *A) {
+    const r &A = a.far(); // 支持虚引用借用
+}
+func use5(a A) {
+    var a1 = a;
+    var a2 = a1.far();  // 注意这里是值类型赋值，将会复制a1给a2
+}
+```
+
 ### this关键字
 
 `this`是一个类内部的特殊关键字，用于指代当前实例本身。

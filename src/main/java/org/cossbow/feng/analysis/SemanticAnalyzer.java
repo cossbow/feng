@@ -1209,6 +1209,10 @@ public class SemanticAnalyzer {
             semantic("method's @Sync status must same: %s <--> %s",
                     pm.pos(), sm.pos());
         }
+        if (pm.returnThis() != sm.returnThis()) {
+            semantic("methods must both return this or not: %s <--> %s",
+                    pm.pos(), sm.pos());
+        }
     }
 
     private Stream<ClassDefinition>
@@ -1759,7 +1763,7 @@ public class SemanticAnalyzer {
             case ArrayExpression ee -> passingParameters;
             case TupleExpression ee -> passingParameters;
             case NewExpression ee -> passingParameters;
-            case CallExpression ee -> passingParameters;
+            case CallExpression ee -> enablePhantom(lr, ee);
             case BlockExpression ee -> passingParameters;
             case EnumExpression ee -> false;
             default -> false;
@@ -1794,6 +1798,17 @@ public class SemanticAnalyzer {
 
     private boolean enablePhantom(Refer lr, TupleIndexExpression e) {
         return enablePhantom(lr, e.subject());
+    }
+
+    private boolean enablePhantom(Refer lr, CallExpression e) {
+        if (e.callee() instanceof MethodExpression me) {
+            var m = me.method();
+            if (m.returnThis()) {
+                // If the method return-this, check the subject
+                return enablePhantom(lr, me.subject());
+            }
+        }
+        return passingParameters;
     }
 
     private boolean enablePhantom(Refer lr, MemberOfExpression e) {
@@ -4306,7 +4321,7 @@ public class SemanticAnalyzer {
                 && be.origin().has())) {
             var n = new CallExpression(e.pos(), callee,
                     nArgs, e.variadic(), p);
-            var rt = p.returnType();
+            var rt = callReturnType(callee, p);
             return Groups.g2(n, rt);
         }
 
@@ -4322,6 +4337,15 @@ public class SemanticAnalyzer {
         tmpVar.type().set(rt);
         be.result().resultType.set(rt);
         return Groups.g2(be, rt);
+    }
+
+    private TypeDeclarer callReturnType(PrimaryExpression e,
+                                        Prototype p) {
+        if (e instanceof MethodExpression me
+                && me.method().returnThis()) {
+            return me.subject().resultType.must();
+        }
+        return p.returnType();
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(ConvertExpression e) {

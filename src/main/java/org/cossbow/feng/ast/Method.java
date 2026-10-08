@@ -25,6 +25,9 @@ public class Method extends Entity {
     public Prototype prototype();
 
     abstract
+    public boolean returnThis();
+
+    abstract
     public TypeParameters generic();
 
     abstract

@@ -262,8 +262,82 @@ public class SemanticAnalyzerTest {
     @Test
     public void testThis3() {
         var d = "class A{var id int; func m()this{}} ";
-        // TODO: return this
-//        checkSucc(d + "func f(a *A){var id = a.m().id;}");
+        checkSucc(d + "func f(a *A){var id = a.m().id;}");
+    }
+
+    @Test
+    public void testReturnThis() {
+        var d = "class A{var id int; ";
+        // 空方法体：方法变 void，无 return 合成
+        checkSucc(d + "func m()this{}} func f(a *A){var x = a.m().id;}");
+        // 方法体内 `return;` 保持 void 语义
+        checkSucc(d + "func m()this{return;}} func f(a *A){var x = a.m().id;}");
+        // 级联调用 + 前向调用（拆句链）
+        checkSucc(d + "func m()this{return;} func n()this{m(); return;}}" +
+                " func f(a *A){var x = a.m().n().id;}");
+        // 结果类型 = subject 类型（*A 强引用）：变量接收者可借为 phantom（lockVar）
+        checkSucc(d + "func m()this{return;}} func f(a *A){const b &A = a.m();}");
+        // 字段读接收者（可变强引用字段 c.a）：拒绝借用
+        checkFail(d + "func m()this{return;}} class C{var a*A;} func f(c *C){const b &A = c.a.m();}");
+        // 用户示例 f1/f2：变量接收者（强引用变量 / 值类型变量）结果可借
+        checkSucc("class A{func get()this{}} class C{var a*A;} func f1(){" +
+                "var a = new(A); var c = new(C,{a=a}); const r1 &A = a.get();}");
+        checkSucc("class A{func get()this{}} class C{var a*A;} func f2(){" +
+                "var a A; var c C = {a=new(A)}; const r1 &A = a.get();}");
+        // 用户示例 f1/f2：同一代码中字段读接收者 c.a.get() 拒绝
+        checkFail("class A{func get()this{}} class C{var a*A;} func f1(){" +
+                "var a = new(A); var c = new(C,{a=a}); const r2 &A = c.a.get();}");
+        checkFail("class A{func get()this{}} class C{var a*A;} func f2(){" +
+                "var a A; var c C = {a=new(A)}; const r2 &A = c.a.get();}");
+        // 带值 return 与 void 方法一致：不允许
+        checkFail("class A{func m()this{return 1;}}");
+        checkFail("class A{func m()this{return this;}}");
+        // 非终止路径：方法变 void，末尾掉出合法
+        checkSucc("class A{func m(c bool)this{if(c){return;}}}");
+        checkSucc("class A{func m(c bool)this{if(c){return;}return;}}");
+        // 逃逸方法：subject 强引用，结果强引用 *A
+        checkSucc("class A{func m*()this{}} func f(a *A){var b *A = a.m();}");
+        checkSucc("class A{func m*()this{return;}} func f(a *A){var b *A = a.m();}");
+        // 逃逸方法结果同样可借：借用资格只看 subject 稳定性（变量 → lockVar 可借）
+        checkSucc("class A{func m*()this{}} func f(a *A){const b &A = a.m();}");
+        // 逃逸方法链 + 非逃逸续调：结果仍是 subject 强引用，可解析字段
+        checkSucc("class A{var id int; func far*()this{this.id+=1;} func boo()this{this.id+=10;}}" +
+                " func f(a *A){var x = a.far().boo().id;}");
+        // 非逃逸结果 = subject 强引用 *A，可赋给强引用
+        checkSucc("class A{func m()this{}} func f(a *A){var b *A = a.m();}");
+        // 逃逸方法仅强引用可调用（checkEscaped）：值类型接收者报错
+        checkFail("class A{func m*()this{}} func f(){var a A; var b = a.m();}");
+        // 接口逃逸方法：结果 = subject 类型 *A，强→强可赋 *I
+        checkSucc("interface I{clone*()this;} class A(I){func clone*()this{return;}}" +
+                " func f(a *A){var b *I = a.clone();}");
+        // 接口非逃逸方法：变量接收者结果可借为 &I phantom 绑定
+        checkSucc("interface I{clone()this;} class A(I){func clone()this{return;}}" +
+                " func f(a *A){const b &I = a.clone();}");
+        // 混合 override 签名（父 returnThis + 子 void）拒绝——returnThis 是签名契约
+        checkFail("class A{func m()this{}} class B:A{func m(){}}");
+        // 反向混合（父 void + 子 returnThis）同样拒绝
+        checkFail("class A{func m(){}} class B:A{func m()this{}}");
+        // 接口 implements 的 returnThis 混配（接口 returnThis + 类 void）拒绝
+        checkFail("interface I{clone()this;} class A(I){func clone(){}}");
+        // 类型传递：子类接收者调用父类 returnThis，结果 = 子类引用（*B）
+        checkSucc("class A{func m()this{return;}} class B:A{var extra int;}" +
+                " func f(b *B){var x = b.m().extra;}");
+        checkSucc("class A{func m*()this{return;}} class B:A{var extra int;}" +
+                " func f(b *B){var q *B = b.m(); var x = q.extra;}");
+        // 类型传递：子类非逃逸结果 = subject 强引用 *B，可赋强引用
+        checkSucc("class A{func m()this{}} class B:A{}" +
+                " func f(b *B){var q *B = b.m();}");
+        // 值类型接收者：结果 = 值类型 B，变量可借为 &B phantom 绑定
+        checkSucc("class B{var id int; func m()this{this.id+=1;}}" +
+                " func f(){var b B; const r &B = b.m();}");
+        // 值接收者链（phantom 接收者）：&B 虚引用接收者，结果 &B，可赋 const &B
+        checkSucc("class B{var id int; func m()this{this.id+=1;}}" +
+                " func f(r &B){const s &B = r.m();}");
+        // 值接收者字段读：拆句后作用于原 lvalue，可解析字段
+        checkSucc("class B{var id int; func m()this{this.id+=1;}}" +
+                " func f(){var b B; var x = b.m().id;}");
+        // 注：泛型类 returnThis 方法声明目前即失败（声明侧 enterClass.refer
+        // 对泛型类 mismatch type arguments），属既有缺陷，泛型类型传递暂不可测
     }
 
     @Test

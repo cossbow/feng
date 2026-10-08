@@ -1,0 +1,87 @@
+// returnThis 特性运行时验证：虚派发 override、继承槽位复用、接口派发
+interface I {
+    clone()this;
+}
+
+class A {
+    var id int;
+    func far()this { this.id += 1; }
+}
+
+class B : A {
+    var tag int;
+    func far()this { this.id += 2; }
+}
+
+class D : A {
+    var extra int;
+}
+
+class C(I) {
+    var id int;
+    func clone()this { this.id += 1; }
+}
+
+func test() {
+    // 1. 虚派发 + override：B.far 返回接收者
+    var p *B = new(B);
+    p.far();
+    assert(p.id == 2);
+    const q &B = p.far();
+    assert(q == p);
+    assert(p.id == 4);
+
+    // 2. 继承未 override：父 vtable 槽位复用，虚派发到 A.far
+    var d *D = new(D);
+    d.far();
+    assert(d.id == 1);
+    const s &D = d.far();
+    assert(s == d);
+    assert(d.id == 2);
+
+    // 3. 基类指针调用被 override 的方法：仍虚派发到 B.far
+    var a *A = new(B);
+    a.far();
+    assert(a.id == 2);
+
+    // 4. 接口派发：非逃逸 returnThis 返回虚引用 &I
+    var c *C = new(C);
+    const ci &I = c.clone();
+    assert(ci == c);
+    assert(c.id == 1);
+
+    // 5. 语句形态链式：拆分块尾丢弃，无 inc 无泄漏
+    p.far().far();
+    assert(p.id == 8);
+
+    // 6. 强引用绑定：块尾 inc 由 q2 的 cleanup 平衡
+    var q2 *B = p.far();
+    assert(q2 == p);
+    assert(p.id == 10);
+    q2.far();
+    assert(p.id == 12);
+
+    // 7. 链式绑定到强引用：尾 inc 由 s2 的 cleanup 平衡
+    var s2 *B = p.far().far();
+    assert(s2 == p);
+    assert(p.id == 16);
+
+    // 8. 链式绑定到虚引用：尾不 inc（无释放者，不得产生计数）
+    const t &B = p.far().far();
+    assert(t == p);
+    assert(p.id == 20);
+
+    // 9. 接口链式绑定到虚引用：尾不 inc
+    const ci2 &I = c.clone().clone();
+    assert(ci2 == c);
+    assert(c.id == 3);
+
+    // 10. 接口链式绑定到强引用：尾 inc 由 cj 的 cleanup 平衡
+    var cj *I = c.clone().clone();
+    assert(cj == c);
+    assert(c.id == 5);
+}
+
+func main(args [&#][*?#]byte) {
+    test();
+}

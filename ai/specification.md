@@ -634,6 +634,32 @@ classMemberMethod  = functionDefinition
 4. [MUST] Parameters and escape/unmodifiable markers must match exactly.
 5. [MUST] Covariance (polymorphism and abstraction) does NOT apply to final classes; reference types cannot be converted to or from a final class.
 
+#### this Return Type
+
+A method may declare `this` as its return type (`returnSet = "this"`, see §4.2) — a sugar
+meaning the method always returns the current instance, enabling chained (cascading) calls.
+
+**Rules:**
+1. [MUST] The method always returns the current instance. A bare `return;` desugars to
+   `return this;`; `return value;` is rejected just as in a void method.
+2. [MUST] When the body does not terminate (including an empty body), `return this;` is
+   appended automatically; writing `return this;` explicitly is forbidden.
+3. [MUST] The effective return type is a reference to the current class: a phantom reference
+   (`&A`) in an ordinary method, or a strong reference (`*A`) in an escape method (marked `*`,
+   see §7.2).
+4. [MUST] The returned reference carries the receiver's dynamic type and dispatch stays
+   virtual: calling through a base-class reference invokes the most-derived override.
+5. [MUST] Chained (cascading) calls are memory-safe: each intermediate result is carried as a
+   phantom reference (a borrow) that never extends the instance's lifetime. Binding the final
+   result to a strong reference (`var *A`) keeps the instance alive, balanced by that
+   variable's own cleanup; binding to a phantom reference (`const &A`) borrows without
+   retaining. No chained form retains the instance twice or leaks it.
+6. [MUST] Interface methods support `this` too: `interface I { clone()this; }` — the
+   interface-typed result follows the same phantom/strong binding rules (see §4.4).
+7. [MUST] A value-type receiver is supported: the method returns a phantom reference (`&A`)
+   to that receiver, so chained calls operate on the same instance, and
+   `var a2 = a.far()` copies the receiver's value into `a2`.
+
 #### final Class
 
 [MUST] A class declared with the `final` keyword is a final class. Classes without `final` are non-final classes.
@@ -670,6 +696,9 @@ interfaceMemberMethod = name "(" [parametersSet] ")" [returnSet] ";"
 5. [MUST] A composed interface can be passed where a component interface is expected.
 6. [MUST] A class implementing an interface must provide all methods.
 7. [MUST] Both final and non-final classes can implement interfaces. However, since covariance applies only to non-final classes, an interface reference can only point to a non-final implementing class instance.
+8. [MUST] An interface method may use `this` as its return type (see §4.3 this Return Type);
+   an implementing class method must then return the current instance, and the interface-typed
+   result is bound under the same phantom/strong rules.
 
 ### 4.5 Enums
 
@@ -1103,6 +1132,8 @@ Execution order:
 2. [MUST] The returned value must be type-compatible with the declared return type.
 3. [MUST] A function with a return type must have a terminating statement on every reachable path.
 4. [MUST] An infinite loop (condition provably always `true` at compile time) counts as a terminating statement.
+5. [MUST] In a method whose return type is `this` (see §4.3), a bare `return;` is treated as
+   `return this;`; an explicit `return this;` is forbidden.
 
 ### 6.11 throw Statement
 

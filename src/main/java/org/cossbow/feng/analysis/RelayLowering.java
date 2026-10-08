@@ -2,6 +2,7 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.Identifier;
 import org.cossbow.feng.ast.IdentifierMap;
+import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
@@ -11,6 +12,7 @@ import org.cossbow.feng.ast.proc.Procedure;
 import org.cossbow.feng.ast.stmt.*;
 import org.cossbow.feng.ast.var.*;
 import org.cossbow.feng.util.Lazy;
+import org.cossbow.feng.util.Optional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +44,17 @@ import java.util.function.Function;
 public class RelayLowering {
 
     private final AnalyseSymbolTable ast;
+
+    // 拆块后继语句：声明形态 `var a1 = { chain; a }` 拆为无初值声明 `var a1 T;`
+    // + 后继块 `{ chain; a1 = a }`。该块必须扁平化为外层语句列表的兄弟语句
+    // （不能嵌套 BlockStatement）——a1 被后续语句引用时嵌套会破坏作用域。
+    // 由消费方 lowerStatementInto 在每条语句之后收集展平。
+    private final ArrayList<Statement> splitSuffix = new ArrayList<>();
+
+    // 是否允许在当前上下文拆块：仅块体语句列表允许（lowerStatementInto 置 true）；
+    // for/if/switch init、upd、else、labeled target 等单语句位置置 false——链块
+    // 保留 BlockExpression 形态（强绑定本就平衡无泄漏，phantom init 属超边缘）。
+    private boolean allowChainSplit = true;
 
     public RelayLowering(AnalyseSymbolTable ast) {
         this.ast = ast;
@@ -100,9 +113,41 @@ public class RelayLowering {
     private BlockStatement lowerBlockStatement(BlockStatement bs) {
         var old = bs.list();
         var newList = new ArrayList<Statement>(old.size());
-        for (var s : old) newList.add(lowerStatement(s));
+        for (var s : old) lowerStatementInto(newList, s);
         bs.list(newList);
         return bs;
+    }
+
+    /**
+     * Lower a statement into {@code out}, flattening any chain-split suffix
+     * produced by this statement ({@code var a1 = { chain; a }} → {@code
+     * var a1 T;} followed by {@code { chain; a1 = a }}) as sibling statements.
+     */
+    private void lowerStatementInto(List<Statement> out, Statement s) {
+        var start = splitSuffix.size();
+        var prev = allowChainSplit;
+        allowChainSplit = true;
+        var lowered = lowerStatement(s);
+        allowChainSplit = prev;
+        out.add(lowered);
+        if (splitSuffix.size() > start) {
+            out.addAll(splitSuffix.subList(start, splitSuffix.size()));
+            splitSuffix.subList(start, splitSuffix.size()).clear();
+        }
+    }
+
+    /**
+     * Lower a statement in a single-statement position (for/if/switch init,
+     * updater, else branch, labeled target): chain splitting is disabled——
+     * a split declaration needs sibling statements this position cannot hold,
+     * and its variable must remain visible to the following control-flow scope.
+     */
+    private Statement lowerSingleStatement(Statement s) {
+        var prev = allowChainSplit;
+        allowChainSplit = false;
+        var r = lowerStatement(s);
+        allowChainSplit = prev;
+        return r;
     }
 
     private Branch lowerBranch(Branch br) {
@@ -118,8 +163,8 @@ public class RelayLowering {
 
     private ForStatement lowerStatement(
             ConditionalForStatement cfs) {
-        var init = cfs.initializer().map(this::lowerStatement);
-        var upd = cfs.updater().map(this::lowerStatement);
+        var init = cfs.initializer().map(this::lowerSingleStatement);
+        var upd = cfs.updater().map(this::lowerSingleStatement);
         var cond = lowerExpression(cfs.condition());
         var body = lowerBlockStatement(cfs.body());
         return new ConditionalForStatement(cfs.pos(),
@@ -131,10 +176,10 @@ public class RelayLowering {
             case CallStatement cs -> lowerCallStatement(cs);
             case BlockStatement bs -> lowerBlockStatement(bs);
             case IfStatement is -> {
-                var init = is.init().map(this::lowerStatement);
+                var init = is.init().map(this::lowerSingleStatement);
                 var cond = (lowerExpression(is.condition()));
                 var yes = lowerBlockStatement(is.yes());
-                var not = is.not().map(this::lowerStatement);
+                var not = is.not().map(this::lowerSingleStatement);
                 yield new IfStatement(is.pos(), init, cond, yes, not);
             }
             case ForStatement fs -> {
@@ -146,11 +191,22 @@ public class RelayLowering {
             }
             case ReturnStatement rs -> {
                 var v = rs.result().map(this::lowerExpression);
+                // return { chain; a } → { chain; return a }：块尾强 lvalue 直写，
+                // 消除生产者 inc；try-finally 时序不变（chain 先执行再走返回路径）。
+                if (v.has() && v.get() instanceof BlockExpression be
+                        && allowChainSplit && canSplitBlock(be)) {
+                    var stmts = new ArrayList<Statement>(be.block());
+                    var nrs = new ReturnStatement(rs.pos(), Optional.of(be.result()));
+                    rs.procedure().use(p -> nrs.procedure().set(p));
+                    nrs.local(rs.local());
+                    stmts.add(nrs);
+                    yield new BlockStatement(rs.pos(), stmts);
+                }
                 rs.result(v);
                 yield rs;
             }
             case SwitchStatement ss -> {
-                var init = ss.init().map(this::lowerStatement);
+                var init = ss.init().map(this::lowerSingleStatement);
                 var cond = lowerExpression(ss.value());
                 for (var br : ss.branches()) {
                     lowerBlockStatement(br.body());
@@ -172,6 +228,37 @@ public class RelayLowering {
                 for (var v : ds.variables()) {
                     v.value().update(this::lowerExpression);
                 }
+                // 拆块：var a1 = { chain; a } → var a1 T; + splitSuffix { chain; a1 = a }
+                // （无初值声明发射 = NULL；初值统一移到 suffix 顺序执行，保证多变量
+                //  声明左到右求值次序不变）。消除"块尾生产者 inc"——强绑定直写
+                //  lvalue 由槽位 cleanup 平衡，phantom 直写无计数，语句无值。
+                if (allowChainSplit && !ds.variables().isEmpty()) {
+                    var splitAny = false;
+                    for (var v : ds.variables()) {
+                        if (v.value().has() && v.value().must() instanceof BlockExpression be
+                                && canSplitBlock(be)) {
+                            splitAny = true;
+                            break;
+                        }
+                    }
+                    if (splitAny) {
+                        var suffix = new ArrayList<Statement>();
+                        for (var v : ds.variables()) {
+                            if (!v.value().has()) continue;
+                            var val = v.value().must();
+                            v.value().set(Lazy.nil());
+                            if (val instanceof BlockExpression be && canSplitBlock(be)) {
+                                suffix.add(new BlockStatement(ds.pos(),
+                                        chainAssignStmts(be, v)));
+                            } else {
+                                suffix.add(new AssignmentsStatement(ds.pos(),
+                                        List.of(new Assignment(ds.pos(),
+                                                makeVarOperand(v), val))));
+                            }
+                        }
+                        splitSuffix.addAll(suffix);
+                    }
+                }
                 yield ds;
             }
             case AssertStatement as -> lowerAssert(as);
@@ -180,7 +267,7 @@ public class RelayLowering {
                 yield new ThrowStatement(ts.pos(), e);
             }
             case LabeledStatement ls -> {
-                var tgt = lowerStatement(ls.target());
+                var tgt = lowerSingleStatement(ls.target());
                 yield new LabeledStatement(ls.pos(), ls.label(), tgt);
             }
             default -> s;
@@ -227,12 +314,44 @@ public class RelayLowering {
             }
         }
 
+        // 拆块：b.a = { chain; a } → { chain; b.a = a }（链按序插到其赋值之前，
+        // 保持多赋值语句左到右求值次序；块尾强 lvalue 直写，无生产者 inc）。
+        if (allowChainSplit && hasSplittableValue(as)) {
+            var stmts = new ArrayList<>(preStmts);
+            if (!pins.isEmpty()) stmts.add(new DeclarationStatement(as.pos(), pins));
+            var pending = new ArrayList<Assignment>();
+            for (var a : as.list()) {
+                if (a.value() instanceof BlockExpression be && canSplitBlock(be)) {
+                    if (!pending.isEmpty()) {
+                        stmts.add(new AssignmentsStatement(as.pos(), pending));
+                        pending = new ArrayList<>();
+                    }
+                    stmts.addAll(be.block());
+                    a.value(be.result());
+                    stmts.add(new AssignmentsStatement(as.pos(), List.of(a)));
+                } else {
+                    pending.add(a);
+                }
+            }
+            if (!pending.isEmpty()) stmts.add(new AssignmentsStatement(as.pos(), pending));
+            return new BlockStatement(as.pos(), stmts);
+        }
+
         if (pins.isEmpty() && preStmts.isEmpty()) return as;
 
         var stmts = new ArrayList<>(preStmts);
         if (!pins.isEmpty()) stmts.add(new DeclarationStatement(as.pos(), pins));
         stmts.add(as);
         return new BlockStatement(as.pos(), stmts);
+    }
+
+    private boolean hasSplittableValue(AssignmentsStatement as) {
+        for (var a : as.list()) {
+            if (a.value() instanceof BlockExpression be && canSplitBlock(be)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -419,7 +538,7 @@ public class RelayLowering {
             case DereferExpression de -> lowerDerefer(de);
             case BlockExpression be -> {
                 var newBlock = new ArrayList<Statement>(be.block().size());
-                for (var s : be.block()) newBlock.add(lowerStatement(s));
+                for (var s : be.block()) lowerStatementInto(newBlock, s);
                 be.block(newBlock);
                 var newResult = lowerExpression(be.result());
                 if (newResult != be.result()) {
@@ -634,6 +753,11 @@ public class RelayLowering {
      * May return a BlockExpression wrapping the call with temp vars.
      */
     private Expression lowerCallExpression(CallExpression ce) {
+        // 0: returnThis 调用（C 签名 void，返回值即接收者）→ 拆句为
+        //    { self.m(args); self }，由接收者表达式承载结果值
+        if (isReturnThisCall(ce)) {
+            return splitReturnThisCall(ce);
+        }
         // 1: lower arguments
         var newArgs = new ArrayList<Expression>(ce.arguments().size());
         for (var arg : ce.arguments()) newArgs.add(lowerExpression(arg));
@@ -734,6 +858,91 @@ public class RelayLowering {
         return be;
     }
 
+    // ---- returnThis split ----
+
+    /**
+     * A returnThis call has a void C signature (returnSet 空)——its value is
+     * the receiver itself. Split it into {@code { self.m(args); self }}: the
+     * inner call becomes a statement, the receiver becomes the block tail
+     * that carries the result value. Nested chains flatten recursively
+     * through {@link #lowerSubject} ({@code q.m1().m2()} → {@code
+     * { q.m1(); q.m2(); q }}).
+     * <p>
+     * 计数约定（强结果 ⟺ 生产者 inc）：
+     * <ul>
+     *   <li>绑定 / 存字段 / return：块 unbound → 外层 inc 跳过，块尾 inc 传递；</li>
+     *   <li>实参：块 unbound → 外层 pin 接住尾 inc；</li>
+     *   <li>语句：lowerCallStatement 丢弃块尾，无 inc 无泄漏。</li>
+     * </ul>
+     */
+    private Expression splitReturnThisCall(CallExpression ce) {
+        var me = (MethodExpression) ce.callee();
+
+        // 1: lower arguments (same rule as lowerCallExpression)
+        var newArgs = new ArrayList<Expression>(ce.arguments().size());
+        for (var arg : ce.arguments()) newArgs.add(lowerExpression(arg));
+
+        // 2: lower subject, hoisting nested split blocks flat
+        //    ({ q.m1(); q }.m2() → preStmts [q.m1()] + subject q)
+        var preStmts = new ArrayList<Statement>();
+        var subject = lowerSubject(me.subject(), preStmts);
+
+        // 3: a non-trivial subject (field read / temporary) would otherwise be
+        //    evaluated twice (inner call + block tail) — materialize it once
+        //    so the call and the tail alias one stable lvalue
+        if (needMaterializeSplitSubject(subject)) {
+            var pin = makePinVar(subject);
+            var pinExpr = new VariableExpression(subject.pos(), pin);
+            pinExpr.resultType.set(subject.resultType);
+            preStmts.add(new DeclarationStatement(subject.pos(), List.of(pin)));
+            subject = pinExpr;
+        }
+
+        // 4: pin unbound arguments
+        for (int i = 0; i < newArgs.size(); i++) {
+            var arg = newArgs.get(i);
+            if (arg.unbound() && needPin(arg.resultType.must())) {
+                var pin = makePinVar(arg);
+                var pinExpr = new VariableExpression(arg.pos(), pin);
+                pinExpr.resultType.set(arg.resultType);
+                newArgs.set(i, pinExpr);
+                preStmts.add(new DeclarationStatement(arg.pos(), List.of(pin)));
+            }
+        }
+
+        // 5: build { preStmts; self.m(args); self }
+        var newME = new MethodExpression(me.pos(), (PrimaryExpression) subject,
+                me.method(), me.generic());
+        newME.resultType.set(me.resultType);
+        var call = new CallExpression(ce.pos(), newME, newArgs,
+                ce.variadic(), ce.prototype().must());
+        call.resultType.set(ce.resultType);
+        preStmts.add(new CallStatement(ce.pos(), call));
+
+        var be = new BlockExpression(ce.pos(), preStmts, subject);
+        be.resultType.set(ce.resultType.must());
+        return be;
+    }
+
+    /**
+     * A returnThis call is recognized by the resolved method's returnThis
+     * flag——its C signature is void, so the call must be split.
+     */
+    private boolean isReturnThisCall(CallExpression ce) {
+        return ce.callee() instanceof MethodExpression me
+                && me.method().returnThis();
+    }
+
+    /**
+     * Only a plain lvalue (variable / this) can serve directly as both the
+     * inner call's receiver and the block tail; any other subject is
+     * materialized once so it isn't evaluated twice.
+     */
+    private boolean needMaterializeSplitSubject(Expression subject) {
+        return !(subject instanceof VariableExpression)
+                && !(subject instanceof CurrentExpression);
+    }
+
     private CallExpression pinReceiver(
             CallExpression ce, PrimaryExpression pinnedReceiver) {
         var me = (MethodExpression) ce.callee();
@@ -751,6 +960,46 @@ public class RelayLowering {
         newArgs.set(index, pinnedArg);
         return new CallExpression(ce.pos(), ce.callee(), newArgs,
                 ce.variadic(), ce.prototype().must());
+    }
+
+    // ---- chain-split helpers ----
+
+    /**
+     * A block expression can be split into plain statements when its result is a
+     * <em>bound strong lvalue</em>——e.g. a returnThis chain {@code { a.m(); a }}
+     * or a pinned member read {@code { var p = a.b; p.c }}. The block tail then
+     * needs no "producer inc": the bound lvalue is written straight to the
+     * consuming slot (strong slot inc is balanced by its own cleanup, phantom
+     * slot borrows without counting, statement discards the value).
+     */
+    private boolean canSplitBlock(BlockExpression be) {
+        var rt = be.resultType;
+        if (!rt.has()) return false;
+        if (!rt.must().checkRefer(ReferKind.STRONG)) return false;
+        return !be.result().unbound();
+    }
+
+    /**
+     * Build the suffix body {@code [chain stmts..., a1 = result]} for a
+     * declaration split.
+     */
+    private List<Statement> chainAssignStmts(BlockExpression be, Variable v) {
+        var stmts = new ArrayList<Statement>(be.block());
+        stmts.add(new AssignmentsStatement(be.pos(),
+                List.of(new Assignment(be.pos(), makeVarOperand(v), be.result()))));
+        return stmts;
+    }
+
+    /**
+     * A variable operand bound to the concrete {@link Variable}——synthetic
+     * assignments (declaration split) bypass symbol resolution, so the
+     * variable cache must be wired directly (StmtWriter reads it).
+     */
+    private VariableOperand makeVarOperand(Variable v) {
+        var ov = new VariableOperand(v.pos(), new Symbol(v.name()));
+        ov.variable().set(v);
+        v.type().use(ov.type::set);
+        return ov;
     }
 
     // ---- pinning helpers ----

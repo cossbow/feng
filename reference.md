@@ -900,6 +900,53 @@ func sample2() {
 }
 ```
 
+#### this Return Type
+
+The return type of a method may be replaced with the `this` keyword: the method automatically
+returns the instance on which it was called. Inside the body you must NOT write an explicit
+`return this;` — like a void method, write a bare `return;` for an early return, and no
+`return` statement at all at the end.
+
+This feature enables chained (cascading) calls, for example:
+
+```feng
+class A {
+   var id int;
+   func far() this { this.id += 1; }
+   func empty() this {}
+   func ret() this {
+      if (id > 0) return;
+      id = 100;
+   }
+}
+func use1() {
+   var a A;
+   var id = a.far().far().id;   // Chained call
+   assert(id == 2);
+}
+func use2(a *A) {
+   var id = a.far().far().id;   // Chained call
+   assert(id == 2);
+}
+func use3(a &A) {
+   var id = a.far().far().id;   // Chained call
+   assert(id == 2);
+}
+```
+
+Since the method returns the caller itself, any operation the caller supports can be applied to
+the result directly. For example, with the class above:
+
+```feng
+func use4(a *A) {
+    const r &A = a.far(); // Phantom (borrowed) reference is supported
+}
+func use5(a A) {
+    var a1 = a;
+    var a2 = a1.far();  // Note: value-type assignment — copies a1 into a2
+}
+```
+
 ### this Keyword
 
 `this` is a special keyword inside a class that refers to the current instance itself.

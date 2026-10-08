@@ -61,7 +61,7 @@ public class MethodExpression extends PrimaryExpression {
 
     @Override
     public String toString() {
-        return subject + "." + method.name() + method.prototype();
+        return subject + "." + method.name();
     }
 
     /**
