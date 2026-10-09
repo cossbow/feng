@@ -106,6 +106,10 @@ The following sections describe the definitions and usage of each syntactic elem
 
 A module is the basic unit of code management.
 
+As the unit of code organization, all files in the same directory belong to one module,
+and the module name equals the directory name, so the module name is not declared in
+files. The main requirements are:
+
 1. Global symbols within a module cannot be reused; it's the same as within a single file.
 2. Everything inside a module is visible internally. Cross-module access is limited to exported symbols.
 3. Module names correspond one-to-one with paths; module names are not declared in files. Directory names must follow
@@ -179,9 +183,10 @@ strings are only meaningful when processing characters.
 All built-in integer types are as follows:
 
 - Signed: `int8`/`int16`/`int32`/`int64`/`int`
-- Unsigned: `uint8`/`uint16`/`uint32`/`uint64`/`uint`
+- Unsigned: `byte`/`uint8`/`uint16`/`uint32`/`uint64`/`uint`
 
 The suffix number indicates bit width; types without a suffix are determined by the compilation target platform.
+`byte` is an 8-bit unsigned integer.
 
 The highest bit of signed numbers is the sign bit: `0` for positive, `1` for negative. Thus, signed numbers have one
 fewer bit for the numeric value.
@@ -210,7 +215,8 @@ The language itself does not check for overflow; programmers must handle it them
 ### Floating-Point Types
 
 Floating-point types are defined by the [IEEE 754 standard](https://standards.ieee.org/ieee/754/6210/), including
-single-precision `float32` and double-precision `float64`.
+`float`, `float32` and `float64`, where `float` and `float64` are 64-bit double-precision and `float32` is 32-bit
+single-precision. Float literals default to type `float`.
 
 Floating-point types support [arithmetic operations](#arithmetic-operations)
 and [relational operations](#relational-operations).
@@ -314,9 +320,6 @@ func test(a,b int) {
 | Operator | Description |
 |----------|-------------|
 | !        | Logical NOT |
-| &        | Bitwise AND |
-| ~        | Bitwise XOR |
-| \|       | Bitwise OR  |
 | &&       | Logical AND |
 | \|\|     | Logical OR  |
 
@@ -470,11 +473,22 @@ definitions. Two simple error examples:
 // var a = []int[1,3.1];   // Second element is float
 ```
 
-If the type is not specified, the element type is inferred from the first element:
+If the type is not specified, the element type must still be given in the prefix,
+and the length can be omitted (it then equals the element count). A bare literal
+with no type prefix and no known target type cannot be inferred:
 
 ```feng
-var a = [1,2,3];     // a's type inferred as: [3]int
-// var a = [1,3.1];  // First element infers type int, but second is float
+var a = []int[1,2,3];  // a's type inferred as: [3]int
+// var a = [1,2,3];    // Error: cannot infer type from a bare literal
+```
+
+However, when the target type is known (declared variable type or assignment
+target), the literal prefix may be omitted:
+
+```feng
+func far() {
+   var a [4]int = [1,2,3]; // type declared explicitly
+}
 ```
 
 A more complex example:
@@ -482,8 +496,8 @@ A more complex example:
 ```feng
 class Animal {}
 class Cat : Animal {}
-var a = [new(Animal), new(Cat)];    // Inferred array type: [2]*Animal
-// var a = [new(Cat), new(Animal)]; // Error: inferred type [2]*Cat, cannot store *Animal element
+var a = []*Animal[new(Animal), new(Cat)];    // Inferred array type: [2]*Animal
+// var a = []*Cat[new(Cat), new(Animal)];    // Error: cannot store *Animal element
 ```
 
 ##### Array Expression Nesting
@@ -565,17 +579,14 @@ func far() {
 Used to check whether a class reference can be converted. For example, a reference to a class instance can be passed to
 an interface or parent class pointer; conversion back requires type checking.
 
-Returns a reference of the corresponding type. If the type does not match, it returns `nil`, which may cause a null
-pointer:
+Returns a nullable reference of the corresponding type. If the type does not match, it returns `nil`, so the result
+must be checked against `nil` before use:
 
 ```feng
 func test(o *Object) {
-   var f *File = o?(*File);   // Convert to File class reference
-   var w Writer = o?(*Writer);  // Convert to Writer interface
-   o?(*Writer).write("Hello!"); // Used in an expression, risk of null pointer
-   if (var w Writer = o?(*Writer); w != nil) {
-      // This avoids null pointer
-   }
+   var f = o?(*?File);     // Convert to File class reference
+   var w = o?(*?Writer);   // Convert to Writer interface reference
+   if (w!=nil) w.write("Hello!");
 }
 ```
 
@@ -876,7 +887,7 @@ Call methods via value type variables:
 func sample1() {
    var task Task;
    task.start();
-   printf("task state '%s'\n", task.state.name);   // Prints: task state: 'RUN'
+   os$printf("task state '{}'\n", task.state.name);   // Prints: task state: 'RUN'
 }
 ```
 
@@ -903,7 +914,7 @@ class Cat {
       this.name = name; // The name variable/parameter above conflicts with field name; must use this
    }
    func log() {
-      printf("%s: miao~~\n", name); // No name variable above; can omit this
+      os$printf("{}: miao~~\n", name); // No name variable above; can omit this
    }
 }
 ```
@@ -966,7 +977,7 @@ Example of class polymorphism: first define a parent class `Animal` with a field
 class Animal {
     var name [*#]byte;
     func eat(food [*#]byte) {
-        printf("Animal %s eating %s\n", name, food);
+        os$printf("Animal {} eating {}\n", name, food);
     }
 }
 ```
@@ -977,7 +988,7 @@ prototype:
 ```feng
 class Cat : Animal {
     func eat(food [*#]byte) {
-        printf("Cat %s eating %s.\n", name, food);
+        os$printf("Cat {} eating {}.\n", name, food);
     }
 }
 ```
@@ -1464,7 +1475,7 @@ Supports [iteration loops](#iteration-loop) over all enumeration values:
 ```feng
 func test() {
    for ( s : TaskState )
-      printf("name: %s, id: %d \n", s.name, s.id);
+      os$printf("name: {}, id: {} \n", s.name, s.id);
 }
 ```
 
@@ -1634,7 +1645,7 @@ If fewer, elements are initialized sequentially from the first position; remaini
 var b [4]int = [1,2];   // b initialized to: [1,2,0,0]
 ```
 
-When initialized with an expression, as a value type, assignment requires the same array type, including element type and length:
+As a value type, assignment requires the same array type, including element type and length:
 
 ```feng
 func foo() [4]int {
@@ -1711,7 +1722,7 @@ var ga (bool,int);
 var gb (bool,*int);
 var gc (int,[*]uint64,[16]byte);
 class Car {
-   var int speed;
+   var speed int;
 }
 var gd (int,Car);
 ```
@@ -1828,7 +1839,7 @@ The function name is required; parameter list, return list, and function body ca
 ```feng
 func run() {}
 func start() { run(); }
-func exec(a []String) *Error {
+func exec(a [*#]String) *Error {
    return nil;
 }
 ```
@@ -1921,7 +1932,7 @@ func div(a, b int) int { return a / b; }
 
 func Calc(a, b int) int;
 func test(c Calc) {
-    printf("%d\n", c(rand(), rand()));
+    os$printf("{}\n", c(rand(), rand()));
 }
 func test() {
     test(add);
@@ -2059,20 +2070,22 @@ func abs(m int) int {
 The `else` branch can be omitted:
 
 ```feng
+import std$os;
 func printIfError(err uint) {
    if (err == 0) return;
-   printf("Error: %u\n", err);
+   os$printf("Error: {}\n", err);
 }
 ```
 
 An initialization statement can be added before the conditional expression:
 
 ```feng
+import std$os;
 func test(m Map`int,*Node`, k int) {
    if (var n,ok = m[k]; ok) { // n and ok are only within this block
-      printf("value of %d is: %s\n", k, n.value());
+      os$printf("value of {} is: {}\n", k, n.value());
    }
-   // printf("value of %d is: %s\n", k, n.value()); // Error: cannot use outside
+   // os$printf("value of {} is: {}\n", k, n.value()); // Error: cannot use outside
 }
 ```
 
@@ -2174,6 +2187,8 @@ func test() {
 ```
 
 `continue` and `break` are also effective in iteration loops.
+
+#### Custom Iteration Loop _[Incomplete]_
 
 By default, iteration loops work only for arrays. For custom classes, a custom iterator can be implemented to enable
 iteration loops.
@@ -2370,10 +2385,10 @@ Exception handling statements consist of three parts:
    block executes; otherwise, matching continues.
    If no block matches, the exception continues to propagate outward. Since the caught instance must be escaped, the
    catch type must be a [strong reference](#strong-reference-type), and must be declared as required and unmodifiable.
-3. `finally` block: executes regardless of whether an exception occurred or was caught.
+3. `final` block: executes regardless of whether an exception occurred or was caught.
    If a `return` statement exists in the `try` block, the expression after `return` is evaluated first, then the
-   `finally` block executes, then the return is completed.
-   If no `catch` block or no match, the `finally` block executes before re-throwing.
+   `final` block executes, then the return is completed.
+   If no `catch` block or no match, the `final` block executes before re-throwing.
 
 At least one of parts 2 and 3 must be present.
 
@@ -2388,14 +2403,14 @@ func calc() {
       println("Caught null pointer");
    } catch(e *#IllegalStateException | *#IllegalArgumentException) {
       println("Caught state error or argument error");
-   } finally {
+   } final {
       println("Finally, execution continues after here");
    }
    return getResult();
 }
 ```
 
-With `catch` but no `finally`:
+With `catch` but no `final`:
 
 ```feng
 func calc() {
@@ -2408,7 +2423,7 @@ func calc() {
 }
 ```
 
-With `finally` but no `catch`:
+With `final` but no `catch`:
 
 ```feng
 func calc() {
@@ -2416,13 +2431,13 @@ func calc() {
       step1();
       step2();
       return getResult();
-   } finally {
+   } final {
       println("Finally, execution continues after here");
    }
 }
 ```
 
-`finally` can be used to release external resources, avoiding resource leaks. Example: closing a file:
+`final` can be used to release external resources, avoiding resource leaks. Example: closing a file:
 
 ```feng
 func readTxt() String {
@@ -2434,7 +2449,7 @@ func readTxt() String {
       step1(f);
       step2(f);
       return getTxt(f);
-   } finally {
+   } final {
       f.close();
    }
 }
@@ -2818,7 +2833,7 @@ func test() {
     var b *Device = new(Device);    // Initialized to point to a new Device instance
     var a *Device = b;              // Pass the instance referenced by b to a
     a.speed = 10;                   // Modifications through a and b affect the same instance
-    printf("speed=%d", b.speed);  // Prints: speed=10
+    os$printf("speed={}", b.speed);  // Prints: speed=10
 }
 ```
 
@@ -2991,15 +3006,15 @@ func test() {
    var v = "Hello"; // v's lifetime is within the current function
    {
       var s = "Fēng!"; // s's lifetime is within this block
-      printf("%s %s\n", v, s);   // Can access outer variable v
+      os$printf("{} {}\n", v, s);   // Can access outer variable v
    }
-   // printf("%s %s\n", v, s);  // Error: cannot access s from inner block
+   // os$printf("{} {}\n", v, s);  // Error: cannot access s from inner block
    {
-      // printf("%s %s\n", v, s);  // Error: cannot access s from another block
+      // os$printf("{} {}\n", v, s);  // Error: cannot access s from another block
    }
    {
       var v = "Dear Fēng"; // Inner redeclaration shadows outer v
-      printf("%s\n", v); // Prints: Dear Fēng
+      os$printf("{}\n", v); // Prints: Dear Fēng
    }
    // var v = "Fēng"; // Error: cannot redeclare
 }
@@ -3058,7 +3073,7 @@ func moduleName() [*#]byte {
     return r; // Still usable after leaving function moduleName
 }
 func test() {
-    printf("module: %s\n", moduleName());
+    os$printf("module: {}\n", moduleName());
 }
 ```
 
@@ -3600,11 +3615,12 @@ class Exception {
 }
 ```
 
-In addition to the built-in `Exception`, there are two more built-in exception classes. They are built-in because they are thrown dynamically at
+In addition to the built-in `Exception`, there are three more built-in exception classes. They are built-in because they are thrown dynamically at
 runtime:
 
 1. `NilException`: thrown when a reference used at runtime is `nil`.
 2. `OutOfBoundsException`: thrown when an array index access exceeds the actual length.
+3. `AssertException`: thrown when an [assert statement](#assert-statement) fails.
 
 Custom exceptions can be defined:
 
@@ -3650,7 +3666,7 @@ For example, when calling an async function, only a syncable instance can be pas
 
 ```feng
 @Async
-func startThread(a *?int) { // @Async declares that this function will initiate async execution
+func startThread(a *int) { // @Async declares that this function will initiate async execution
 }
 func test1() {
     @Sync var r = new(int); // The simplest example: variable r with @Sync can be shared concurrently
@@ -3709,8 +3725,8 @@ However, sync references and non-sync references cannot be assigned to each othe
 
 ```feng
 func test() {
-    @Sync var r *?int = new(int);
-    var s *?int = new(int);
+    @Sync var r *int = new(int);
+    var s *int = new(int);
     // r = s;   // ✖：Non-sync reference cannot be assigned to sync reference
     // s = r;   // ✖：Sync reference cannot be assigned to non-sync reference
 }
@@ -3721,7 +3737,7 @@ allowed because `new(int)` creates an unowned instance that can naturally be ass
 
 ```feng
 class A {
-    @Sync const i *?int;
+    @Sync const i *int;
 }
 func test() {
     @Sync var r *A = new(A, {i=new(int)});
@@ -3733,7 +3749,7 @@ with independent instances, making the annotation meaningless. For example:
 
 ```feng
 class A {
-   @Sync const i *?int;
+   @Sync const i *int;
 }
 @Async func startThread(a A) {}
 func test() {
@@ -3817,46 +3833,45 @@ types, they can be divided into two categories:
     1. The rules for classes are:
         1. If a class has no reference-type fields, it automatically acquires the sync attribute.
         2. If all reference-type fields are explicitly marked with `@Sync`, for example:
-           `class A { @Sync var i *?int; @Sync var b *?bool; }`, then class `A` is syncable.
+           `class A { @Sync var i *int; @Sync var b *bool; }`, then class `A` is syncable.
         3. If `@Sync` is explicitly marked on the class, there is no need to mark each reference-type field
            individually; the class is syncable.
            Note!!! **The referenced instance must also be syncable**!!! Therefore, when a value-type field is
            also a class, that class must also be syncable, and so on.
-           For example: `class A { var i *?int; } class B { var a A; }` — class `B` has no reference-type fields,
+           For example: `class A { var i *int; } class B { var a A; }` — class `B` has no reference-type fields,
            but its field `a`'s type `A` has an unmarked `@Sync` reference field `i`, so class `B` is not syncable.
         4. The sync attribute cannot be inherited. Even if the parent class has implemented sync, the child class
            will be checked independently. Therefore, according to rules 2.1.2 and 2.1.3, the following cases exist:
-            1. Example 1: `@Sync class A { var i *?int; } class B : A {}` — class `B` cannot inherit the `@Sync`
+            1. Example 1: `@Sync class A { var i *int; } class B : A {}` — class `B` cannot inherit the `@Sync`
                attribute on the type, so it is not syncable.
-            2. Example 2: `class A { @Sync var i *?int; } class B : A {}` — class `B` will be checked independently.
+            2. Example 2: `class A { @Sync var i *int; } class B : A {}` — class `B` will be checked independently.
                Since the only reference field `i` of class `B` has `@Sync`, it is syncable.
     2. Interfaces cannot be instantiated; their references can only point to instances of a class. Therefore, the
        way to achieve sync is to annotate the interface with `@Sync`, indicating that it can only point to a
        syncable class.
-    3. First, arrays with reference-type elements are not syncable (elements can't be annotated with attributes).
-       Since arrays can be nested, for an array to be syncable, the nesting path must contain no references. That is,
-       all levels on the nesting path must be [fixed-length arrays](#arrays), and the innermost element must be syncable.
-        1. Example 1: `[2][*]int`, `[2][*][4]int`, `[*][3][*]int`, etc.—all have variable-length arrays on the path
-           and are not syncable.
-        2. Example 2: `[2]*A`, `[2][4]*B`, etc.—the innermost element is a reference and is not syncable.
-        3. Example 3: `[2]A`, `[2][4]B`, etc.—the innermost element is a value type, but the innermost element's
-           type must be syncable.
-        4. Example 4: `[*]A`, `[*][4]B`, etc.—variable-length arrays; the inner element's type must be syncable.
-        5. Example 5: `[*]*A`, `[*][4]*B`, etc.—variable-length arrays whose innermost element is a reference
-           and are not syncable.
-        6. Example 6: `[*][*]int`, `[*][2][*]int`, etc.—variable-length arrays with a variable-length array
-           (that is, an array reference) on the nesting path, and are therefore not syncable.
-    4. Tuples are value types, but tuples with reference-type elements are not syncable (elements can't be annotated
-       with attributes). Like arrays, they support nesting. The previous discussion covered arrays alone, but
-       tuples and arrays can be nested within each other, making the situation slightly more complex: arrays are
-       linear nesting, while tuples are tree-shaped nesting. Types composed of nested tuples and arrays are also
-       tree-shaped, and each branch is a nesting path. During checking, each branch must satisfy the requirement
-       of containing no references. For example:
-        1. Example 1: `([2][*]int, [2]int)` — the first element of the tuple is an array whose nesting path contains
-           a reference `[*]int`; it is not syncable.
-        2. Example 2: `[3](int, *A)` — the array's element is a tuple, whose second element is a reference; it is
+    3. Arrays (both variable-length and fixed-length) follow the same rules: ① if an element is a reference,
+       the array is not syncable (array elements can't be annotated with attributes); ② if an element is not
+       syncable, the array is not syncable. Nested cases follow from these two points. For example:
+        1. `[2]*int`, `[*]*int`, etc.—their elements are references to `int`, so they are not syncable.
+        2. `[2][*]int`, `[*][*]int`, etc.—their elements are [variable-length arrays](#variable-length-array),
+           that is, array references, so they are not syncable.
+        3. `[2][3][*]int`, `[*][3][*]int`, etc.—the elements' elements are
+           [variable-length arrays](#variable-length-array), so they are not syncable either.
+        4. `[2]A`, `[*]A`, etc.—their elements contain no references; whether type `A` is syncable decides
+           whether the array is syncable.
+        5. `[2]*A`, `[*]*A`, etc.—their elements are references to `A`, so they are not syncable.
+        6. `[2][4]A`, `[*][4]A`, etc.—their elements contain no references, but the elements are arrays, so
+           whether the elements' element type `A` is syncable decides whether the whole array is syncable.
+        7. `[2][4]*A`, `[*][4]*A`, etc.—their elements contain no references, but the elements are arrays, and
+           the elements' elements are references to `A`, so the whole array is not syncable.
+    4. Tuples follow the same rules as arrays: ① if an element is a reference, the tuple is not syncable (tuple
+       elements can't be annotated with attributes); ② if an element is not syncable, the tuple is not syncable.
+       Nested cases—including arrays and tuples nesting within each other—follow from these two points. For example:
+        1. `([2][*]int, [2]int)` — the first element of the tuple is an array whose nesting path contains
+           a reference `[*]int`; the tuple is not syncable.
+        2. `[3](int, *A)` — the array's element is a tuple, whose second element is a reference; it is
            not syncable.
-        3. Example 3: `[3](int, A)`, `([2]int, [3]A)` — no references on the path; whether they are syncable depends
+        3. `[3](int, A)`, `([2]int, [3]A)` — no references on the path; whether they are syncable depends
            on type `A` (since `int` is syncable).
 3. Generics must carry the built-in concept `Syncable` in the [constraint](#generic-constraints) to support sync:
    1. A generic type parameter must have the `Syncable` constraint to be judged syncable, and the generic field
@@ -3885,7 +3900,7 @@ class A {
    var i *?int;
 }
 class B : A {
-   @Sync var j *?int;
+   @Sync var j *int;
 }
 func test() {
    @Sync var b *B = new(B);

@@ -76,7 +76,7 @@ FloatLiteral = Digits "." [Digits] [ExponentPart]
 ExponentPart = ("e"|"E") ["+"|"-"] Digits
 ```
 
-[MUST] Float literals default to type `float64`.
+[MUST] Float literals default to type `float`.
 
 #### String Literals
 ```
@@ -160,6 +160,7 @@ export Declaration
 | `int32` | 32 | Yes |
 | `int64` | 64 | Yes |
 | `int` | platform-dependent | Yes |
+| `byte` | 8 | No |
 | `uint8` | 8 | No |
 | `uint16` | 16 | No |
 | `uint32` | 32 | No |
@@ -175,6 +176,7 @@ export Declaration
 
 | Type | Width |
 |------|-------|
+| `float` | 64-bit IEEE 754 |
 | `float32` | 32-bit IEEE 754 |
 | `float64` | 64-bit IEEE 754 |
 
@@ -351,6 +353,197 @@ TypeParameter  = Identifier [TypeConstraint]
 3. [MUST] Interface generics can only be on the type, not on individual methods.
 4. [MUST] Generic methods do NOT support polymorphism (cannot override or be overridden).
 5. [MUST] Type inference is supported: type parameters are inferred from argument types, return type context, or the left-hand side of assignments.
+
+**Type Constraints:**
+
+A generic parameter may carry a constraint expression restricting the allowed type
+arguments. Constraint satisfaction is checked before expansion (rule 1).
+
+#### Constraint Expressions
+
+The essence of a generic constraint is a set of types; set operations compose
+constraint expressions:
+
+| Operation | Symbol | Precedence |
+|-----------|--------|-----------|
+| Complement | `!` | 1 |
+| Intersection | `&` | 2 |
+| Union | `\|` | 3 |
+
+Parentheses are supported and bind most tightly, like in ordinary expressions.
+
+Interfaces compose freely, so they are the most common constraint use. Examples:
+
+```feng
+interface A {}
+interface B {}
+interface C {}
+class Box`T !A` {}              // any type except A
+class Box`T A & B` {}           // must be both A and B
+class Box`T A | B` {}           // A or B, or any of their implementing classes
+class Box`T (A | B) & C` {}     // must be C, and A or B
+```
+
+Non-inheritable kinds (e.g. structs) accept exactly the given type, since no
+sub-typing exists for them. Example:
+
+```feng
+struct S1 {id int;}
+struct S2 {id int;}
+class Box`T S1` {}
+var b Box`S1`;       // ✔
+// var b Box`S2`;    // ✖: S2 is not S1
+```
+
+Function prototype constraints are special: the prototype must be **exactly
+identical**; covariant return types are NOT supported. Example:
+
+```feng
+class A {}
+class B:A {}
+func Call1 = () *A;
+func Call2 = () *A;
+func Call3 = () *B;
+class Box`T Call1` {}
+var b Box`Call1`;       // ✔: Call1 itself
+var b Box`Call2`;       // ✔: identical prototype
+// var b Box`Call3`;    // ✖: different prototype (no covariant return)
+```
+
+#### Type Constraints
+
+Seven kind constraints exist, one per type kind:
+
+| Marker | Constraint Type |
+|--------|----------------|
+| `primitive` | Primitive types |
+| `struct` | Structs |
+| `union` | Unions |
+| `enum` | Enums |
+| `interface` | Interfaces |
+| `class` | Classes |
+| `func` | Function prototypes |
+
+```feng
+class A`T primitive` {}    // only primitives
+class B`T !primitive` {}   // anything except primitives
+var a A`int`;              // ✔: int is primitive
+// var b B`int`;           // ✖: int rejected
+```
+
+#### Marker Constraints
+
+Marker constraints are two-valued sets: no marker accepts everything; a marker
+matches "has". To require "not has", use complement. These markers reuse the
+symbols of §3.3 for mnemonic convenience; they are a different concept.
+
+| Marker | Symbol | Meaning |
+|--------|--------|---------|
+| Reference | `*` | Must be a reference type (**phantom references are NOT accepted**) |
+| Nullable | `?` | Must be nullable |
+| Unmodifiable | `#` | Must be unmodifiable |
+| Attribute | `@Symbol` | Must carry attribute `Symbol`; *attribute fields are ignored* |
+
+Reference marker example:
+
+```feng
+class A`T *` { var t T; }     // only reference types
+// var a1 A`int`;             // ✖: int is not a reference type
+var a1 A`*?int`;              // ✔: *?int is a reference type
+```
+
+Nullable marker example:
+
+```feng
+func F = ();
+class A`T ?` {}               // only nullable references or nullable function prototypes
+// var a1 A`*int`;            // ✖: non-null reference rejected
+var a2 A`*?int`;              // ✔: nullable reference accepted
+// var a3 A`F`;               // ✖: non-null function prototype rejected
+var a4 A`?F`;                 // ✔: nullable function prototype accepted
+```
+
+Unmodifiable marker example:
+
+```feng
+class A`T #` {}
+var a1 A`*#int`;              // ✔: unmodifiable reference accepted
+```
+
+Attribute marker example:
+
+```feng
+attribute Beta {};
+class A`T @Beta` {}
+class E1 {}
+@Beta class E2 {}
+// var a1 A`E1`;              // ✖: E1 lacks @Beta
+var a2 A`E2`;                 // ✔: only types carrying @Beta
+```
+
+No marker accepts everything; require the complement to reject a shape.
+Reference example:
+
+```feng
+class A`T`{}      // accepts references and values
+class B`T *`{}    // only references
+class C`T !*`{}   // only values
+```
+
+#### Constraints and `concept`
+
+A `concept` is essentially a named constraint expression and can participate in
+expressions, simplifying repeated constraints:
+
+```feng
+concept objects = * & (class | interface);
+class A`T objects` {}            // use directly
+class B`T objects & @Beta` {}    // participate in another expression
+```
+
+`concept` supports `export`, so public concepts can be defined:
+
+```feng
+export
+concept objects = * & (class | interface);
+```
+
+Because it is named, a concept [MUST] NOT share a name with a defined type or a
+global variable. The only built-in concept is `Syncable`, which constrains to
+syncable instances (see §8.4).
+
+### 3.6 Mappable Types
+
+**Definition:** A type is *mappable* if references to it can be mutually converted
+like C pointers — no type checking, only boundary checking. This differs from class
+covariance/contravariance, which requires type checking.
+
+**Supported types:** structs, integers, floats, and fixed-size arrays of these.
+Such types occupy contiguous memory and contain no references (pointers), so their
+references can be freely converted like in C; the only constraint is the boundary
+check.
+
+**Boundary check:**
+1. [MUST] Since sizes are compile-time known, the compiler checks at compile time that the conversion does not overflow. Converting an `*int` reference to `*int16` is valid (8 bytes ≥ 2 bytes); converting `*int8` to `*int16` fails to compile (1 byte < 2 bytes).
+2. [MUST] Struct conversions follow the same rule. Given `struct Foo { v int32; }`: `func f1(a *Foo) *int16 { return a; }` is valid; `func f2(a *Foo) *int64 { return a; }` is out of bounds (4 bytes < 8 bytes).
+3. [MUST] An array reference may point to any length, so its length is computed at runtime. If the source element size exceeds the target element size, the resulting length is `0`: for `struct Foo { v int32; }`, `func f1(a *Foo) [*]int16 { return a; }` yields length 2, while `func f2(a *Foo) [*]int64 { return a; }` yields length 0.
+
+**Reference-free requirement:** Only types with a definite memory layout matching C
+and containing no references are mappable. Struct fields cannot be references, and
+array elements cannot contain references — including multi-dimensional arrays:
+
+```feng
+func test() {
+   var a1 [*]int;       // mappable
+   var a2 [*][2]int;    // mappable
+   var a3 [*][3][4]int; // mappable
+
+   var a4 [*]*int;      // not mappable
+   var a5 [*][*]int;    // not mappable
+   var a6 [*][5]*int;   // not mappable
+   var a7 [*][6][*]int; // not mappable
+}
+```
 
 ---
 
@@ -740,7 +933,6 @@ macroProcedure = name "(" [params] ")" [type] "{" statementList [expression] "}"
 3. [MUST] If array size and type are omitted from the prefix, element count determines the length: `[]int[1,2,3]` → `[3]int`.
 4. [MUST] Literal-only arrays without type prefix cannot infer type: `[1,2,3]` alone is invalid.
 5. [MUST] Elements must be type-compatible with the declared element type.
-6. [MUST] If no explicit type and first-element inference is used, all elements must be compatible with the inferred type.
 
 ### 5.15 Tuple Expression
 
@@ -760,6 +952,26 @@ macroProcedure = name "(" [params] ")" [type] "{" statementList [expression] "}"
 1. [MUST] The final expression is the value of the block.
 2. [MUST] Enters a new scope; local variables are discarded on exit.
 3. [MUST] Usable anywhere an expression is expected.
+
+### 5.17 Slice Expression
+
+**Syntax:** `array "[" start ":" end "]"`
+
+**Semantics:**
+1. [MUST] Returns a slice of the array; the result type is an array **phantom reference** (`[&]T`), so the sliced array must be phantom-referencable (see §3.3).
+2. [MUST] The slice contains elements from `start` up to (but not including) `end`; its length is `end - start`.
+3. [MUST] `start` must be in `[0, length)` and `end` must be in `[0, length]`.
+
+```feng
+func test() {
+    var a [8]int;
+    const x [&]int = a[2:4];           // elements 2,3
+    var b = new([8]int);
+    const y [&]int = b[2:4];
+    const z = b[2:4];                  // type declaration can be omitted
+    const w [&#]int = b[2:4];          // or converted to unmodifiable
+}
+```
 
 ---
 
@@ -1044,17 +1256,20 @@ The concurrency model is based on `@Sync`/`@Async` attribute-based compile-time 
 [MUST] Marked `@Sync` on the interface means it can only reference syncable implementing classes.
 
 **Conditionally syncable — Arrays:**
-[MUST] Variable-length arrays (`[*]T`) are NEVER syncable.
-[MUST] Fixed-size arrays are syncable only if every nesting level is fixed-size and the innermost element type is syncable.
+[MUST] Arrays (both variable-length and fixed-length) follow the same recursive rule: ① if an element is a reference, the array is NOT syncable (array elements cannot carry attributes); ② if an element is not syncable, the array is not syncable.
+[MUST] Consequently: `[2]*int`, `[*]*int` are NOT syncable (elements are references to `int`); `[2][*]int`, `[*][*]int` are NOT syncable (a nested variable-length array is an array reference); `[2][3][*]int`, `[*][3][*]int` are NOT syncable (the elements' elements are variable-length arrays); `[2]A`, `[*]A`, `[2][4]A`, `[*][4]A` are syncable if `A` is syncable (no references on the nesting path); `[2]*A`, `[*]*A`, `[2][4]*A`, `[*][4]*A` are NOT syncable (a reference appears on the nesting path).
+[MUST] A variable-length array (`[*]T`) in the outermost position — a top-level `@Async` parameter or a top-level `@Sync` variable — is syncable if its innermost element type is syncable: `[*]int` and `[*]A` (given `A` is syncable) are syncable; `[*]*A` is not.
+[MUST] As a class field, a variable-length array follows the general reference-field rule: it is syncable only if the field (or the class) carries `@Sync`. `class A { @Sync var i [*]int; }` is syncable; `class A { var i [*]int; }` is not.
 
 **Conditionally syncable — Tuples:**
-[MUST] Each tuple element branch must independently satisfy the nesting check (no references at any nesting level).
+[MUST] Tuples follow the same rule as arrays: ① if an element is a reference, the tuple is NOT syncable (tuple elements cannot carry attributes); ② if an element is not syncable, the tuple is not syncable. Each element branch is checked independently: `([2][*]int, [2]int)` and `[3](int, *A)` are NOT syncable; `[3](int, A)` and `([2]int, [3]A)` are syncable if `A` is.
 
 ### 8.5 Restrictions
 
 [MUST] Value types cannot be individually marked `@Sync` (they are copied; marking is meaningless).
 [MUST] Phantom references (`&`) cannot be marked `@Sync`.
-[MUST] Generics do not currently support `@Sync`/`@Async`.
+[MUST] A generic parameter is syncable only if its constraint includes the built-in concept `Syncable`; a generic field must additionally be marked `@Sync`.
+[MUST] When a constraint includes `Syncable`, the type argument must be a syncable type.
 
 ### 8.6 Override Rules
 
@@ -1352,7 +1567,7 @@ func load(c &Counter) int32 {
 | Precedence | Operators | Associativity | Notes |
 |:----------:|-----------|:------------:|-------|
 | 1 | `new(...)`, `(expr)`, literals, `this`, `super`, `{...}` | — | Primary |
-| 2 | `?()`, `[expr]`, `.member`, `.index`, `(args)`, `{stmts expr}` | Left | Postfix & invocation |
+| 2 | `?()`, `[expr]`, `.member`, `.index`, `(args)`, `{stmts expr}`, `is` | Left | Postfix, invocation & type test |
 | 3 | `+x`, `-x`, `!x` | Right | Unary |
 | 4 | `^` | Right | Power (binds tighter on left) |
 | 5 | `*`, `/`, `%` | Left | Multiplicative |
