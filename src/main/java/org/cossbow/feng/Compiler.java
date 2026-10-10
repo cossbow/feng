@@ -273,8 +273,9 @@ public class Compiler {
             var cmakeArgs = new ArrayList<String>();
             cmakeArgs.add("cmake");
 
+            var ninja = TargetOS.commandExists("ninja");
             // Prefer Ninja on all os for fast parallel builds
-            if (TargetOS.commandExists("ninja")) {
+            if (ninja) {
                 cmakeArgs.add("-G");
                 cmakeArgs.add("Ninja");
             } else if (TargetOS.isHostWindows()) {
@@ -298,11 +299,11 @@ public class Compiler {
             buildArgs.add("cmake");
             buildArgs.add("--build");
             buildArgs.add(".");
-            if (!TargetOS.commandExists("ninja")) {
+            if (!ninja) {
                 buildArgs.add("-j");
+                buildArgs.add("-s");
             }
             buildArgs.add("--");
-            buildArgs.add("-s");
             ret = new Command(dir, buildArgs).exec();
             if (ret.code() != 0) {
                 ErrorUtil.backend("build failed (exit %d): %s",
