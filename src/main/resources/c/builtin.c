@@ -7,6 +7,17 @@ _Thread_local Feng$ExFrame* Feng$ex_top = NULL;
 // ===== exception-safe cleanup stack（Header.h 声明）=====
 _Thread_local Feng$Cleanup* Feng$cleanup_top = NULL;
 
+// Feng$newObject 必须非内联：内联会使调用方可见 "$meta = 常量" store，clang 借此
+// 折叠派发 load → 去虚化 → 方法体内联 → 继承方法体以父类型（A*）写子类对象字段
+// （跨类型访问，strict aliasing UB）→ TBAA 判 NoAlias → GVN 用陈旧值重写后续
+// 检查 load（-Og/-O2 误编译，assert 崩溃）。定义在 builtin.c：$meta store 藏进
+// 被调函数，派发保持间接调用（opaque），方法体永不内联，无跨类型访问交错。
+void* Feng$newObject(int64_t size, const Feng$Meta* meta) {
+    void* _p = Feng$alloc(size);
+    (($Object*)_p)->$meta = meta;
+    return _p;
+}
+
 _Noreturn void Feng$throw(void* ex) {
     if (!Feng$ex_top) {
         // 无捕获帧：先展开全部清理（释放局部强引用）再中止

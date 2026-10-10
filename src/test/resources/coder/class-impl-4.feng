@@ -1,0 +1,44 @@
+
+interface I{
+    run();
+}
+interface J{I;}
+
+class A final (J) {
+    var id int;
+    func run() {
+        id += 1;
+    }
+}
+
+class B final:A{}
+
+func use1(id int) {
+    var a = new(A, {id=id});
+    a.run();
+    assert(a.id == id+1);
+
+    var b = new(B, {id=id});
+    b.run();
+    assert(b.id == id+1);
+}
+
+func use2(id int) {
+    var a = A{id=id};
+    a.run();
+    assert(a.id == id+1);
+
+    var b = B{id=id};
+    b.run();
+    assert(b.id == id+1);
+}
+
+func test(n int) {
+    use1(n+1);
+    use2(n+2);
+}
+
+
+func main() {
+    test(11);
+}

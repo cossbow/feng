@@ -21,11 +21,8 @@ extern const Feng$Meta Feng$meta_$NilException;
 extern const Feng$Meta Feng$meta_$OutOfBoundsException;
 extern const Feng$Meta Feng$meta_$AssertException;
 
-static inline void* Feng$newObject(int64_t size, const Feng$Meta* meta) {
-    void* _p = Feng$alloc(size);
-    (($Object*)_p)->$meta = meta;
-    return _p;
-}
+// ===== object allocation =====
+void* Feng$newObject(int64_t size, const Feng$Meta* meta);
 
 // ===== built-in interfaces =====
 
