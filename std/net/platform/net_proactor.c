@@ -18,15 +18,16 @@
 #define PRO_CONNECT 4
 #define PRO_TIMEOUT 5
 
+#include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+
 #ifdef _WIN32
 
 #include <winsock2.h>
 #include <windows.h>
 #include <mswsock.h>
-#include <stdint.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <string.h>
 
 // ---- 扩展 OVERLAPPED：per-op 携带 token/op/fd ----
 typedef struct {
@@ -317,8 +318,6 @@ void proactorDestroy(void* h) {
 // ===== Linux：io_uring 推迟（docs/net-event-plan.md §5.4）=====
 // 暂以 select/poll 占位以保证非 Windows 平台能链接通过；
 // 正式 io_uring 后端待有 Linux 环境后实现。
-
-#include <stdint.h>
 
 void* proactorCreate(void) { return NULL; }
 int   proactorAssociate(void* p, int fd) { (void)p; (void)fd; return 0; }
