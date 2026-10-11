@@ -1,5 +1,10 @@
 // ===== os_platform.c —— 平台相关 C 函数实现 =====
 
+// 生成代码的 Makefile 使用严格 -std=c11（__STRICT_ANSI__），
+// POSIX 声明（fileno/fdopen/dup 等）默认被隐藏；不加此宏会导致
+// 隐式声明、fdopen 的 FILE* 返回值被截断为 int，setvbuf 上 SEGV。
+#define _POSIX_C_SOURCE 200809L
+
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
