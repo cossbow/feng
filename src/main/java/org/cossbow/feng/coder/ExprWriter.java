@@ -2,6 +2,7 @@ package org.cossbow.feng.coder;
 
 import org.cossbow.feng.analysis.hir.AddressOfException;
 import org.cossbow.feng.analysis.meta.ClassMeta;
+import org.cossbow.feng.analysis.meta.MethodFunc;
 import org.cossbow.feng.analysis.meta.VTable;
 import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.*;
@@ -35,8 +36,9 @@ import java.util.stream.Collectors;
  *       类 upcast / 类→接口）；</li>
  *   <li>sync 字段读取：{@code isSyncVarField} 命中 → {@code Feng$load_sl}
  *       （返回值已 +1，调用点跳过 inc）；</li>
- *   <li>方法调用符号：优先查 {@code ClassMeta.methods()} 预解析符号
- *       （{@link #methodSymbolOf}），虚派发经扁平 vtable 槽直达
+ *   <li>方法调用符号：直调优先查 {@code ClassMeta.allMethods()} 全方法表
+ *       （{@link #allMethodFunc}，声明类已由 ClassMetadata 解析好，含继承），
+ *       跨模块类退回 {@link #methodSymbolOf} 公式；虚派发经扁平 vtable 槽直达
  *       （{@link #vtableOf} / {@link #isDynamicSlot}）。</li>
  * </ul>
  */
@@ -1093,6 +1095,9 @@ public class ExprWriter extends CWriter<ExprWriter> {
                 return writeCallArgs(e);
             }
             var td = tdOpt.get();
+            // 直调分支（final 类 / 值类型 subject）解析出「声明方法」的祖先类时，
+            // 记录其（具体化）DerivedType：subject 需 cast 到该类型再传给方法。
+            DerivedType castOwner = null;
             // 数组内建方法 swap/move → Header.h 宏
             if (td instanceof ArrayTypeDeclarer atd) {
                 return arrayCall(e, me, atd);
@@ -1107,19 +1112,18 @@ public class ExprWriter extends CWriter<ExprWriter> {
                             .map(Mangle::typeKey).toList();
                     var ownerDt = classDt;
                     if (def instanceof ClassDefinition cd) {
-                        var owner = cd;
-                        while (!owner.methods().exists(me.method().name())
-                                && owner.parent().has()
-                                && owner.parent().must() != ClassDefinition.ObjectClass) {
-                            owner = owner.parent().must();
-                        }
-                        if (owner != cd) {
+                        // 声明类查 allMethods 表（ClassMetadata 沿 inherit() 链
+                        // 解析好，mf.master().def() = 声明类）；表 miss（跨模块 /
+                        // 模板 def 不在 classMetas）退回调用点自身类型。
+                        var mf = allMethodFunc(cd, me.method().name());
+                        var dc = mf != null ? mf.master().def() : cd;
+                        if (dc != cd) {
                             // owner 可能是泛型模板（map 定义在 SealedBox`X`）：
                             // ancestorDt 对泛型祖先退回调用点类型（IntBox），
                             // 拼出 IntBox$map_Float 而定义是 SealedBox_Int$map_Float。
                             // 沿调用点具体化 inherit 链找 owner 的 DerivedType
                             // （SealedBox`int` → mangle SealedBox_Int）。
-                            ownerDt = concreteAncestorDt(cd, classDt, owner);
+                            ownerDt = concreteAncestorDt(cd, classDt, dc);
                         }
                     }
                     // 直调名：<ownerMangled>$<method>_<typeKey...>
@@ -1174,29 +1178,52 @@ public class ExprWriter extends CWriter<ExprWriter> {
                     write(me.subject());
                     write("->$meta)->").write(mName);
                 } else {
-                    // 直调（final 类 / 值类型 subject）：owner 必须用具体化类
-                    // （def 可能是模板类，如 Box`T`），否则拼出 Box$get 而非
-                    // Box_Int$get；符号唯一权威 ClassMeta.methods()。
-                    ClassDefinition owner = null;
+                    // 直调（final 类 / 值类型 subject）：方法符号一律查 allMethods
+                    // 表——ClassMetadata 已沿 inherit() 链解析「声明方法」的类并
+                    // 构建 MethodFunc（symbol = <声明类>$<方法>），ExprWriter 扁平
+                    // 查表，不再沿父链找 owner。方法可能继承自父类（F3.run →
+                    // F1$run），subject 需 cast 到声明类；运算符/索引宏不继承，
+                    // 声明类即静态类型类，无 cast。
+                    var mName = me.method().name();
                     if (def instanceof ClassDefinition c2) {
-                        owner = vtableOf(dtd.derivedType())
-                                .map(VTable::def).getOrElse(c2);
-                    }
-                    if (owner == null && me.method() instanceof ClassMethod cmm
+                        // def 可能是模板类（DerivedType.def() 未更新为具体化类，
+                        // 如 Box`T`）——先用具体化类查表（模板类不在 classMetas）。
+                        var concrete = (ClassDefinition) concreteClassDef(
+                                dtd.derivedType(), c2);
+                        var mf = allMethodFunc(concrete, mName);
+                        if (mf != null) {
+                            write(mf.symbol());
+                            var dc = mf.master().def();
+                            if (dc != concrete) {
+                                castOwner = concreteAncestorDt(
+                                        concrete, dtd.derivedType(), dc);
+                            }
+                        } else if (me.method() instanceof ClassMethod cmm
+                                && cmm.master() != null) {
+                            // 跨模块类（不在本模块 classMetas）：退回旧解析
+                            // （master + 符号公式），无 cast（维持原行为）。
+                            write(methodSymbolOf(cmm.master(),
+                                    dtd.derivedType(), mName));
+                        } else {
+                            write(mName);
+                        }
+                    } else if (me.method() instanceof ClassMethod cmm
                             && cmm.master() != null) {
-                        owner = cmm.master();
-                    }
-                    if (owner != null) {
-                        write(methodSymbolOf(owner, dtd.derivedType()
-                                , me.method().name()));
+                        write(methodSymbolOf(cmm.master(),
+                                dtd.derivedType(), mName));
                     } else {
-                        write(me.method().name());
+                        write(mName);
                     }
                 }
             } else {
                 write(me.method().name());
             }
             write('(');
+            if (castOwner != null) {
+                // C 无派生→基类指针隐式转换：继承方法按声明类直调时补 cast
+                // （与泛型直调分支 1076-1077 一致）。
+                write("(").mangledName(castOwner).write(" *)");
+            }
             // self：值类型取地址
             if (td.maybeRefer().none()) write('&');
             write(me.subject());
@@ -1445,6 +1472,19 @@ public class ExprWriter extends CWriter<ExprWriter> {
             cur = cur.parent().must();
         }
         return false;
+    }
+
+    /**
+     * 当前类可见全部方法表查「方法名 → MethodFunc」：声明类（{@code mf.master().def()}）
+     * 与符号（{@code mf.symbol()} = {@code <声明类>$<方法>}）已由 ClassMetadata 沿
+     * inherit() 链解析好，ExprWriter 扁平查表即可，不再沿父链找 owner。
+     * <p>跨模块类（不在本模块 {@code classMetas}）返回 {@code null}，调用方退回
+     * {@link #methodSymbolOf} 公式解析。
+     */
+    private MethodFunc allMethodFunc(ClassDefinition cd, Identifier name) {
+        var meta = context.table.classMetas.tryGet(cd.symbol());
+        if (meta.none()) return null;
+        return meta.get().allMethods().tryGet(name).getOrElse(null);
     }
 
     /**

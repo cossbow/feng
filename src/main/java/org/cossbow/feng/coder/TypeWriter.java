@@ -495,9 +495,10 @@ public class TypeWriter extends CWriter<TypeWriter> {
             return; // module 模式仅 context.header
 
         if (cd.isFinal()) {
-            // final 类：无 $meta，直接 own fields
+            // final 类：无 $meta，扁平字段布局（allFields：继承字段在前、own 在后，
+            // 与非 final 类一致，保证 (Parent*)&child 可 reinterpret）。
             write("typedef struct ").write(cd.symbol()).write(" {").indent();
-            for (var f : cd.fields().values()) writeClassField(f);
+            writeFlatStructFields(cd);
             dedent().write("} ").write(cd.symbol()).endStmt();
         } else {
             // 非 final：$meta 首字段 + 扁平字段（父先子后，子类可 reinterpret 成父类）

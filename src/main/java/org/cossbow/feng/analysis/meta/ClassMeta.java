@@ -25,6 +25,14 @@ public final class ClassMeta {
      * 及方法级泛型实例化）。按定义序插入，保证后端按序 emit 且行为稳定。
      */
     private final IdentifierMap<MethodFunc> methods = new IdentifierMap<>();
+    /**
+     * 方法名 → 函数描述符：当前类**可见**的全部方法（本类声明 + 继承 + 运算符 /
+     * 索引宏 + 方法级泛型实例化），一律按「声明方法」的类构建——{@code symbol} =
+     * {@code <声明类>$<方法>}、{@code master().def()} = 声明类。供 ExprWriter
+     * 直调查表（扁平使用，不再沿父链解析 owner）；不参与 emit（emit 只走
+     * {@link #methods}，避免继承方法重复定义）。
+     */
+    private final IdentifierMap<MethodFunc> allMethods = new IdentifierMap<>();
 
     public ClassMeta(ClassDefinition def) {
         this.def = def;
@@ -49,6 +57,18 @@ public final class ClassMeta {
 
     public void addMethod(MethodFunc mf) {
         methods.add(mf.name(), mf);
+    }
+
+    /**
+     * 当前类可见的全部方法（含继承），按声明类构建的 {@link MethodFunc} 表。
+     * 由 ClassMetadata 填充；ExprWriter 查此表生成直调，不再解析 owner 关系。
+     */
+    public IdentifierMap<MethodFunc> allMethods() {
+        return allMethods;
+    }
+
+    public void addAllMethod(MethodFunc mf) {
+        allMethods.add(mf.name(), mf);
     }
 
     /**

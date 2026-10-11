@@ -1,0 +1,93 @@
+
+// 回归示例：final / 值类型 subject 直调继承方法。
+// 覆盖缺陷：
+//  1. TypeWriter final 分支 struct 只发本类字段 → 继承字段丢失（field designator 报错）
+//  2. ExprWriter 直调分支以静态类型类命名 → <子类>$<方法> 未声明（应 <父类>$<方法>）
+//  3. 直调继承方法时 subject 缺到声明类的 cast
+//  4. 非 final 类值类型 subject 同样命中 2/3（缺陷边界 = 直调 + 继承方法）
+//  5. 运算符宏不在 allMethods：guard 必须保持 owner=声明类，不沿父链误走
+
+class G1 final {
+    var id int;
+}
+
+class G2 final:G1 {
+    // G2 有父类 G1：若无 guard，宏调用会沿父链走到 G1，
+    // 拼出 G1$feng$macro$operator$add 而定义是 G2$...
+    macro operator add(rhs) {
+        {id=id+rhs.id}
+    }
+}
+
+class F1 final {
+    var id int;
+    func run() {
+        id += 1;
+    }
+}
+
+class F2 final:F1 {
+    func inc() int {
+        return id + 2;
+    }
+}
+
+class F3 final:F2 {
+}
+
+class N1 {
+    var id int;
+    func run() {
+        id += 1;
+    }
+}
+
+class N2:N1 {
+}
+
+class O1:N1 {
+    func run() {
+        id += 100;
+    }
+}
+
+func useFinalValue(id int) {
+    var f = F3{id=id};
+    f.run();          // 值 subject + 继承方法（跨两级）：F1$run((F1 *)&$f)
+    assert(f.id == id+1);
+    var g = f.inc();  // 中间类方法：F2$inc((F2 *)&$f)
+    assert(g == id+3);
+}
+
+func useFinalNew(id int) {
+    var f = new(F3, {id=id});
+    f.run();          // 引用 subject + 继承方法：F1$run((F1 *)$f)
+    assert(f.id == id+1);
+}
+
+func useNonFinalValue(id int) {
+    var n = N2{id=id};
+    n.run();          // 非 final 值 subject + 继承方法：N1$run((N1 *)&$n)
+    assert(n.id == id+1);
+}
+
+func useOverride(id int) {
+    var o = O1{id=id};
+    o.run();          // 子类 override：O1$run（不沿父链、无 cast）
+    assert(o.id == id+100);
+}
+
+func useMacro(id int) {
+    var a = G2{id=id};
+    var b = G2{id=2};
+    var s = a + b;    // 运算符宏：G2$feng$macro$operator$add
+    assert(s.id == id+2);
+}
+
+func main() {
+    useFinalValue(1);
+    useFinalNew(2);
+    useNonFinalValue(3);
+    useOverride(4);
+    useMacro(5);
+}

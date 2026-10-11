@@ -93,7 +93,14 @@ public final class ClassMetadata {
             }
         }
 
-        // 5. 输出为 SymbolMap（按类符号索引）
+        // 5. 填 allMethods：当前类可见的全部方法（含继承）→ MethodFunc，
+        //    一律按「声明方法」的类构建。ExprWriter 查此表直调，不再沿父链
+        //    解析 owner（声明类解析在此一次性完成）。
+        for (var meta : order.values()) {
+            collectAllMethods(meta.def(), meta, order);
+        }
+
+        // 6. 输出为 SymbolMap（按类符号索引）
         for (var meta : order.values()) {
             ast.classMetas.add(meta.def().symbol(), meta);
         }
@@ -101,17 +108,7 @@ public final class ClassMetadata {
 
     public MethodFunc
     methodFunc(ClassMeta meta, ClassMethod cm) {
-        var self = new SelfParameter(Position.ZERO, meta.def());
-        var pc = cm.procedure().must();
-        var pt = cm.prototype();
-        var ps = pt.parameterSet();
-        var params = CommonUtil.concat(List.of(self), ps.params());
-        ps = new ParameterSet(ps.pos(), params);
-        pt = new Prototype(pt.pos(), ps, pt.returnSet(), pt.catchAll());
-        pc = new Procedure(pc.pos(), pt, pc.body(), pc.labels());
-        return new MethodFunc(cm.name(),
-                ClassMeta.methodSymbol(meta.def(), cm.name()),
-                pt, Optional.of(pc), meta, cm.dynamic());
+        return buildMethodFunc(meta.def(), cm, meta);
     }
 
     /**
@@ -135,5 +132,103 @@ public final class ClassMetadata {
             io.set().use(cm ->
                     meta.addMethod(methodFunc(meta, cm)));
         });
+    }
+
+    /**
+     * 填充 {@link ClassMeta#allMethods}：当前类可见的全部方法 → {@link MethodFunc}。
+     * <ol>
+     *   <li>{@code cd.allMethods()}（本类声明 + 继承克隆，含方法级泛型模板）——
+     *       按声明类构建（{@code symbol} = {@code <声明类>$<名>}）；</li>
+     *   <li>运算符 / 索引宏——声明类即当前类（宏不继承）；</li>
+     *   <li>{@code methods()} 里未覆盖的（mono 方法级实例化）直接并入。</li>
+     * </ol>
+     */
+    private void collectAllMethods(ClassDefinition cd, ClassMeta meta,
+                                   Map<Symbol, ClassMeta> order) {
+        for (var cm : cd.allMethods()) {
+            var mf = methodFuncOfDecl(cd, cm, order);
+            if (mf != null) meta.addAllMethod(mf);
+        }
+        for (var cm : cd.binaryOperators().values()) {
+            meta.addAllMethod(methodFunc(meta, cm));
+        }
+        for (var cm : cd.unaryOperators().values()) {
+            meta.addAllMethod(methodFunc(meta, cm));
+        }
+        cd.indexOperator().use(io -> {
+            io.get().use(cm ->
+                    meta.addAllMethod(methodFunc(meta, cm)));
+            io.set().use(cm ->
+                    meta.addAllMethod(methodFunc(meta, cm)));
+        });
+        for (var mf : meta.methods()) {
+            if (!meta.allMethods().exists(mf.name())) {
+                meta.addAllMethod(mf);
+            }
+        }
+    }
+
+    /**
+     * 按「声明方法」的类构建 {@link MethodFunc}：{@code symbol} =
+     * {@code <声明类>$<名>}、self 参数类型 = 声明类、{@code master} = 声明类
+     * meta。继承克隆（{@code cd.allMethods()} 里的 inheritMethods）没有函数体，
+     * prototype / body 取声明类原方法（checkInherit 克隆只带 prototype）。
+     * 返回 {@code null} 表示该方法是无函数体的内建方法（如 Exception.trace，
+     * StmtWriter 专用路径发射，不进全方法表）。
+     */
+    private MethodFunc methodFuncOfDecl(
+            ClassDefinition cd, ClassMethod cm,
+            Map<Symbol, ClassMeta> order) {
+        var dc = declareClass(cd, cm.name());
+        var dm = metaOf(dc, order);
+        var src = dc.methods().tryGet(cm.name()).getOrElse(cm);
+        if (src.procedure().none()) return null;
+        return buildMethodFunc(dc, src, dm);
+    }
+
+    /**
+     * 声明方法 {@code name} 的类：沿 {@code inherit()} 链找第一个
+     * {@code methods()} 命中的类。与 {@code concreteAncestorDt} 同链
+     * （具体化类 parent() 不可靠，inherit() 链已链接具体化父类）；找不到
+     * （链断裂）退回 {@code cd} 自身。
+     */
+    private ClassDefinition declareClass(ClassDefinition cd, Identifier name) {
+        var cur = cd;
+        while (cur != null && cur != ClassDefinition.ObjectClass) {
+            if (cur.methods().exists(name)) return cur;
+            if (cur.inherit().none()) break;
+            var idt = cur.inherit().must();
+            if (!(idt.def() instanceof ClassDefinition p)) break;
+            cur = p;
+        }
+        return cd;
+    }
+
+    /**
+     * {@code dc} 的 {@link ClassMeta}：不在构建序（模板类 / 跨模块类）时临时
+     * 构造——仅作 MethodFunc 的 master 载体（self 类型 + 符号前缀），不进表。
+     */
+    private ClassMeta metaOf(ClassDefinition dc, Map<Symbol, ClassMeta> order) {
+        var m = order.get(dc.symbol());
+        return m != null ? m : new ClassMeta(dc);
+    }
+
+    /**
+     * 用「声明类」{@code dc} 及其原方法 {@code cm} 构建 {@link MethodFunc}
+     * （self 首参注入、符号公式与 {@link #methodFunc} 一致，仅 def 换为 dc）。
+     */
+    private MethodFunc buildMethodFunc(ClassDefinition dc, ClassMethod cm,
+                                       ClassMeta master) {
+        var self = new SelfParameter(Position.ZERO, dc);
+        var pc = cm.procedure().must();
+        var pt = cm.prototype();
+        var ps = pt.parameterSet();
+        var params = CommonUtil.concat(List.of(self), ps.params());
+        ps = new ParameterSet(ps.pos(), params);
+        pt = new Prototype(pt.pos(), ps, pt.returnSet(), pt.catchAll());
+        pc = new Procedure(pc.pos(), pt, pc.body(), pc.labels());
+        return new MethodFunc(cm.name(),
+                ClassMeta.methodSymbol(dc, cm.name()),
+                pt, Optional.of(pc), master, cm.dynamic());
     }
 }
