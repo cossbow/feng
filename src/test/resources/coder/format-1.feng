@@ -1,4 +1,3 @@
-import std$os;
 
 class NilWriter (Writer) {
     var buf [*]byte;
@@ -20,6 +19,5 @@ func main() {
     var b NilWriter = {buf=new([64]byte)};
     var s Buffer = {data="feng"};
     format(b, "Hello {}!\n", s);
-    os$printf("size={}\n",b.size);
     assert(b.size == 12);  // ❌：预期是4，实际是3，需后续定位
 }
