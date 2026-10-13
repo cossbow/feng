@@ -2,12 +2,7 @@ package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.analysis.meta.ClassMeta;
 import org.cossbow.feng.analysis.meta.VTable;
-import org.cossbow.feng.ast.Entity;
-import org.cossbow.feng.ast.EnumDefinition;
-import org.cossbow.feng.ast.GlobalVariable;
-import org.cossbow.feng.ast.Symbol;
-import org.cossbow.feng.ast.SymbolMap;
-import org.cossbow.feng.ast.TypeDefinition;
+import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.lit.StringLiteral;
 import org.cossbow.feng.ast.mod.FModule;
@@ -61,21 +56,15 @@ public class AnalyseSymbolTable {
     // ---- (CGenerator) Monomorphization results (populated by Monomorphization pass) ----
 
     /**
-     * Dependency sub-DAGs bucketed by analysis-order unit (deduplicated):
-     * key = type / global variable, value = the mono types it needs.
-     */
-    @Deprecated
-    public Map<Entity, DAGGraph<TypeDefinition>> monoDeps = new LinkedHashMap<>();
-
-    /**
      * 锚点（原始类型 / 全局变量）→ 紧随其后生成的 mono 类型，已按依赖拓扑序排列。
      * 无原始类型锚点的（纯 primitive 依赖，如 [2]int、(int,float)）进 monoHead。
-     * <p>mono2 生成顺序重构：取代 {@link #monoDeps} + {@link #monoTrailing} 的
-     * 「按消费者分桶 + trailing」两套排序，改为「按依赖锚点后置」单一排序。
+     * <p>mono2 生成顺序重构：单一排序。
      */
     public Map<Entity, List<TypeDefinition>> monoAfter = new LinkedHashMap<>();
 
-    /** 无锚点的 mono 类型（依赖全为 primitive / 无值依赖），按拓扑序。 */
+    /**
+     * 无锚点的 mono 类型（依赖全为 primitive / 无值依赖），按拓扑序。
+     */
     public List<TypeDefinition> monoHead = new ArrayList<>();
 
     /**
@@ -91,7 +80,8 @@ public class AnalyseSymbolTable {
 
     /**
      * 每个需 emit 的类的编译期元数据（方法 → 函数描述符）。由
-     * {@link ClassMetadata} pass 在单态化之后填充；key 是 {@code def.symbol()}。
+     * {@link org.cossbow.feng.analysis.meta.ClassMetadata} pass
+     * 在单态化之后填充；key 是 {@code def.symbol()}。
      */
     public SymbolMap<ClassMeta> classMetas = new SymbolMap<>();
     /**
@@ -121,14 +111,6 @@ public class AnalyseSymbolTable {
      * 仅含强引用成员/元素的类型才有（Lazy 包装：嵌套类型首次被查时递归生成）。
      */
     public Map<TypeDeclarer, Lazy<FunctionDefinition>> copies = new LinkedHashMap<>();
-
-    /**
-     * 未被任何 unit 值依赖引用的具体化类型（仅被函数/方法体或签名引用），
-     * 由 mono2 {@code buildUnitDeps} 末尾收集（trailing group），依赖拓扑序。
-     * 后端在 {@link #monoDeps} 之后补发这些类型的 typedef/struct。
-     */
-    @Deprecated
-    public DAGGraph<TypeDefinition> monoTrailing = DAGGraph.empty();
 
     /**
      * 空的语义分析结果表（无任何源符号），用于承载「合成模块」这类无源文件的
