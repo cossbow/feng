@@ -463,6 +463,19 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
         dedent().write("} else {").newLine();
         indent().write("Feng$ex_top = _frame.prev;").newLine();
         write("void* _ex = _frame.exception;").newLine();
+        write("const Feng$Meta* _em = Feng$objMeta(_ex);").newLine();
+        write("printf(\"  EX meta=%p fn=%llu line=%u\", (const void*)_em,").newLine();
+        write("       (unsigned long long)((($Exception*)_ex)->fn),").newLine();
+        write("       (unsigned)((($Exception*)_ex)->line));").newLine();
+        if (importsTesting()) {
+            write("if (Feng$is_kind(_em, (const Feng$Meta*)&Feng$meta_std$testing$AssertionException)) {")
+                    .indent().newLine();
+            write("std$string$String* _msg = &((std$testing$AssertionException*)_ex)->$message;").newLine();
+            write("printf(\" msg=\\\"%.*s\\\"\", (int)_msg->$value.$length, (const char*)_msg->$value.$values);")
+                    .newLine();
+            dedent().write("}").newLine();
+        }
+        write("printf(\"\\n\");").newLine();
         write("Feng$release_ns(&_ex);").newLine();
         write("printf(\"FAIL\\n\");").newLine();
         write("failed++;").newLine();
@@ -474,6 +487,18 @@ public class ReleaserWriter extends CWriter<ReleaserWriter> {
         write("return failed > 0 ? 1 : 0;").newLine();
         dedent().write("}").newLine();
         newLine();
+    }
+
+    /**
+     * 当前模块是否 import 了 {@code std$testing}：只有这样才能在诊断里
+     * 访问 {@code std$testing$AssertionException} 及其 {@code $message} 字段。
+     */
+    private boolean importsTesting() {
+        return context.table.module.has()
+                && context.table.module.must().imports().stream()
+                        .anyMatch(mp -> mp.pkg().value().equals("std")
+                                && mp.size() == 1
+                                && mp.get(0).value().equals("testing"));
     }
 
     // ---- 辅助 ----
