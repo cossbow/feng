@@ -302,9 +302,9 @@ export func formatFloat(val float) [*#]byte {
     // Handle special cases
     if (val == 0.0) {
         if (1.0 / val < 0.0) {
-            return "-0.0";
+            return "-0";
         }
-        return "0.0";
+        return "0";
     }
 
     var neg = false;
@@ -333,20 +333,27 @@ export func formatFloat(val float) [*#]byte {
         }
     }
 
-    // Collect fractional digits (up to 6)
+    // Collect fractional digits (up to 6); 整数（frac==0）不产生小数位。
     var fracBuf [7]byte;
     var fracLen = 0;
-    for (var k = 0; k < 6; k += 1) {
-        frac = frac * 10.0;
-        var d = int(frac);
-        fracBuf[k] = byte(d + 48);
-        frac = frac - float(d);
-        fracLen += 1;
-        if (frac == 0.0) { break; }
+    if (frac != 0.0) {
+        for (var k = 0; k < 6; k += 1) {
+            frac = frac * 10.0;
+            var d = int(frac);
+            fracBuf[k] = byte(d + 48);
+            frac = frac - float(d);
+            fracLen += 1;
+            if (frac == 0.0) { break; }
+        }
+        // 去掉小数部分尾随的 '0'（3.140000 → 3.14）
+        for (fracLen > 0 && fracBuf[fracLen - 1] == 48) {
+            fracLen -= 1;
+        }
     }
 
     // Build result
-    var totalLen = fracLen + intLen + 1;  // +1 for '.'
+    var totalLen = fracLen + intLen;
+    if (fracLen > 0) { totalLen += 1; }  // '.'
     if (neg) { totalLen += 1; }
     var result = new([totalLen]byte);
     var pos = 0;
@@ -359,10 +366,12 @@ export func formatFloat(val float) [*#]byte {
         result[pos + j] = intBuf[intLen - 1 - j];
     }
     pos += intLen;
-    result[pos] = 46;  // '.'
-    pos += 1;
-    for (var j = 0; j < fracLen; j += 1) {
-        result[pos + j] = fracBuf[j];
+    if (fracLen > 0) {
+        result[pos] = 46;  // '.'
+        pos += 1;
+        for (var j = 0; j < fracLen; j += 1) {
+            result[pos + j] = fracBuf[j];
+        }
     }
     return result;
 }
