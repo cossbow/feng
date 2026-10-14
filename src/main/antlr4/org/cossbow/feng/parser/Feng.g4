@@ -384,7 +384,7 @@ primaryConstraint
     | AT symbol                                     # AttributeTypeConstraint
     ;
 typeDomain
-    : CLASS | INTERFACE | ENUM | STRUCT | UNION | ATTRIBUTE | FUNC | PRIMITIVE
+    : CLASS | INTERFACE | ENUM | STRUCT | UNION | FUNC | PRIMITIVE
     ;
 
 concept
