@@ -1,0 +1,35 @@
+
+// CopyBuilder gm 缺口（缺陷三）：泛型值类型含强引用字段时，拷贝不生成
+// Feng$copy_ 函数（只做 C 结构体浅拷贝），赋值/传参双释放（ref=-2）。
+// 修复前：containsStrongRef(Result`*Box`) 走 dtd.def()（模板类，字段 V）→
+//         isLeafValue(V)=true 短路 → false → needsCopy=false → 无 copy 函数 →
+//         a2 = a1 浅拷贝后 a1、a2 各自析构同一 *Box → 双释放。
+// 修复后：gm.mapIf 解析出 *Box 强引用 → 生成 Feng$copy_Result$PBox → inc → 无泄漏。
+
+class Result`V` final {
+    var v V;
+    var ok bool;
+}
+
+class Box final {
+    var data int;
+}
+
+func makeBox(v int) *Box {
+    return new(Box, {data=v});
+}
+
+// 绑定值类型变量拷贝：值类型含强引用字段 → 需要 Feng$copy_ 深拷贝（inc）
+func passThrough(r Result`*Box`) Result`*Box` {
+    return r;
+}
+
+func doubleFree() bool {
+    var r = Result`*Box`{v=makeBox(7), ok=true};
+    var r2 = passThrough(r);
+    return r2.ok;
+}
+
+func main() {
+    assert(doubleFree());
+}

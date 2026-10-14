@@ -1,0 +1,33 @@
+
+// needPin gm 缺口（缺陷一）：泛型值类型含强引用字段，链式访问丢弃临时值
+// 必须 pin 临时 Result`*Box` 再析构（dec 其 v 字段），否则 *Box 泄漏（ref=1）。
+// 修复前：needPin(Result`*Box`) 走 dtd.def()（模板类，字段是 V）→ GenericTypeDeclarer
+//         掩盖实参 *Box 强引用 → 不 pin → 泄漏。
+// 修复后：dtd.gm().mapIf(V)=*Box → needPin=true → pin + cleanup → leaked=0。
+
+class Result`V` final {
+    var v V;
+    var ok bool;
+}
+
+class Box final {
+    var data int;
+}
+
+func makeBox(v int) *Box {
+    return new(Box, {data=v});
+}
+
+func pop() Result`*Box` {
+    var b = makeBox(7);
+    return Result`*Box`{v=b, ok=true};
+}
+
+// 链式成员访问丢弃临时 Result`*Box`（unbound）：v 字段强引用必须被析构
+func leaky() bool {
+    return pop().ok;
+}
+
+func main() {
+    assert(leaky());
+}

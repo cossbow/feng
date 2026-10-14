@@ -71,7 +71,8 @@ public final class CopyBuilder {
         }
         if (td instanceof DerivedTypeDeclarer dtd && dtd.def() instanceof ClassDefinition cd) {
             for (var cf : cd.allFields().values())                            // 成员（含继承字段）
-                if (containsStrongRef(cf.type())) return true;
+                // 单态化后 dtd.def() 仍是模板类（字段为类型变量），需 gm.mapIf 解析实参。
+                if (containsStrongRef(dtd.gm().mapIf(cf.type()))) return true;
             return false;
         }
         return false;
@@ -135,9 +136,9 @@ public final class CopyBuilder {
         }
         if (td instanceof DerivedTypeDeclarer dtd
                 && dtd.def() instanceof ClassDefinition cd) {
-            // 内嵌类值：递归字段
+            // 内嵌类值：递归字段（字段声明可能是类型变量，需 gm.mapIf 解析实参）
             for (var cf : cd.allFields().values()) {
-                copyValue(cf.type(), member(lv, cf.name()), out, depth);
+                copyValue(dtd.gm().mapIf(cf.type()), member(lv, cf.name()), out, depth);
             }
         }
     }

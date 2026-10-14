@@ -551,11 +551,7 @@ public class RelayLowering {
                 var li = te.elements().stream().map(this::lowerExpression).toList();
                 yield new TupleExpression(te.pos(), li, te.types());
             }
-            case TupleIndexExpression tie -> {
-                var subject = lowerExpression(tie.subject());
-                yield new TupleIndexExpression(tie.pos(),
-                        (PrimaryExpression) subject, tie.index());
-            }
+            case TupleIndexExpression tie -> lowerTupleIndex(tie);
             case ArrayExpression ae -> {
                 var li = ae.elements().stream().map(this::lowerExpression).toList();
                 yield new ArrayExpression(ae.pos(), li, ae.type());
@@ -678,6 +674,39 @@ public class RelayLowering {
             result = inner;
         }
         var be = new BlockExpression(ie.pos(), preStmts, result);
+        be.resultType.set(rt);
+        return be;
+    }
+
+    private Expression lowerTupleIndex(TupleIndexExpression tie) {
+        var preStmts = new ArrayList<Statement>();
+        var subject = lowerSubject(tie.subject(), preStmts);
+        var rt = tie.resultType.must();
+
+        var base = new TupleIndexExpression(tie.pos(),
+                (PrimaryExpression) subject, tie.index());
+        base.resultType.set(rt);
+
+        Expression result;
+        if (needPinOperandSubject(subject)) {
+            result = makePin(subject, rt, pinned -> {
+                var n = new TupleIndexExpression(tie.pos(),
+                        (PrimaryExpression) pinned, tie.index());
+                n.resultType.set(rt);
+                return n;
+            });
+        } else {
+            result = base;
+        }
+
+        if (preStmts.isEmpty()) return result;
+        if (result instanceof BlockExpression be) {
+            preStmts.addAll(be.block());
+            var inner = be.result();
+            be.resultType.use(inner.resultType::set);
+            result = inner;
+        }
+        var be = new BlockExpression(tie.pos(), preStmts, result);
         be.resultType.set(rt);
         return be;
     }
@@ -1058,7 +1087,9 @@ public class RelayLowering {
         if (t instanceof DerivedTypeDeclarer dtd) {
             if (dtd.def() instanceof ClassDefinition cd) {
                 for (var f : cd.allFields()) {
-                    if (needPin(f.type())) return true;
+                    // 单态化后 dtd.def() 仍是模板类（字段声明类型为类型变量），
+                    // 需经 gm.mapIf 解析实参后才能判定强引用（同 TypeDeclarer.requiredInit）。
+                    if (needPin(dtd.gm().mapIf(f.type()))) return true;
                 }
             }
             return false;
@@ -1067,6 +1098,13 @@ public class RelayLowering {
         if (t instanceof ArrayTypeDeclarer atd) {
             if (atd.len() == 0) return false;
             return needPin(atd.element());
+        }
+
+        if (t instanceof TupleTypeDeclarer ttd) {
+            for (var e : ttd.elements()) {
+                if (needPin(e)) return true;
+            }
+            return false;
         }
 
         return false;

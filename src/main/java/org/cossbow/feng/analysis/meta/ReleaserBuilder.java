@@ -510,7 +510,9 @@ public final class ReleaserBuilder {
             return;
         }
         if (td instanceof DerivedTypeDeclarer dtd && dtd.def() instanceof ClassDefinition cd) {
-            for (var cf : cd.allFields().values()) collect(out, cf.type(), seen);
+            for (var cf : cd.allFields().values())
+                // 字段声明可能是类型变量，需 gm.mapIf 解析实参（同 requiredInit）。
+                collect(out, dtd.gm().mapIf(cf.type()), seen);
         }
     }
 

@@ -1,0 +1,28 @@
+
+// needPin 元组分支缺失（缺陷二）：含强引用元素的元组值 (int, *Box)
+// 链式索引访问丢弃临时元组 → 其 *Box 强引用无人析构 → 泄漏（ref=1）。
+// 修复前：needPin((int,*Box)) 无 TupleTypeDeclarer case → 返回 false → 不 pin → 泄漏。
+// 修复后：递归判定元素 → needPin=true → pin + cleanup → leaked=0。
+
+class Box final {
+    var data int;
+}
+
+func makeBox(v int) *Box {
+    return new(Box, {data=v});
+}
+
+// 含强引用元素的元组值
+func popT() (int, *Box) {
+    var b = makeBox(7);
+    return (42, b);
+}
+
+// 链式索引访问丢弃临时元组（unbound）：*Box 强引用必须被析构
+func leakyT() int {
+    return popT().0;
+}
+
+func main() {
+    assert(leakyT() == 42);
+}
