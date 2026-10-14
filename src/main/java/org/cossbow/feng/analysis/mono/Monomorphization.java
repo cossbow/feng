@@ -385,7 +385,8 @@ public class Monomorphization {
                 if (!concretized(Mangle.symbol(ttd))) pending.add(ttd);
             }
             case NamedFuncTypeDeclarer nftd -> {
-                if (nftd.def().has() && !nftd.derivedType().generic().isEmpty()
+                var def = nftd.def().must();
+                if (!def.generic().isEmpty()
                         && !concretized(Mangle.symbol(nftd.derivedType()))) {
                     pending.add(nftd);
                 }
@@ -682,7 +683,7 @@ public class Monomorphization {
     }
 
     private TypeDefinition concretizePrototype(NamedFuncTypeDeclarer nftd) {
-        var pd = nftd.def().get().must();
+        var pd = nftd.def().must();
         var dt = nftd.derivedType();
         var gm = GenericMap.make(pd, pd.generic(), dt.generic());
         var symbol = Mangle.symbol(dt);
@@ -803,6 +804,9 @@ public class Monomorphization {
     /** 函数类型（匿名/命名）具体化后的 PrototypeDefinition。 */
     private TypeDefinition funcProtoDef(FuncTypeDeclarer ftd) {
         if (ftd instanceof NamedFuncTypeDeclarer nftd) {
+            var def = nftd.def().must();
+            if (def.generic().isEmpty()) return def;
+
             return concreteDef(Mangle.symbol(nftd.derivedType()));
         }
         return concreteDef(Mangle.anonProtoSymbol(ftd.prototype()));
@@ -1121,7 +1125,9 @@ public class Monomorphization {
      * 类型找到「其具体化后依赖中生成序最靠后」的锚点，插到它后面，全局顺序即
      * 不乱。依赖可能是原始类型（进 {@code orderIndex}）或另一个 mono 类型（锚点
      * 递归向上传播）。按依赖递归（后序）自然排好 mono→mono，无需对子图再做
-     * DAG 排序；结果收集进有序 {@link #monoAfter}（LinkedHashMap）/ {@link #monoHead}。
+     * DAG 排序；结果收集进有序集合：
+     * {@link AnalyseSymbolTable#monoAfter}
+     * {@link AnalyseSymbolTable#monoHead}。
      */
     private void buildUnitDeps() {
         // 原始类型生成序索引：与 TypeWriter 实际生成顺序一致

@@ -225,6 +225,8 @@ public class Mangle {
             }
         }
         if (td instanceof FuncTypeDeclarer ftd) {
+            if (td instanceof NamedFuncTypeDeclarer nftd)
+                return nftd.derivedType().symbol().module();
             return moduleOf(ftd.prototype());
         }
         return Optional.empty();

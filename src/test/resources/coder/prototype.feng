@@ -65,6 +65,10 @@ func create`E`(cb Task`E`) *Work`E` {
     return new(Work`E`, {cb=cb});
 }
 
+class C final {
+    var cs [2]Callable;
+    var ts [3]Task`int`;
+}
 
 func test(n int) {
     var a1 A = {cb=run};

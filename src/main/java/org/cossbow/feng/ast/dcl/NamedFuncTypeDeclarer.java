@@ -14,6 +14,9 @@ import java.util.Objects;
  */
 public class NamedFuncTypeDeclarer extends FuncTypeDeclarer {
     private DerivedType derivedType;
+    /**
+     * Must cache the PrototypeDefinition in analysis
+     */
     private Lazy<PrototypeDefinition> def;
 
     public NamedFuncTypeDeclarer(Position pos,
