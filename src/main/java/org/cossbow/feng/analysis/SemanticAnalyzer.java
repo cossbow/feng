@@ -1731,11 +1731,12 @@ public class SemanticAnalyzer {
                 continue;
             var t = fp.type();
             if (async) {
-                markSync(t);
+                t = markSync(t);
+                fp.type(t);
                 if (TypeTool.checkSync(t)) continue;
                 error("'%s' don't support sync: %s", t, t.pos());
             } else {
-                markSync(fp.modifier(), t);
+                fp.type(markSync(fp.modifier(), t));
             }
         }
         if (async && prot.returnSet().has()) {
@@ -2443,7 +2444,7 @@ public class SemanticAnalyzer {
                         t, t.pos());
                 return;
             }
-            markSync(v.modifier(), vt);
+            vt = markSync(v.modifier(), vt);
             v.type().set(vt);
         }
         if (isNonNil(g.a())) {
@@ -2451,23 +2452,25 @@ public class SemanticAnalyzer {
         }
     }
 
-    private void markSync(Modifier m, TypeDeclarer t) {
+    private TypeDeclarer markSync(Modifier m, TypeDeclarer t) {
         var s = m.sync();
-        if (s.none()) return;
+        if (s.none()) return t;
         if (t.maybeRefer().none()) {
             error("value-type should not set @Sync: %s",
                     s.get().pos());
         }
-        markSync(t);
+        return markSync(t);
     }
 
-    private void markSync(TypeDeclarer t) {
+    private TypeDeclarer markSync(TypeDeclarer t) {
         if (t.checkRefer(PHANTOM)) {
             semantic("phantom-reference can't set @Sync: %s",
                     t.pos());
-            return;
+            return t;
         }
+        t = (TypeDeclarer) t.clone();
         t.markSync(true);
+        return t;
     }
 
     private void analyse(Variable v) {
@@ -2475,8 +2478,7 @@ public class SemanticAnalyzer {
         v.type().update(t -> {
             enablePhantom = true;
             t = analyse(t);
-            markSync(v.modifier(), t);
-            return t;
+            return markSync(v.modifier(), t);
         });
         if (v.value().none()) {
             if (v.isConst()) {

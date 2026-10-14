@@ -64,8 +64,8 @@ public class GenericMap {
         var t = find(tp);
         if (t == null)
             return ErrorUtil.unreachable();
-        if (next == null) return t;
-        if (!t.hasTypeVar()) return t;
+        if (next == null || !t.hasTypeVar())
+            return (TypeDeclarer) t.clone(); // clone：防止后续修改状态
         return next.mapIf(t);
     }
 
