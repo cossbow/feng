@@ -7,22 +7,22 @@ import java.util.Map;
  * Each type definition is associated with a unique TypeDomain value.
  */
 public enum TypeDomain {
-    PRIMITIVE("primitive", false),
+    PRIMITIVE("primitive", true),
     STRUCT("struct", true),
     UNION("union", true),
     ENUM("enum", true),
-    ATTRIBUTE("attribute", true),
+    ATTRIBUTE("attribute", false),
     INTERFACE("interface", true),
     CLASS("class", true),
     FUNC("func", true),
     ;
 
     public final String name;
-    public final boolean using;
+    public final boolean instantiable;
 
-    TypeDomain(String name, boolean using) {
+    TypeDomain(String name, boolean instantiable) {
         this.name = name;
-        this.using = using;
+        this.instantiable = instantiable;
     }
 
     @Override

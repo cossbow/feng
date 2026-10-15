@@ -4760,13 +4760,7 @@ public class SemanticAnalyzerTest {
 
     @Test
     public void testGenericConstraint30() {
-        // 域约束：attribute/func
-        checkSucc("attribute D {} " +
-                "class Box`T attribute` { var v T; } " +
-                "func f() { var h Box`D`; }");
-        checkFail("attribute D {} " +
-                "class Box`T attribute` { var v T; } " +
-                "func f() { var h Box`int`; }");
+        // 域约束：func
         checkSucc("class Box`T func` { var v T; } " +
                 "func f() { var h Box`func()`; }");
         checkFail("class Box`T func` { var v T; } " +
