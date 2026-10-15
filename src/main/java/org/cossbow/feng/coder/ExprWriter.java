@@ -1176,7 +1176,18 @@ public class ExprWriter extends CWriter<ExprWriter> {
                     }
                     write("((Feng$Meta_").mangledName(dtd.derivedType()).write("*)");
                     write(me.subject());
-                    write("->$meta)->").write(mName);
+                    if (me.subject() instanceof CurrentExpression ce && !ce.isSelf()) {
+                        // super.m()：必须从「直接父类 meta」派发。扁平前缀布局下
+                        // $self->$meta 是子类 meta，其 override 槽原位替换为子类
+                        // 实现 → 读到自身方法无限递归。$self->$meta->super 导航到
+                        // 直接父类 meta（dtd.derivedType() = 父类具体化类型）读槽。
+                        // 槽函数指针参数是父类指针，subject 需 upcast（castOwner）。
+                        write("->$meta->super");
+                        castOwner = dtd.derivedType();
+                    } else {
+                        write("->$meta");
+                    }
+                    write(")->").write(mName);
                 } else {
                     // 直调（final 类 / 值类型 subject）：方法符号一律查 allMethods
                     // 表——ClassMetadata 已沿 inherit() 链解析「声明方法」的类并

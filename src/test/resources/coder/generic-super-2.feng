@@ -1,0 +1,25 @@
+
+// super 调用在泛型子类中的具体化：B`int` 里 super.get2()
+// 必须解析到具体化父类 A_Int 的元表（Feng$Meta_A_Int），
+// 而不是模板 A`T`（Feng$Meta_A_T）。
+class A`T` {
+    var v T;
+    func get() T { return v; }
+    func get2() T { return v; }
+}
+
+class B`E` : A`E` {
+    var w E;
+    func get() E { return super.get2(); }
+}
+
+class C`F` : B`F` {
+    func get() F { return super.get(); }
+}
+
+func main() {
+    var b = new(B`int`, {v=42, w=7});
+    if (b.get() != 42) { assert false; }
+    var c = new(C`int`, {v=42, w=7});
+    if (c.get() != 42) { assert false; }
+}

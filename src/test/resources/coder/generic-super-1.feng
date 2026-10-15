@@ -1,0 +1,22 @@
+
+class A {
+    var v int;
+    func get() int { return v; }
+    func get2() int { return v; }
+}
+
+class B : A {
+    var w int;
+    func get() int { return super.get2(); }
+}
+
+class C : B {
+    func get() int { return super.get(); }
+}
+
+func main() {
+    var b = new(B, {v=42, w=7});
+    if (b.get() != 42) { assert false; }
+    var c = new(C, {v=42, w=7});
+    if (c.get() != 42) { assert false; }
+}
