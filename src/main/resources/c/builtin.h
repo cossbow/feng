@@ -21,6 +21,14 @@ extern const Feng$Meta Feng$meta_$NilException;
 extern const Feng$Meta Feng$meta_$OutOfBoundsException;
 extern const Feng$Meta Feng$meta_$AssertException;
 
+// ===== built-in class destructors (empty recursion; keep the
+//      "non-final class destroy non-NULL" invariant required by Feng$vDestroy) =====
+void Feng$destroy_$Object(void* self);
+void Feng$destroy_$Exception(void* self);
+void Feng$destroy_$NilException(void* self);
+void Feng$destroy_$OutOfBoundsException(void* self);
+void Feng$destroy_$AssertException(void* self);
+
 // ===== object allocation =====
 void* Feng$newObject(int64_t size, const Feng$Meta* meta);
 

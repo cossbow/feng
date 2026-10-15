@@ -34,11 +34,11 @@ _Noreturn void Feng$throw(void* ex) {
 
 // ===== built-in class destructors (empty recursion; keep the
 //      "non-final class destroy non-NULL" invariant required by Feng$vDestroy) =====
-static void Feng$destroy_$Object(void* self) {}
-static void Feng$destroy_$Exception(void* self) {}
-static void Feng$destroy_$NilException(void* self) {}
-static void Feng$destroy_$OutOfBoundsException(void* self) {}
-static void Feng$destroy_$AssertException(void* self) {}
+void Feng$destroy_$Object(void* self) {}
+void Feng$destroy_$Exception(void* self) {}
+void Feng$destroy_$NilException(void* self) {}
+void Feng$destroy_$OutOfBoundsException(void* self) {}
+void Feng$destroy_$AssertException(void* self) {}
 
 // ===== runtime exception types =====
 const Feng$Meta Feng$meta_$Exception = {
