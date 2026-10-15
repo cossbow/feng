@@ -115,6 +115,7 @@ func innerSubmit(h uint64, fd int32, buf *?Buf, len int32,
 
 export
 func newProactor() *Proactor {
+    ensureStartup();
     var h = platform$proactorCreate();
     if (h == uint64(0)) { throw new(error$IllegalStateException); }
     return new(Proactor, {_h = h});
