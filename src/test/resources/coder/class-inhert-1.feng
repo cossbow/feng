@@ -1,0 +1,21 @@
+
+class A`T` {
+    var t T;
+    func get() {}
+}
+class B`E`:A`E`{
+    func get() {
+        super.get();
+    }
+}
+
+func main() {
+    {
+        var b B`int`;
+        b.get();
+    }
+    {
+        var b = new(B`int`);
+        b.get();
+    }
+}

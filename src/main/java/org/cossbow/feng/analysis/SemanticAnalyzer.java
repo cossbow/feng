@@ -4415,8 +4415,8 @@ public class SemanticAnalyzer {
     private Groups.G2<Expression, TypeDeclarer> optimize(CurrentExpression e) {
         assert enterClass != null;
         assert enterMethod != null;
-        var def = e.isSelf() ? enterClass : enterClass.parent().must();
-        var dt = def.link(e.pos());
+        var dt = e.isSelf() ? enterClass.link(e.pos())
+                : enterClass.inherit().must();
         var kind = enterMethod.escaped() ? STRONG : PHANTOM;
         var ref = new Refer(e.pos(), kind, true, false);
         var td = new DerivedTypeDeclarer(e.pos(), dt, Optional.of(ref));
