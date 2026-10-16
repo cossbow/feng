@@ -1175,16 +1175,18 @@ public class ExprWriter extends CWriter<ExprWriter> {
                         return write(')');
                     }
                     write("((Feng$Meta_").mangledName(dtd.derivedType()).write("*)");
-                    write(me.subject());
                     if (me.subject() instanceof CurrentExpression ce && !ce.isSelf()) {
-                        // super.m()：必须从「直接父类 meta」派发。扁平前缀布局下
-                        // $self->$meta 是子类 meta，其 override 槽原位替换为子类
-                        // 实现 → 读到自身方法无限递归。$self->$meta->super 导航到
-                        // 直接父类 meta（dtd.derivedType() = 父类具体化类型）读槽。
-                        // 槽函数指针参数是父类指针，subject 需 upcast（castOwner）。
-                        write("->$meta->super");
+                        // super.m()：词法绑定。subject 类型已矫正为父类具体化类型
+                        //（dtd.derivedType() = 父类），meta 槽直接引用编译期父类
+                        // meta 常量 &Feng$meta_<父类>，与运行时对象类型无关——
+                        // $self->$meta 在对象是更深子类时读到中间层 override，破坏
+                        // 词法绑定。扁平布局下父类 meta 含全部继承槽，跨代方法
+                        // 天然可达，无需查 owner。槽函数参数是父类指针，subject
+                        // 需 upcast（castOwner）。
+                        write("&Feng$meta_").mangledName(dtd.derivedType());
                         castOwner = dtd.derivedType();
                     } else {
+                        write(me.subject());
                         write("->$meta");
                     }
                     write(")->").write(mName);

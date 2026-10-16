@@ -3,23 +3,27 @@
 // 必须解析到具体化父类 A_Int 的元表（Feng$Meta_A_Int），
 // 而不是模板 A`T`（Feng$Meta_A_T）。
 class A`T` {
-    var v T;
+    var v,u T;
     func get() T { return v; }
-    func get2() T { return v; }
+    func get2() T { return u; }
 }
 
 class B`E` : A`E` {
-    var w E;
+    var w,r E;
     func get() E { return super.get2(); }
+    func get2() E { return r; }
 }
 
-class C`F` : B`F` {
-    func get() F { return super.get(); }
+class C`R` : B`R` {
+    func get() R { return super.get(); }
+    func get2() R { return super.get2(); }
 }
 
 func main() {
-    var b = new(B`int`, {v=42, w=7});
-    if (b.get() != 42) { assert false; }
-    var c = new(C`int`, {v=42, w=7});
-    if (c.get() != 42) { assert false; }
+    var b = new(B`int`, {v=42, u=43, w=7, r=8});
+    assert (b.get() == 43);
+    assert (b.get2() == 8);
+    var c = new(C`int`, {v=42, u=43, w=7, r=8});
+    assert (c.get() == 43);
+    assert (c.get2() == 8);
 }

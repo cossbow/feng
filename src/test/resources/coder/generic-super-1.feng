@@ -1,22 +1,26 @@
 
 class A {
-    var v int;
+    var v,u int;
     func get() int { return v; }
-    func get2() int { return v; }
+    func get2() int { return u; }
 }
 
 class B : A {
-    var w int;
+    var w,r int;
     func get() int { return super.get2(); }
+    func get2() int { return r; }
 }
 
 class C : B {
     func get() int { return super.get(); }
+    func get2() int { return super.get2(); }
 }
 
 func main() {
-    var b = new(B, {v=42, w=7});
-    if (b.get() != 42) { assert false; }
-    var c = new(C, {v=42, w=7});
-    if (c.get() != 42) { assert false; }
+    var b = new(B, {v=42, u=43, w=7, r=8});
+    assert (b.get() == 43);
+    assert (b.get2() == 8);
+    var c = new(C, {v=42, u=43, w=7, r=8});
+    assert (c.get() == 43);
+    assert (c.get2() == 8);
 }
