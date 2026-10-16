@@ -1,0 +1,21 @@
+
+func printf(fmt [&#]byte, ...) {}
+
+class A {
+    func m1() {
+        printf("A.m1();\n");
+    }
+}
+
+class Box`T` {
+    func m1() {
+        printf("Box`T`.m1();\n");
+    }
+}
+
+func main() {
+    var a A;
+    a.m1();
+    var b Box`int`;
+    b.m1();
+}

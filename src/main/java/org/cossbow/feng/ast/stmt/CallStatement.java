@@ -39,7 +39,11 @@ public class CallStatement extends Statement {
 
     @Override
     public CallStatement mono(GenericMap gm) {
-        return new CallStatement(pos(), call.mono(gm));
+        var n = new CallStatement(pos(), call.mono(gm));
+        n.replace.set(replace);
+        // Must update replace Statement
+        n.replace.update(r -> r.mono(gm));
+        return n;
     }
 
 }

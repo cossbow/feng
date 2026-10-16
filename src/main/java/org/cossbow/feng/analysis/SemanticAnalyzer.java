@@ -1354,6 +1354,7 @@ public class SemanticAnalyzer {
         analyse(m.modifier());
         analyse(m.generic());
         analyse(m.prototype(), false);
+        variadicMethod(m);
     }
 
     private void checkSyncMethod(ClassDefinition cd) {
@@ -1527,6 +1528,7 @@ public class SemanticAnalyzer {
     private Entity analyse(InterfaceMethod m) {
         invalid(m.generic());
         analyse(m.prototype(), false);
+        variadicMethod(m);
         return m;
     }
 
@@ -5605,6 +5607,11 @@ public class SemanticAnalyzer {
 
     // variadic expand
 
+    private <M extends Method> void variadicMethod(M m) {
+        if (!m.prototype().variadic()) return;
+        semantic("method can't be variadic '%s': %s", m, m.pos());
+    }
+
     private Optional<FunctionExpression>
     checkVariadicFunc(PrimaryExpression pe) {
         if (pe instanceof FunctionExpression fe) {
@@ -5625,7 +5632,7 @@ public class SemanticAnalyzer {
     private Optional<Groups.G2<Expression, TypeDeclarer>>
     expand(CallExpression ce) {
         // During variadic body analysis, skip expansion
-        if (enterFunc == null || enterFunc.variadic())
+        if (enterProc == null || enterProc.prototype().variadic())
             return Optional.empty();
         // Check if the target of the call is the format function
         var o = checkVariadicFunc(ce.callee());
@@ -5838,7 +5845,7 @@ public class SemanticAnalyzer {
 
     private Optional<Groups.G2<Expression, TypeDeclarer>>
     expandVariadic(CallExpression ce) {
-        if (enterFunc == null || enterFunc.variadic())
+        if (enterProc == null || enterProc.prototype().variadic())
             return Optional.empty();
         var o = checkVariadicFunc(ce.callee());
         if (o.none()) return Optional.empty();
