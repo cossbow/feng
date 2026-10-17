@@ -1,0 +1,4 @@
+export
+interface I`T` {
+    export put(t T);
+}

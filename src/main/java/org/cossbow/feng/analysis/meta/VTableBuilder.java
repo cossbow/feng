@@ -48,18 +48,14 @@ public final class VTableBuilder {
         // 类 impl() 里的 DerivedType 经 gm.mapIf 后 def() 仍是模板接口
         // （GenericMap.mapIf 只替换 generic、不更新 def），接口 meta 槽位
         // 签名必须来自具体化接口（I_Int 而非 I），否则残留 $O 模板签名。
+        // 跨模块：泛型接口具体化按 definition-site 归属写入「定义模块」的表
+        // （Monomorphization.owner），本模块类实现的外模块接口不在本表
+        // monoAfter/monoHead——必须跨模块归集，否则 iface vtable 静默缺失 → 运行时
+        // Feng$iface_vtable 返回 NULL → 接口方法调用崩溃（0xC0000005）。
         var concreteIfaces = new HashMap<String, InterfaceDefinition>();
-        for (var list : table.monoAfter.values()) {
-            for (var def : list) {
-                if (def instanceof InterfaceDefinition id && !id.builtin()) {
-                    concreteIfaces.put(ClassMeta.symbolName(id.symbol()), id);
-                }
-            }
-        }
-        for (var def : table.monoHead) {
-            if (def instanceof InterfaceDefinition id && !id.builtin()) {
-                concreteIfaces.put(ClassMeta.symbolName(id.symbol()), id);
-            }
+        collectConcreteIfaces(table, concreteIfaces);
+        for (var tab : map.values()) {
+            if (tab != table) collectConcreteIfaces(tab, concreteIfaces);
         }
 
         // 父类 vtable 先于子类存在（classMetas 依赖序）：叠加父 slots 后追加自身
@@ -73,6 +69,22 @@ public final class VTableBuilder {
             var ifaces = buildIfaceVTables(cd, slots, concreteIfaces);
 
             table.vtables.add(cd.symbol(), new VTable(cd, slots, ifaces, pvt));
+        }
+    }
+
+    private static void collectConcreteIfaces(
+            AnalyseSymbolTable tab, Map<String, InterfaceDefinition> out) {
+        for (var list : tab.monoAfter.values()) {
+            for (var def : list) {
+                if (def instanceof InterfaceDefinition id && !id.builtin()) {
+                    out.put(ClassMeta.symbolName(id.symbol()), id);
+                }
+            }
+        }
+        for (var def : tab.monoHead) {
+            if (def instanceof InterfaceDefinition id && !id.builtin()) {
+                out.put(ClassMeta.symbolName(id.symbol()), id);
+            }
         }
     }
 

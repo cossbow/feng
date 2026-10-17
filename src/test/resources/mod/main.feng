@@ -2,6 +2,7 @@ import test$aaa a;
 import test$aab v;
 import test$aac r;
 import test$aad d;
+import test$aae e;
 
 struct V3 {
     arr [3]a$Bu;
@@ -49,6 +50,23 @@ func test(n int) {
     var vv v$Vector = t.1;
 }
 
+class Impl`T` (e$I`T`) {
+    var last T;
+    export func put(t T) {
+        last = t;
+    }
+}
+
+func callIface(i *e$I`int`, n int) {
+    i.put(n);
+}
+func testIface(n int) {
+    var a = new(Impl`int`);
+    callIface(a, n);
+    assert(a.last == n);
+}
+
 func main(args [&#][*?#]byte) {
     test(5);
+    testIface(18241);
 }
