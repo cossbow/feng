@@ -4188,8 +4188,21 @@ public class SemanticAnalyzer {
         }
         if (p instanceof DerivedTypeDeclarer ptd &&
                 a instanceof DerivedTypeDeclarer atd) {
-            genericCollect(e, ptd.generic().arguments(),
-                    atd.generic().arguments(), tParams, tArgs);
+            if (ptd.def().equals(atd.def())) {
+                // 同一定义：直接对齐泛型实参
+                genericCollect(e, ptd.generic().arguments(),
+                        atd.generic().arguments(), tParams, tArgs);
+                return;
+            }
+            // 不同定义（实现/继承）：把实参 a 沿 supers() 链投影到形参 p 的视角，
+            // 得到与 p 同定义父类型的泛型实参后再对齐
+            var o = TypeTool.checkInherited(
+                    ptd.derivedType(), atd.derivedType());
+            if (o.has()) {
+                genericCollect(e, ptd.generic().arguments(),
+                        o.must().arguments(), tParams, tArgs);
+            }
+            // 投影失败：a 不实现/继承 p，交由 assignable 报具体错误，此处静默
             return;
         }
         if (p instanceof FuncTypeDeclarer ptd &&

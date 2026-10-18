@@ -4000,6 +4000,68 @@ public class SemanticAnalyzerTest {
         checkSucc("func g`T`(t T) T { return t; } func u(f func(int)int) {} func f() { u(g); }");
     }
 
+    @Test
+    public void testGenericInfer6() {
+        // 接口实现：具体类 A 实现泛型接口 I`int`，实参 A 需沿 supers 投影到 I 推断 T=int
+        var d = "interface I`T` { export run(t T); } ";
+        d += "class A (I`int`) { export func run(t int) {} } ";
+        d += "func wrap`T`(a *I`T`) *I`T` { return a; } ";
+        checkSucc(d + "func f(){ var a = new(A); var i = wrap`int`(a); }");
+        // 不显式指定 T，也应由投影推断出 T=int
+        checkSucc(d + "func f(){ var a = new(A); var i = wrap(a); }");
+
+        // 接口实现 + 泛型类自身：A`E` 实现 I`E`，传 A`int` 应投影出 T=int
+        var d2 = "interface I`T` { export run(t T); } ";
+        d2 += "class A`E` (I`E`) { export func run(t E) {} } ";
+        d2 += "func wrap`T`(a *I`T`) *I`T` { return a; } ";
+        checkSucc(d2 + "func f(){ var a = new(A`int`); var i = wrap`int`(a); }");
+        checkSucc(d2 + "func f(){ var a = new(A`int`); var i = wrap(a); }");
+    }
+
+    @Test
+    public void testGenericInfer7() {
+        // 类继承：具体类 C : B : A`int`，传 C 需沿继承链投影到 A 推断 T=int
+        var d = "class A`T` {} ";
+        d += "class B : A`int` {} ";
+        d += "class C : B {} ";
+        d += "func wrap`T`(a *A`T`) *A`T` { return a; } ";
+        checkSucc(d + "func f(){ var a = new(C); var i = wrap`int`(a); }");
+        checkSucc(d + "func f(){ var a = new(C); var i = wrap(a); }");
+
+        // 泛型类继承：C`R` : B`R` : A`R`，传 C`int` 投影出 T=int
+        var d2 = "class A`T` {} ";
+        d2 += "class B`E` : A`E` {} ";
+        d2 += "class C`R` : B`R` {} ";
+        d2 += "func wrap`T`(a *A`T`) *A`T` { return a; } ";
+        checkSucc(d2 + "func f(){ var a = new(C`int`); var i = wrap`int`(a); }");
+        checkSucc(d2 + "func f(){ var a = new(C`int`); var i = wrap(a); }");
+
+        // 类继承 + 类型包装：C`R` : B`R` : A`List`R``，传 C`int` 投影出 T=List`int`
+        var d3 = "class List`E`{} ";
+        d3 += "class A`T` {} ";
+        d3 += "class B`E` : A`List`E`` {} ";
+        d3 += "class C`R` : B`R` {} ";
+        d3 += "func wrap`T`(a *A`T`) *A`T` { return a; } ";
+        // 显式 T=int 与 C 的继承链不符（A 的 T 是 List`R`），应报错
+        checkFail(d3 + "func f(){ var a = new(C`int`); var i = wrap`int`(a); }");
+        // 不显式指定，投影出 T=List`int`
+        checkSucc(d3 + "func f(){ var a = new(C`int`); var i = wrap(a); }");
+    }
+
+    @Test
+    public void testGenericInfer8() {
+        // 多重实现：A 同时实现 I`int` 与 J`int64`，投影到各自接口应无歧义
+        var d = "interface I`T` { export runI(t T); } ";
+        d += "interface J`T` { export runJ(t T); } ";
+        d += "class A (I`int`, J`int64`) { export func runI(t int) {} export func runJ(t int64) {} } ";
+        d += "func wrapI`T`(a *I`T`) *I`T` { return a; } ";
+        d += "func wrapJ`T`(a *J`T`) *J`T` { return a; } ";
+        checkSucc(d + "func f(){ var a = new(A); var i = wrapI`int`(a); }");
+        checkSucc(d + "func f(){ var a = new(A); var i = wrapI(a); }");
+        checkSucc(d + "func f(){ var a = new(A); var j = wrapJ`int64`(a); }");
+        checkSucc(d + "func f(){ var a = new(A); var j = wrapJ(a); }");
+    }
+
     //
 
     @Test
