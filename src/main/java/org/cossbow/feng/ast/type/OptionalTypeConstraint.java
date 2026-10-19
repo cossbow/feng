@@ -3,6 +3,7 @@ package org.cossbow.feng.ast.type;
 import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDomain;
+import org.cossbow.feng.ast.dcl.FuncTypeDeclarer;
 import org.cossbow.feng.ast.dcl.GenericTypeDeclarer;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 
@@ -21,6 +22,8 @@ public class OptionalTypeConstraint extends TypeConstraint {
     public boolean contains(TypeDeclarer t) {
         var r = t.maybeRefer();
         if (r.has() && !r.get().required()) return true;
+        // 可空 func 原型（func 非引用，可空性由 required() 表达）
+        if (t instanceof FuncTypeDeclarer f && !f.required()) return true;
         return t instanceof GenericTypeDeclarer gtd
                 && containsByConstraint(gtd);
     }
@@ -34,7 +37,17 @@ public class OptionalTypeConstraint extends TypeConstraint {
     @Override
     public Tri referenced() {
         // 可空引用：本身仍是引用
+        return Tri.BOTH;
+    }
+
+    @Override
+    public Tri optional() {
         return Tri.YES;
+    }
+
+    @Override
+    public Tri unmodifiable() {
+        return Tri.BOTH;
     }
 
     @Override

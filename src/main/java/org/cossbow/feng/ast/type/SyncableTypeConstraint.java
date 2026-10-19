@@ -32,6 +32,16 @@ public class SyncableTypeConstraint extends TypeConstraint {
     }
 
     @Override
+    public Tri optional() {
+        return Tri.BOTH;
+    }
+
+    @Override
+    public Tri unmodifiable() {
+        return Tri.BOTH;
+    }
+
+    @Override
     public MemberSet members() {
         return MemberSet.empty();
     }

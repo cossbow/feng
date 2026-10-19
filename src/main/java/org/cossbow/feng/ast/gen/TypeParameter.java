@@ -63,6 +63,24 @@ public class TypeParameter extends Entity {
     }
 
     /**
+     * 该类型参数在「可选性」维度上的投影。
+     * 无约束 → {@link Tri#BOTH}（都可能）。
+     */
+    public Tri optional() {
+        if (constraint.none()) return Tri.BOTH;
+        return constraint.get().optional();
+    }
+
+    /**
+     * 该类型参数在「不可修改」维度上的投影。
+     * 无约束 → {@link Tri#BOTH}（都可能）。
+     */
+    public Tri unmodifiable() {
+        if (constraint.none()) return Tri.BOTH;
+        return constraint.get().unmodifiable();
+    }
+
+    /**
      * 该类型参数在「成员集」维度上的下近似。
      * 无约束 → 空下近似。
      */

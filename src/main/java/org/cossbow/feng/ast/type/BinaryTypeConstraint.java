@@ -63,7 +63,7 @@ public class BinaryTypeConstraint extends TypeConstraint {
     @Override
     public boolean contains(TypeDeclarer t) {
         if (t instanceof GenericTypeDeclarer gtd) {
-            // 类型变量分支（§3.4）：委托 include 做集合包含
+            // 类型变量分支：委托 include 做集合包含
             return containsByConstraint(gtd);
         }
         return calc(left.contains(t), right.contains(t));
@@ -79,6 +79,16 @@ public class BinaryTypeConstraint extends TypeConstraint {
     @Override
     public Tri referenced() {
         return calc(left.referenced(), right.referenced());
+    }
+
+    @Override
+    public Tri optional() {
+        return calc(left.optional(), right.optional());
+    }
+
+    @Override
+    public Tri unmodifiable() {
+        return calc(left.unmodifiable(), right.unmodifiable());
     }
 
     @Override

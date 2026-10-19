@@ -5338,6 +5338,26 @@ public class SemanticAnalyzerTest {
     }
 
     @Test
+    public void testGenericConstraint71b() {
+        // ---- 类约束裸 T：实参直接传类值（含子类值）----
+        // 正例：B 实现接口 A（B (A)），B 满足 T A 约束，实参传 B 类值
+        checkSucc("interface A{run();} class B (A){func run(){}} " +
+                "func add`T A`(a T){} func test(){ add`B`(B{}); }");
+        // 正例：纯类约束 A，子类 B : A 实参传值
+        checkSucc("class A{} class B:A{} " +
+                "func add`T A`(a T){} func test(){ add`B`(B{}); }");
+        // 正例：裸类 A 实参传值
+        checkSucc("class A{} " +
+                "func add`T A`(a T){} func test(){ add`A`(A{}); }");
+        // 反例：非子类实参 C 不满足 T A 约束
+        checkFail("class A{} class C{} " +
+                "func add`T A`(a T){} func test(){ add`C`(C{}); }");
+        // 反例：接口约束 A，B 未实现 A，实参传 B 值
+        checkFail("interface A{run();} class B{} " +
+                "func add`T A`(a T){} func test(){ add`B`(B{}); }");
+    }
+
+    @Test
     public void testGenericConstraint72() {
         // ---- 引用性维度（ReferTypeConstraint，标记只能作二元操作数，见 checkMarker）----
         // 正例（include YES 路径）：T 被 interface 约束（referenced()==YES）
@@ -5496,15 +5516,15 @@ public class SemanticAnalyzerTest {
     @Test
     public void testGenericConstraint83() {
         // ---- 可空/只读/引用约束（? # *）投影族 + Exclude 取反触发 newable ----
-        // 反例：?.referenced=YES → Binary AND referenced=meet(YES,NO)=BOTH 于 L4862 报错；
-        // 覆盖 Optional.referenced + Binary.referenced AND + Tri.meet(YES,NO) 兜底 BOTH 分支
-        checkFail("func f`T ? & int`(){ var a = new(T); }");
-        // 反例：同模式覆盖 Unmodifiable.referenced（#.referenced=YES）
-        checkFail("func f`T # & int`(){ var a = new(T); }");
-        // 反例：同模式覆盖 Refer.referenced（*.referenced=YES）
+        // 决策 D3（见 generic-constraint-refer-projection.md §8）：? & int / # & int 不拦截。
+        // 二者未标记 * 却带 ?/#，匹配不到任何类型，不产生有效视图，放行无副作用。
+        checkSucc("func f`T ? & int`(){ var a = new(T); }");
+        checkSucc("func f`T # & int`(){ var a = new(T); }");
+        // 反例：*.referenced=YES（必引用）→ Binary AND referenced=meet(YES,NO)=BOTH；
+        // new(T) 判据 referenced==YES → 拒。覆盖 Refer.referenced + Binary.referenced AND + Tri.meet(YES,NO)
         checkFail("func f`T * & int`(){ var a = new(T); }");
-        // 反例：!? → Exclude.referenced=not(Optional.referenced=YES)=NO 通过 L4862；
-        // newable=not(Optional.newable=BOTH)=BOTH → can't new；覆盖 Optional.referenced+newable + Tri.not(YES)/not(BOTH)
+        // 反例：!? → Exclude.referenced=not(Optional.referenced=BOTH)=BOTH；
+        // newable=not(Optional.newable=BOTH)=BOTH → can't new；覆盖 Optional.referenced+newable + Tri.not(BOTH)
         checkFail("func f`T !?`(){ var a = new(T); }");
         // 反例：同模式覆盖 Unmodifiable.referenced+newable
         checkFail("func f`T !#`(){ var a = new(T); }");
@@ -5638,6 +5658,72 @@ public class SemanticAnalyzerTest {
         checkFail(d + "func f`T (F)`(p *T){}");
         checkFail(d + "func f`T (F)`(p *?T){}");
         checkFail(d + "func f`T (F)`(p *#T){}");
+    }
+
+    @Test
+    public void testGenericConstraintD2() {
+        // 决策 D2：BOTH 在消费点收敛——unmodifiable()==BOTH → 派生 refer unmodifiable=true（不可修改）
+        var d = "class A{func run(){}} ";
+        // *&A: unmodifiable()=meet(BOTH,BOTH)=BOTH → 派生 unmodifiable=true → 可变方法调用拒
+        checkFail(d + "func f`T *&A`(t T){ t.run(); }");
+        // 用户触发 *&!?&!#&A: unmodifiable()=meet(BOTH,BOTH,NO,BOTH)=NO → 可修 → 放行
+        checkSucc(d + "func f`T *&!?&!#&A`(t T){ t.run(); }");
+    }
+
+    @Test
+    public void testGenericConstraintD2b() {
+        // *T 形态检查值域补全：primitive/struct/union/enum 域同属"确定值域"，可引用
+        checkSucc("struct S{ i int; } func f`T (S)`(p *T){ var i int = p.i; }");
+        checkSucc("union U{ a int; } func f`T (U)`(p *T){}");
+        checkSucc("enum E{A} func f`T (E)`(p *T){}");
+        checkSucc("func f`T (int)`(p *T){}");
+
+        // deriveRefer 可空派生（required = optional()==NO）：
+        // optional()==YES → required=false（可空引用），未 nil 检查调用拒
+        // unmodifiable()=meet(BOTH,BOTH,BOTH)=BOTH → 派生 unmodifiable=true（不可修改），
+        // 调不可变方法 run# 不受 unmodifiable 拦截 → 由 nil 检查单独门控
+        var d = "class A{func run#(){}} ";
+        checkFail(d + "func f`T * & ? & A`(t T){ t.run(); }");
+        checkSucc(d + "func f`T * & ? & A`(t T){ if (t != nil) { t.run(); } }");
+
+        // optional()==BOTH（D2 判空）→ required=false（可空），未 nil 检查调用拒
+        checkFail(d + "func f`T * & A`(t T){ t.run(); }");
+        checkSucc(d + "func f`T * & A`(t T){ if (t != nil) { t.run(); } }");
+    }
+
+    @Test
+    public void testGenericConstraintD2c() {
+        // deref 只对语法标记的 *T 有效：裸 T 由约束投影出引用（派生 refer）时,
+        // T 本身是引用 → *t 无法解引用,报语义错误。
+        var d = "class A{func run(){} var i int; } ";
+        // 派生 refer（*&A 必引用）的裸 T 解引用 → 拒
+        checkFail(d + "func f`T *&A`(t T){ var i int = *t; }");
+        // 无 * 标记且值域约束 → 值类型,解引用 → 拒（既有:can't de-refer a value）
+        checkFail(d + "func f`T (A)`(t T){ var i int = *t; }");
+        // 语法标记 *T → 解引用得值 T,放行
+        checkSucc(d + "func f`T (A)`(p *T){ var q T = *p; }");
+    }
+
+    @Test
+    public void testGenericConstraintD3() {
+        // interface 域裸 T：派生 STRONG 必选引用，消费点表现与具体 *I 一致
+        var d = "interface I{run();} ";
+        // 派生引用可调用接口方法（无需显式 * 标记）
+        checkSucc(d + "func f`T (I)`(t T){ t.run(); }");
+        // 派生引用可判空
+        checkSucc(d + "func f`T (I)`(t T){ if(t != nil){ t.run(); } }");
+        // 派生必选引用：无初始化局部变量报 required initialize（与 *I 一致）
+        checkFail(d + "func f`T (I)`(t T){ var a T; }");
+        // 派生必选引用：局部变量初始化后才可调用
+        checkSucc(d + "class A(I){func run(){}} " +
+                "func f`T (I)`(t T){ var a *I = new(A); a.run(); }");
+        // 派生必选引用：nil 赋值需判空检查
+        checkFail(d + "func f`T (I)`(t T){ var a T = nil; }");
+        // 约束已含引用记号（*&I）的裸 T：不得再加 * 造成双重引用
+        checkFail(d + "func f`T (*&I)`(t *T){ t.run(); }");
+        // func 域裸 T：引用形态拒绝，但可空 func（?T）放行
+        checkFail("func F=(); func f`T (F)`(t *T){ t(); }");
+        checkSucc("func F=(); func f`T (F)`(t ?T){ if(t != nil){ t(); } }");
     }
 
     // ===== findCallable：函数原型约束的变量/字段可调用 =====

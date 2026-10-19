@@ -34,6 +34,16 @@ public class UnmodifiableTypeConstraint extends TypeConstraint {
     @Override
     public Tri referenced() {
         // 只读引用：本身仍是引用
+        return Tri.BOTH;
+    }
+
+    @Override
+    public Tri optional() {
+        return Tri.BOTH;
+    }
+
+    @Override
+    public Tri unmodifiable() {
         return Tri.YES;
     }
 

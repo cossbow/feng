@@ -76,6 +76,24 @@ public class TypeConstraint extends Entity {
     abstract public Tri referenced();
 
     /**
+     * 该约束在「可选性」维度上的投影。
+     * <p>
+     * 以「可选性」为属性：{@link Tri#YES} = 必为optional，
+     * {@link Tri#NO} = 必为required，{@link Tri#BOTH} = 两种都可能。
+     * 与 {@link #contains} 一样是判定式，但只提取可选性这一个维度。
+     */
+    abstract public Tri optional();
+
+    /**
+     * 该约束在「不可修改」维度上的投影。
+     * <p>
+     * 以「不可修改性」为属性：{@link Tri#YES} = 必为不可修改，
+     * {@link Tri#NO} = 必为可修改，{@link Tri#BOTH} = 两种都可能。
+     * 与 {@link #contains} 一样是判定式，但只提取不可修改性这一个维度。
+     */
+    abstract public Tri unmodifiable();
+
+    /**
      * 该约束在「成员集」维度上的下近似（字段 / 方法 / 必填初始化）。
      * 空（{@link MemberSet#empty()}）表示无公共成员下近似。
      */

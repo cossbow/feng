@@ -30,13 +30,26 @@ public class ReferTypeConstraint extends TypeConstraint {
     public boolean include(TypeConstraint tc) {
         var x = normalize(tc);
         if (equals(x)) return true;
-        // referenced() == YES ⟹ 集合中每个元素都是引用 → 全部命中 *any
-        return x.referenced() == Tri.YES;
+        // 全 BOTH 化后 referenced() 失去精度，改用域判据：
+        // interface 必引用，其域 ⊆ {INTERFACE} → 集合中每个元素都是引用 → 全部命中 *any
+        var ds = x.domains();
+        return !ds.isEmpty()
+                && ds.stream().allMatch(d -> d == TypeDomain.INTERFACE);
     }
 
     @Override
     public Tri referenced() {
         return Tri.YES;
+    }
+
+    @Override
+    public Tri optional() {
+        return Tri.BOTH;
+    }
+
+    @Override
+    public Tri unmodifiable() {
+        return Tri.BOTH;
     }
 
     @Override

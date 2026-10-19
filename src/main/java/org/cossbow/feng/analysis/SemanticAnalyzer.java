@@ -533,7 +533,7 @@ public class SemanticAnalyzer {
     /**
      * 检查 AND 约束两侧是否矛盾（投影为 ∅，即无效约束）。
      * <p>
-     * 采用结构化判据而非投影判据（见 §4.2 与 §2.4）：
+     * 采用结构化判据（约束与其补集相交、确定域互斥）而非投影判据：
      * <ol>
      *   <li>{@code C & !C}：约束与其补集相交，恒空；</li>
      *   <li>两个确定域约束（域/具体类型）域不同：无类型同时属于两个域。</li>
@@ -807,19 +807,64 @@ public class SemanticAnalyzer {
     }
 
     private GenericTypeDeclarer analyse(GenericTypeDeclarer td) {
+        // 泛型类型参数的使用形态必须满足既有类型系统（analyse(DerivedTypeDeclarer)）：
+        //   - interface 必引用（DerivedTypeDeclarer: interface must be refer）
+        //   - func 是裸类型，不能带引用记号（func-type can't be refer）
+        // 形态来源有两条：语法标记（*T 的 kind / ?T 的 syntacticRequired）
+        // 与约束投影（constraint 含 * 时 deriveRefer 派生的 refer）。
+        // 裸 T 在此处按约束域补全引用：interface 域必须显式派生 STRONG 引用
+        // （deriveRefer 在解析期无法区分 interface 域，referenced() 全 BOTH），
+        // 使 T 在消费点表现与具体 *I 一致。
+        var param = td.type().param();
+        var ds = param.domains();
+        var isFunc = !ds.isEmpty() &&
+                ds.stream().allMatch(d -> d == TypeDomain.FUNC);
+        var isInterface = !ds.isEmpty() &&
+                ds.stream().allMatch(d -> d == TypeDomain.INTERFACE);
         if (td.kind().has()) {
-            // *T / *?T / *#T: 只有值类型约束可引用
-            if (td.type().param().referenced() != Tri.NO) {
-                return semantic("only value-type support refer: %s", td.pos());
+            // 语法 *T：仅"确定值域"约束可显式引用，且约束不得已使 T 为引用
+            // （约束含 * → referenced()==YES → 多级引用 → 拒，与其它允许引用
+            // 的类型一致——对已含 * 的约束再加 * 是双重引用）。
+            // 值域 = class/primitive/struct/union/enum（非 func/interface）；
+            // func/interface 是引用形态 → 多级引用 → 拒；
+            // 无约束（全 8 域）→ 无法确定 T 是值类型 → 拒；
+            // 空域（!?/!# 等投影坍缩）→ 无法确定 → 拒。
+            if (isValueDomain(ds) && param.referenced() != Tri.YES) {
+                return td;
             }
-        } else if (!td.required()) {
-            // ?T: 仅 func 约束
-            var ds = td.type().param().domains();
-            if (ds.size() != 1 || !ds.contains(TypeDomain.FUNC)) {
-                return semantic("only func-constraint support optional: %s", td.pos());
+            return semantic("only value-type support refer: %s", td.pos());
+        }
+        if (isFunc) {
+            // func 约束：不可引用（与既有类型系统一致——func 是裸类型），
+            // 语法上不能加 * / # 记号。?T（可空 func）由语法标记放行，
+            // 约束派生引用（refer.has()）则拒绝多级引用。
+            if (td.refer().has()) {
+                return semantic("func-type can't be refer: %s", td.pos());
             }
+            return td;
+        }
+        if (!td.syntacticRequired()) {
+            // 语法 ?T：仅 func 约束支持可空（?T 是语法构造，可空性不由约束
+            // 投影改写，故用 syntacticRequired() 而非 refer()）。
+            return semantic("only func-constraint support optional: %s",
+                    td.pos());
+        }
+        if (isInterface) {
+            // interface 域：必须为引用。约束含 *（*&I）时 deriveRefer 已派生
+            // refer；裸 T (I) 则补派生 STRONG 必选引用，与具体 *I 一致。
+            // （接口引用可空性由约束 optional 投影决定，这里裸 T (I) 派生必选。）
+            if (td.refer().none()) {
+                return new GenericTypeDeclarer(td.pos(), td.type(),
+                        new Refer(td.pos(), ReferKind.STRONG, true, false));
+            }
+            return td;
         }
         return td;
+    }
+
+    private boolean isValueDomain(EnumSet<TypeDomain> ds) {
+        return !ds.isEmpty() && ds.stream().allMatch(d -> d != TypeDomain.FUNC
+                && d != TypeDomain.INTERFACE && d != TypeDomain.ATTRIBUTE);
     }
 
 
@@ -4846,8 +4891,9 @@ public class SemanticAnalyzer {
         if (gt.param().constraint().none()) {
             return semantic("'%s' can't support new instance: %s", gt, gt.pos());
         }
-        // 引用性投影：仅值类型可 new 实例
-        if (gt.param().referenced() != Tri.NO) {
+        // 引用性投影：非必引用（可值可引用 / 必值）且值形态可构造时才可 new
+        if (gt.param().referenced() == Tri.YES
+                || gt.param().newable() != Tri.YES) {
             return semantic("only value-type support new instance: %s", gt.pos());
         }
         var ms = gt.param().members();

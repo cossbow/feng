@@ -4,6 +4,7 @@ import org.cossbow.feng.ast.Position;
 import org.cossbow.feng.ast.Symbol;
 import org.cossbow.feng.ast.TypeDomain;
 import org.cossbow.feng.ast.dcl.*;
+import org.cossbow.feng.util.ErrorUtil;
 
 import java.util.EnumSet;
 
@@ -50,11 +51,17 @@ public class DomainTypeConstraint extends TypeConstraint {
 
     @Override
     public Tri referenced() {
-        return switch (domain) {
-            case PRIMITIVE, STRUCT, UNION, ENUM -> Tri.NO;   // 值类型
-            case INTERFACE, FUNC -> Tri.YES;                 // 引用类型
-            case CLASS, ATTRIBUTE -> Tri.BOTH;               // class 可值可引用 / attribute 不参与二分
-        };
+        return Tri.BOTH;
+    }
+
+    @Override
+    public Tri optional() {
+        return Tri.BOTH;
+    }
+
+    @Override
+    public Tri unmodifiable() {
+        return Tri.BOTH;
     }
 
     @Override

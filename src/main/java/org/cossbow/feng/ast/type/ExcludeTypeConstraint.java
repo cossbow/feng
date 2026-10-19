@@ -49,6 +49,16 @@ public class ExcludeTypeConstraint extends TypeConstraint {
     }
 
     @Override
+    public Tri optional() {
+        return Tri.not(operand.optional());
+    }
+
+    @Override
+    public Tri unmodifiable() {
+        return Tri.not(operand.unmodifiable());
+    }
+
+    @Override
     public MemberSet members() {
         // 补集在成员集维度上坍缩：无法保证任何公共成员。
         return MemberSet.empty();

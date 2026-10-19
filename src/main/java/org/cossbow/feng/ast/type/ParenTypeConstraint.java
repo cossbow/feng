@@ -43,6 +43,16 @@ public class ParenTypeConstraint extends TypeConstraint {
     }
 
     @Override
+    public Tri optional() {
+        return child.optional();
+    }
+
+    @Override
+    public Tri unmodifiable() {
+        return child.unmodifiable();
+    }
+
+    @Override
     public MemberSet members() {
         return child.members();
     }

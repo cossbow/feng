@@ -54,7 +54,7 @@ public class DefinedTypeConstraint extends TypeConstraint {
     @Override
     public boolean contains(TypeDeclarer t) {
         if (t instanceof GenericTypeDeclarer gtd) {
-            // 类型变量分支（§3.4）：同一 param 恒真（U 对 U 自身，即使无约束）；
+            // 类型变量分支：同一 param 恒真（U 对 U 自身，即使无约束）；
             // 否则以其约束集合做包含判定
             if (definedType instanceof GenericType gt
                     && gtd.type().equals(gt)) {
@@ -123,21 +123,30 @@ public class DefinedTypeConstraint extends TypeConstraint {
 
     @Override
     public Tri referenced() {
-        if (definedType instanceof PrimitiveType) {
-            return Tri.NO;      // 原始类型是值
-        }
         if (definedType instanceof GenericType gt) {
             // 同胞参数引用：委托其自身约束
             var oc = gt.param().constraint();
             return oc.none() ? Tri.BOTH : oc.get().referenced();
         }
-        if (definedType instanceof DerivedType dt) {
-            // 具体类型约束表示「裸类型符号」：class/struct/... 的裸形态即值
-            return switch (dt.def().domain()) {
-                case PRIMITIVE, STRUCT, UNION, ENUM, CLASS -> Tri.NO;
-                case INTERFACE, FUNC -> Tri.YES;
-                case ATTRIBUTE -> Tri.BOTH;
-            };
+        return Tri.BOTH;
+    }
+
+    @Override
+    public Tri optional() {
+        if (definedType instanceof GenericType gt) {
+            // 同胞参数引用：委托其自身约束
+            var oc = gt.param().constraint();
+            return oc.none() ? Tri.BOTH : oc.get().optional();
+        }
+        return Tri.BOTH;
+    }
+
+    @Override
+    public Tri unmodifiable() {
+        if (definedType instanceof GenericType gt) {
+            // 同胞参数引用：委托其自身约束
+            var oc = gt.param().constraint();
+            return oc.none() ? Tri.BOTH : oc.get().unmodifiable();
         }
         return Tri.BOTH;
     }
@@ -182,7 +191,11 @@ public class DefinedTypeConstraint extends TypeConstraint {
             return oc.none() ? allDomains() : oc.get().domains();
         }
         if (definedType instanceof DerivedType dt) {
-            return EnumSet.of(dt.def().domain());
+            // 未解析（概念约束在类分析后才会被解析）→ 保守返回全集，
+            // 与其它未解析路径（无约束 / 未知）一致
+            return dt.analyzed()
+                    ? EnumSet.of(dt.def().domain())
+                    : allDomains();
         }
         return allDomains();
     }
