@@ -4495,6 +4495,43 @@ public class SemanticAnalyzerTest {
                 "func f() { t`int`(new(A)); }");
     }
 
+    @Test
+    public void testAsyncSyncableSelfRef() {
+        // 自引用 @Sync 类（Node.next *?Node）的环必须在 checkSyncable 中终止
+        // （TypeTool 先占位再递归），否则 StackOverflow。
+        // 用本地 @Sync 接口 Task + start 模拟 async$Task/async$start 的检查入口。
+        var pre = "@Sync interface Task { @Async run(); } " +
+                "@Async func start(t *Task) { t.run(); }";
+        checkSucc(pre + " " +
+                "@Sync class Node { var next *?Node; var x int; } " +
+                "@Sync class Q { var head *?Node; var tail *?Node; } " +
+                "@Sync class H (Task) { @Sync var q *Q; " +
+                "  @Async func run() { @Sync var qq = q; } } " +
+                "func f() { @Sync var q = new(Q); @Sync var h = new(H, {q=q}); start(h); }");
+        // 环 + 真实字段（含 mutex 句柄值）也应通过。
+        checkSucc(pre + " " +
+                "@Sync class Mut { var _h uint64; } @Sync func newM() *Mut { return new(Mut); } " +
+                "@Sync class Node { var mu *Mut; var next *?Node; } " +
+                "@Sync class Q { var mu *Mut; var head *?Node; } " +
+                "@Sync class H (Task) { @Sync var q *Q; " +
+                "  @Async func run() { @Sync var qq = q; } } " +
+                "func f() { @Sync var q = new(Q, {mu=newM()}); @Sync var h = new(H, {q=q}); start(h); }");
+        // 全标 @Sync 的环（A↔B）经接口协变入口 checkSyncable(A) → 占位 true 正确不动点
+        // （先递归 b 命中 B 占位 true，再递归 B.a 命中 A 占位 true，环终止），通过。
+        checkSucc(pre + " " +
+                "@Sync class B { var a *?A; } " +
+                "@Sync class A (Task) { var b *?B; @Async func run() {} } " +
+                "func f() { @Sync var a = new(A); start(a); }");
+        // 反例：环中某节点未标 @Sync（A 未标，含环字段 b *?B）→ 198 分支
+        // !cd.markSync() && maybeRefer → 直接拒（未标 @Sync 即声明不可同步，
+        // 占位 true 不影响此判定）。B 标 @Sync 引用 A → 接口协变 checkSyncable(B)
+        // 递归到 a *?A → A 未标 @Sync 含引用 → false → 报错。
+        checkFail(pre + " " +
+                "@Sync class B (Task) { var a *?A; @Async func run() {} } " +
+                "class A { var b *?B; } " +
+                "func f() { @Sync var b = new(B); start(b); }");
+    }
+
     // TypeConstraint
 
     @Test

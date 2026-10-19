@@ -225,6 +225,9 @@ public class TypeTool {
         if (def instanceof ClassDefinition cd) {
             var sync = cache.get(dt);
             if (sync == null) {
+                // 先占位再递归：自引用类型（如 Node.next *?Node）的环在此终止——
+                // 可同步性是字段 AND，环本身不引入新约束，占位 true 是正确不动点。
+                cache.put(dt, Boolean.TRUE);
                 gm = GenericMap.make(dtd, gm,
                         cd.generic(), dt.generic());
                 sync = checkSyncable(cd, gm, cache);
