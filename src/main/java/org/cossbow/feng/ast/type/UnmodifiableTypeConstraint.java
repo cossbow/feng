@@ -72,6 +72,12 @@ public class UnmodifiableTypeConstraint extends TypeConstraint {
         return Tri.BOTH;
     }
 
+    @Override
+    public OperatorSet operators() {
+        // 不可变标记不保证任何运算符 → 空
+        return OperatorSet.empty();
+    }
+
     //
 
     @Override

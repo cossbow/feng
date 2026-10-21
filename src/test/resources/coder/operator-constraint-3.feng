@@ -1,0 +1,21 @@
+// 泛型运算符约束：类自定义 macro index get/set 投影（VecLike = Vec 保证 T[i] 读写）
+// 正例：模板体内 w[0] 读 与 w[0] = v 写，分别重写为 index get / index set 方法调用
+
+class Vec {
+    var x, y int;
+    macro index get(index int) int { index == 0 ? x : y }
+    macro index set(index int, value int) { if (index == 0) { x = value; } else { y = value; } }
+}
+
+concept VecLike = Vec ;
+
+func set0`T VecLike`(v T) int {
+    var w T = v;
+    w[0] = 100;
+    return w[0];
+}
+
+func main() {
+    var r = set0`Vec`({x=1, y=2});
+    assert r == 100;
+}

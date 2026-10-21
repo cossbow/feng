@@ -49,7 +49,11 @@ public class AssignmentsStatement extends Statement {
     public AssignmentsStatement mono(GenericMap gm) {
         var l = new ArrayList<Assignment>(list.size());
         for (var a : list) {
-            l.add(new Assignment(a.pos(), a.operand().mono(gm), a.value().mono(gm)));
+            var na = new Assignment(a.pos(), a.operand().mono(gm), a.value().mono(gm));
+            // 保留语义分析挂上的 replacer（index-set / sync 字段改写），并经 gm 重建；
+            // 否则单态化后 StmtWriter 仍按数组访问发射（CallStatement.mono 同理保留 replace）。
+            a.replacer().use(r -> na.replacer().set(r.mono(gm)));
+            l.add(na);
         }
         return new AssignmentsStatement(pos(), l);
     }

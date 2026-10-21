@@ -1,8 +1,11 @@
 package org.cossbow.feng.ast.dcl;
 
+import org.cossbow.feng.ast.BinaryOperator;
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.UnaryOperator;
 import org.cossbow.feng.ast.gen.GenericType;
 import org.cossbow.feng.ast.gen.TypeParameter;
+import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.type.Tri;
 import org.cossbow.feng.util.Optional;
 
@@ -121,6 +124,50 @@ public class GenericTypeDeclarer extends TypeDeclarer
     public boolean requiredInit() {
         if (refer.has()) return refer.get().required();
         return type.param().members().hasRequiredInit();
+    }
+
+    // ──────────────── 运算符查询 ────────────────
+
+    /**
+     * 该类型参数保证支持的二元运算符（由约束投影得到下近似）。
+     */
+    public boolean supports(BinaryOperator op) {
+        return type.param().operators().hasBinary(op);
+    }
+
+    /**
+     * 该类型参数保证支持的一元运算符。
+     */
+    public boolean supports(UnaryOperator op) {
+        return type.param().operators().hasUnary(op);
+    }
+
+    /**
+     * 该二元运算符的自定义方法（{@code macro operator}）；primitive 或未实现 → empty。
+     */
+    public Optional<ClassMethod> binaryOperator(BinaryOperator op) {
+        return type.param().operators().binaryMethod(op);
+    }
+
+    /**
+     * 该一元运算符的自定义方法；primitive 或未实现 → empty。
+     */
+    public Optional<ClassMethod> unaryOperator(UnaryOperator op) {
+        return type.param().operators().unaryMethod(op);
+    }
+
+    /**
+     * index 读运算符 {@code T[i]} 的自定义方法；未实现 → empty。
+     */
+    public Optional<ClassMethod> indexGet() {
+        return type.param().operators().indexGet();
+    }
+
+    /**
+     * index 写运算符 {@code T[i] = v} 的自定义方法；未实现 → empty。
+     */
+    public Optional<ClassMethod> indexSet() {
+        return type.param().operators().indexSet();
     }
 
     //

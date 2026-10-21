@@ -87,6 +87,12 @@ public class ExcludeTypeConstraint extends TypeConstraint {
         return Tri.not(operand.has(c));
     }
 
+    @Override
+    public OperatorSet operators() {
+        // 补集在运算符维度上坍缩：无法保证任何公共运算符。
+        return OperatorSet.empty();
+    }
+
     //
 
     @Override

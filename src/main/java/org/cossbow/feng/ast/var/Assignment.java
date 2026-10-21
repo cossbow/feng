@@ -60,6 +60,9 @@ public class Assignment extends Entity {
     }
 
     public Assignment mirror() {
-        return new Assignment(pos(), operand.mirror(), value.mirror());
+        var n = new Assignment(pos(), operand.mirror(), value.mirror());
+        // mirror（变长参数内联展开）同样保留 replacer，避免 index-set 改写丢失
+        replacer().use(r -> n.replacer().set(r.mirror()));
+        return n;
     }
 }

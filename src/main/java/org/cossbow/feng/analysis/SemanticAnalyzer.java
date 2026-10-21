@@ -2410,9 +2410,18 @@ public class SemanticAnalyzer {
             return;
         }
         var s = io.subject();
-        var td = (DerivedTypeDeclarer) s.resultType.must();
-        var cd = (ClassDefinition) td.def();
-        var set = cd.indexOperator().must().set().must();
+        var t = s.resultType.must();
+        ClassMethod set;
+        if (t instanceof DerivedTypeDeclarer td) {
+            var cd = (ClassDefinition) td.def();
+            set = cd.indexOperator().must().set().must();
+        } else if (t instanceof GenericTypeDeclarer gtd) {
+            // 泛型类型参数：约束投影保证的 index-set 运算符
+            set = gtd.indexSet().must();
+        } else {
+            unreachable();
+            return;
+        }
         var m = new MethodExpression(io.pos(), s, set);
         var n = new CallExpression(a.pos(), m, List.of(io.index(), a.value()),
                 set.prototype());
@@ -3596,6 +3605,18 @@ public class SemanticAnalyzer {
             return semantic("'%s' not implement index-set: %s", dtd, op.pos());
         }
 
+        // 泛型类型参数：约束投影保证的 index-set 运算符
+        if (sg.b() instanceof GenericTypeDeclarer gtd) {
+            var set = gtd.indexSet();
+            if (set.has()) {
+                var s = (PrimaryExpression) sg.a();
+                var n = new IndexOperand(op.pos(), s, ig.a());
+                return Groups.g2(n, set.get().prototype().returnType());
+            }
+            return semantic("'%s' not implement index-set: %s",
+                    gtd, op.pos());
+        }
+
         if (!(sg.b() instanceof ArrayTypeDeclarer atd))
             return semantic("require array: %s", op.pos());
 
@@ -3971,6 +3992,65 @@ public class SemanticAnalyzer {
                 l.b(), op, r.b(), e.pos());
     }
 
+    /**
+     * 泛型类型参数上的二元运算符 {@code T op T}（模板体分析期）。
+     * <p>
+     * 仅当两侧都是同一类型参数（{@code lg.equals(rg)}）时处理；
+     * 消费约束投影的 {@link org.cossbow.feng.ast.type.OperatorSet}：
+     * <ul>
+     *   <li>自定义运算符（{@code macro operator}）→ 重写为
+     *       {@code MethodExpression} + {@code CallExpression}，结果 = 方法返回类型；</li>
+     *   <li>primitive 投影保证的运算符 → 关系运算结果 = {@code bool}，
+     *       其余（算术/位）结果 = {@code T}（闭合）；</li>
+     *   <li>EQ/NE 值比较 → {@code bool}。</li>
+     * </ul>
+     * 非 {@code T op T} 形态返回 empty（回落到派生类型/报错路径）。
+     */
+    private Optional<Groups.G2<Expression, TypeDeclarer>> genericBinOp(
+            Groups.G2<Expression, TypeDeclarer> l,
+            Groups.G2<Expression, TypeDeclarer> r,
+            BinaryExpression e) {
+        if (!(l.b() instanceof GenericTypeDeclarer lg) ||
+                !(r.b() instanceof GenericTypeDeclarer rg) ||
+                !lg.equals(rg)) {
+            return Optional.empty();
+        }
+
+        var op = e.operator();
+
+        // 自定义运算符优先（macro operator）
+        var m = lg.binaryOperator(op);
+        if (m.has()) {
+            var me = new MethodExpression(l.a().pos(),
+                    (PrimaryExpression) l.a(), m.get());
+            me.resultType.set(new AnonFuncTypeDeclarer(me.pos(), true,
+                    m.get().prototype()));
+            var ce = new CallExpression(e.pos(), me, List.of(r.a()),
+                    m.get().prototype());
+            return Optional.of(Groups.g2(ce,
+                    m.get().prototype().returnSet().must()));
+        }
+
+        // 约束投影保证的运算符（primitive 闭合）
+        if (lg.supports(op)) {
+            var t = BinaryOperator.SetRel.contains(op)
+                    ? Primitive.BOOL.declarer(e.pos())
+                    : lg;
+            var n = new BinaryExpression(e.pos(), op, l.a(), r.a());
+            return Optional.of(Groups.g2(n, t));
+        }
+
+        // 值类型 EQ/NE 比较
+        if (BinaryOperator.SetEquals.contains(op)
+                && assignable(lg, rg, Optional.empty(), e).ok) {
+            var n = new BinaryExpression(e.pos(), op, l.a(), r.a());
+            return Optional.of(Groups.g2(n,
+                    Primitive.BOOL.declarer(e.pos())));
+        }
+
+        return Optional.empty();
+    }
+
 
     private Groups.G2<Expression, TypeDeclarer>
     optimize(BinaryExpression e) {
@@ -3995,6 +4075,10 @@ public class SemanticAnalyzer {
         var lr = l.b().maybeRefer();
         var rr = r.b().maybeRefer();
         if (lr.none() && rr.none()) {
+            // 泛型类型参数：模板体分析期经约束投影判定运算符
+            var go = genericBinOp(l, r, e);
+            if (go.has()) return go.get();
+
             var t = primitiveBinOp(l.b(), r.b(), e);
             if (t.none()) {
                 return derivedTypeBinOp(l, r, e);
@@ -4107,6 +4191,22 @@ public class SemanticAnalyzer {
                             List.of(), m.prototype());
                     return Groups.g2(ce, td);
                 }
+            }
+        } else if (isValue && td instanceof GenericTypeDeclarer gtd) {
+            // 泛型类型参数：自定义运算符或约束投影保证的一元运算符
+            var m = gtd.unaryOperator(op);
+            if (m.has()) {
+                var me = new MethodExpression(o.a().pos(),
+                        (PrimaryExpression) o.a(), m.get());
+                me.resultType.set(new AnonFuncTypeDeclarer(me.pos(),
+                        true, m.get().prototype()));
+                var ce = new CallExpression(e.pos(), me,
+                        List.of(), m.get().prototype());
+                return Groups.g2(ce, td);
+            }
+            if (gtd.supports(op)) {
+                var n = new UnaryExpression(e.pos(), e.operator(), o.a());
+                return Groups.g2(n, o.b());
             }
         }
         return semantic("type '%s' not support operator '%s': %s",
@@ -4588,6 +4688,24 @@ public class SemanticAnalyzer {
 
         if (sg.b() instanceof DerivedTypeDeclarer dtd) {
             return indexOfCustom(e, dtd, sg);
+        }
+
+        // 泛型类型参数：约束投影保证的 index-get 运算符
+        if (sg.b() instanceof GenericTypeDeclarer gtd) {
+            var get = gtd.indexGet();
+            if (get.has()) {
+                var cm = get.get();
+                var prot = cm.prototype();
+                var a = (PrimaryExpression) sg.a();
+                var s = new MethodExpression(a.pos(), a, cm);
+                var ig = optimize(e.index());
+                var n = new CallExpression(e.pos(), s,
+                        List.of(ig.a()), prot);
+                var td = prot.returnSet().must();
+                return Groups.g2(n, td);
+            }
+            return semantic("'%s' not implement index: %s",
+                    gtd, e.index().pos());
         }
 
         return semantic("'%s' not implement index: %s",

@@ -131,6 +131,16 @@ public class TypeConstraint extends Entity {
      */
     abstract public Tri has(Concept c);
 
+    /**
+     * 该约束在「运算符」维度上的投影：约束集合中保证可用的运算符下近似。
+     * <p>
+     * 运算符集合是封闭有限的，与 {@code domains()} 同属可精确计算的有限维度
+     * （区别：primitive 运算符是类型代数属性，自定义运算符来自 class 的
+     * {@code binaryOperators}/{@code unaryOperators}/{@code indexOperator} 表）。
+     * 空（{@link OperatorSet#empty()}）表示无保证可用运算符。
+     */
+    abstract public OperatorSet operators();
+
     //
 
     abstract public boolean equals(Object obj);

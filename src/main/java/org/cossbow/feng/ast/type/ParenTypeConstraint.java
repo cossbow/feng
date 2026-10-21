@@ -77,6 +77,11 @@ public class ParenTypeConstraint extends TypeConstraint {
         return child.has(c);
     }
 
+    @Override
+    public OperatorSet operators() {
+        return child.operators();
+    }
+
     //
 
 

@@ -77,6 +77,12 @@ public class ReferTypeConstraint extends TypeConstraint {
         return Tri.BOTH;
     }
 
+    @Override
+    public OperatorSet operators() {
+        // 引用标记不保证任何运算符（class 是否实现运算符未知）→ 空
+        return OperatorSet.empty();
+    }
+
     //
 
     @Override

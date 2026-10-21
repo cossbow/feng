@@ -5773,4 +5773,80 @@ public class SemanticAnalyzerTest {
         checkFail(d + "func f() { var h Box`B`; }");
     }
 
+    // ===== 运算符约束投影（OperatorSet）=====
+
+    @Test
+    public void testGenericOperator1() {
+        // 正例：primitive 约束投影保证算术/比较运算符，模板体可用
+        checkSucc("concept Number = int | float ; " +
+                "func max`T Number`(a, b T) T { return a >= b ? a : b; } " +
+                "func f(){ var v = max`int`(1, 2); }");
+        // 正例：单 primitive 约束同样投影
+        checkSucc("func f`T (int)`(a T) T { return a + a; }");
+        // 反例：位运算符不在 Number 投影保证集内
+        checkFail("concept Number = int | float ; " +
+                "func bitwise`T Number`(a, b T) T { return a & b; }");
+        // 反例：布尔约束不保证算术运算符
+        checkFail("func f`T (bool)`(a T) T { return a + a; }");
+    }
+
+    @Test
+    public void testGenericOperator2() {
+        // 正例：类自定义 macro operator 投影，模板体经方法调用
+        checkSucc("class Vec { var x,y int; macro operator lt(rhs){ x<rhs.x } } " +
+                "concept VecLike = Vec ; " +
+                "func less`T VecLike`(a, b T) int { return a < b ? 1 : 0; } " +
+                "func f(){ var r = less`Vec`({x=1},{x=2}); }");
+        // 反例：类自定义 operator 未实现 lt 时，< 不在投影保证集内
+        checkFail("class Vec { var x,y int; macro operator gt(rhs){ x>rhs.x } } " +
+                "concept VecLike = Vec ; " +
+                "func less`T VecLike`(a, b T) int { return a < b ? 1 : 0; }");
+    }
+
+    @Test
+    public void testGenericOperator3() {
+        // 正例：类自定义 index get/set 投影，模板体可读写 T[i]
+        checkSucc("class Vec { var x,y int; " +
+                "macro index get(index int) int { index==0 ? x : y } " +
+                "macro index set(index int, value int) { if (index==0) { x=value; } else { y=value; } } } " +
+                "concept VecLike = Vec ; " +
+                "func set0`T VecLike`(v T) int { var w T = v; w[0] = 100; return w[0]; } " +
+                "func f(){ var r = set0`Vec`({x=1, y=2}); }");
+        // 反例：类只实现 index get，未实现 index set，写操作拒绝
+        checkFail("class Vec { var x,y int; " +
+                "macro index get(index int) int { index==0 ? x : y } } " +
+                "concept VecLike = Vec ; " +
+                "func set0`T VecLike`(v T) int { var w T = v; w[0] = 100; return w[0]; }");
+    }
+
+    @Test
+    public void testGenericOperator4() {
+        // OR 组合按保证集取交集：int | float 保证算术，但 int | bool 交集不含算术
+        checkSucc("concept N = int | float ; " +
+                "func f`T N`(a T) T { return a + a; }");
+        // 反例：int | bool 的交集不含 +，模板体拒绝
+        checkFail("concept N = int | bool ; " +
+                "func f`T N`(a T) T { return a + a; }");
+    }
+
+    @Test
+    public void testGenericOperator5() {
+        // OR 组合发射一致性：两侧同为 primitive（int | float 的 <），模板体可用
+        checkSucc("concept N = int | float ; " +
+                "func min`T N`(a, b T) T { return a < b ? a : b; } " +
+                "func f(){ var v = min`int`(1, 2); }");
+        // 反例：一侧 primitive 一侧自定义类（int | Vec），< 发射歧义（primitive vs 方法调用）
+        // 模板体只分析一次，无统一发射形式 → 从投影剔除，模板体拒绝
+        checkFail("class Vec { var x,y int; macro operator lt(rhs){ x<rhs.x } } " +
+                "concept N = int | Vec ; " +
+                "func min`T N`(a, b T) T { return a < b ? a : b; } " +
+                "func f(){ var v = min`int`(1, 2); }");
+        // 正例：两侧同一自定义方法（class A | class B 且都实现 lt），模板体可用
+        checkSucc("class A { var x int; macro operator lt(rhs){ x<rhs.x } } " +
+                "class B { var x int; macro operator lt(rhs){ x<rhs.x } } " +
+                "concept N = A | B ; " +
+                "func min`T N`(a, b T) T { return a < b ? a : b; } " +
+                "func f(){ var v = min`A`({x=1},{x=2}); }");
+    }
+
 }

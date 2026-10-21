@@ -12,6 +12,7 @@ import org.cossbow.feng.ast.lit.*;
 import org.cossbow.feng.ast.oop.ClassDefinition;
 import org.cossbow.feng.ast.oop.ClassMethod;
 import org.cossbow.feng.ast.oop.InterfaceDefinition;
+import org.cossbow.feng.ast.proc.FixedParameter;
 import org.cossbow.feng.ast.struct.StructureDefinition;
 import org.cossbow.feng.util.ErrorUtil;
 import org.cossbow.feng.util.Optional;
@@ -1098,6 +1099,11 @@ public class ExprWriter extends CWriter<ExprWriter> {
             // 直调分支（final 类 / 值类型 subject）解析出「声明方法」的祖先类时，
             // 记录其（具体化）DerivedType：subject 需 cast 到该类型再传给方法。
             DerivedType castOwner = null;
+            // 参数发射目标类型（直调分支专用，null = 回退调用点 prototype）：
+            // OR 投影保留的宏方法来自约束一侧（如 A|B 保留 A.lt 的 &A 形参），
+            // 调用点 prototype 对另一侧实例化时仍是 stale 的 &A——改用具体方法
+            // mf 的形参类型（去 self 首参）按具体类发射。
+            List<TypeDeclarer> argTypes = null;
             // 数组内建方法 swap/move → Header.h 宏
             if (td instanceof ArrayTypeDeclarer atd) {
                 return arrayCall(e, me, atd);
@@ -1211,6 +1217,13 @@ public class ExprWriter extends CWriter<ExprWriter> {
                                 castOwner = concreteAncestorDt(
                                         concrete, dtd.derivedType(), dc);
                             }
+                            // 用具体方法形参类型发射参数（去 self 首参）：
+                            // OR 投影宏方法形参是保留侧 &self（如 &A），stale
+                            // prototype 会让 B 的值参数丢失 & 包装。
+                            argTypes = mf.prototype().parameterSet().params()
+                                    .stream().skip(1)
+                                    .map(p -> ((FixedParameter) p).type())
+                                    .collect(Collectors.toList());
                         } else if (me.method() instanceof ClassMethod cmm
                                 && cmm.master() != null) {
                             // 跨模块类（不在本模块 classMetas）：退回旧解析
@@ -1242,7 +1255,11 @@ public class ExprWriter extends CWriter<ExprWriter> {
             write(me.subject());
             if (!e.arguments().isEmpty()) {
                 write(COMMA);
-                writeValues(e.arguments(), e.prototype().must().parameterSet().types());
+                if (argTypes != null) {
+                    writeValues(e.arguments(), argTypes);
+                } else {
+                    writeValues(e.arguments(), e.prototype().must().parameterSet().types());
+                }
             }
             write(')');
             return this;

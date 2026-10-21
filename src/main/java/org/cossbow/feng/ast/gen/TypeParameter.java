@@ -4,6 +4,7 @@ import org.cossbow.feng.ast.*;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.type.Concept;
 import org.cossbow.feng.ast.type.MemberSet;
+import org.cossbow.feng.ast.type.OperatorSet;
 import org.cossbow.feng.ast.type.Tri;
 import org.cossbow.feng.ast.type.TypeConstraint;
 import org.cossbow.feng.util.Optional;
@@ -119,6 +120,15 @@ public class TypeParameter extends Entity {
     public Tri has(Concept c) {
         if (constraint.none()) return Tri.BOTH;
         return constraint.get().has(c);
+    }
+
+    /**
+     * 该类型参数在「运算符」维度上的投影（保证可用的运算符下近似）。
+     * 无约束 → 空下近似（不保证任何运算符）。
+     */
+    public OperatorSet operators() {
+        if (constraint.none()) return OperatorSet.empty();
+        return constraint.get().operators();
     }
 
     //

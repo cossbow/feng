@@ -91,6 +91,15 @@ public class DomainTypeConstraint extends TypeConstraint {
         return Tri.BOTH;
     }
 
+    @Override
+    public OperatorSet operators() {
+        // 域约束不保证具体类型实现任何运算符 → 空（保守下近似）。
+        // 即使 primitive 域，bool 也不支持关系/算术运算，
+        // 全体 primitive 的运算符交集为空；用户应显式枚举
+        // （如 `concept Number = int | float`）以获得保证运算符。
+        return OperatorSet.empty();
+    }
+
     //
 
     @Override

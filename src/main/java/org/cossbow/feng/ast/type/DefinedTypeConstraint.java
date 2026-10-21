@@ -225,6 +225,21 @@ public class DefinedTypeConstraint extends TypeConstraint {
         return Tri.NO;
     }
 
+    @Override
+    public OperatorSet operators() {
+        if (definedType instanceof GenericType gt) {
+            var oc = gt.param().constraint();
+            return oc.none() ? OperatorSet.empty() : oc.get().operators();
+        }
+        if (definedType instanceof PrimitiveType pt) {
+            return OperatorSet.of(pt.declarer(Optional.empty()));
+        }
+        if (definedType instanceof DerivedType dt) {
+            return OperatorSet.of(dt.declarer(Optional.empty()));
+        }
+        return OperatorSet.empty();
+    }
+
     //
 
 

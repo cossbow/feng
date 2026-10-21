@@ -75,6 +75,11 @@ public class ConceptTypeConstraint extends TypeConstraint {
         return concept.expr().has(c);
     }
 
+    @Override
+    public OperatorSet operators() {
+        return concept.expr().operators();
+    }
+
     //
 
     @Override

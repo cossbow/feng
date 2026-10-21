@@ -1,0 +1,22 @@
+// 泛型运算符约束：类自定义 macro operator 投影（VecLike = Vec 保证 lt）
+// 正例：模板体内 v < v2 重写为 macro operator lt 方法调用
+
+class Vec {
+    var x, y int;
+    macro operator lt(rhs) {
+        x < rhs.x || (x == rhs.x && y < rhs.y)
+    }
+}
+
+concept VecLike = Vec ;
+
+func less`T VecLike`(a, b T) int {
+    return a < b ? 1 : 0;
+}
+
+func main() {
+    var a = Vec{x=1, y=2};
+    var b = Vec{x=1, y=3};
+    assert less`Vec`(a, b) == 1;
+    assert less`Vec`(b, a) == 0;
+}

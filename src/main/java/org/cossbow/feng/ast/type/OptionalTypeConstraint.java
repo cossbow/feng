@@ -75,6 +75,12 @@ public class OptionalTypeConstraint extends TypeConstraint {
         return Tri.BOTH;
     }
 
+    @Override
+    public OperatorSet operators() {
+        // 可空标记不保证任何运算符 → 空
+        return OperatorSet.empty();
+    }
+
     //
 
     @Override

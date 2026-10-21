@@ -134,6 +134,16 @@ public class BinaryTypeConstraint extends TypeConstraint {
         return calc(l, r);
     }
 
+    @Override
+    public OperatorSet operators() {
+        return switch (operator) {
+            // AND：类型同时满足两侧，运算符取并集
+            case AND -> OperatorSet.and(left.operators(), right.operators());
+            // OR：满足任一侧，只有两侧都保证的运算符存活（交集，含 sameView 剔除）
+            case OR -> OperatorSet.or(left.operators(), right.operators());
+        };
+    }
+
     //
 
     @Override

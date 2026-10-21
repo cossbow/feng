@@ -1,0 +1,16 @@
+// 泛型运算符约束：primitive 约束投影（Number = int | float 保证 >=、+ 等算术与比较）
+// 正例：max 在模板体内使用 >=，编译期由约束投影判定支持，运行时按实例类型发射
+
+concept Number = int | float ;
+
+func max`T Number`(a, b T) T {
+    return a >= b ? a : b;
+}
+
+func main() {
+    var vi = max`int`(3, 7);
+    assert vi == 7;
+    var vf = max`float`(1.5, 0.5);
+    assert vf == 1.5;
+    // int/float 实例化都经约束投影放行
+}

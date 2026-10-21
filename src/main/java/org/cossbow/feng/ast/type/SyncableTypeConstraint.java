@@ -68,6 +68,12 @@ public class SyncableTypeConstraint extends TypeConstraint {
     }
 
     @Override
+    public OperatorSet operators() {
+        // Syncable 是并发能力标记，不保证任何运算符 → 空
+        return OperatorSet.empty();
+    }
+
+    @Override
     public boolean equals(Object obj) {
         return false;
     }

@@ -1,0 +1,34 @@
+// 泛型运算符约束：OR 组合两个自定义类（A | B 都实现 lt）
+// 正例：两侧宏方法结果类型一致（都返回 bool），< 在投影中保留；
+// 模板体只分析一次，实例化 A/B 时按具体类重解析宏方法发射。
+
+class A final {
+    var x int;
+    macro operator lt(rhs) { x < rhs.x }
+}
+
+class B final {
+    var x int;
+    macro operator lt(rhs) { x < rhs.x }
+}
+
+concept N = A | B ;
+
+func min`T N`(a, b T) T {
+    return a < b ? a : b;
+}
+
+func max`T N`(a, b T) T {
+    return a < b ? b : a;
+}
+
+func main() {
+    var a1 = A{x=1};
+    var a2 = A{x=2};
+    assert min`A`(a1, a2).x == 1;
+    assert max`A`(a1, a2).x == 2;
+    var b1 = B{x=5};
+    var b2 = B{x=3};
+    assert min`B`(b1, b2).x == 3;
+    assert max`B`(b1, b2).x == 5;
+}
