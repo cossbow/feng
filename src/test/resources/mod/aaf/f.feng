@@ -1,0 +1,17 @@
+export class S`T` {
+    var v T;
+    export
+    func get() T {
+        return v;
+    }
+}
+export class A`T` {
+    export
+    func run(t T) {
+        var s = new(S`T`, {v=t});
+        var g = s.get();
+    }
+}
+export func just`T`(x T) *A`T` {
+    return new(A`T`);
+}

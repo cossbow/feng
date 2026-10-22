@@ -817,6 +817,7 @@ public class Monomorphization {
             // 模板类型（如 BigBox`V`.change 里 `var o V` 仍是 $V / BigBox_V）。
             var proc = m.procedure().map(p -> new Procedure(p.pos(), pt,
                     p.body().mono(gm), p.labels()));
+            proc.use(p -> scanProc(p, GenericMap.EMPTY));
             var cm = new ClassMethod(m.pos(), m.modifier(), m.name(), m.generic(),
                     m.escaped(), m.unmodifiable(), pt, proc, m.returnThis());
             cm.dynamic(m.dynamic());

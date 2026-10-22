@@ -3,6 +3,7 @@ import test$aab v;
 import test$aac r;
 import test$aad d;
 import test$aae e;
+import test$aaf f;
 
 struct V3 {
     arr [3]a$Bu;
@@ -64,6 +65,11 @@ func testIface(n int) {
     var a = new(Impl`int`);
     callIface(a, n);
     assert(a.last == n);
+}
+
+func testF() {
+    var a = f$just`int`(42);
+    a.run(7);
 }
 
 func main(args [&#][*?#]byte) {
