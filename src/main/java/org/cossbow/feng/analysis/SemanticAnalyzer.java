@@ -2068,16 +2068,16 @@ public class SemanticAnalyzer {
     }
 
     /**
-     * 收窄 gm：{@code T} → 克隆（保 id）并写入收窄约束
+     * 分支收窄 gm：{@code T} → 克隆（保 id）并写入收窄约束
      * {@code C0 & C1}（真）/ {@code C0 & !C1}（假）。克隆 T id 与原 T 相同，
      * mono 期 {@link GenericMap#make} 以原 T 为键靠 HashMap equals 冲突命中
      * 替换为具体类型；收窄 gm 为单层、不 merge/overlay，不泄漏出分支。
      */
-    private GenericMap yesGm(GenericTypeDeclarer tp,
-                             Optional<TypeConstraint> c0, StaticExpr cond) {
-        var c1 = conditionConstraint(cond, tp, true);
+    private GenericMap branchGm(GenericTypeDeclarer tp,
+                                Optional<TypeConstraint> c0,
+                                TypeConstraint c1) {
         var np = (TypeParameter) tp.param().clone();
-        // 无约束 = 顶约束（全集）：真分支直接取条件约束，否则 C0 & C1。
+        // 无约束 = 顶约束（全集）：分支直接取条件约束，否则 C0 & C1。
         np.constraint(c0.has()
                 ? new BinaryTypeConstraint(tp.pos(), TypeOperator.AND,
                 c0.get(), c1)
@@ -2086,20 +2086,128 @@ public class SemanticAnalyzer {
                 tp.type().replaceParam(np).declarer(Optional.empty())));
     }
 
+    /**
+     * 有限域补集化简：{@code C0 & !C1} 在 C0 为有限 OR 枚举时，若被排除项
+     * {@code C1}（{@code ==X}）完整覆盖 C0 中某成员（结构相等且该成员封闭、
+     * 无子类型），则将该成员从枚举剔除——补集在该域内是精确集合差。
+     * <p>
+     * 动机：{@code ExcludeTypeConstraint.operators()} 恒空（补集无法保证公共
+     * 运算符），而 {@code C0 = int | Point} 的 OR 投影已因 primitive/自定义
+     * 发射歧义剔除 {@code +}。假分支 {@code !(T==int)} 若仍保留 {@code int}
+     * 枚举，投影坍缩，{@code else} 分支内 {@code q + r} 报「not support」。
+     * 化简后 {@code C0 & !(==int) = ==Point}，投影恢复 Point 的宏方法运算符。
+     * <p>
+     * 封闭判定（无子类型 → 剔除安全）：primitive 无派生；{@code final} 类
+     * 不可被继承；其余 class 若当前模块内无子类（{@code inherited()==0}）
+     * 也视为封闭。无法判定封闭（如非 final 且有子类的 class）→ 保守保留。
+     * <p>
+     * 仅当 C0 是 OR 二元约束且其成员可逐一枚举、C1 是 {@code ==X} 时化简；
+     * 其余形态返回 C1（不化简，避免把条件约束覆盖为 C0）。
+     * 递归下钻 OR 的左右两侧。
+     */
+    private TypeConstraint narrowExclude(
+            TypeConstraint c0, TypeConstraint c1) {
+        if (!(c0 instanceof BinaryTypeConstraint bc)
+                || bc.operator() != TypeOperator.OR) {
+            return c1;
+        }
+        if (!(c1 instanceof ExcludeTypeConstraint ec)
+                || !(ec.operand() instanceof TypeEqualsConstraint eq)) {
+            return c1;
+        }
+
+        // 枚举 C0 成员：递归展开嵌套 OR，收集叶子（保持顺序）。
+        var leaves = new ArrayList<TypeConstraint>();
+        collectOrLeaves(bc, leaves);
+        if (leaves.size() < 2) return c1;
+
+        // 若被排除成员在枚举中完整命中，则剔除；否则保留（保守）。
+        var reduced = new ArrayList<TypeConstraint>();
+        var removed = false;
+        for (var leaf : leaves) {
+            if (covered(leaf, eq.type())) {
+                removed = true;
+                continue;
+            }
+            reduced.add(leaf);
+        }
+        if (!removed || reduced.isEmpty()) return c1;
+
+        // 重建为剩余成员的 OR。
+        var it = reduced.iterator();
+        var r = it.next();
+        while (it.hasNext()) {
+            r = new BinaryTypeConstraint(c0.pos(), TypeOperator.OR,
+                    r, it.next());
+        }
+        return r;
+    }
+
+    /**
+     * 枚举成员是否被具体类型 {@code X} 完整覆盖：结构相等（同定义同实参）
+     * 且 {@code X} 封闭（无子类型）→ 剔除安全；否则保留。
+     */
+    private boolean covered(TypeConstraint leaf, TypeDeclarer x) {
+        if (!(leaf instanceof DefinedTypeConstraint dc)) {
+            return false;
+        }
+        var dt = dc.definedType();
+        // 结构相等：成员 DefinedType 与 X 的底层 DefinedType 同定义同实参。
+        if (dt instanceof PrimitiveType pt) {
+            if (!(x instanceof PrimitiveTypeDeclarer ptd)
+                    || pt.primitive() != ptd.primitive()) {
+                return false;
+            }
+            return true;     // primitive 无派生
+        }
+        if (dt instanceof DerivedType d) {
+            if (!(x instanceof DerivedTypeDeclarer dtd)
+                    || !d.equals(dtd.derivedType())) {
+                return false;
+            }
+            if (dtd.def() instanceof ClassDefinition cd) {
+                // final 类不可被继承；非 final 且当前模块无子类 → 封闭
+                return cd.isFinal() || cd.inherited() == 0;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 递归展开 OR 约束，收集叶子（不嵌套 OR 的约束）。
+     */
+    private void collectOrLeaves(
+            TypeConstraint c, List<TypeConstraint> out) {
+        if (c instanceof BinaryTypeConstraint bc
+                && bc.operator() == TypeOperator.OR) {
+            collectOrLeaves(bc.left(), out);
+            collectOrLeaves(bc.right(), out);
+            return;
+        }
+        out.add(c);
+    }
+
+    /**
+     * 真分支约束：{@code C0 & C1}。当条件为 {@code !(T==X)} 时 C1 是
+     * {@code !(==X)}，同样做有限域补集化简（与假分支对称）。
+     */
+    private GenericMap yesGm(GenericTypeDeclarer tp,
+                             Optional<TypeConstraint> c0, StaticExpr cond) {
+        var c1 = conditionConstraint(cond, tp, true);
+        if (c0.has())
+            c1 = narrowExclude(c0.get(), c1);
+        return branchGm(tp, c0, c1);
+    }
+
     private GenericMap notGm(GenericTypeDeclarer tp,
                              Optional<TypeConstraint> c0, StaticExpr cond) {
         // 假分支约束 = 条件为假时蕴含的约束：conditionConstraint(cond, tp, false)
         // 对 ! / && / || 递归做 De Morgan，等价于 !C1 且不会产生 !!C 双重取反
         // （双重取反会让 Exclude.members() 恒空坍缩，丢失成员集）。
         var n1 = conditionConstraint(cond, tp, false);
-        var np = (TypeParameter) tp.param().clone();
-        // 无约束 = 顶约束（全集）：假分支直接取 !C1，否则 C0 & !C1。
-        np.constraint(c0.has()
-                ? new BinaryTypeConstraint(tp.pos(), TypeOperator.AND,
-                c0.get(), n1)
-                : n1);
-        return new GenericMap(Map.of(tp.param(),
-                tp.type().replaceParam(np).declarer(Optional.empty())));
+        if (c0.has())
+            n1 = narrowExclude(c0.get(), n1);
+        return branchGm(tp, c0, n1);
     }
 
     /**

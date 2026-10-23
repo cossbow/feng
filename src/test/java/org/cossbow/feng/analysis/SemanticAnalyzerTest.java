@@ -5979,4 +5979,56 @@ public class SemanticAnalyzerTest {
                 "static if (T == A) { return 1; } else { var q T = t; return q.y; } }");
     }
 
+    // ===== static-if 假分支 Exclude 运算符投影坍缩（narrowExclude）=====
+
+    // T 约束 int|Point（有限 OR 枚举），static if (T==int) 假分支 !(==int) 应
+    // 有限域补集化简为 ==Point，恢复 Point 自定义宏运算符投影（+ 方法调用）。
+    @Test
+    public void testStaticIfNarrowExcludeOp() {
+        var d = "class Point final { export var x int; " +
+                "macro operator add(rhs){ { x = x + rhs.x } } } ";
+        // 正例：假分支收窄为 ==Point 后，q + r 经 Point.add 方法调用可用
+        checkSucc(d + "func f`T (int | Point)`(a, b T) int { " +
+                "static if (T == int) { return 1; } else { " +
+                "var q T = a; var r T = b; var s = q + r; return s.x; } }");
+        // 正例：假分支无 + 时（化简后仍可 return a）——回归隔离
+        checkSucc(d + "func g`T (int | Point)`(a, b T) T { " +
+                "static if (T == int) { return a; } else { return a; } }");
+        // 正例：单 class 约束（无 OR 无发射歧义）无需化简，假分支 + 本就可用——
+        // 对照：int|Point 的坍缩只在 OR 发射歧义时才必需
+        checkSucc(d + "func h`T (Point)`(a, b T) int { " +
+                "static if (T == int) { return 1; } else { " +
+                "var q T = a; var r T = b; var s = q + r; return s.x; } }");
+        // 反例：被排除项不在 C0 枚举内（float64 ∉ int|Point）→ 无法化简，
+        // 假分支保留 (int|Point) & !(==float64)，OR 投影因发射歧义剔除 + → 拒绝
+        checkFail(d + "func k`T (int | Point)`(a, b T) int { " +
+                "static if (T == float64) { return 1; } else { " +
+                "var q T = a; var r T = b; var s = q + r; return s.x; } }");
+    }
+
+    // 有限域补集化简保守性：被排除成员在枚举中但无法判定封闭（非 final 且
+    // 模块内有子类）→ 保守保留，不剔除；子类不满足结构相等也不会被误剔除。
+    @Test
+    public void testStaticIfNarrowExcludeConservative() {
+        // 正例：Pt 封闭（final）→ !(==Pt) 化简为 ==int，假分支 +（int primitive）可用
+        checkSucc("class Pt final { export var x int; } " +
+                "func f`T (int | Pt)`(a, b T) T { " +
+                "static if (T == Pt) { return a; } else { " +
+                "var q T = a; var r T = b; return q + r; } }");
+        // 正例：Pt 非 final 但模块内无子类 → 封闭可剔除，假分支 + 可用
+        checkSucc("class Pt { export var x int; " +
+                "macro operator add(rhs){ { x = x + rhs.x } } } " +
+                "func g`T (int | Pt)`(a, b T) int { " +
+                "static if (T == int) { return 1; } else { " +
+                "var q T = a; var r T = b; var s = q + r; return s.x; } }");
+        // 反例：Pt 非 final 且有子类 → 无法判定封闭，保守保留：假分支
+        // (int|Pt) & !(==Pt) 保留两成员，OR 投影因发射歧义剔除 + → 拒绝
+        checkFail("class Pt { export var x int; " +
+                "macro operator add(rhs){ { x = x + rhs.x } } } " +
+                "class Sub : Pt { export var z int; } " +
+                "func f`T (int | Pt)`(a, b T) int { " +
+                "static if (T == Pt) { return 1; } else { " +
+                "var q T = a; var r T = b; var s = q + r; return s.x; } }");
+    }
+
 }
