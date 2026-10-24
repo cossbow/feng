@@ -1,0 +1,296 @@
+import std$string;
+import std$testing;
+
+// λ 演算求值器：用 Fēng 验证 lambda/函数式新能力。
+//
+// 结构：
+//   1. Expr 语法树（Var / Lam / App / Num）
+//   2. Closure 值（λ 的语义值 = 参数名 + 体 + 求值时刻环境）
+//   3. Env 环境链表
+//   4. 递归下降解析器（源码字符串 → Expr）
+//   5. eval 求值器（β 归约 + 词法闭包 + 按值调用）
+//
+// 语法：
+//   expr := '\\' name '.' expr        （λ 抽象）
+//         | atom+                        （应用，左结合）
+//         | number                       （数字扩展）
+//   atom := name | '(' expr ')'
+
+// ---- 表达式树 ----
+class Expr {
+    var kind int;        // 0=Var, 1=Lam, 2=App, 3=Num
+    var name string$String;
+    var body *?Expr;
+    var arg *?Expr;
+    var num int;         // kind=3 时的值
+}
+
+func mkVar(name string$String) *Expr {
+    return new(Expr, {kind=0, name=name});
+}
+func mkLam(name string$String, body *Expr) *Expr {
+    return new(Expr, {kind=1, name=name, body=body});
+}
+func mkApp(fn *Expr, arg *Expr) *Expr {
+    return new(Expr, {kind=2, body=fn, arg=arg});
+}
+func mkNum(n int) *Expr {
+    return new(Expr, {kind=3, num=n});
+}
+
+// ---- 值：闭包 ----
+class Closure {
+    var kind int;        // 1=Lam 闭包, 2=Num
+    var param string$String;
+    var body *?Expr;
+    var env *?Env;
+    var num int;
+}
+
+// ---- 环境：链表 ----
+class Env {
+    var name string$String;
+    var val *?Closure;
+    var next *?Env;
+}
+
+func envExtend(name string$String, val *Closure, next *?Env) *Env {
+    return new(Env, {name=name, val=val, next=next});
+}
+
+func envLookup(name string$String, env *?Env) *?Closure {
+    var p = env;
+    for (p != nil) {
+        if (p.name.equals(name)) { return p.val; }
+        p = p.next;
+    }
+    return nil;
+}
+
+// ---- 求值（按值调用） ----
+func eval(e *?Expr, env *?Env) *?Closure {
+    if (e == nil) { return nil; }
+    if (e.kind == 0) {
+        return envLookup(e.name, env);
+    }
+    if (e.kind == 1) {
+        return new(Closure, {kind=1, param=e.name, body=e.body, env=env});
+    }
+    if (e.kind == 3) {
+        return new(Closure, {kind=2, num=e.num});
+    }
+    // App：按值调用（在 fn 非空块内完成，Fēng 块内收窄）
+    var fn = eval(e.body, env);
+    if (fn != nil) {
+        if (fn.kind != 1) { return nil; }  // 不是函数
+        var a = eval(e.arg, env);
+        if (a != nil) {
+            var body = fn.body;
+            if (body != nil) {
+                var newEnv = envExtend(fn.param, a, fn.env);
+                return eval(body, newEnv);
+            }
+        }
+    }
+    return nil;
+}
+
+// ---- 递归下降解析器 ----
+class Parser {
+    var src string$String;   // 剩余源码
+}
+
+// 跳过空白
+func skipWs(p *Parser) {
+    var s = p.src;
+    for (!s.isEmpty()) {
+        var c = s.rune(0);
+        if (c != 32 && c != 10 && c != 9 && c != 13) { break; }
+        s = s.substring(1, s.byteLength());
+        p.src = s;
+    }
+}
+
+// 读一个标识符（非特殊字符序列）
+func readName(p *Parser) string$String {
+    var s = p.src;
+    var i = 0;
+    var n = s.byteLength();
+    for (i < n) {
+        var c = s.rune(i);
+        if (c == 40 || c == 41 || c == 46 || c == 92 || c == 32) { break; }  // () . \ 空格
+        i += 1;
+    }
+    var name = s.substring(0, i);
+    p.src = s.substring(i, n);
+    return name;
+}
+
+// 解析原子：name / '(' expr ')' / 数字
+func parseAtom(p *Parser) *?Expr {
+    skipWs(p);
+    var s = p.src;
+    if (s.isEmpty()) { return nil; }
+    var c = s.rune(0);
+    if (c == 40) {  // '('
+        p.src = s.substring(1, s.byteLength());
+        var e = parseExpr(p);
+        skipWs(p);
+        var s2 = p.src;
+        if (!s2.isEmpty() && s2.rune(0) == 41) {  // ')'
+            p.src = s2.substring(1, s2.byteLength());
+        }
+        return e;
+    }
+    if (c >= 48 && c <= 57) {  // 数字：手动解析
+        var name = readName(p);
+        var n = 0;
+        for (var i = 0; i < name.byteLength(); i += 1) {
+            var d = name.rune(i);
+            n = n * 10 + int(d - 48);
+        }
+        return mkNum(n);
+    }
+    // 变量名
+    var name = readName(p);
+    if (name.isEmpty()) { return nil; }
+    return mkVar(name);
+}
+
+// 解析应用：原子+ 左结合
+func parseApp(p *Parser) *?Expr {
+    var first = parseAtom(p);
+    if (first == nil) { return nil; }
+    var e *Expr = first;  // 非空
+    for (true) {
+        skipWs(p);
+        var s = p.src;
+        if (s.isEmpty()) { break; }
+        var c = s.rune(0);
+        if (c == 41 || c == 46) { break; }  // ')' '.' 终止应用
+        var a0 = parseAtom(p);
+        if (a0 != nil) {
+            var a *Expr = a0;
+            e = mkApp(e, a);
+        } else {
+            break;
+        }
+    }
+    return e;
+}
+
+// 解析表达式：'\\' name '.' expr 或 应用
+func parseExpr(p *Parser) *?Expr {
+    skipWs(p);
+    var s = p.src;
+    if (s.isEmpty()) { return nil; }
+    var c = s.rune(0);
+    if (c == 92) {  // '\\'
+        p.src = s.substring(1, s.byteLength());
+        skipWs(p);
+        var name = readName(p);
+        skipWs(p);
+        var s2 = p.src;
+        if (!s2.isEmpty() && s2.rune(0) == 46) {  // '.'
+            p.src = s2.substring(1, s2.byteLength());
+        }
+        var body = parseExpr(p);
+        if (body == nil) { return nil; }
+        return mkLam(name, body);
+    }
+    return parseApp(p);
+}
+
+func parse(src string$String) *?Expr {
+    var p = new(Parser, {src=src});
+    return parseExpr(p);
+}
+
+// ---- 测试辅助 ----
+
+func numOf(c *?Closure) int {
+    if (c == nil) { return -999; }
+    if (c.kind == 2) { return c.num; }
+    return -999;
+}
+
+func isClosure(c *?Closure) bool {
+    return c != nil && c.kind == 1;
+}
+
+// ---- 测试 ----
+
+@Test
+func testParseAndEvalIdentity() {
+    // ((\x.x) 42) → 42
+    var e = parse(string$utf8("((\\x.x) 42)"));
+    var r = eval(e, nil);
+    assert(numOf(r) == 42);
+}
+
+@Test
+func testEvalKCombinator() {
+    // K = \x.\y.x：(((\x.\y.x) 7) 9) → 7
+    var e = parse(string$utf8("(((\\x.\\y.x) 7) 9)"));
+    var r = eval(e, nil);
+    assert(numOf(r) == 7);
+}
+
+@Test
+func testEvalHigherOrder() {
+    // 高阶：((\f.\x.f x) (\y.y)) 42 → 42
+    var e = parse(string$utf8("(((\\f.\\x.f x) (\\y.y)) 42)"));
+    var r = eval(e, nil);
+    assert(numOf(r) == 42);
+}
+
+@Test
+func testEvalClosureCapture() {
+    // 闭包捕获：((\x.\y.x) 7) 9 → 7
+    // 外层 x 被内层闭包捕获，y 忽略
+    var e = parse(string$utf8("(((\\x.\\y.x) 7) 9)"));
+    var r = eval(e, nil);
+    assert(numOf(r) == 7);
+}
+
+@Test
+func testEvalReturnsClosure() {
+    // 函数作为值：((\x.\y.x) 7) 返回一个闭包
+    var e = parse(string$utf8("((\\x.\\y.x) 7)"));
+    var r = eval(e, nil);
+    assert(isClosure(r));
+}
+
+@Test
+func testEvalChurchBoolean() {
+    // Church 布尔：TRUE = \x.\y.x，FALSE = \x.\y.y
+    // 验证：TRUE a b = a；FALSE a b = b
+    // ((\t.\f.t 7 9) ...) —— 直接测布尔选择：
+    // (\b.b 7 9) (\x.\y.x) → 7  （TRUE 选第一个）
+    var e = parse(string$utf8("((\\b.b 7 9) (\\x.\\y.x))"));
+    var r = eval(e, nil);
+    assert(numOf(r) == 7);
+}
+
+@Test
+func testEvalNestedLambda() {
+    // 嵌套 λ + 变量遮蔽：((\x.\x.x) 7) 9 → 9
+    // 内层 \x.x 遮蔽外层 x
+    var e = parse(string$utf8("(((\\x.\\x.x) 7) 9)"));
+    var r = eval(e, nil);
+    assert(numOf(r) == 9);
+}
+
+@Test
+func testEvalDeepRecursion() {
+    // 深度递归压栈：恒等函数反复应用
+    // 构造 ((\x.x) ((\x.x) ((\x.x) 42))) 嵌套 50 层
+    // 用 parse 构造太深，直接程序化构造：
+    var id = mkLam(string$utf8("x"), mkVar(string$utf8("x")));
+    var e = mkNum(42);
+    for (var i = 0; i < 50; i += 1) {
+        e = mkApp(id, e);
+    }
+    var r = eval(e, nil);
+    assert(numOf(r) == 42);
+}

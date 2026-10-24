@@ -1,0 +1,31 @@
+import std$testing;
+import std$string;
+
+interface Getter {
+    get() int;
+}
+
+interface ValueGetter`T` {
+    get() T;
+}
+
+// ---- 泛型函数内的类 lambda：捕获类型为 T 的局部变量 ----
+
+func makeGetter`T`(v T) *ValueGetter`T` {
+    var g *ValueGetter`T` = class() T { return v; };
+    return g;
+}
+
+@Test
+func testClassLambdaGeneric() {
+    var g = makeGetter`int`(42);
+    assert(g.get() == 42);
+}
+
+@Test
+func testClassLambdaGenericString() {
+    var g = makeGetter`string$String`(string$utf8("hi"));
+    var got = g.get();
+    var want = string$utf8("hi");
+    assert(got == want);
+}

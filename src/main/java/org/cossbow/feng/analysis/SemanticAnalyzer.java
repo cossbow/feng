@@ -59,6 +59,9 @@ public class SemanticAnalyzer {
     // The current tool class has some states, so it cannot be reused
     private boolean used;
     private final List<String> errors = new ArrayList<>();
+    // Functions synthesized from function-lambdas, analyzed during
+    // the analysis phase; appended to functionList at the end.
+    private final List<FunctionDefinition> lambdaFuncs = new ArrayList<>();
 
     public SemanticAnalyzer(ParseSymbolTable table,
                             SymbolContext root, boolean test) {
@@ -228,6 +231,9 @@ public class SemanticAnalyzer {
                 case LiteralExpression e -> {
                 }
                 case FunctionExpression e -> {
+                }
+                case ClassLambdaExpression e -> {
+                    // 类 lambda 捕获的是外层局部变量（非全局），不产生依赖
                 }
                 case null, default -> semantic("can't depend of global: %s", c);
             }
@@ -417,7 +423,8 @@ public class SemanticAnalyzer {
         result.testcases = checkTestcases(functions);
 
         result.typeList = table.types.stream().toList();
-        result.functionList = functions.stream()
+        result.functionList = Stream.concat(
+                        functions.stream(), lambdaFuncs.stream())
                 .filter(Predicate.not(FunctionDefinition::variadic))
                 .toList();
 
@@ -1953,11 +1960,43 @@ public class SemanticAnalyzer {
             // 分支树 mono(narrowGm) 重建（T→克隆T），写回槽位后再分析；
             // 另一分支与模板声明持各自克隆互不影响，无需 scope 还原。
             // 仅单类型变量收窄（首版边界），多个不同变量时走常量原路径。
-            narrow(e);
+            // 收窄 gm 还要压入 branchGms 栈：直接引用外层变量（如参数 c）时，
+            // 其类型仍是原始 T（符号表不随分支重建），findSymbol/findCallable/
+            // optimize(VariableExpression) 经 narrowType 映射到收窄克隆，才能
+            // 在分支内解析接口成员（T <: Callable → c.call()）。
+            var ng = narrow(e);
+            if (ng != null) {
+                branchGms.push(ng.a());
+                analyse(e.yes());
+                branchGms.pop();
+                branchGms.push(ng.b());
+                e.not().use(this::analyse);
+                branchGms.pop();
+                return e;
+            }
         }
         analyse(e.yes());
         e.not().use(this::analyse);
         return e;
+    }
+
+    /**
+     * 当前生效的分支收窄 gm 栈：外层在底、内层在顶（嵌套 static if）。
+     * 分支分析期间压入，离开分支弹出；空栈 = 无收窄。
+     * 仅供 {@link #narrowType} 映射外层变量类型使用，不参与表达式 mono
+     * （表达式树已由 {@code narrow} 的 mono 重建处理）。
+     */
+    private final ArrayDeque<GenericMap> branchGms = new ArrayDeque<>();
+
+    /**
+     * 把类型经当前分支收窄 gm 栈映射：外层变量（参数/局部）声明的类型是原始
+     * {@code T}，分支内须映射为收窄克隆（保 id）以解析成员。无收窄或类型不含
+     * 类型变量时原样返回。
+     */
+    private TypeDeclarer narrowType(TypeDeclarer t) {
+        if (branchGms.isEmpty() || !t.hasTypeVar()) return t;
+        for (var gm : branchGms) t = gm.mapIf(t);
+        return t;
     }
 
     /**
@@ -1974,9 +2013,9 @@ public class SemanticAnalyzer {
      * 仅当条件两侧类型变量同一（且恰好一个）才收窄；其余（{@code T==S}、
      * 裸参数恒 false 等）保持原约束、由常量原路径分析。
      */
-    private void narrow(StaticIfStatement e) {
+    private Groups.G2<GenericMap, GenericMap> narrow(StaticIfStatement e) {
         var tp = conditionParam(e.condition());
-        if (tp == null) return;
+        if (tp == null) return null;
         var p = tp.param();
         // 无约束 = 顶约束（全集）：收窄仍生效，真分支直接取条件约束。
         var c0 = p.constraint();
@@ -1989,6 +2028,7 @@ public class SemanticAnalyzer {
         } else {
             e.not(e.not().map(s -> s.mono(not)));
         }
+        return Groups.g2(yes, not);
     }
 
     /**
@@ -2655,6 +2695,10 @@ public class SemanticAnalyzer {
         if (r instanceof FuncTypeDeclarer rf) {
             if (l instanceof FuncTypeDeclarer lf)
                 return compatible(lf.prototype(),
+                        rf.prototype(), e);
+            if (l instanceof DerivedTypeDeclarer ld
+                    && ld.def() instanceof PrototypeDefinition pd)
+                return compatible(pd.prototype(),
                         rf.prototype(), e);
         }
 
@@ -4095,7 +4139,8 @@ public class SemanticAnalyzer {
             case CurrentExpression ee -> optimize(ee);
             case IndexOfExpression ee -> optimize(ee);
             case SliceOfExpression ee -> optimize(ee);
-            case LambdaExpression ee -> optimize(ee);
+            case FuncLambdaExpression ee -> optimize(ee);
+            case ClassLambdaExpression ee -> optimize(ee);
             case LiteralExpression ee -> optimize(ee);
             case MemberOfExpression ee -> optimize(ee);
             case TupleIndexExpression ee -> optimize(ee);
@@ -4107,7 +4152,7 @@ public class SemanticAnalyzer {
             case BlockExpression ee -> optimize(ee);
             case ConditionalExpression ee -> optimize(ee);
             case VariableExpression ee -> Groups.g2(ee,
-                    ee.variable().type().must());
+                    narrowType(ee.variable().type().must()));
             case DereferExpression ee -> optimize(ee);
             case FunctionExpression ee -> optimize(ee);
             case MethodExpression ee -> optimize(ee);
@@ -5108,8 +5153,324 @@ public class SemanticAnalyzer {
         return Groups.g2(n, t);
     }
 
-    private Groups.G2<Expression, TypeDeclarer> optimize(LambdaExpression e) {
-        return unsupported("lambda");
+    private Groups.G2<Expression, TypeDeclarer> optimize(FuncLambdaExpression e) {
+        // 函数 lambda：纯函数指针，不捕获局部变量，接受者只能是函数类型。
+        // 合成具名函数 + 函数表达式值，走既有函数发射管线。
+        var proc = e.procedure();
+        var prot = proc.prototype();
+        if (prot.hasTypeVar()) {
+            return semantic("function-lambda can't use type variables: %s",
+                    e.pos());
+        }
+
+        var symbol = new Symbol(CommonUtil.rand("Lambda"));
+        var fd = new FunctionDefinition(e.pos(), Modifier.empty(), symbol,
+                TypeParameters.empty(), proc);
+        lambdaFuncs.add(fd);
+
+        // 就地分析 lambda 体（临时切换 enterFunc/enterProc，模式同 implMethod）
+        var savedFunc = enterFunc;
+        var savedProc = enterProc;
+        enterFunc = fd;
+        enterProc = null;
+        analyse(proc);
+        enterFunc = savedFunc;
+        enterProc = savedProc;
+
+        // 函数 lambda 是纯函数指针，不能捕获外层局部变量/参数：
+        // C 层无捕获载体，静默接受会在代码生成时产生悬空引用。
+        var locals = new HashSet<Variable>(proc.stack());
+        var captures = new ArrayList<Variable>();
+        collectCaptures(proc.body(), locals, captures);
+        if (!captures.isEmpty()) {
+            return semantic("function-lambda can't capture " +
+                    "variable '%s' (capture as " +
+                    "class-lambda instead): %s",
+                    captures.getFirst().name(), e.pos());
+        }
+
+        var n = new FunctionExpression(e.pos(), fd, TypeArguments.EMPTY);
+        var td = new AnonFuncTypeDeclarer(e.pos(), true, prot);
+        return Groups.g2(n, td);
+    }
+
+    private Groups.G2<Expression, TypeDeclarer>
+    optimize(ClassLambdaExpression e) {
+        // 类 lambda：可捕获局部变量，接受者只能是单方法接口。
+        // 分析期只做：目标接口校验、原型推断、体分析（捕获集收集）、
+        // 泛型提升收集。匿名类在 P4 lowering pass 合成。
+
+        // 1. 目标接口来自 expectType
+        var et = e.expectType.get();
+        if (et.none())
+            return semantic("class-lambda needs a target " +
+                    "single-method-interface type: %s", e.pos());
+        if (!(et.get() instanceof DerivedTypeDeclarer etd))
+            return semantic("can't use class-lambda as type " +
+                    "'%s': %s", et.get(), e.pos());
+        var dt = etd.derivedType();
+        analyse(dt);
+        checkConstraint(dt.gm());
+        if (!(dt.def() instanceof InterfaceDefinition id))
+            return semantic("class-lambda target must be an " +
+                    "interface: '%s': %s", dt, e.pos());
+        if (!id.singleMethod())
+            return semantic("can't use class-lambda as " +
+                    "non-single-method-interface '%s': %s",
+                    id.symbol(), e.pos());
+
+        // 2. 从接口唯一方法推断原型。经调用点 gm 实例化：目标接口是泛型
+        // （如 ValueGetter`T`）时，接口方法原型里的接口类型参数 T_iface 须
+        // 替换为调用点实参（int）或外层类型变量（外层函数 T），否则与
+        // lambda 签名比较残留 T_iface（不同 id）恒不等。
+        var im = id.methods().isEmpty()
+                ? id.allMethods().getValue(0)
+                : id.methods().getValue(0);
+        var ipt = dt.gm().instantiate(im.prototype());
+
+        // 3. 校验 lambda 自身签名与接口方法原型兼容（参数个数/类型）。
+        // 允许类型变量：引用外层泛型作用域（泛型函数/泛型类的 T），
+        // 由 P6 提升为匿名类类型参数（不在此拒绝）。
+        var proc = e.procedure();
+        var ppt = proc.prototype();
+        if (ppt.parameterSet().size() != ipt.parameterSet().size())
+            return semantic("class-lambda parameter-count " +
+                    "mismatch with '%s': %s", id.symbol(), e.pos());
+        var pc = compatible(ipt, ppt, e);
+        if (!pc.ok)
+            return semantic("class-lambda signature mismatch " +
+                    "with '%s': %s", id.symbol(), e.pos());
+
+        // 4. 构造带推断原型的新 Procedure 分析 lambda 体
+        // （临时切换 enterFunc/enterProc，模式同 P1；return 绑定到新原型）
+        var nprot = new Prototype(ppt.pos(), ppt.parameterSet(),
+                ipt.returnSet(), ipt.catchAll());
+        var nproc = new Procedure(proc.pos(), nprot,
+                proc.body(), proc.labels());
+        var savedFunc = enterFunc;
+        var savedProc = enterProc;
+        enterFunc = null;
+        enterProc = null;
+        analyse(nproc);
+        enterFunc = savedFunc;
+        enterProc = savedProc;
+
+        // 5. 收集捕获集：体内引用的外层局部变量
+        var locals = new HashSet<Variable>(nproc.stack());
+        var captures = new ArrayList<Variable>();
+        collectCaptures(proc.body(), locals, captures);
+        // 捕获变量转匿名类字段；虚引用（&x）不能是字段（reference_zh.md
+        // 「虚引用」：虚引用只能是本地变量或参数），且匿名类可逃逸捕获
+        // 作用域 → 悬垂。须按强引用/值捕获，否则拒绝。
+        for (var v : captures) {
+            if (v.type().has()
+                    && v.type().must().maybeRefer()
+                            .match(r -> r.isKind(PHANTOM))) {
+                return semantic("can't capture phantom-reference " +
+                        "'%s' in class-lambda (capture as " +
+                        "strong/value instead): %s",
+                        v.name(), e.pos());
+            }
+        }
+        e.captures(captures);
+
+        // 5.5 泛型提升：收集 lambda 引用的外层类型变量（P6）。
+        // 来源：实例化后的接口原型（返回/参数）、lambda 自身原型、捕获字段
+        // 类型。这些类型变量在匿名类合成时提升为类型参数（P4），mono 期
+        // concretizeClass 按实参具体化。lambda 体内局部声明引用的外层 T
+        // 不在此收集——匿名类方法体经 gm 具体化时按同 id 命中替换。
+        var typeVars = new LinkedHashSet<TypeParameter>();
+        collectTypeVars(ipt, typeVars);
+        collectTypeVars(ppt, typeVars);
+        for (var v : captures) {
+            if (v.type().has())
+                collectTypeVars(v.type().must(), typeVars);
+        }
+        e.typeVars(new ArrayList<>(typeVars));
+
+        // 6. 挂载分析产物
+        e.targetIface(id);
+        e.targetType(etd);
+        e.inferredPrototype(ipt);
+
+        // 7. resultType = 目标接口类型
+        return Groups.g2(e, etd);
+    }
+
+    /**
+     * 收集类 lambda 体内的捕获变量：引用外层作用域的变量
+     * （不在 {@code locals} 中、非全局变量）。
+     */
+    private void collectCaptures(BlockStatement bs,
+                                 Set<Variable> locals,
+                                 List<Variable> captures) {
+        for (var s : bs.list())
+            collectCaptures(s, locals, captures);
+    }
+
+    private void collectCaptures(Statement s,
+                                 Set<Variable> locals,
+                                 List<Variable> captures) {
+        switch (s) {
+            case DeclarationStatement ds -> {
+                for (var v : ds.variables()) {
+                    v.value().use(e ->
+                            collectCaptures(e, locals, captures));
+                }
+            }
+            case BlockStatement bs -> collectCaptures(bs, locals, captures);
+            case CallStatement cs -> collectCaptures(cs.call(),
+                    locals, captures);
+            case ReturnStatement rs -> rs.result().use(e ->
+                    collectCaptures(e, locals, captures));
+            case IfStatement is -> {
+                is.init().use(x ->
+                        collectCaptures(x, locals, captures));
+                collectCaptures(is.condition(), locals, captures);
+                collectCaptures(is.yes(), locals, captures);
+                is.not().use(x ->
+                        collectCaptures(x, locals, captures));
+            }
+            case ForStatement fs -> {
+                if (fs instanceof ConditionalForStatement cfs) {
+                    cfs.initializer().use(x ->
+                            collectCaptures(x, locals, captures));
+                    collectCaptures(cfs.condition(), locals, captures);
+                }
+                collectCaptures(fs.body(), locals, captures);
+            }
+            case SwitchStatement ss -> {
+                for (var br : ss.branches())
+                    collectCaptures(br, locals, captures);
+            }
+            case AssignmentsStatement as -> {
+                for (int i = 0; i < as.list().size(); i++)
+                    collectCaptures(as.value(i), locals, captures);
+            }
+            case SwitchBranch sb -> collectCaptures(sb.body(),
+                    locals, captures);
+            case TryStatement ts -> {
+                collectCaptures(ts.body(), locals, captures);
+                for (var cc : ts.catchClauses())
+                    collectCaptures(cc.body(), locals, captures);
+                ts.finallyClause().use(x ->
+                        collectCaptures(x, locals, captures));
+            }
+            case StaticIfStatement sis -> {
+                collectCaptures(sis.yes(), locals, captures);
+                sis.not().use(x ->
+                        collectCaptures(x, locals, captures));
+            }
+            default -> {
+            }
+        }
+    }
+
+    private void collectCaptures(Expression e,
+                                 Set<Variable> locals,
+                                 List<Variable> captures) {
+        switch (e) {
+            case VariableExpression ve -> {
+                var v = ve.variable();
+                if (v.global()) return;
+                if (!locals.contains(v) && !captures.contains(v))
+                    captures.add(v);
+            }
+            case CallExpression ce -> {
+                collectCaptures(ce.callee(), locals, captures);
+                for (var a : ce.arguments())
+                    collectCaptures(a, locals, captures);
+            }
+            case NewExpression ne -> ne.arg().use(a ->
+                    collectCaptures(a, locals, captures));
+            case ConvertExpression ce -> collectCaptures(ce.operand(),
+                    locals, captures);
+            case ObjectExpression oe -> {
+                for (var val : oe.entries().values())
+                    collectCaptures(val, locals, captures);
+            }
+            case ArrayExpression ae -> {
+                for (var item : ae.elements())
+                    collectCaptures(item, locals, captures);
+            }
+            case BinaryExpression be -> {
+                collectCaptures(be.left(), locals, captures);
+                collectCaptures(be.right(), locals, captures);
+            }
+            case UnaryExpression ue -> collectCaptures(ue.operand(),
+                    locals, captures);
+            case ConditionalExpression ce -> {
+                collectCaptures(ce.condition(), locals, captures);
+                collectCaptures(ce.yes(), locals, captures);
+                collectCaptures(ce.not(), locals, captures);
+            }
+            case BlockExpression be -> {
+                for (var st : be.block())
+                    collectCaptures(st, locals, captures);
+                collectCaptures(be.result(), locals, captures);
+            }
+            case IsExpression ie -> collectCaptures(ie.subject(),
+                    locals, captures);
+            case MemberOfExpression moe -> collectCaptures(moe.subject(),
+                    locals, captures);
+            case IndexOfExpression ioe -> collectCaptures(ioe.subject(),
+                    locals, captures);
+            case SliceOfExpression soe -> {
+                collectCaptures(soe.subject(), locals, captures);
+                if (soe.start() != null)
+                    collectCaptures(soe.start(), locals, captures);
+                if (soe.end() != null)
+                    collectCaptures(soe.end(), locals, captures);
+            }
+            case TupleExpression te -> {
+                for (var item : te.elements())
+                    collectCaptures(item, locals, captures);
+            }
+            case ClassLambdaExpression cl -> {
+                // 嵌套类 lambda：它引用的外层变量若不属本层局部，
+                // 须提升为本层捕获（内层匿名类 new 时以 $self->字段 传递）。
+                // cl.captures() 已在 analyse(nproc) 期间填充。
+                for (var v : cl.captures()) {
+                    if (locals.contains(v) || captures.contains(v)) continue;
+                    captures.add(v);
+                }
+            }
+            default -> {
+            }
+        }
+    }
+
+    /**
+     * 收集 {@code td} 引用的全部类型参数（泛型提升集，P6）。
+     * {@code GenericTypeDeclarer} 是类型参数的使用点；{@code DerivedType}/
+     * 数组/元组/函数类型逐层下钻其实参/元素/原型。
+     */
+    private static void collectTypeVars(TypeDeclarer td,
+                                        Set<TypeParameter> out) {
+        if (td == null) return;
+        switch (td) {
+            case GenericTypeDeclarer gtd -> out.add(gtd.param());
+            case DerivedTypeDeclarer dtd -> {
+                for (var ga : dtd.derivedType().generic())
+                    collectTypeVars(ga, out);
+            }
+            case ArrayTypeDeclarer atd -> collectTypeVars(atd.element(), out);
+            case TupleTypeDeclarer ttd -> {
+                for (var e : ttd.elements()) collectTypeVars(e, out);
+            }
+            case FuncTypeDeclarer ftd -> collectTypeVars(ftd.prototype(), out);
+            default -> {
+            }
+        }
+    }
+
+    private static void collectTypeVars(Prototype pt,
+                                        Set<TypeParameter> out) {
+        pt.returnSet().use(t -> collectTypeVars(t, out));
+        for (var p : pt.parameterSet()) {
+            if (p instanceof FixedParameter fp)
+                collectTypeVars(fp.type(), out);
+        }
     }
 
     private Groups.G2<Expression, TypeDeclarer> optimize(LiteralExpression e) {
@@ -5487,13 +5848,14 @@ public class SemanticAnalyzer {
         var ov = context.findVar(s);
         if (ov.has()) {
             var v = ov.get();
-            if (v.type().must() instanceof FuncTypeDeclarer ftd) {
+            var vt = narrowType(v.type().must());
+            if (vt instanceof FuncTypeDeclarer ftd) {
                 invalid(re.generic());
                 var n = new VariableExpression(
                         re.pos(), ov.get(), s);
                 return Groups.g2(n, ftd);
             }
-            if (v.type().must() instanceof GenericTypeDeclarer gtd
+            if (vt instanceof GenericTypeDeclarer gtd
                     && gtd.kind().none()) {
                 var op = funcPrototype(gtd.type().param());
                 if (op.has()) {
@@ -5584,9 +5946,9 @@ public class SemanticAnalyzer {
             var v = o.get();
             if (v.isConst() && v.value().match(e ->
                     e instanceof LiteralExpression))
-                return Groups.g2(v.value().must(), v.type().must());
+                return Groups.g2(v.value().must(), narrowType(v.type().must()));
             var n = new VariableExpression(re.pos(), v, s);
-            return Groups.g2(n, v.type().must());
+            return Groups.g2(n, narrowType(v.type().must()));
         }
 
         var f = context.findFunc(s);

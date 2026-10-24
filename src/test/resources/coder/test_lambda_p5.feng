@@ -1,0 +1,116 @@
+import std$testing;
+
+interface Getter {
+    get() int;
+}
+
+class Box {
+    var v int;
+}
+
+class Payload {
+    var v int;
+}
+
+class Holder {
+    var p *Payload;
+}
+
+// ---- 强引用（*）捕获：匿名类持有自己的引用，外层置 nil 不影响 ----
+
+@Test
+func testClassLambdaCaptureStrong() {
+    var b *?Box = new(Box, {v = 42});
+    var c *Getter = class() int { return b.v; };
+    var r = c.get();
+    assert(r == 42);
+    b = nil;
+    // 匿名类持有自己的强引用，外层置 nil 不影响
+    assert(c.get() == 42);
+}
+
+@Test
+func testClassLambdaCaptureStrongMulti() {
+    var b1 *?Box = new(Box, {v = 10});
+    var b2 *?Box = new(Box, {v = 20});
+    var c *Getter = class() int { return b1.v + b2.v; };
+    var r = c.get();
+    assert(r == 30);
+    b1 = nil;
+    b2 = nil;
+    assert(c.get() == 30);
+}
+
+// ---- 值类型（无 refer）捕获：字段内嵌类值，捕获时深拷贝 ----
+
+@Test
+func testClassLambdaCaptureValueType() {
+    var b Box = {v = 7};
+    var c *Getter = class() int { return b.v; };
+    var r = c.get();
+    assert(r == 7);
+}
+
+// 值类型捕获 + 内部强引用：深拷贝后匿名类独立释放
+@Test
+func testClassLambdaCaptureValueWithStrong() {
+    var h Holder = {p = new(Payload, {v = 99})};
+    var c *Getter = class() int { return h.p.v; };
+    var r = c.get();
+    assert(r == 99);
+}
+
+// ---- 值捕获是创建时的快照，之后外层修改不影响 ----
+
+@Test
+func testClassLambdaCaptureSnapshot() {
+    var base = 100;
+    var c *Getter = class() int { return base; };
+    base = 200;
+    assert(c.get() == 100);
+}
+
+func makeAdder(base int) *Getter {
+    var c *Getter = class() int { return base; };
+    return c;
+}
+
+@Test
+func testClassLambdaCaptureParam() {
+    var c = makeAdder(5);
+    assert(c.get() == 5);
+}
+
+// ---- SRef 数组捕获：保留自己的引用（inc_ns），销毁时 dec+free ----
+
+@Test
+func testClassLambdaCaptureArray() {
+    var arr = new([4]int);
+    arr[0] = 10;
+    var c *Getter = class() int { return arr[0]; };
+    assert(c.get() == 10);
+    arr[0] = 99;
+    // SRef 数组按共享引用捕获：外层修改对匿名类可见
+    assert(c.get() == 99);
+}
+
+// ---- var 捕获：lambda 体内可写，写的是匿名字段 - 状态在多次调用间保留 ----
+
+@Test
+func testClassLambdaCaptureVarWrite() {
+    var count = 10;
+    var c *Getter = class() int { count = count + 1; return count; };
+    // 第一次调用：count 先自增再返回
+    assert(c.get() == 11);
+    // 第二次调用：字段状态保留，继续自增
+    assert(c.get() == 12);
+}
+
+// ---- const 捕获：字段同步 const，lambda 体内只读 ----
+
+@Test
+func testClassLambdaCaptureConstRead() {
+    const base = 40;
+    var c *Getter = class() int { return base + 2; };
+    assert(c.get() == 42);
+}

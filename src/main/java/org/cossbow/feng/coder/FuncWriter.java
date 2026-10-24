@@ -3,6 +3,8 @@ package org.cossbow.feng.coder;
 import org.cossbow.feng.analysis.meta.ClassMeta;
 import org.cossbow.feng.analysis.meta.MethodFunc;
 import org.cossbow.feng.ast.GlobalVariable;
+import org.cossbow.feng.ast.dcl.DerivedTypeDeclarer;
+import org.cossbow.feng.ast.dcl.FuncTypeDeclarer;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.proc.*;
 import org.cossbow.feng.ast.stmt.Statement;
@@ -233,7 +235,13 @@ public class FuncWriter extends CWriter<FuncWriter> {
             var vo = fp.var();
             if (vo.none()) continue;
             var v = vo.get();
-            context.stmts.declareVar(v.type().must(), v, () -> {
+            // 函数类型参数：C 层是函数类型 typedef，不能声明变量实例（含 _own 副本），
+            // 且无生命周期管理，直接跳过。
+            var vt = v.type().must();
+            if (vt instanceof FuncTypeDeclarer) continue;
+            if (vt instanceof DerivedTypeDeclarer dtd
+                    && dtd.def() instanceof PrototypeDefinition) continue;
+            context.stmts.declareVar(vt, v, () -> {
                 write('$').write(v.name().value()).write('_').write(v.id()).write("_own");
             }, () -> {
                 context.exprs.varName(v);

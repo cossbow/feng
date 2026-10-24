@@ -1,0 +1,77 @@
+import std$testing;
+
+interface Runner {
+    run() int;
+}
+
+@Test
+func testClassLambda() {
+    var c *Runner = class() int { return 42; };
+    var r = c.run();
+    assert(r == 42);
+}
+
+@Test
+func testClassLambdaCapture() {
+    var base = 100;
+    var c *Runner = class() int { return base; };
+    var r = c.run();
+    assert(r == 100);
+}
+
+@Test
+func testClassLambdaCaptureCalc() {
+    var base = 10;
+    var factor = 3;
+    var c *Runner = class() int { return base * factor + 1; };
+    var r = c.run();
+    assert(r == 31);
+}
+
+interface Adder {
+    add(a int, b int) int;
+}
+
+@Test
+func testClassLambdaParams() {
+    var c *Adder = class(a int, b int) int { return a + b; };
+    var r = c.add(20, 22);
+    assert(r == 42);
+}
+
+@Test
+func testClassLambdaParamsCapture() {
+    var base = 5;
+    var c *Adder = class(a int, b int) int { return a + b + base; };
+    var r = c.add(1, 2);
+    assert(r == 8);
+}
+
+// 类 lambda 返回值是接口方法返回类型，匿名类方法体可调用其他函数
+interface Getter {
+    get() int;
+}
+
+@Test
+func testClassLambdaCallFunc() {
+    var c *Getter = class() int { return sum(3, 4); };
+    var r = c.get();
+    assert(r == 7);
+}
+
+func sum(a int, b int) int {
+    return a + b;
+}
+
+// 嵌套类 lambda：内层捕获外层 lambda 体内的变量
+@Test
+func testClassLambdaNested() {
+    var outer = 7;
+    var c *Getter = class() int {
+        var inner = 10;
+        var d *Getter = class() int { return inner + outer; };
+        return d.get();
+    };
+    var r = c.get();
+    assert(r == 17);
+}

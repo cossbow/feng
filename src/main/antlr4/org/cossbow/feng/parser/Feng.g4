@@ -620,6 +620,7 @@ operandExpr
     | symbol typeArguments?     # SymbolExpression
     | current=(THIS|SUPER)      # CurrentExpression
     | FUNC procedure            # LambdaExpression
+    | CLASS procedure           # ClassLambdaExpression
     | '(' expression ')'        # ParenExpression
     | new                       # NewExpression
     | blockExpr                 # BlockExpression

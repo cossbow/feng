@@ -1,0 +1,121 @@
+import std$testing;
+
+// P7：泛型约束 func|interface + static if 判别 lambda 调用
+//
+// 目标（lambda-plan §1 核心示例的类 lambda 侧）：
+//   func invoke`T func|interface`(c T) {
+//       static if (T <: func)  { c(); }
+//       else                   { c.call(); }
+//   }
+// 约束判别（T <: func / T <: interface）在 mono 期按实例裁决；本阶段实现
+// 接口侧：static if 分支收窄（T <: Callable）后，直接引用参数 c 即可经
+// 接口派发调用方法（c.call()），类 lambda 经单方法接口调用。
+//
+// 说明（与设计文档差异）：
+//   - func 分支的 c() 函数指针调用：裸 func 域约束不含原型，分析期无法
+//     解析函数类型原型（funcPrototype 仅解析单个原型约束），mono 期不重分析，
+//     故本阶段只做域判别（T <: func），实际函数调用须显式原型约束或直调。
+//   - 嵌套 static if 的分支收窄有既存 mono 折叠缺陷（外层收窄 mono 会把
+//     内层条件按克隆约束过早裁决），本阶段测试用单层判别。
+
+// ---- 单方法接口（类 lambda 的接受者） ----
+
+interface Callable {
+    call() int;
+}
+
+interface Callable2`T` {
+    get() T;
+}
+
+// ---- 泛型函数：T func|interface 判别 + 接口收窄后调用 ----
+
+// 判别：func 域返回 1，其余（interface）进入接口侧
+func kind`T func|interface`(c T) int {
+    static if (T <: func) {
+        { return 1; }
+    } else {
+        { return 2; }
+    }
+}
+
+// 接口收窄后直接调用参数 c 的接口方法（本阶段核心：分支收窄直达参数引用）
+func invoke`T interface`(c T) int {
+    static if (T <: Callable) {
+        { return c.call(); }
+    } else {
+        { return 0; }
+    }
+}
+
+// 泛型接口收窄：T <: Callable2`int` 后调用 get()
+func invokeG`T interface`(c T) int {
+    static if (T <: Callable2`int`) {
+        { return c.get(); }
+    } else {
+        { return 0; }
+    }
+}
+
+// ---- 具体实现 ----
+
+class Impl(Callable) {
+    func call() int { return 7; }
+}
+
+class Impl2`T` (Callable2`T`) {
+    var v T;
+    export func get() T { return v; }
+}
+
+func f(x int) int { return x + 1; }
+
+// ---- 测试 ----
+
+@Test
+func testP7Discriminate() {
+    // 判别 func 域
+    assert(kind`func(int)int`(f) == 1);
+    // 判别 interface 域（*Callable 是接口强引用）
+    var i *Callable = new(Impl);
+    assert(kind`*Callable`(i) == 2);
+}
+
+@Test
+func testP7InterfaceDispatch() {
+    // 接口收窄后直接调用参数接口方法（分支收窄直达参数引用）
+    var i *Callable = new(Impl);
+    assert(invoke`*Callable`(i) == 7);
+}
+
+@Test
+func testP7GenericInterfaceDispatch() {
+    // 泛型接口收窄：类 lambda 实现 Callable2`int`，经 get() 判别调用
+    var c2 *Callable2`int` = class() int { return 5; };
+    assert(invokeG`*Callable2`int``(c2) == 5);
+}
+
+@Test
+func testP7ClassLambdaDispatch() {
+    // 类 lambda 经单方法接口，作为 *Callable 传入后经接口收窄判别调用
+    var cb *Callable = class() int { return 42; };
+    assert(invoke`*Callable`(cb) == 42);
+}
+
+// ---- 具名函数原型约束（func 分支的显式原型形态） ----
+
+// 设计文档示例：func Task = () int; func f`T (Task)`(t T) int { return t(); }
+// 具名函数原型约束下，泛型函数体内可直接调用参数（t()），无需收窄到接口。
+func Task = () int;
+
+func callFn`T (Task)`(t T) int {
+    return t();
+}
+
+func run42() int { return 42; }
+
+@Test
+func testP7PrototypeConstraintCall() {
+    var fn Task = run42;
+    assert(callFn`Task`(fn) == 42);
+}

@@ -999,9 +999,20 @@ final class SourceParseVisitor
 
     @Override
     public Entity visitLambdaExpression(FengParser.LambdaExpressionContext ctx) {
-        unsupported("lambda");
+        var saved = methodReturnThis;
+        methodReturnThis = false;
         var procedure = (Procedure) visit(ctx.procedure());
-        return new LambdaExpression(posOf(ctx), procedure);
+        methodReturnThis = saved;
+        return new FuncLambdaExpression(posOf(ctx), procedure);
+    }
+
+    @Override
+    public Entity visitClassLambdaExpression(FengParser.ClassLambdaExpressionContext ctx) {
+        var saved = methodReturnThis;
+        methodReturnThis = false;
+        var procedure = (Procedure) visit(ctx.procedure());
+        methodReturnThis = saved;
+        return new ClassLambdaExpression(posOf(ctx), procedure);
     }
 
     @Override
@@ -1684,11 +1695,12 @@ final class SourceParseVisitor
     @Override
     public Entity visitProcedure(FengParser.ProcedureContext ctx) {
         var prototype = (Prototype) visit(ctx.prototype());
-        assert labels == null;
+        // lambda 体可以再嵌套 procedure，labels 需保存/恢复而非断言为空
+        var saved = labels;
         labels = new HashMap<>();
         var body = (BlockStatement) visit(ctx.blockStatement());
         var l = Map.copyOf(labels);
-        labels = null;
+        labels = saved;
         return new Procedure(posOf(ctx), prototype,
                 noScope(body), l);
     }

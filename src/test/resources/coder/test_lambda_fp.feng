@@ -1,0 +1,155 @@
+import std$testing;
+
+// 函数式编程支持测试：高阶函数、函数 lambda、闭包、组合
+
+// ---- 1. 高阶函数：把函数作为参数 ----
+
+func apply(x int, f func(int) int) int {
+    return f(x);
+}
+
+func twice(a int) int { return a * 2; }
+
+@Test
+func testHigherOrderApply() {
+    // 具名函数作为实参
+    assert(apply(21, twice) == 42);
+    // 函数 lambda 字面量直接传入
+    assert(apply(21, func(a int) int { return a * 2; }) == 42);
+}
+
+// ---- 2. 闭包工厂（类 lambda 捕获外层变量） ----
+// 函数 lambda 是纯函数指针、不能捕获（语义分析显式拒绝），
+// 捕获闭包须用类 lambda（经单方法接口）。
+
+interface UnaryFn {
+    apply(x int) int;
+}
+
+func adder(n int) *UnaryFn {
+    return class(x int) int { return x + n; };
+}
+
+@Test
+func testClosureFactory() {
+    var add5 = adder(5);
+    var add10 = adder(10);
+    assert(add5.apply(37) == 42);
+    assert(add10.apply(32) == 42);
+    // 两个闭包互不影响
+    assert(add5.apply(0) == 5);
+    assert(add10.apply(0) == 10);
+}
+
+// ---- 3. 函数组合（compose，类 lambda 捕获两个函数） ----
+
+func inc(a int) int { return a + 1; }
+func dbl(a int) int { return a * 2; }
+
+func composeInt(f func(int) int, g func(int) int) *UnaryFn {
+    // 类 lambda 捕获 f、g：h(x) = f(g(x))
+    return class(x int) int { return f(g(x)); };
+}
+
+@Test
+func testCompose() {
+    // (inc ∘ dbl)(21) = inc(dbl(21)) = 43
+    var h = composeInt(inc, dbl);
+    assert(h.apply(21) == 43);
+    // (dbl ∘ inc)(20) = dbl(inc(20)) = 42
+    var g = composeInt(dbl, inc);
+    assert(g.apply(20) == 42);
+}
+
+// ---- 4. 泛型高阶函数 + 函数 lambda ----
+
+func applyTwice`T`(x T, f func(T) T) T {
+    return f(f(x));
+}
+
+@Test
+func testGenericHigherOrder() {
+    assert(applyTwice(3, func(x int) int { return x + 1; }) == 5);
+    assert(applyTwice`float64`(2.5, func(x float64) float64 { return x * 2.0; }) == 10.0);
+    assert(applyTwice`int64`(7, func(x int64) int64 { return x * x; }) == 2401);
+}
+
+// ---- 5. 类持有变长数组 + 高阶方法（map/filter/reduce 等价） ----
+// 变长数组类型是 [*]T（数组引用），指向 new 创建的实例。
+
+class IntList {
+    var data [*]int;
+    var n int;
+
+    func map2(f func(int) int) [*]int {
+        var r [*]int = new([n]int);
+        for (var i = 0; i < n; i += 1) {
+            r[i] = f(data[i]);
+        }
+        return r;
+    }
+
+    func filter2(f func(int) bool) [*]int {
+        var r [*]int = new([n]int);
+        var m = 0;
+        for (var i = 0; i < n; i += 1) {
+            if (f(data[i])) {
+                r[m] = data[i];
+                m += 1;
+            }
+        }
+        return r;
+    }
+
+    func reduce2(init int, f func(int, int) int) int {
+        var acc = init;
+        for (var i = 0; i < n; i += 1) {
+            acc = f(acc, data[i]);
+        }
+        return acc;
+    }
+}
+
+@Test
+func testMapFilterReduce() {
+    var xs IntList = {data = new([5]int, [1, 2, 3, 4, 5]), n = 5};
+    // map：平方
+    var sq = xs.map2(func(x int) int { return x * x; });
+    assert(sq[0] == 1);
+    assert(sq[1] == 4);
+    assert(sq[4] == 25);
+    // filter：偶数
+    var ev = xs.filter2(func(x int) bool { return x % 2 == 0; });
+    assert(ev[0] == 2);
+    assert(ev[1] == 4);
+    // reduce：求和
+    var sum = xs.reduce2(0, func(a int, b int) int { return a + b; });
+    assert(sum == 15);
+}
+
+// ---- 6. 递归 ----
+
+func fact(n int) int {
+    if (n <= 1) { return 1; }
+    return n * fact(n - 1);
+}
+
+@Test
+func testRecursion() {
+    assert(fact(5) == 120);
+}
+
+// ---- 7. 函数作为字段（回调） ----
+
+class Button {
+    var onClick func(int) int;
+    var label int;
+}
+
+@Test
+func testCallbackField() {
+    var b Button = {onClick = func(v int) int { return v * 10; }, label = 3};
+    assert(b.onClick(4) == 40);
+    b.onClick = func(v int) int { return v + 1; };
+    assert(b.onClick(41) == 42);
+}

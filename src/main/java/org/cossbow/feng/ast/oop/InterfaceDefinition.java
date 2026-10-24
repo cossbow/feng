@@ -99,6 +99,14 @@ public class InterfaceDefinition extends ObjectDefinition {
         return (allMethods.isEmpty() ? methods : allMethods).tryGet(name);
     }
 
+    /**
+     * Whether this interface declares exactly one method.
+     * Class-lambda target types must be single-method interfaces.
+     */
+    public boolean singleMethod() {
+        return (allMethods.isEmpty() ? methods : allMethods).size() == 1;
+    }
+
     public boolean markSync() {
         return modifier().sync().has();
     }
