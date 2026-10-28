@@ -1,0 +1,9 @@
+// 问题4：泛型接口 I`T`（方法原型）。
+// 当它被跨模块具体化（如 I`ms$S` 归合成模块 mi_ms）且该合成模块
+// 只承载具体化接口（无具体化类）时，MetaWriter.metaDefinitions() 的
+// 守卫（vtables 与 dagInterfaces 都空）会跳过接口 meta 发射 →
+// 下游引用 Feng$meta_<I_ms$S> 报 undeclared identifier。
+export
+interface I`T` {
+    export get() T;
+}

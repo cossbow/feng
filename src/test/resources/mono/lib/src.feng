@@ -1,0 +1,13 @@
+// 问题1 回归测试（package 模式，coder/mono-cross 包）：
+// 跨模块泛型工厂 just`T` 的 owner 是 lib。同一具体化函数 just`int` 被
+// ua/ub 两个模块各自实例化（都写入 lib owner 的 monoFuncs）——若写入端不去重，
+// C 输出将重复定义 test$lib$just_Int（redefinition of 'test$lib$just_Int'）。
+export
+func just`T`(x T) T {
+    return x;
+}
+
+export
+func twice`T`(x T) T {
+    return just`T`(x);
+}

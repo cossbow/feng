@@ -1,0 +1,25 @@
+// 模块 ub：也实例化 just`int`（再次写入 lib owner 的 monoFuncs → 若无去重即重复）；
+// 也引用 makeF`ms$S`（与 ua 双模块引用，触发跨模块函数去重）。
+import test$lib lib;
+import test$ta ta;
+import test$ma ma;
+import test$mb mb;
+import test$ms ms;
+
+export
+const b0 ta$Pair`int,int` = {a=30,b=40};
+
+export
+func makeB() ta$Pair`int,int` {
+    return {a=3,b=4};
+}
+
+export
+func useB() int {
+    return lib$just`int`(2);
+}
+
+export
+func callMakeF() *mb$B`ms$S` {
+    return ma$makeF`ms$S`();
+}

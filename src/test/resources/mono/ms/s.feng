@@ -1,0 +1,5 @@
+// 实参来源类型 S（真实模块）。
+export
+class S {
+    var v int;
+}

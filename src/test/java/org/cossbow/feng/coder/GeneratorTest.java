@@ -101,6 +101,16 @@ public class GeneratorTest {
         exec(subDir, PkgName);
     }
 
+    @Test
+    public void testCrossModuleMono(@TempDir Path tempDir) throws IOException {
+        var dir = ResourceUtil.getDir("mono");
+        var c = compiler(PkgName);
+        var subDir = tempDir.resolve("out");
+        Files.createDirectories(subDir);
+        c.compilePackage(dir, subDir);
+        exec(subDir, PkgName);
+    }
+
     // ---- mixed module test (Feng + pure-C) ----
 
     @Test

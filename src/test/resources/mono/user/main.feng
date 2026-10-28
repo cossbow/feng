@@ -1,0 +1,74 @@
+// 入口：同时 import ua、ub、ta、ma、ms，拉通三条实例化链与类型共享。
+// 若问题1未修复（lib owner 的 monoFuncs 被写两次），C 编译直接报
+// redefinition of 'test$lib$just_Int'；
+// 若问题2未修复（A`ms$S` 合成模块 ma_ms 不 include B`ms$S` 的 mb_ms），
+// C 报 unknown type name 'Feng$test_mb$test_ms$B_test$ms$S_'；
+// 若函数场景去重失效（makeF`ms$S` 被 ua/ub 双模块引用），C 链接报
+// duplicate symbol makeF_test$ms$S_。
+// 类型路径：ta$Pair`int,int` 被 ua/ub 双模块共享，应只在 test_ta.h 定义一次。
+import test$ua ua;
+import test$ub ub;
+import test$ta ta;
+import test$ma ma;
+import test$ms ms;
+import test$ma2 ma2;
+
+func testDedup() {
+    var a = ua$useA();
+    var b = ub$useB();
+    assert(a == 1);
+    assert(b == 2);
+    // 同模块内同符号再次实例化也走同一去重路径
+    var t = ua$useTwiceA();
+    assert(t == 3);
+}
+
+func testTypeShare() {
+    var x = ua$makeA();
+    var y = ub$makeB();
+    assert(x.a == 1);
+    assert(y.b == 4);
+    // 全局常量直接持有跨模块具体化类型实例
+    assert(ua$a0.a == 10);
+    assert(ub$b0.b == 40);
+    // 本地再直接引用类型本身
+    var z ta$Pair`int,int` = {a=5,b=6};
+    assert(z.a == 5 && z.b == 6);
+}
+
+func testSynthClassEdge() {
+    // 问题2：A`ms$S` 归合成模块 ma_ms，B`ms$S` 归 mb_ms，依赖边必须存在
+    var a = new(ma$A`ms$S`);
+    var b = a.make();
+    assert(a != nil);
+    assert(b != nil);
+}
+
+func testSynthFuncDedup() {
+    // 函数场景：makeF`ms$S` 被 ua/ub 双模块引用，必须只在合成模块定义一次
+    var b = ua$callMakeF();
+    assert(b != nil);
+    var b2 = ub$callMakeF();
+    assert(b2 != nil);
+    // 直接调用也走同一去重路径，返回类型可访问方法
+    var b3 = ma$makeF`ms$S`();
+    assert(b3 != nil);
+}
+
+func testSynthIfaceMeta() {
+    // 问题4：I`ms$S` 归合成模块 mi_ms（只有接口、无类），其 meta 常量
+    // 必须被发射，否则 A`ms$S`.callSub 的接口派发引用 Feng$meta_<I_ms$S>
+    // 报 undeclared identifier。
+    var a = new(ma2$A`ms$S`);
+    assert(a != nil);
+    var g = a.callSub();
+    assert(g == nil);
+}
+
+func main(args [&#][*?#]byte) {
+    testDedup();
+    testTypeShare();
+    testSynthClassEdge();
+    testSynthFuncDedup();
+    testSynthIfaceMeta();
+}

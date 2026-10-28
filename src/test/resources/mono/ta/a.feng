@@ -1,0 +1,7 @@
+// 跨模块泛型类型 Pair`A,B` 定义在 ta（类型路径去重验证：
+// ua/ub 都持有 ta$Pair`int,int` 具体化实例，应只在 ta 的 header 定义一次）
+export
+class Pair`A,B` {
+    export const a A;
+    export const b B;
+}

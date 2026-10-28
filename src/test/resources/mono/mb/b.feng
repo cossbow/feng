@@ -1,0 +1,7 @@
+// 问题2/函数场景：mb 定义泛型类 B`T`（方法原型被 ma 的 A`T` 引用，
+// 也作为泛型函数 makeF 的返回类型）。
+export
+class B`T` {
+    var v T;
+    export func get() T { return v; }
+}

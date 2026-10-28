@@ -63,7 +63,8 @@ public class MetaWriter extends CWriter<MetaWriter> {
     public void metaDefinitions() {
         if (context.header) return;
         if (context.table.vtables.isEmpty() &&
-                context.table.dagInterfaces.isEmpty()) return;
+                context.table.dagInterfaces.isEmpty() &&
+                !hasConcreteIfaceMetas()) return;
 
         // 1. 接口 meta 常量（类 meta 的 iface entries / 接口派发引用它们，必须先定义）
         interfaceMetas();
@@ -83,6 +84,28 @@ public class MetaWriter extends CWriter<MetaWriter> {
     // ===================================================================
     //  接口 meta 常量
     // ===================================================================
+
+    /**
+     * 是否存在「具体化接口」meta 待发射（monoHead / monoAfter 中的
+     * InterfaceDefinition）。合成模块可能只承载具体化接口（无类、无原始接口），
+     * 此时 vtables / dagInterfaces 都为空，但接口派发调用点仍引用其
+     * {@code Feng$meta_<ifaceKey>} 常量——守卫不能把它们跳过（问题 4）。
+     */
+    private boolean hasConcreteIfaceMetas() {
+        for (var list : context.table.monoAfter.values()) {
+            for (var def : list) {
+                if (def instanceof InterfaceDefinition id && !id.builtin()) {
+                    return true;
+                }
+            }
+        }
+        for (var def : context.table.monoHead) {
+            if (def instanceof InterfaceDefinition id && !id.builtin()) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * [S] 接口 meta 常量：{@code const Feng$Meta_<ifaceKey> Feng$meta_<ifaceKey> =

@@ -1,0 +1,32 @@
+// 模块 ua：实例化 just`int`（写入 lib owner 的 monoFuncs）；
+// 也引用 makeF`ms$S`（函数场景：与 ub 双模块引用，具体化归合成模块
+// ma_ms，应只在 ma_ms 定义一次）。
+import test$lib lib;
+import test$ta ta;
+import test$ma ma;
+import test$mb mb;
+import test$ms ms;
+
+export
+const a0 ta$Pair`int,int` = {a=10,b=20};
+
+export
+func makeA() ta$Pair`int,int` {
+    return {a=1,b=2};
+}
+
+export
+func useA() int {
+    return lib$just`int`(1);
+}
+
+export
+func useTwiceA() int {
+    // 同一符号 just`int` 在本模块再出现一次，且经 twice`T` 转发一次
+    return lib$twice`int`(lib$just`int`(3));
+}
+
+export
+func callMakeF() *mb$B`ms$S` {
+    return ma$makeF`ms$S`();
+}

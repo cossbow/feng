@@ -1,0 +1,19 @@
+// 问题2：泛型类 A`T` 的方法原型引用跨模块泛型 B`T`（A`ms$S` 归合成模块
+// ma_ms，B`ms$S` 归合成模块 mb_ms，ma_ms 必须 include mb_ms，否则 C 报
+// unknown type name）。
+// 函数场景：泛型函数 makeF`T` 返回跨模块泛型 B`T`（具体化归合成模块
+// ma_ms，被 ua/ub 双模块引用，必须只在 ma_ms 定义一次，否则 C 链接报
+// duplicate symbol）。
+import test$mb mb;
+
+export
+class A`T` {
+    export func make() *mb$B`T` {
+        return new(mb$B`T`);
+    }
+}
+
+export
+func makeF`T`() *mb$B`T` {
+    return new(mb$B`T`);
+}

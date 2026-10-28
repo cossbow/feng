@@ -1,0 +1,15 @@
+// 问题4：泛型类 A`T` 字段引用跨模块泛型接口 I`T`，方法内经接口派发调用。
+// 具体化 A`ms$S` 时同时物化 I`ms$S`，后者归合成模块 mi_ms（无类）。
+import test$mi mi;
+
+export
+class A`T` {
+    export var sub *?mi$I`T`;
+    export func callSub() *?mi$I`T` {
+        var s = sub;
+        if (s != nil) {
+            s.get();   // ← 接口派发调用点，引用 Feng$meta_<I<S>>
+        }
+        return s;
+    }
+}

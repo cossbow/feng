@@ -10,6 +10,7 @@ import org.cossbow.feng.ast.gen.DerivedType;
 import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.gen.TypeArguments;
 import org.cossbow.feng.ast.gen.TypeParameters;
+import org.cossbow.feng.ast.mod.ModulePath;
 import org.cossbow.feng.mod.ModuleManager;
 import org.cossbow.feng.ast.oop.*;
 import org.cossbow.feng.ast.proc.FixedParameter;
@@ -60,6 +61,10 @@ public class Monomorphization {
      */
     private final Set<FuncInstantiation> funcInsts = new LinkedHashSet<>();
     /**
+     * Deduplicate concreted functions
+     */
+    private final Map<Symbol, FunctionDefinition> monoFuncBySymbol = new LinkedHashMap<>();
+    /**
      * Concrete method-level generic instantiations discovered during scanning.
      */
     private final Set<MethodInstantiation> methodInsts = new LinkedHashSet<>();
@@ -70,6 +75,12 @@ public class Monomorphization {
      * generic discovery.
      */
     private final Map<Symbol, GenericMap> classGmBySymbol = new LinkedHashMap<>();
+    /**
+     * 当前 concretize 类型的归属模块。其内部 collect 的跨模块类型，依赖边
+     * user 取它（可能是合成模块）而非 table.module，否则合成模块间缺边。
+     * discover 阶段为 null，回退 table.module。
+     */
+    private ModulePath currentConcretizeOwner;
 
     public Monomorphization(AnalyseSymbolTable ast) {
         this(ast, null);
@@ -89,6 +100,26 @@ public class Monomorphization {
         if (manager == null || symbol.module().none()) return this;
         var m = manager.mono(symbol.module().get());
         return m != null ? m : this;
+    }
+
+    /** 类型声明器的定义站点归属模块（同 {@code Mangle.symbol(td).module()}），无则 null。 */
+    private ModulePath ownerOf(TypeDeclarer td) {
+        if (manager == null) return null;
+        var mod = switch (td) {
+            case DerivedTypeDeclarer dtd -> Mangle.symbol(dtd.derivedType()).module();
+            case ArrayTypeDeclarer atd -> Mangle.symbol(atd).module();
+            case TupleTypeDeclarer ttd -> Mangle.symbol(ttd).module();
+            case NamedFuncTypeDeclarer nftd -> Mangle.symbol(nftd.derivedType()).module();
+            case AnonFuncTypeDeclarer aftd ->
+                    Mangle.anonProtoSymbol(aftd.prototype()).module();
+            default -> null;
+        };
+        return mod.has() ? mod.get() : null;
+    }
+
+    /** 当前执行 mono 的模块（table.module），单文件模式/无模块为 {@code null}。 */
+    private ModulePath tableModule() {
+        return table.module.has() ? table.module.must().path() : null;
     }
 
     /**
@@ -360,6 +391,7 @@ public class Monomorphization {
                 break;
             }
             var td = pending.poll();
+            currentConcretizeOwner = ownerOf(td);
             var def = concretizeType(td);
             if (def != null) {
                 var o = owner(def.symbol());
@@ -368,6 +400,7 @@ public class Monomorphization {
                 }
             }
         }
+        currentConcretizeOwner = null;
     }
 
     /**
@@ -672,7 +705,8 @@ public class Monomorphization {
         if (manager == null) return; // 单文件模式：无跨模块元组
         var mods = Mangle.elementModules(ttd);
         if (mods.size() <= 1) return; // 单模块或全内置：无需合成模块
-        var user = table.module.has() ? table.module.must().path() : null;
+        var user = currentConcretizeOwner != null
+                ? currentConcretizeOwner : tableModule();
         manager.ensureSynthetic(mods, user);
     }
 
@@ -693,7 +727,10 @@ public class Monomorphization {
         // 存在最小公共后代（通常就是使用模块自己）：类型直接归它（真实模块），
         // 不建合成模块，从而避免「合成模块 ↔ 使用模块」的镜像环。
         if (manager.commonDescendant(mods) != null) return;
-        var user = table.module.has() ? table.module.must().path() : null;
+        // user 取「真正引用者」：concretize 上下文中是当前类型 owner（可能是
+        // 另一个合成模块），否则合成模块间缺依赖边；discover 阶段回退 table.module。
+        var user = currentConcretizeOwner != null
+                ? currentConcretizeOwner : tableModule();
         manager.ensureSynthetic(mods, user);
     }
 
@@ -713,11 +750,32 @@ public class Monomorphization {
         }
     }
 
+    /**
+     * 跨模块具体化函数：先建归属合成模块（同类型的 ensureGenericModule），
+     * 否则 owner(symbol) 因合成模块不存在回退 this → 各模块各写一份函数体
+     * （C 链接 duplicate symbol）。discoverFuncInsts 扫描函数体前调用，
+     * 让 collect 的依赖边挂到本函数归属合成模块而非 table.module。
+     */
+    private ModulePath ensureFuncModule(FunctionDefinition fd, TypeArguments args) {
+        if (manager == null) return null; // 单文件模式：无跨模块
+        var mods = Mangle.genericModules(fd.symbol(), args);
+        if (mods.size() <= 1) {
+            return mods.isEmpty() ? null : mods.iterator().next();
+        }
+        var common = manager.commonDescendant(mods);
+        if (common != null) return common; // 归公共后代（通常就是使用模块自己）
+        var user = currentConcretizeOwner != null
+                ? currentConcretizeOwner : tableModule();
+        return manager.ensureSynthetic(mods, user);
+    }
+
     // ---- M2: concretization ----
 
     private void concretizeTypes() {
         while (!pending.isEmpty()) {
             var td = pending.poll();
+            // 见字段 currentConcretizeOwner：collect 的依赖边 user 跟随当前类型 owner。
+            currentConcretizeOwner = ownerOf(td);
             var def = concretizeType(td);
             if (def != null) {
                 var o = owner(def.symbol());
@@ -726,6 +784,7 @@ public class Monomorphization {
                 }
             }
         }
+        currentConcretizeOwner = null;
     }
 
     private TypeDefinition concretizeType(TypeDeclarer td) {
@@ -1164,7 +1223,11 @@ public class Monomorphization {
             if (fi.args().hasTypeVar()) continue;
             if (!processed.add(fi)) continue;
             var gm = GenericMap.make(fi.fd(), fi.fd().generic(), fi.args());
+            // 先建函数归属合成模块（否则 owner 回退、去重失效），并让 collect
+            // 的依赖边挂到它（见 ensureFuncModule）。
+            currentConcretizeOwner = ensureFuncModule(fi.fd(), fi.args());
             scanFunc(fi.fd(), gm);
+            currentConcretizeOwner = null;
             for (var fi2 : funcInsts) {
                 if (!processed.contains(fi2)) worklist.add(fi2);
             }
@@ -1182,22 +1245,35 @@ public class Monomorphization {
             var fd = fi.fd();
             var gm = GenericMap.make(fd, fd.generic(), fi.args());
             var symbol = Mangle.symbol(fd.symbol(), fi.args());
+            // 幂等兜底：保证 owner(symbol) 稳定解析到共享合成模块（见 ensureFuncModule）。
+            ensureFuncModule(fd, fi.args());
             var prototype = gm.instantiate(fd.prototype());
             var o = owner(symbol);
-            if (fd.procedure().has()) {
-                var proc = fd.procedure().must();
-                var nproc = new Procedure(proc.pos(), prototype,
-                        proc.body().mono(gm), proc.labels());
-                // 重建后把 body 内 return/throw 的 procedure 重指向新 proc：
-                // 后端按它取返回类型发射（指向模板 proc 会残留 [*]T 类型变量）。
-                retarget(nproc, nproc.body());
-                o.table.monoFuncs.add(new FunctionDefinition(fd.pos(), fd.modifier(),
-                        symbol, TypeParameters.empty(), nproc));
-            } else {
-                o.table.monoFuncs.add(new FunctionDefinition(fd.pos(), fd.modifier(),
-                        symbol, TypeParameters.empty(), prototype));
+            var def = fd.procedure().has()
+                    ? new FunctionDefinition(fd.pos(), fd.modifier(),
+                            symbol, TypeParameters.empty(),
+                            concreteFunc(fd, symbol, gm, prototype))
+                    : new FunctionDefinition(fd.pos(), fd.modifier(),
+                            symbol, TypeParameters.empty(), prototype);
+            if (o.monoFuncBySymbol.putIfAbsent(symbol, def) == null) {
+                o.table.monoFuncs.add(def);
             }
         }
+    }
+
+    /**
+     * 重建带函数体的具体化 {@link Procedure}：body 经 {@code gm} 重写，
+     * return/throw 的 procedure 重指向新 proc（见 {@link #retarget}）。
+     */
+    private static Procedure concreteFunc(FunctionDefinition fd,
+                                          Symbol symbol,
+                                          GenericMap gm,
+                                          Prototype prototype) {
+        var proc = fd.procedure().must();
+        var nproc = new Procedure(proc.pos(), prototype,
+                proc.body().mono(gm), proc.labels());
+        retarget(nproc, nproc.body());
+        return nproc;
     }
 
     /**
