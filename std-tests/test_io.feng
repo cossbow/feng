@@ -159,6 +159,30 @@ func testHandleSocketpair() {
     b.close();
 }
 
+@Test
+func testHandleOpenFlags() {
+    // openFile 的 flags 翻译（Windows: POSIX→MSVC，见 handle_open.c）
+    // O_RDWR(2)|O_CREAT(64)：新建文件并读写
+    const p1 [&#]byte = "std-tests/_io_tmp_flags_a.txt";
+    var f1 = handle$openFile(p1, int(2 + 64));
+    testing$assertTrue(f1 != nil);
+    if (f1 == nil) { return; }
+    f1.close();
+
+    // O_WRONLY(1)|O_CREAT(64)|O_TRUNC(512)：截断重写
+    const p2 [&#]byte = "std-tests/_io_tmp_flags_b.txt";
+    var f2 = handle$openFile(p2, int(1 + 64 + 512));
+    testing$assertTrue(f2 != nil);
+    if (f2 == nil) { return; }
+    f2.close();
+
+    // O_RDONLY(0)：只读打开已存在文件
+    var f3 = handle$openFile(p1, int(0));
+    testing$assertTrue(f3 != nil);
+    if (f3 == nil) { return; }
+    f3.close();
+}
+
 // ===== Proactor: 超时 =====
 
 @Test
