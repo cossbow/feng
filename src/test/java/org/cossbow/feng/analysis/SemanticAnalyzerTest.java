@@ -4386,6 +4386,95 @@ public class SemanticAnalyzerTest {
 
     }
 
+    // ---- 类 lambda 并发检查（@Async/@Sync）----
+
+    @Test
+    public void testClassLambdaAsync1() {
+        var d = "@Sync interface I { @Async run(); } ";
+        // 两侧 @Async 一致 → 通过
+        checkSucc(d + "func f(){ @Sync var i *I = @Async class(){ }; i.run(); }");
+        // 接口 @Async + lambda 无 @Async → 拒绝（不一致）
+        checkFail(d + "func f(){ @Sync var i *I = class(){ }; i.run(); }");
+        // lambda @Async + 接口无 @Async → 拒绝（不一致）
+        checkFail("interface I { run(); } " +
+                "func f(){ @Sync var i *I = @Async class(){ }; i.run(); }");
+        // 两侧无 @Async（普通类 lambda）→ 通过
+        checkSucc("interface I { run(); } " +
+                "func f(){ var i *I = class(){ }; i.run(); }");
+    }
+
+    @Test
+    public void testClassLambdaAsync2() {
+        // @Async 类 lambda 是异步边界：参数强制 @Sync、拒绝返回值
+        var d = "@Sync interface I { @Async run(); } ";
+        // 异步方法可无返回值
+        checkSucc(d + "func f(){ @Sync var i *I = @Async class(){ }; i.run(); }");
+        // lambda 自身 @Sync（整个类同步）→ 捕获类型须可同步
+        var d2 = "class C { var v int; } " +
+                "@Sync interface I { @Async run(); } " +
+                "var g int; ";
+        // 捕获可同步值类型 → 通过
+        checkSucc(d2 + "func f(){ var c C = {v=1}; " +
+                "@Sync var i *I = @Async @Sync class(){ g = c.v; }; i.run(); }");
+    }
+
+    @Test
+    public void testClassLambdaSyncReceiver1() {
+        // lambda 自身 @Sync → resultType 烧 markSync：
+        // 接受者无 @Sync + lambda @Sync → 赋值点拒绝
+        var d = "@Sync interface I { @Async run(); } ";
+        checkFail(d + "func f(){ var i *I = @Async @Sync class(){ }; i.run(); }");
+        // 接受者 @Sync + lambda @Sync → 通过
+        checkSucc(d + "func f(){ @Sync var i *I = @Async @Sync class(){ }; i.run(); }");
+    }
+
+    @Test
+    public void testClassLambdaCaptureCheck() {
+        // @Async 类 lambda：捕获变量须 @Sync（或 lambda 整体 @Sync 时类型可同步）
+        var d = "@Sync interface I { @Async run(); } " +
+                "var g int; ";
+        // 捕获 @Sync 变量 → 通过
+        checkSucc(d + "func f(){ @Sync var c *int = new(int); " +
+                "@Sync var i *I = @Async class(){ g = *c; }; i.run(); }");
+        // 捕获非 @Sync 引用 → 拒绝
+        checkFail(d + "func f(){ var c *int = new(int); " +
+                "@Sync var i *I = @Async class(){ g = *c; }; i.run(); }");
+        // 捕获值类型（结构可同步）→ 通过
+        checkSucc(d + "func f(){ var v int = 1; " +
+                "@Sync var i *I = @Async class(){ g = v; }; i.run(); }");
+    }
+
+    @Test
+    public void testClassLambdaCaptureSyncable() {
+        // lambda 整体 @Sync → 捕获类型须可同步（不要求捕获变量本身 @Sync）
+        var d = "class C { var v int; } " +
+                "@Sync class S { var v int; } " +
+                "@Sync interface I { @Async run(); } " +
+                "var g int; ";
+        // 捕获 @Sync 类实例（可同步）→ 通过
+        checkSucc(d + "func f(){ var s S = {v=1}; " +
+                "@Sync var i *I = @Async @Sync class(){ g = s.v; }; i.run(); }");
+        // 捕获不可同步类型（非 @Sync 类含未同步引用字段）→ 拒绝
+        var d2 = "class Inner { var v int; } " +
+                "class B { var b2 *Inner; } " +
+                "class C { var b *B; } " +
+                "@Sync interface I { @Async run(); } " +
+                "var g int; ";
+        checkFail(d2 + "func f(){ var c C = {b = new(B, {b2 = new(Inner)})}; " +
+                "@Sync var i *I = @Async @Sync class(){ g = c.b.b2.v; }; i.run(); }");
+    }
+
+    @Test
+    public void testFuncLambdaAsync() {
+        // @Async 函数 lambda：参数强制 @Sync、拒绝返回值
+        checkSucc("func f(){ var t = @Async func() { }; }");
+        checkSucc("func f(){ var t = @Async func(a int) { }; }");
+        // @Async 函数 lambda 带返回值 → 拒绝
+        checkFail("func f(){ var t = @Async func() int { return 0; }; }");
+        // 普通函数 lambda 不受影响
+        checkSucc("func f(){ var t = func() int { return 0; }; }");
+    }
+
     @Test
     public void testAsyncFunction9() {
         checkSucc("@Async func t`E Syncable`(e E) {}");

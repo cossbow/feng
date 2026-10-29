@@ -1,0 +1,88 @@
+import std$testing;
+
+// 阶段2：lambda 并发检查（@Async/@Sync）端到端
+// 覆盖：@Async 函数 lambda、@Async 类 lambda（接口一致）、
+// @Async @Sync 类 lambda（整体同步 + 捕获可同步类型）、
+// 普通类 lambda 回归。
+
+// ---- @Async 函数 lambda ----
+
+@Async func Task = ();
+
+var funcRan int = 0;
+
+@Test
+func testFuncLambdaAsync() {
+    // @Async 函数 lambda：无返回值、参数可省略
+    var t Task = @Async func() { funcRan = funcRan + 1; };
+    t();
+    assert(funcRan == 1);
+}
+
+// ---- @Async 类 lambda：接口方法 ⇔ lambda 两侧一致 ----
+
+@Sync
+interface Runner {
+    @Async run();
+}
+
+var runnerRan int = 0;
+
+@Test
+func testClassLambdaAsync() {
+    // 两侧 @Async 一致；lambda 无返回值（异步边界）
+    @Sync var r *Runner = @Async class() { runnerRan = runnerRan + 1; };
+    r.run();
+    assert(runnerRan == 1);
+}
+
+// ---- @Async @Sync 类 lambda：整体同步 + 捕获可同步类型 ----
+
+class Inner {
+    var v int;
+}
+
+@Sync
+class SyncRef {
+    var i *Inner;
+}
+
+var lastRead int = 0;
+
+@Test
+func testClassLambdaAsyncSyncCapture() {
+    // lambda 整体 @Sync → 捕获类型须可同步（SyncRef 是 @Sync 类）
+    @Sync var s *SyncRef = new(SyncRef, {i = new(Inner)});
+    s.i.v = 9;
+    @Sync var r *Runner = @Async @Sync class() { lastRead = s.i.v; };
+    r.run();
+    assert(lastRead == 9);
+}
+
+// ---- 普通类 lambda 回归：不受 @Async/@Sync 影响 ----
+
+interface Plain {
+    run() int;
+}
+
+@Test
+func testPlainClassLambda() {
+    var p *Plain = class() int { return 3; };
+    assert(p.run() == 3);
+}
+
+// ---- @Sync 接收者 + @Async 方法调用（既有规则回归）----
+
+@Sync
+class Counter {
+    @Sync var n *int;
+}
+
+@Test
+func testSyncReceiverAsyncCall() {
+    // @Async 方法调用要求接收者可同步（checkEnterAsync）
+    @Sync var c *Counter = new(Counter, {n = new(int, 5)});
+    @Sync var r *Runner = @Async class() { lastRead = *c.n; };
+    r.run();
+    assert(lastRead == 5);
+}

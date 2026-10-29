@@ -597,6 +597,10 @@ public class AnonFuncNormalizer {
                 walkBlockStmt(sis.yes());
                 if (sis.not().has()) walkStmt(sis.not().get());
             }
+            case AssertStatement as -> {
+                var nc = walkExpr(as.condition());
+                if (nc != as.condition()) as.condition(nc);
+            }
             default -> {
             }
         }

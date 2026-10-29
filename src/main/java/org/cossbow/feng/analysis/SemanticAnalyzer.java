@@ -5335,8 +5335,13 @@ public class SemanticAnalyzer {
         e.targetType(etd);
         e.inferredPrototype(ipt);
 
-        // 7. resultType = 目标接口类型
-        return Groups.g2(e, etd);
+        // 7. resultType = 目标接口类型。lambda 自身 @Sync（整个类同步）
+        // → 类型烧 markSync：赋值点 assignable 的 markSync 一致性比对
+        // 才能拦截「接受者无 @Sync + lambda @Sync」的错配。
+        TypeDeclarer rt = etd;
+        if (e.modifier().sync().has())
+            rt = markSync(etd);
+        return Groups.g2(e, rt);
     }
 
     /**
@@ -5403,6 +5408,8 @@ public class SemanticAnalyzer {
                 sis.not().use(x ->
                         collectCaptures(x, locals, captures));
             }
+            case AssertStatement as -> collectCaptures(as.condition(),
+                    locals, captures);
             default -> {
             }
         }
@@ -5452,6 +5459,8 @@ public class SemanticAnalyzer {
                 collectCaptures(be.result(), locals, captures);
             }
             case IsExpression ie -> collectCaptures(ie.subject(),
+                    locals, captures);
+            case DereferExpression de -> collectCaptures(de.subject(),
                     locals, captures);
             case MemberOfExpression moe -> collectCaptures(moe.subject(),
                     locals, captures);
