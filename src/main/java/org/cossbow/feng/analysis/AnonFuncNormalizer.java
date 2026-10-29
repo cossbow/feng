@@ -831,7 +831,7 @@ public class AnonFuncNormalizer {
         var normalized = new Prototype(pt.pos(),
                 pt.parameterSet(),
                 pt.returnSet().map(this::replaceAnon),
-                pt.catchAll());
+                pt.catchAll(), pt.async());
         for (var p : normalized.parameterSet()) {
             if (p instanceof FixedParameter fp) {
                 fp.type(replaceAnon(fp.type()));
@@ -863,6 +863,8 @@ public class AnonFuncNormalizer {
 
     private String protoKey(Prototype pt) {
         var sb = new StringBuilder("Proto");
+        // async 参与去重：@Async 与普通同签名函数类型是不同函数类型
+        if (pt.async()) sb.append("_Async");
         sb.append('_');
         if (pt.returnSet().has()) sb.append(typeKey(pt.returnSet().get()));
         else sb.append("Void");

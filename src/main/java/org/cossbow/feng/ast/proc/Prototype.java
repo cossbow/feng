@@ -17,21 +17,36 @@ public class Prototype extends Entity {
     private final ParameterSet parameterSet;
     private Optional<TypeDeclarer> returnSet;
     private final boolean catchAll;
+    /**
+     * async: this prototype is a concurrency boundary (method/function
+     * marked {@code @Async}). Checked for consistency at assignment /
+     * parameter passing / lambda signature matching.
+     */
+    private boolean async;
+
+    public Prototype(Position pos,
+                     ParameterSet parameterSet,
+                     Optional<TypeDeclarer> returnSet,
+                     boolean catchAll,
+                     boolean async) {
+        super(pos);
+        this.parameterSet = parameterSet;
+        this.returnSet = returnSet;
+        this.catchAll = catchAll;
+        this.async = async;
+    }
 
     public Prototype(Position pos,
                      ParameterSet parameterSet,
                      Optional<TypeDeclarer> returnSet,
                      boolean catchAll) {
-        super(pos);
-        this.parameterSet = parameterSet;
-        this.returnSet = returnSet;
-        this.catchAll = catchAll;
+        this(pos, parameterSet, returnSet, catchAll, false);
     }
 
     public Prototype(Position pos,
                      ParameterSet parameterSet,
                      Optional<TypeDeclarer> returnSet) {
-        this(pos, parameterSet, returnSet, false);
+        this(pos, parameterSet, returnSet, false, false);
     }
 
     public Prototype(Position pos,
@@ -55,6 +70,14 @@ public class Prototype extends Entity {
 
     public boolean catchAll() {
         return catchAll;
+    }
+
+    public boolean async() {
+        return async;
+    }
+
+    public void async(boolean async) {
+        this.async = async;
     }
 
     public void returnSet(Optional<TypeDeclarer> returnSet) {
@@ -87,13 +110,16 @@ public class Prototype extends Entity {
         if (!(o instanceof Prototype p)) return false;
         return parameterSet.equals(p.parameterSet) &&
                 returnSet.equals(p.returnSet) &&
-                catchAll == p.catchAll;
+                catchAll == p.catchAll &&
+                async == p.async;
     }
 
     @Override
     public int hashCode() {
         int result = parameterSet.hashCode();
         result = 31 * result + returnSet.hashCode();
+        result = 31 * result + Boolean.hashCode(catchAll);
+        result = 31 * result + Boolean.hashCode(async);
         return result;
     }
 
@@ -101,9 +127,10 @@ public class Prototype extends Entity {
     @Override
     public String toString() {
         var c = catchAll ? "catch" : "";
+        var a = async ? "@Async " : "";
         if (returnSet.none())
-            return "(" + parameterSet + ") " + c;
-        return "(" + parameterSet + ") " + c + " "
+            return a + "(" + parameterSet + ") " + c;
+        return a + "(" + parameterSet + ") " + c + " "
                 + returnSet.get();
     }
 }

@@ -1118,6 +1118,10 @@ public class SemanticAnalyzer {
             Prototype l, Prototype r, Entity e) {
         var vt = checkParameters(l.parameterSet(), r.parameterSet(), e);
         if (!vt.ok) return vt;
+        // @Async 一致性：异步边界函数类型只能赋给同样标记 @Async 的函数类型
+        if (l.async() != r.async())
+            return TypeValid.err("async not consistent '%s' <> '%s': %s",
+                    l, r, e.pos());
         var lr = l.returnSet();
         var rr = r.returnSet();
         if (lr.none() != rr.none())
@@ -1590,6 +1594,8 @@ public class SemanticAnalyzer {
 
         analyse(pd.generic());
         analyse(pd.prototype(), false);
+        // @Async 函数类型：原型标记 async，供赋值/传参/签名比对时检查一致性
+        pd.prototype().async(pd.modifier().async().has());
         return pd;
     }
 
@@ -5877,6 +5883,8 @@ public class SemanticAnalyzer {
             var gm = checkConstraint(GenericMap.make(re, false,
                     f.generic(), re.generic()));
             var prot = gm.instantiate(f.prototype());
+            // @Async 函数：函数引用的函数类型标记 async，供赋值/传参一致性检查
+            prot.async(f.modifier().async().has());
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
             var n = new FunctionExpression(re.pos(), f, re.generic());
             return Groups.g2(n, td);
@@ -5980,6 +5988,8 @@ public class SemanticAnalyzer {
                 }
                 prot = gm.instantiate(prot);
             }
+            // @Async 函数：函数引用的函数类型标记 async，供赋值/传参一致性检查
+            prot.async(fd.modifier().async().has());
             var td = new AnonFuncTypeDeclarer(re.pos(), true, prot);
             var n = new FunctionExpression(re.pos(), fd, re.generic());
             return Groups.g2(n, td);
