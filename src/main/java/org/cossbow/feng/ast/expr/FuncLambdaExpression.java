@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.gen.GenericMap;
 import org.cossbow.feng.ast.proc.Procedure;
 
@@ -13,12 +14,24 @@ import org.cossbow.feng.ast.proc.Procedure;
  * through the existing function pipeline.
  */
 public class FuncLambdaExpression extends PrimaryExpression {
+    private final Modifier modifier;
     private final Procedure procedure;
 
     public FuncLambdaExpression(Position pos,
                                 Procedure procedure) {
+        this(pos, Modifier.empty(), procedure);
+    }
+
+    public FuncLambdaExpression(Position pos,
+                                Modifier modifier,
+                                Procedure procedure) {
         super(pos);
+        this.modifier = modifier;
         this.procedure = procedure;
+    }
+
+    public Modifier modifier() {
+        return modifier;
     }
 
     public Procedure procedure() {

@@ -1,6 +1,7 @@
 package org.cossbow.feng.ast.expr;
 
 import org.cossbow.feng.ast.Position;
+import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.TypeDeclarer;
 import org.cossbow.feng.ast.dcl.Variable;
 import org.cossbow.feng.ast.gen.GenericMap;
@@ -23,12 +24,24 @@ import java.util.List;
  * inferred prototype) are filled in during semantic analysis.
  */
 public class ClassLambdaExpression extends PrimaryExpression {
+    private final Modifier modifier;
     private final Procedure procedure;
 
     public ClassLambdaExpression(Position pos,
                                  Procedure procedure) {
+        this(pos, Modifier.empty(), procedure);
+    }
+
+    public ClassLambdaExpression(Position pos,
+                                 Modifier modifier,
+                                 Procedure procedure) {
         super(pos);
+        this.modifier = modifier;
         this.procedure = procedure;
+    }
+
+    public Modifier modifier() {
+        return modifier;
     }
 
     public Procedure procedure() {

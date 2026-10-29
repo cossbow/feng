@@ -619,8 +619,8 @@ operandExpr
     | pairsExpr                 # PairsExpression
     | symbol typeArguments?     # SymbolExpression
     | current=(THIS|SUPER)      # CurrentExpression
-    | FUNC procedure            # LambdaExpression
-    | CLASS procedure           # ClassLambdaExpression
+    | attributes FUNC procedure # LambdaExpression
+    | attributes CLASS procedure # ClassLambdaExpression
     | '(' expression ')'        # ParenExpression
     | new                       # NewExpression
     | blockExpr                 # BlockExpression

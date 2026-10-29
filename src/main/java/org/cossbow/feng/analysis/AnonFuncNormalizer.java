@@ -1,6 +1,8 @@
 package org.cossbow.feng.analysis;
 
 import org.cossbow.feng.ast.*;
+import org.cossbow.feng.ast.attr.Attribute;
+import org.cossbow.feng.ast.attr.AttributeDefinition;
 import org.cossbow.feng.ast.attr.Modifier;
 import org.cossbow.feng.ast.dcl.*;
 import org.cossbow.feng.ast.expr.*;
@@ -312,7 +314,8 @@ public class AnonFuncNormalizer {
         var capFields = new LinkedHashMap<Variable, ClassField>();
         for (var v : e.captures()) {
             var td = replaceAnon(v.type().must());
-            var cf = new ClassField(pos, Modifier.empty(),
+            // 捕获字段继承捕获变量的 @Sync（异步边界内匿名类字段须可同步）
+            var cf = new ClassField(pos, syncModifier(v.modifier()),
                     v.declare(), v.name(), td);
             fieldsMap.add(cf.name(), cf);
             capFields.put(v, cf);
@@ -328,17 +331,20 @@ public class AnonFuncNormalizer {
         var ppt = e.procedure().prototype();
         var nprot = new Prototype(ppt.pos(), ppt.parameterSet(),
                 ipt.returnSet(), ipt.catchAll());
+        nprot.async(im.modifier().async().has());
         var nproc = new Procedure(e.procedure().pos(), nprot,
                 e.procedure().body(), e.procedure().labels());
-        var ncm = new ClassMethod(pos, Modifier.empty(), im.name(),
-                TypeParameters.empty(), im.escaped(), im.unmodifiable(),
-                nprot, Optional.of(nproc), im.returnThis());
+        // 匿名类方法继承接口方法 @Async（异步边界检查由 analyse 期完成）
+        var ncm = new ClassMethod(pos, asyncModifier(im.modifier()),
+                im.name(), TypeParameters.empty(), im.escaped(),
+                im.unmodifiable(), nprot, Optional.of(nproc), im.returnThis());
         var methodsMap = new IdentifierMap<ClassMethod>(1);
         methodsMap.add(ncm.name(), ncm);
 
         // ---- 匿名类定义 ----
-        var anonClass = new ClassDefinition(pos, Modifier.empty(),
-                anonSymbol, generic, false,
+        // lambda 自身 @Sync（整个类同步）→ 匿名类继承 @Sync 标记
+        var anonClass = new ClassDefinition(pos,
+                syncModifier(e.modifier()), anonSymbol, generic, false,
                 Optional.of(ClassDefinition.ObjectClass.link(pos)),
                 implMap, fieldsMap, methodsMap, new MacroTable());
 
@@ -397,6 +403,30 @@ public class AnonFuncNormalizer {
             return id.allMethods().getValue(0);
         }
         return ms.getValue(0);
+    }
+
+    /**
+     * 捕获字段继承捕获变量的 @Sync 标记：异步类 lambda 的匿名类字段
+     * 须可同步（analyse 期已按 TypeTool.checkSync 校验捕获类型）。
+     */
+    private static Modifier syncModifier(Modifier src) {
+        if (src.sync().none()) return Modifier.empty();
+        return modifierWith(AttributeDefinition.SyncDef.symbol());
+    }
+
+    /**
+     * 匿名类方法继承接口方法的 @Async 标记：异步边界标志须在
+     * 合成方法上保留（调用点 checkEnterAsync / 代码生成按此识别）。
+     */
+    private static Modifier asyncModifier(Modifier src) {
+        if (src.async().none()) return Modifier.empty();
+        return modifierWith(AttributeDefinition.AsyncDef.symbol());
+    }
+
+    private static Modifier modifierWith(Symbol symbol) {
+        var attrs = new SymbolMap<Attribute>();
+        attrs.add(symbol, new Attribute(symbol));
+        return new Modifier(ZERO, false, attrs);
     }
 
     /**

@@ -5168,11 +5168,18 @@ public class SemanticAnalyzer {
             return semantic("function-lambda can't use type variables: %s",
                     e.pos());
         }
+        // @Async 函数 lambda：原型标记 async，供赋值/传参一致性比对
+        prot.async(e.modifier().async().has());
 
         var symbol = new Symbol(CommonUtil.rand("Lambda"));
-        var fd = new FunctionDefinition(e.pos(), Modifier.empty(), symbol,
+        // @Async 函数 lambda：modifier 传给合成函数 → declareFunc 的
+        // checkSync 强制参数 @Sync + 拒绝返回值，走既有异步函数检查
+        var fd = new FunctionDefinition(e.pos(), e.modifier(), symbol,
                 TypeParameters.empty(), proc);
         lambdaFuncs.add(fd);
+        // 合成函数不入全局 declareFunc 列表，就地走同步检查
+        // （@Async → 参数强制 @Sync、拒绝返回值）
+        declareFunc(fd);
 
         // 就地分析 lambda 体（临时切换 enterFunc/enterProc，模式同 implMethod）
         var savedFunc = enterFunc;
@@ -5233,24 +5240,37 @@ public class SemanticAnalyzer {
                 ? id.allMethods().getValue(0)
                 : id.methods().getValue(0);
         var ipt = dt.gm().instantiate(im.prototype());
+        // @Async 一致性：接口方法 ⇔ lambda 两侧都须有 @Async（reference_zh.md
+        // 并发边界），原型 async 标记经 compatible → checkPrototype 比对
+        ipt.async(im.modifier().async().has());
 
         // 3. 校验 lambda 自身签名与接口方法原型兼容（参数个数/类型）。
         // 允许类型变量：引用外层泛型作用域（泛型函数/泛型类的 T），
         // 由 P6 提升为匿名类类型参数（不在此拒绝）。
         var proc = e.procedure();
         var ppt = proc.prototype();
+        ppt.async(e.modifier().async().has());
         if (ppt.parameterSet().size() != ipt.parameterSet().size())
             return semantic("class-lambda parameter-count " +
                     "mismatch with '%s': %s", id.symbol(), e.pos());
         var pc = compatible(ipt, ppt, e);
-        if (!pc.ok)
+        if (!pc.ok) {
+            // 优先报告 @Async 不一致（接口方法 ⇔ 类 lambda 须两侧同标注）
+            if (ipt.async() != ppt.async())
+                return semantic("class-lambda @Async not consistent " +
+                        "with interface '%s': %s", id.symbol(), e.pos());
             return semantic("class-lambda signature mismatch " +
                     "with '%s': %s", id.symbol(), e.pos());
+        }
 
         // 4. 构造带推断原型的新 Procedure 分析 lambda 体
         // （临时切换 enterFunc/enterProc，模式同 P1；return 绑定到新原型）
         var nprot = new Prototype(ppt.pos(), ppt.parameterSet(),
                 ipt.returnSet(), ipt.catchAll());
+        // @Async 类 lambda：匿名类方法即异步边界 → 参数强制 @Sync、
+        // 拒绝返回值（同 checkSyncMethod 对具名类方法的检查）
+        nprot.async(e.modifier().async().has());
+        checkSync(nprot, e.modifier().async().has());
         var nproc = new Procedure(proc.pos(), nprot,
                 proc.body(), proc.labels());
         var savedFunc = enterFunc;
@@ -5276,6 +5296,22 @@ public class SemanticAnalyzer {
                         "'%s' in class-lambda (capture as " +
                         "strong/value instead): %s",
                         v.name(), e.pos());
+            }
+            // @Async 类 lambda：捕获变量转匿名类字段后成为异步边界的
+            // 可同步状态。lambda 自身 @Sync（整个类同步）→ 类型须结构
+            // 可同步；否则每个捕获变量须 @Sync（引用须带标记 + 可同步）
+            if (e.modifier().async().has()
+                    && v.type().has()) {
+                var t = v.type().must();
+                var ok = e.modifier().sync().has()
+                        ? TypeTool.checkSyncable(t)
+                        : TypeTool.checkSync(t);
+                if (!ok) {
+                    return semantic("can't capture non-sync '%s' in " +
+                            "async class-lambda (mark @Sync or capture " +
+                            "value instead): %s",
+                            t, e.pos());
+                }
             }
         }
         e.captures(captures);

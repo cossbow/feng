@@ -1001,18 +1001,22 @@ final class SourceParseVisitor
     public Entity visitLambdaExpression(FengParser.LambdaExpressionContext ctx) {
         var saved = methodReturnThis;
         methodReturnThis = false;
+        var modifier = new Modifier(posOf(ctx), false,
+                parseAttributes(ctx.attributes()));
         var procedure = (Procedure) visit(ctx.procedure());
         methodReturnThis = saved;
-        return new FuncLambdaExpression(posOf(ctx), procedure);
+        return new FuncLambdaExpression(posOf(ctx), modifier, procedure);
     }
 
     @Override
     public Entity visitClassLambdaExpression(FengParser.ClassLambdaExpressionContext ctx) {
         var saved = methodReturnThis;
         methodReturnThis = false;
+        var modifier = new Modifier(posOf(ctx), false,
+                parseAttributes(ctx.attributes()));
         var procedure = (Procedure) visit(ctx.procedure());
         methodReturnThis = saved;
-        return new ClassLambdaExpression(posOf(ctx), procedure);
+        return new ClassLambdaExpression(posOf(ctx), modifier, procedure);
     }
 
     @Override
