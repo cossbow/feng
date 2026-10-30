@@ -738,6 +738,37 @@ public class AnonFuncNormalizer {
                 copyTypes(ie, n);
                 return n;
             }
+            case MethodExpression me -> {
+                // 捕获变量作方法调用接收者（b.get()）：subject 须重写为
+                // $self->字段，否则匿名类方法体引用自由变量悬空。
+                var ns = walkExpr(me.subject());
+                if (ns == me.subject()) return me;
+                if (!(ns instanceof PrimaryExpression npe))
+                    return me;
+                var n = new MethodExpression(me.pos(), npe,
+                        me.method(), me.generic());
+                copyTypes(me, n);
+                return n;
+            }
+            case CheckNilExpression cne -> {
+                var ns = walkExpr(cne.subject());
+                if (ns == cne.subject()) return cne;
+                var n = new CheckNilExpression(cne.pos(), ns, cne.nil());
+                copyTypes(cne, n);
+                return n;
+            }
+            case ReferEqualExpression ree -> {
+                var nl = walkExpr(ree.left());
+                var nr = walkExpr(ree.right());
+                if (nl == ree.left() && nr == ree.right()) return ree;
+                if (!(nl instanceof PrimaryExpression npe) ||
+                        !(nr instanceof PrimaryExpression npr))
+                    return ree;
+                var n = new ReferEqualExpression(ree.pos(), npe, npr,
+                        ree.same());
+                copyTypes(ree, n);
+                return n;
+            }
             case MemberOfExpression moe -> {
                 var ns = walkExpr(moe.subject());
                 if (ns == moe.subject()) return moe;

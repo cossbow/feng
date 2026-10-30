@@ -4476,6 +4476,33 @@ public class SemanticAnalyzerTest {
     }
 
     @Test
+    public void testFoldKeepCapture() {
+        // required 引用比较折叠成 BlockExpression {call; true} 后，
+        // 调用接收者仍须作为捕获被收集（并发检查触发）：
+        // b.get() != nil → {b.get(); true}，b 保留在 AST 不丢失。
+        var d = "@Sync class Inner { var v int; } " +
+                "@Sync class Box { var inner *Inner; " +
+                "func get() *Inner { return inner; } } " +
+                "@Sync interface I { @Async run(); } " +
+                "var g int; ";
+        // 折叠 + 捕获可同步类型 → 通过（b 被收集且并发检查通过）
+        checkSucc(d + "func f(){ var b *Box = " +
+                "new(Box, {inner = new(Inner)}); " +
+                "@Sync var i *I = @Async @Sync class(){ " +
+                "if (b.get() != nil) { g = 1; } }; i.run(); }");
+        // 捕获不可同步类型（非 @Sync 类作接收者）→ 折叠后仍被收集 → 拒绝
+        var d2 = "class Inner { var v int; } " +
+                "class Box { var inner *Inner; " +
+                "func get() *Inner { return inner; } } " +
+                "@Sync interface I { @Async run(); } " +
+                "var g int; ";
+        checkFail(d2 + "func f(){ var b *Box = " +
+                "new(Box, {inner = new(Inner)}); " +
+                "@Sync var i *I = @Async @Sync class(){ " +
+                "if (b.get() != nil) { g = 1; } }; i.run(); }");
+    }
+
+    @Test
     public void testAsyncFunction9() {
         checkSucc("@Async func t`E Syncable`(e E) {}");
         checkFail("@Async func t`E`(e E){}");

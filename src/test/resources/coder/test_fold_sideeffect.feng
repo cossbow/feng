@@ -1,0 +1,101 @@
+import std$testing;
+
+// 常量折叠副作用保留：required 引用比较折叠成 BlockExpression {call; true}
+// 后，方法调用的副作用仍须执行（b.get() 被调用），捕获变量保留。
+
+class Inner {
+    var v int;
+}
+
+class Box {
+    var calls int;
+    var inner *Inner;
+
+    func get() *Inner {
+        calls = calls + 1;
+        return inner;
+    }
+}
+
+var g1 int = 0;
+
+// ---- 无 lambda：if 条件折叠保留副作用 ----
+
+@Test
+func testFoldSideEffectIf() {
+    var b *Box = new(Box, {calls = 0, inner = new(Inner)});
+    if (b.get() != nil) {
+        g1 = 1;
+    }
+    // get() 必须被调用一次（副作用保留）
+    assert(b.calls == 1);
+    assert(g1 == 1);
+}
+
+// ---- 类 lambda：折叠保留捕获 + 副作用 ----
+
+@Sync
+class SyncInner {
+    var v int;
+}
+
+@Sync
+class SyncBox {
+    var calls int;
+    var inner *SyncInner;
+
+    func get() *SyncInner {
+        calls = calls + 1;
+        return inner;
+    }
+}
+
+@Sync
+interface I {
+    @Async run();
+}
+
+var last int = 0;
+
+@Test
+func testFoldSideEffectLambda() {
+    var b *SyncBox = new(SyncBox, {calls = 0, inner = new(SyncInner)});
+    @Sync var i *I = @Async @Sync class() {
+        if (b.get() != nil) { last = 1; }
+    };
+    i.run();
+    // b 作为捕获字段被收集；get() 调用保留（副作用执行）
+    assert(last == 1);
+    assert(b.calls == 1);
+}
+
+// ---- optional 引用（CheckNilExpression，不折叠）捕获接收者 ----
+
+@Sync
+class OptInner {
+    var v int;
+}
+
+@Sync
+class OptBox {
+    var calls int;
+    var inner *?OptInner;
+
+    func get() *?OptInner {
+        calls = calls + 1;
+        return inner;
+    }
+}
+
+var last2 int = 0;
+
+@Test
+func testFoldOptionalCapture() {
+    var b *OptBox = new(OptBox, {calls = 0, inner = new(OptInner)});
+    @Sync var i *I = @Async @Sync class() {
+        if (b.get() != nil) { last2 = 1; }
+    };
+    i.run();
+    assert(last2 == 1);
+    assert(b.calls == 1);
+}

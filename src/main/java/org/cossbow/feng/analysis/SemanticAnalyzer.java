@@ -4334,9 +4334,19 @@ public class SemanticAnalyzer {
             return semantic("'%s' can't check-nil: %s", g.a(), e.pos());
 
         if (g.b().required()) {
-            // required refer cannot be empty, so direct set to literal-bool
+            // required refer cannot be empty, so direct set to literal-bool.
+            // 但操作数可能是调用（方法/函数调用带副作用），直接折叠会丢弃
+            // 其求值：a.get() != nil → {a.get(); true}
+            // 纯读取操作数（变量/字段/解引用）无副作用，仍直接折叠成字面量。
             var n = new LiteralExpression(e.pos(),
                     new BoolLiteral(e.pos(), !nil));
+            if (g.a() instanceof CallExpression call) {
+                n.resultType.set(t);
+                var block = new BlockExpression(e.pos(),
+                        List.of(new CallStatement(call.pos(), call)), n);
+                block.resultType.set(t);
+                return Groups.g2(block, t);
+            }
             return Groups.g2(n, t);
         }
 
@@ -5460,6 +5470,14 @@ public class SemanticAnalyzer {
             }
             case IsExpression ie -> collectCaptures(ie.subject(),
                     locals, captures);
+            case MethodExpression me -> collectCaptures(me.subject(),
+                    locals, captures);
+            case CheckNilExpression cne -> collectCaptures(cne.subject(),
+                    locals, captures);
+            case ReferEqualExpression ree -> {
+                collectCaptures(ree.left(), locals, captures);
+                collectCaptures(ree.right(), locals, captures);
+            }
             case DereferExpression de -> collectCaptures(de.subject(),
                     locals, captures);
             case MemberOfExpression moe -> collectCaptures(moe.subject(),
