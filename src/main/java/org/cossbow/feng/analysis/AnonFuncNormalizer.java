@@ -826,6 +826,19 @@ public class AnonFuncNormalizer {
                 te.elements(elems);
                 return te;
             }
+            case TupleIndexExpression tie -> {
+                // 取元组下标后，subject 可能是含类 lambda 的调用
+                // （如 makePair(class(x){...}).1）；须递归遍历 subject，
+                // 否则类 lambda 不降级泄漏到 coder 触发 unreachable。
+                var ns = walkExpr(tie.subject());
+                if (ns == tie.subject()) return tie;
+                if (!(ns instanceof PrimaryExpression npe))
+                    return tie;
+                var n = new TupleIndexExpression(tie.pos(), npe,
+                        tie.index());
+                copyTypes(tie, n);
+                return n;
+            }
             case ParenExpression pe -> {
                 var nc = walkExpr(pe.child());
                 if (nc == pe.child()) return pe;

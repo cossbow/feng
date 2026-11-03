@@ -1,0 +1,120 @@
+import std$testing;
+
+// 缺陷②（TupleIndexExpression 残留路径）回归测试。
+//
+// 根因回顾：AnonFuncNormalizer.walkExpr 的 switch 缺 case，类 lambda
+// （class(x int) int { ... }）作为方法/函数实参时未降级为 new(Anon, {...})，
+// 泄漏到 coder 的 ExprWriter.write 大 switch（无 ClassLambdaExpression case）
+// → ErrorUtil$UnreachableException。b36a0c0 补了 MethodExpression case
+// （链式方法实参主路径）；本工作区改动补 TupleIndexExpression case（约
+// 829 行）——残留路径是「取元组下标，且 subject 是含类 lambda 实参的调用」，
+// 如 makePair(class(x int) int { return x + 100; }).0。
+//
+// 执行机制说明：coder 测试（CGeneratorTest）以非测试模式编译（compileFile），
+// @Test 函数体在该模式下不参与分析/代码生成（SemanticAnalyzer 按
+// test || !fd.testcase() 过滤，test=false 时排除 @Test 函数），只会产出静态库、
+// 不生成可执行文件、断言不执行。因此本文件用 main() 承载断言：main 函数
+// 始终参与编译与执行（GeneratorTest.exec 对生成 .exe 的产物运行并校验退出码），
+// assert 在 debug 模式下为假时抛 $AssertException 使进程非零退出 → 测试失败。
+// 这也与既有 test_lambda_calculus/test_lambda_fp 等文件用 main 的惯例一致。
+
+// ---- 单方法接口：类 lambda 的目标 ----
+
+interface Handler {
+    handle(x int) int;
+}
+
+// ---- 变体 1（核心回归）：函数实参 + 取元组下标 ----
+// 触发形态：makePair(class(x){...}).0 —— TupleIndexExpression 的 subject 是
+// 含类 lambda 实参的调用。修复前 walkExpr 对 TupleIndexExpression 走 default
+// 直接返回，subject 里的类 lambda 从未降级 → coder unreachable。
+
+func makePair(h *Handler) (int, int) {
+    return (h.handle(1), h.handle(2));
+}
+
+func testTupleIndexCore() {
+    // 下标 .0：subject 是含类 lambda 的调用
+    var v = makePair(class(x int) int { return x + 100; }).0;
+    assert(v == 101);
+
+    // 下标 .1：同一泄漏路径的另一下标
+    var w = makePair(class(x int) int { return x + 100; }).1;
+    assert(w == 102);
+}
+
+// ---- 变体 2（链式方法实参，b36a0c0 主路径）：类 lambda 作链式方法实参 ----
+// 触发形态：new(Builder).set(class(x){...}).build() —— MethodExpression case。
+// set 参数为接口强引用 *Handler（lambda 实参 → castRef 需引用递增，触发
+// needInc 路径）；.build() 的存在改变实参类型推断。
+
+class Builder {
+    var h *?Handler;
+
+    export func set(h *Handler) this {
+        this.h = h;
+        return;
+    }
+
+    export func build() (int, int) {
+        var h = this.h;
+        if (h == nil) {
+            return (0, 0);
+        }
+        return (h.handle(10), h.handle(20));
+    }
+}
+
+func testChainMethodArg() {
+    var b = new(Builder)
+        .set(class(x int) int { return x * 2; })
+        .build();
+    // 链式 + tuple 下标组合：.0 的 subject 是链式方法调用
+    var v = new(Builder)
+        .set(class(x int) int { return x * 3; })
+        .build().0;
+    assert(v == 30);
+}
+
+// ---- 变体 3（捕获变量）：类 lambda 捕获外层变量后作实参 + 取元组下标 ----
+// 捕获变量被收集为匿名类字段，捕获值须正确传播到匿名方法体。
+
+func testCaptureVariant() {
+    var base = 50;
+    var v = makePair(class(x int) int { return x + base; }).0;
+    assert(v == 51);
+
+    var factor = 7;
+    var w = makePair(class(x int) int { return x * factor; }).1;
+    assert(w == 14);
+}
+
+// ---- 变体 4（多语句 lambda + .1 下标）：----
+// lambda 体含局部变量与多条语句；返回值取元组下标 .1。
+
+func testMultiStatement() {
+    var v = makePair(class(x int) int {
+        var step = 2;
+        var y = x + step;
+        return y * y;
+    }).1;
+    // x=2 → y=4 → 16
+    assert(v == 16);
+}
+
+// ---- 变体 5（lambda 先赋类型化变量再作实参）：历史规避形态，应同样 PASS ----
+// lambda 先赋值给类型化变量，再作为实参传入；同样取元组下标。
+
+func testTypedVarArg() {
+    var h *Handler = class(x int) int { return x - 1; };
+    var v = makePair(h).0;
+    assert(v == 0);
+}
+
+func main() {
+    testTupleIndexCore();
+    testChainMethodArg();
+    testCaptureVariant();
+    testMultiStatement();
+    testTypedVarArg();
+}

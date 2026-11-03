@@ -261,9 +261,12 @@ public class StmtWriter extends CWriter<StmtWriter> {
             // 非 final 类值类型：$meta 是运行时类型标识，赋值不得覆盖。切片赋值
             // *r = a1（r 指向派生类 B）时 _t.$meta 是 A_meta，整体赋值会覆盖 B 的
             // $meta，破坏 vDestroy 虚派发 → 漏析构 B.j。保留目标原 $meta。
+            // 但目标槽位可能是 Feng$alloc 零初始化（@Sync final 容器内嵌的
+            // 非 final 值类型字段，如 String）：此时目标 $meta 为 NULL，覆盖会
+            // 抹掉 _t 的正确 meta → 后续虚方法分派崩溃。仅当目标 $meta 非 NULL
+            //（已持有合法运行时类型标识）才保留。
             if (isNonFinalValue(t)) {
-                write("; _t.$meta = ");
-                write(o).write(".$meta");
+                write("; if (").write(o).write(".$meta) _t.$meta = ").write(o).write(".$meta");
             }
             write("; ").write(valueCleanupFn(t)).write("(&");
             write(o);
