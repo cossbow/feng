@@ -213,7 +213,12 @@ public class Mangle {
      */
     private static Optional<ModulePath> moduleOf(TypeDeclarer td) {
         if (td instanceof DerivedTypeDeclarer dtd) {
-            return dtd.derivedType().symbol().module();
+            // 泛型具体化归 mono owner（合成模块/公共后代），与 argModule 一致；否则
+            // 跨模块泛型元素会使数组/元组归到模板定义站点模块，与元素 owner 错位，
+            // ensureSynthetic 给真实模块补反向边成环。
+            var dt = dtd.derivedType();
+            if (dt.generic().isEmpty()) return dt.symbol().module();
+            return genericModule(dt.symbol(), dt.generic());
         }
         if (td instanceof ArrayTypeDeclarer atd) {
             return moduleOf(atd.element());

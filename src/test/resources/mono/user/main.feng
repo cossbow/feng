@@ -6,6 +6,9 @@
 // 若函数场景去重失效（makeF`ms$S` 被 ua/ub 双模块引用），C 链接报
 // duplicate symbol makeF_test$ms$S_。
 // 类型路径：ta$Pair`int,int` 被 ua/ub 双模块共享，应只在 test_ta.h 定义一次。
+// Mangle.moduleOf 数组场景：new([2]*?ma$A`ms$S`)（元素为跨模块泛型，定义模块
+// ma 不 import 实参模块 ms）——修复前数组归 test$ma 与元素归合成模块错位，
+// ensureSynthetic 给 test$ma 补反向边成环；修复后数组 owner=合成模块，无环。
 import test$ua ua;
 import test$ub ub;
 import test$ta ta;
@@ -44,6 +47,20 @@ func testSynthClassEdge() {
     assert(b != nil);
 }
 
+func testModuleOfArray() {
+    // Mangle.moduleOf(DerivedTypeDeclarer) 修复的数组场景回归：
+    // 数组元素是跨模块泛型 ma$A`ms$S`（定义模块 ma 不 import 实参模块 ms）时，
+    // 数组 mono 归属（Mangle.symbol(atd) → moduleOf(element)）修复前取
+    // 模板定义站点模块 test$ma，而元素本体归合成模块 Feng$test_ma$test_ms
+    // ——数组 owner 与元素 owner 错位 → ensureSynthetic(user=test$ma) 给真实
+    // 模块补指向合成模块的反向边，合成模块又 import ma+ms → 2 环 cyclic
+    // dependence。修复后数组 owner=合成模块（与元素一致），user==path 不自引。
+    var a = new([2]*?ma$A`ms$S`);
+    assert(a.length == 2);
+    assert(a[0] == nil);
+    assert(a[1] == nil);
+}
+
 func testSynthFuncDedup() {
     // 函数场景：makeF`ms$S` 被 ua/ub 双模块引用，必须只在合成模块定义一次
     var b = ua$callMakeF();
@@ -69,6 +86,7 @@ func main(args [&#][*?#]byte) {
     testDedup();
     testTypeShare();
     testSynthClassEdge();
+    testModuleOfArray();
     testSynthFuncDedup();
     testSynthIfaceMeta();
 }
