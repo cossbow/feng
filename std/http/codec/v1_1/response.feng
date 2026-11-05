@@ -52,3 +52,80 @@ func serializeResponse(r *Response) string$String {
     var out = sb.build();
     return out;
 }
+
+// 增量解析响应：状态行 + 头部 + Content-Length 定界的 body（对称 parseRequestHead）。
+// 返回 (resp, state)（ParseState 定义于 request.feng）：
+//   OK        → 状态行 + 头完整，body 已按 Content-Length 到齐（或本就无体），resp 非 nil；
+//   NeedMore  → 状态行/头尚未完整（未到空行）或 body 未到齐，调用方继续累积；
+//   BadRequest→ 状态行非 3 段 / 版本未知 / 状态码非数字 / 头字段非法；
+//   TooLarge  → 头部累计超过 MAX_HEAD_BYTES 或头部条数超 MAX_HEADERS。
+// 无状态、可重入：每次对累积缓冲全量重扫（同 parseRequestHead）。
+export
+func parseResponseHead(data [&#]byte) (*?Response, ParseState) {
+    // 1. 状态行（HTTP/1.1 <code> <reason>）
+    var lineEnd = findCRLF(data, 0);
+    if (lineEnd < 0) {
+        if (data.length > MAX_HEAD_BYTES) { return (nil, ParseState.TooLarge); }
+        return (nil, ParseState.NeedMore);
+    }
+    var sp1 = -1;
+    var sp2 = -1;
+    for (var i = 0; i < lineEnd; i += 1) {
+        if (data[i] == 32) {
+            if (sp1 < 0) { sp1 = i; }
+            else if (sp2 < 0) { sp2 = i; break; }
+        }
+    }
+    if (sp1 <= 0 || sp2 < 0) { return (nil, ParseState.BadRequest); }
+    // 状态码段后不得再有空格（严格 3 段）
+    for (var i = sp2 + 1; i < lineEnd; i += 1) {
+        if (data[i] == 32) { return (nil, ParseState.BadRequest); }
+    }
+
+    var vr = parseVersion(sliceBytes(data, 0, sp1));
+    if (!vr.1) { return (nil, ParseState.BadRequest); }
+    // 状态码：3 位数字（允许前导空白由段切分保证）
+    var code = 0;
+    var codeBytes = sliceBytes(data, sp1 + 1, sp2);
+    if (codeBytes.length != 3) { return (nil, ParseState.BadRequest); }
+    for (var i = 0; i < 3; i += 1) {
+        var c = int(codeBytes[i]);
+        if (c < 48 || c > 57) { return (nil, ParseState.BadRequest); }
+        code = code * 10 + (c - 48);
+    }
+
+    var resp = new(Response);
+    resp.version = vr.0;
+    resp.statusCode = code;
+
+    // 2. 头部（直到空行）
+    var pos = lineEnd + 2;
+    var headBytes = lineEnd + 2;
+    var headCount = 0;
+    for (true) {
+        var e = findCRLF(data, pos);
+        if (e < 0) {
+            if (data.length > MAX_HEAD_BYTES) { return (nil, ParseState.TooLarge); }
+            return (nil, ParseState.NeedMore);
+        }
+        if (e == pos) { pos = e + 2; break; }   // 空行 = 头部结束
+        headBytes = e + 2;
+        if (headBytes > MAX_HEAD_BYTES) { return (nil, ParseState.TooLarge); }
+        headCount += 1;
+        if (headCount > MAX_HEADERS) { return (nil, ParseState.TooLarge); }
+        var hr = parseHeaderLine(sliceStr(data, pos, e));
+        if (!hr.2) { return (nil, ParseState.BadRequest); }
+        resp.headers.add(hr.0, hr.1);
+        pos = e + 2;
+    }
+
+    // 3. body（仅 Content-Length 定界）
+    var cl = contentLength(resp.headers);
+    if (cl == -2) { return (nil, ParseState.BadRequest); }
+    if (cl > 0) {
+        var need = pos + cl;
+        if (need > data.length) { return (nil, ParseState.NeedMore); }
+        resp.body = sliceBytes(data, pos, need);
+    }
+    return (resp, ParseState.OK);
+}
